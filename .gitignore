@@ -1,0 +1,12 @@
+frontend/.nuxt
+frontend/.output
+frontend/node_modules
+frontend/.data
+frontend/dist
+out
+dist
+.DS_Store
+*.log
+coverage
+/.vercel
+node_modules
