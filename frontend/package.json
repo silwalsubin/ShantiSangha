@@ -14,7 +14,9 @@
     "ci": "npm run build"
   },
   "dependencies": {
+    "@tailwindcss/vite": "^4.1.13",
     "nuxt": "3.12.4",
+    "tailwindcss": "^4.1.13",
     "vue": "3.4.31",
     "vue-router": "4.4.0"
   }

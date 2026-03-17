@@ -1,8 +1,13 @@
+import tailwindcss from "@tailwindcss/vite";
+
 export default defineNuxtConfig({
   compatibilityDate: "2026-03-16",
   ssr: false,
   devtools: { enabled: true },
-  css: ["~/assets/css/main.css"],
+  css: ["~/assets/css/tailwind.css"],
+  vite: {
+    plugins: [tailwindcss()],
+  },
   app: {
     head: {
       title: "ShantiSangha",
