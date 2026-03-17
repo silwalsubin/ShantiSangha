@@ -9,7 +9,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: ${{ secrets.VERCEL_TOKEN != '' && secrets.VERCEL_ORG_ID != '' && secrets.VERCEL_PROJECT_ID != '' }}
 
     defaults:
       run:
@@ -28,6 +27,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Verify Vercel secrets
+        run: |
+          test -n "${{ secrets.VERCEL_TOKEN }}"
+          test -n "${{ secrets.VERCEL_ORG_ID }}"
+          test -n "${{ secrets.VERCEL_PROJECT_ID }}"
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
