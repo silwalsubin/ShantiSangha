@@ -117,34 +117,6 @@ try
             opts.Authority = appConfig.ClerkAuthority;
             opts.TokenValidationParameters.ValidateAudience = false;
             opts.MapInboundClaims = false;
-            opts.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
-            {
-                OnAuthenticationFailed = context =>
-                {
-                    Log.Warning("JWT auth failed: {Error} | Authority: {Authority}",
-                        context.Exception.Message, appConfig.ClerkAuthority);
-                    return Task.CompletedTask;
-                },
-                OnMessageReceived = context =>
-                {
-                    var hasAuth = context.Request.Headers.ContainsKey("Authorization");
-                    var authHeader = context.Request.Headers["Authorization"].FirstOrDefault() ?? "(none)";
-                    Log.Information("JWT OnMessageReceived: HasAuth={HasAuth}, Header={Header}",
-                        hasAuth, authHeader.Length > 20 ? authHeader[..20] + "..." : authHeader);
-                    return Task.CompletedTask;
-                },
-                OnTokenValidated = context =>
-                {
-                    Log.Information("JWT token VALIDATED for {Sub}", context.Principal?.FindFirst("sub")?.Value);
-                    return Task.CompletedTask;
-                },
-                OnChallenge = context =>
-                {
-                    Log.Warning("JWT Challenge: Error={Error} Desc={ErrorDescription} AuthFailure={Failure}",
-                        context.Error, context.ErrorDescription, context.AuthenticateFailure?.Message);
-                    return Task.CompletedTask;
-                }
-            };
         });
     builder.Services.AddAuthorization();
 
