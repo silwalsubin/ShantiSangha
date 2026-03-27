@@ -5,8 +5,15 @@ export function useApi() {
   const base = import.meta.env.VITE_API_BASE_URL || '/api'
 
   async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const token = await getToken()
-    const res = await fetch(`${base}${path}`, {
+    const url = `${base}${path}`
+    console.log(`[API] ${method} ${url}`)
+    let token: string | null = null
+    try {
+      token = await getToken()
+    } catch (e) {
+      console.error('[API] getToken() failed:', e)
+    }
+    const res = await fetch(url, {
       method,
       headers: {
         'Content-Type': 'application/json',

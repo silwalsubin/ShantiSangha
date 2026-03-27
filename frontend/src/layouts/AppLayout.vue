@@ -4,7 +4,10 @@ import { UserButton } from '@clerk/vue'
 
 const route = useRoute()
 
-const buildTime = import.meta.env.VITE_BUILD_TIME || 'dev'
+const rawBuildTime = import.meta.env.VITE_BUILD_TIME || ''
+const buildTime = rawBuildTime
+  ? new Date(rawBuildTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+  : 'dev'
 
 const navItems = [
   { icon: '🏠', label: 'Dashboard', href: '/app/dashboard' },
