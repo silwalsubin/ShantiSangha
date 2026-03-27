@@ -5,9 +5,9 @@ import { watch } from 'vue'
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', component: () => import('@/pages/index.vue') },
-    { path: '/login', component: () => import('@/pages/login.vue') },
-    { path: '/signup', component: () => import('@/pages/signup.vue') },
+    { path: '/', redirect: '/app/dashboard' },
+    { path: '/login', component: () => import('@/pages/login.vue'), meta: { guestOnly: true } },
+    { path: '/signup', component: () => import('@/pages/signup.vue'), meta: { guestOnly: true } },
     {
       path: '/app',
       component: () => import('@/layouts/AppLayout.vue'),
@@ -30,7 +30,6 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
-  if (!to.meta.requiresAuth) return true
   const { isSignedIn, isLoaded } = useAuth()
   // Wait for Clerk to initialize
   if (!isLoaded.value) {
@@ -38,7 +37,10 @@ router.beforeEach(async (to) => {
       const unwatch = watch(isLoaded, (val) => { if (val) { unwatch(); resolve() } })
     })
   }
-  if (!isSignedIn.value) return '/login'
+  // Redirect authenticated users away from login/signup
+  if (to.meta.guestOnly && isSignedIn.value) return '/app/dashboard'
+  // Redirect unauthenticated users to login
+  if (to.meta.requiresAuth && !isSignedIn.value) return '/login'
 })
 
 export default router
