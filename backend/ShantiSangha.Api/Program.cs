@@ -119,6 +119,13 @@ try
 
     var app = builder.Build();
 
+    // Run pending EF Core migrations on startup (safe to run on every deploy)
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await db.Database.MigrateAsync();
+    }
+
     app.UseSerilogRequestLogging();
 
     if (app.Environment.IsDevelopment())
