@@ -32,4 +32,4 @@ jobs:
         working-directory: backend
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: railway up --service shantisangha-api --detach
+        run: railway up --project 0f180e64-f1f9-4af6-9915-fed778630f0c --service shantisangha-api --environment production --detach
