@@ -18,6 +18,9 @@ RUN dotnet publish ShantiSangha.Api/ShantiSangha.Api.csproj \
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 
+# Install curl for ECS health checks
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
 # Non-root user for security
 RUN adduser --disabled-password --gecos "" appuser && chown -R appuser /app
 USER appuser
