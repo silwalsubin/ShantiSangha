@@ -76,6 +76,12 @@ variable "openai_api_key" {
   sensitive   = true
 }
 
+variable "domain_name" {
+  description = "Custom domain name for frontend (e.g. shantisangha.org)"
+  type        = string
+  default     = "shantisangha.org"
+}
+
 variable "langfuse_public_key" {
   description = "Langfuse public key (optional, leave empty to disable)"
   type        = string
