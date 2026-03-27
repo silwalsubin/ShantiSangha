@@ -35,6 +35,7 @@ jobs:
         env:
           VITE_API_BASE_URL: /api
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+          VITE_BUILD_TIME: ${{ github.event.head_commit.timestamp || github.event.repository.updated_at }}
         run: npm run build
 
       - name: Configure AWS credentials

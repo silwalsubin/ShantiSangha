@@ -4,6 +4,8 @@ import { UserButton } from '@clerk/vue'
 
 const route = useRoute()
 
+const buildTime = import.meta.env.VITE_BUILD_TIME || 'dev'
+
 const navItems = [
   { icon: '🏠', label: 'Dashboard', href: '/app/dashboard' },
   { icon: '💬', label: 'Chat', href: '/app/chat' },
@@ -51,6 +53,11 @@ function isActive(href: string) {
       <!-- User -->
       <div class="border-t border-[rgba(101,76,52,0.1)] px-4 py-4">
         <UserButton />
+      </div>
+
+      <!-- Build info -->
+      <div class="border-t border-[rgba(101,76,52,0.08)] px-4 py-2 text-[10px] text-[#a89a8c]">
+        &copy; ShantiSangha {{ buildTime }}
       </div>
     </aside>
 
