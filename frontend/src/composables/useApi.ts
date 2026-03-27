@@ -5,15 +5,8 @@ export function useApi() {
   const base = import.meta.env.VITE_API_BASE_URL || '/api'
 
   async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const url = `${base}${path}`
-    console.log(`[API] ${method} ${url}`)
-    let token: string | null = null
-    try {
-      token = await getToken()
-    } catch (e) {
-      console.error('[API] getToken() failed:', e)
-    }
-    const res = await fetch(url, {
+    const token = await getToken.value()
+    const res = await fetch(`${base}${path}`, {
       method,
       headers: {
         'Content-Type': 'application/json',
@@ -32,6 +25,6 @@ export function useApi() {
     patch: <T>(path: string, body: unknown) => request<T>('PATCH', path, body),
     delete: <T>(path: string) => request<T>('DELETE', path),
     base,
-    getToken,
+    getToken: () => getToken.value(),
   }
 }
