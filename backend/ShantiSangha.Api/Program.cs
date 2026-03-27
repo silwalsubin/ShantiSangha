@@ -65,6 +65,9 @@ try
     app.MapWebhookRoutes();
     app.MapUserRoutes();
     app.MapConversationRoutes();
+    app.MapJournalRoutes();
+    app.MapMoodRoutes();
+    app.MapCopingRoutes();
 
     app.Run();
 }
