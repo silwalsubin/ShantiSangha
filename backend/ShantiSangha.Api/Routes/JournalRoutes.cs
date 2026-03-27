@@ -1,7 +1,9 @@
 using System.Security.Claims;
+using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using ShantiSangha.Core.Models;
 using ShantiSangha.Infrastructure.Data;
+using ShantiSangha.Infrastructure.Jobs;
 
 namespace ShantiSangha.Api.Routes;
 
@@ -41,6 +43,7 @@ public static class JournalRoutes
 
     private static async Task<IResult> CreateJournal(
         ClaimsPrincipal principal, AppDbContext db,
+        IBackgroundJobClient jobs,
         CreateJournalRequest body)
     {
         var user = await GetUserAsync(principal, db);
@@ -58,6 +61,12 @@ public static class JournalRoutes
 
         db.Journals.Add(journal);
         await db.SaveChangesAsync();
+
+        // Enqueue embedding + summary + insight extraction
+        jobs.Enqueue<GenerateEmbeddingJob>(j => j.RunForJournalAsync(journal.Id));
+        var summaryJobId = jobs.Enqueue<GenerateSummaryJob>(j => j.RunForJournalAsync(journal.Id, user.Id));
+        jobs.ContinueJobWith<ExtractInsightsJob>(summaryJobId, j =>
+            j.RunAsync(journal.Id, SummarySourceType.Journal, user.Id));
 
         return Results.Created($"/journals/{journal.Id}", new { journal.Id, journal.Title, journal.CreatedAt });
     }

@@ -1,9 +1,11 @@
 using System.Security.Claims;
 using System.Text;
+using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using ShantiSangha.Core.Models;
 using ShantiSangha.Core.Services;
 using ShantiSangha.Infrastructure.Data;
+using ShantiSangha.Infrastructure.Jobs;
 
 namespace ShantiSangha.Api.Routes;
 
@@ -113,6 +115,7 @@ public static class ConversationRoutes
         ClaimsPrincipal principal,
         AppDbContext db,
         IChatService chatService,
+        IBackgroundJobClient jobs,
         HttpContext httpContext,
         SendMessageRequest body,
         CancellationToken cancellationToken)
@@ -148,6 +151,29 @@ public static class ConversationRoutes
 
         await httpContext.Response.WriteAsync("data: [DONE]\n\n", Encoding.UTF8, cancellationToken);
         await httpContext.Response.Body.FlushAsync(cancellationToken);
+
+        // Enqueue background jobs — generate embeddings for the two new messages,
+        // then summarise and extract insights once there are enough messages
+        var messageCount = await db.Messages.CountAsync(m => m.ConversationId == id, CancellationToken.None);
+
+        var lastTwo = await db.Messages
+            .Where(m => m.ConversationId == id)
+            .OrderByDescending(m => m.CreatedAt)
+            .Take(2)
+            .Select(m => m.Id)
+            .ToListAsync(CancellationToken.None);
+
+        foreach (var msgId in lastTwo)
+            jobs.Enqueue<GenerateEmbeddingJob>(j => j.RunForMessageAsync(msgId));
+
+        // Generate summary every 10 messages
+        if (messageCount % 10 == 0)
+        {
+            var userId = (await db.Users.FirstOrDefaultAsync(u => u.ClerkId == principal.FindFirst("sub")!.Value, CancellationToken.None))!.Id;
+            var summaryJobId = jobs.Enqueue<GenerateSummaryJob>(j => j.RunForConversationAsync(id, userId));
+            jobs.ContinueJobWith<ExtractInsightsJob>(summaryJobId, j =>
+                j.RunAsync(id, ShantiSangha.Core.Models.SummarySourceType.Conversation, userId));
+        }
     }
 
     private static async Task<User?> GetUserAsync(ClaimsPrincipal principal, AppDbContext db)

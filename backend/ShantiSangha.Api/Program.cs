@@ -1,3 +1,5 @@
+using Hangfire;
+using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.SemanticKernel;
@@ -7,6 +9,7 @@ using ShantiSangha.Api.Routes;
 using ShantiSangha.Core.Services;
 using ShantiSangha.Infrastructure.AI;
 using ShantiSangha.Infrastructure.Data;
+using ShantiSangha.Infrastructure.Jobs;
 using System.Net.Http.Headers;
 
 Log.Logger = new LoggerConfiguration()
@@ -40,13 +43,29 @@ try
             new AuthenticationHeaderValue("Bearer", appConfig.OpenAiApiKey);
     });
 
-    // Semantic Kernel + OpenAI
+    // Semantic Kernel + OpenAI (chat + embeddings)
+#pragma warning disable SKEXP0010
     builder.Services.AddKernel()
-        .AddOpenAIChatCompletion("gpt-4o", appConfig.OpenAiApiKey);
+        .AddOpenAIChatCompletion("gpt-4o", appConfig.OpenAiApiKey)
+        .AddOpenAIEmbeddingGenerator("text-embedding-3-small", appConfig.OpenAiApiKey);
+#pragma warning restore SKEXP0010
 
     // Safety + Chat services
     builder.Services.AddScoped<ISafetyService, SafetyService>();
     builder.Services.AddScoped<IChatService, ChatService>();
+
+    // Background job classes (Hangfire resolves these via DI)
+    builder.Services.AddScoped<GenerateSummaryJob>();
+    builder.Services.AddScoped<GenerateEmbeddingJob>();
+    builder.Services.AddScoped<ExtractInsightsJob>();
+
+    // Hangfire — PostgreSQL-backed job queue
+    builder.Services.AddHangfire(config => config
+        .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+        .UseSimpleAssemblyNameTypeSerializer()
+        .UseRecommendedSerializerSettings()
+        .UsePostgreSqlStorage(o => o.UseNpgsqlConnection(appConfig.DatabaseUrl)));
+    builder.Services.AddHangfireServer();
 
     // Auth — Clerk issues standard JWTs validated here
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -68,6 +87,8 @@ try
     {
         app.UseSwagger();
         app.UseSwaggerUI();
+        // Hangfire dashboard — dev only, no auth required in local
+        app.UseHangfireDashboard("/hangfire");
     }
 
     app.UseAuthentication();
