@@ -1,0 +1,102 @@
+name: Terraform
+
+on:
+  # Auto-plan on any infra change pushed to main
+  push:
+    branches:
+      - main
+    paths:
+      - 'infrastructure/terraform/**'
+      - '.github/workflows/terraform.yml'
+
+  # Manual trigger — choose plan or apply
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform action to run'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+
+env:
+  TF_STATE_BUCKET: shantisangha-terraform-state
+  TF_STATE_KEY: production/terraform.tfstate
+  AWS_REGION: us-east-1
+
+  # Sensitive Terraform variables from GitHub secrets
+  TF_VAR_db_password:          ${{ secrets.TF_VAR_DB_PASSWORD }}
+  TF_VAR_clerk_authority:      ${{ secrets.TF_VAR_CLERK_AUTHORITY }}
+  TF_VAR_clerk_webhook_secret: ${{ secrets.TF_VAR_CLERK_WEBHOOK_SECRET }}
+  TF_VAR_openai_api_key:       ${{ secrets.TF_VAR_OPENAI_API_KEY }}
+  TF_VAR_r2_account_id:        ${{ secrets.TF_VAR_R2_ACCOUNT_ID }}
+  TF_VAR_r2_access_key_id:     ${{ secrets.TF_VAR_R2_ACCESS_KEY_ID }}
+  TF_VAR_r2_secret_access_key: ${{ secrets.TF_VAR_R2_SECRET_ACCESS_KEY }}
+  TF_VAR_langfuse_secret_key:  ${{ secrets.TF_VAR_LANGFUSE_SECRET_KEY }}
+
+jobs:
+  terraform:
+    name: Terraform ${{ github.event.inputs.action || 'plan' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infrastructure/terraform
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Bootstrap S3 state bucket (idempotent)
+        run: |
+          if ! aws s3api head-bucket --bucket $TF_STATE_BUCKET 2>/dev/null; then
+            echo "Creating state bucket: $TF_STATE_BUCKET"
+            aws s3api create-bucket \
+              --bucket $TF_STATE_BUCKET \
+              --region $AWS_REGION
+            aws s3api put-bucket-versioning \
+              --bucket $TF_STATE_BUCKET \
+              --versioning-configuration Status=Enabled
+            aws s3api put-bucket-encryption \
+              --bucket $TF_STATE_BUCKET \
+              --server-side-encryption-configuration \
+              '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+            aws s3api put-public-access-block \
+              --bucket $TF_STATE_BUCKET \
+              --public-access-block-configuration \
+              "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+            echo "State bucket created."
+          else
+            echo "State bucket already exists."
+          fi
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.9"
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="bucket=$TF_STATE_BUCKET" \
+            -backend-config="key=$TF_STATE_KEY" \
+            -backend-config="region=$AWS_REGION" \
+            -backend-config="encrypt=true"
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        if: github.event.inputs.action == 'apply'
+        run: terraform apply -auto-approve tfplan

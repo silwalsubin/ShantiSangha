@@ -7,14 +7,8 @@ terraform {
     }
   }
 
-  # Uncomment after creating the S3 bucket and DynamoDB table:
-  # backend "s3" {
-  #   bucket         = "shantisangha-terraform-state"
-  #   key            = "production/terraform.tfstate"
-  #   region         = "us-east-1"
-  #   dynamodb_table = "shantisangha-terraform-locks"
-  #   encrypt        = true
-  # }
+  # Backend config is passed via -backend-config flags in CI (see .github/workflows/terraform.yml)
+  backend "s3" {}
 }
 
 provider "aws" {
