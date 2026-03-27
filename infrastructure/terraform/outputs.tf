@@ -34,3 +34,18 @@ output "voice_bucket_name" {
   description = "S3 bucket for voice file uploads"
   value       = aws_s3_bucket.voice.bucket
 }
+
+output "cloudfront_domain" {
+  description = "CloudFront domain — point shantisangha.org CNAME here"
+  value       = aws_cloudfront_distribution.frontend.domain_name
+}
+
+output "cloudfront_distribution_id" {
+  description = "CloudFront distribution ID — used in GitHub Actions cache invalidation"
+  value       = aws_cloudfront_distribution.frontend.id
+}
+
+output "frontend_bucket_name" {
+  description = "S3 bucket for frontend files — used in GitHub Actions deploy"
+  value       = aws_s3_bucket.frontend.bucket
+}
