@@ -68,6 +68,14 @@ resource "aws_acm_certificate" "frontend" {
   }
 }
 
+# Waits for ACM certificate to be validated (you must add the DNS record in Cloudflare first)
+resource "aws_acm_certificate_validation" "frontend" {
+  certificate_arn = aws_acm_certificate.frontend.arn
+  timeouts {
+    create = "10m"
+  }
+}
+
 # CloudFront distribution
 
 resource "aws_cloudfront_distribution" "frontend" {
@@ -120,7 +128,7 @@ resource "aws_cloudfront_distribution" "frontend" {
   }
 
   viewer_certificate {
-    acm_certificate_arn      = aws_acm_certificate.frontend.arn
+    acm_certificate_arn      = aws_acm_certificate_validation.frontend.certificate_arn
     ssl_support_method       = "sni-only"
     minimum_protocol_version = "TLSv1.2_2021"
   }
