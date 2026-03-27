@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.SemanticKernel;
 using Serilog;
 using ShantiSangha.Api;
 using ShantiSangha.Api.Routes;
+using ShantiSangha.Core.Services;
+using ShantiSangha.Infrastructure.AI;
 using ShantiSangha.Infrastructure.Data;
 
 Log.Logger = new LoggerConfiguration()
@@ -28,6 +31,11 @@ try
     builder.Services.AddDbContext<AppDbContext>(opts =>
         opts.UseNpgsql(appConfig.DatabaseUrl, npgsql =>
             npgsql.UseVector()));
+
+    // Semantic Kernel + OpenAI
+    builder.Services.AddKernel()
+        .AddOpenAIChatCompletion("gpt-4o", appConfig.OpenAiApiKey);
+    builder.Services.AddScoped<IChatService, ChatService>();
 
     // Auth — Clerk issues standard JWTs validated here
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -56,6 +64,7 @@ try
 
     app.MapWebhookRoutes();
     app.MapUserRoutes();
+    app.MapConversationRoutes();
 
     app.Run();
 }
