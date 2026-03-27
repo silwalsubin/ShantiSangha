@@ -127,9 +127,15 @@ try
                         hasAuth, authHeader.Length > 20 ? authHeader[..20] + "..." : authHeader);
                     return Task.CompletedTask;
                 },
+                OnTokenValidated = context =>
+                {
+                    Log.Information("JWT token VALIDATED for {Sub}", context.Principal?.FindFirst("sub")?.Value);
+                    return Task.CompletedTask;
+                },
                 OnChallenge = context =>
                 {
-                    Log.Warning("JWT Challenge: {Error} {ErrorDescription}", context.Error, context.ErrorDescription);
+                    Log.Warning("JWT Challenge: Error={Error} Desc={ErrorDescription} AuthFailure={Failure}",
+                        context.Error, context.ErrorDescription, context.AuthenticateFailure?.Message);
                     return Task.CompletedTask;
                 }
             };
