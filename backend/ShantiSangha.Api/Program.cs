@@ -10,6 +10,7 @@ using ShantiSangha.Core.Services;
 using ShantiSangha.Infrastructure.AI;
 using ShantiSangha.Infrastructure.Data;
 using ShantiSangha.Infrastructure.Jobs;
+using ShantiSangha.Infrastructure.Storage;
 using System.Net.Http.Headers;
 
 Log.Logger = new LoggerConfiguration()
@@ -54,10 +55,19 @@ try
     builder.Services.AddScoped<ISafetyService, SafetyService>();
     builder.Services.AddScoped<IChatService, ChatService>();
 
+    // R2 / S3-compatible storage
+    builder.Services.AddSingleton(sp =>
+    {
+        var cfg = sp.GetRequiredService<AppConfig>();
+        var log = sp.GetRequiredService<ILogger<StorageService>>();
+        return new StorageService(cfg.R2ServiceUrl, cfg.R2AccessKeyId, cfg.R2SecretAccessKey, cfg.R2BucketName, log);
+    });
+
     // Background job classes (Hangfire resolves these via DI)
     builder.Services.AddScoped<GenerateSummaryJob>();
     builder.Services.AddScoped<GenerateEmbeddingJob>();
     builder.Services.AddScoped<ExtractInsightsJob>();
+    builder.Services.AddScoped<TranscribeVoiceJob>();
 
     // Hangfire — PostgreSQL-backed job queue
     builder.Services.AddHangfire(config => config
@@ -100,6 +110,7 @@ try
     app.MapJournalRoutes();
     app.MapMoodRoutes();
     app.MapCopingRoutes();
+    app.MapVoiceRoutes();
 
     app.Run();
 }
