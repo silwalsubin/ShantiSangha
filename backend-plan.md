@@ -28,8 +28,8 @@ The backend is built with **ASP.NET Core** (C#). It is hosted as a Docker contai
 | Logging | Serilog (structured JSON) |
 | AI Observability | Langfuse (HTTP API) |
 | App Observability | OpenTelemetry |
-| Hosting (MVP) | Railway (managed Postgres + Redis) |
-| Hosting (Growth) | Azure Container Apps + Azure Database for PostgreSQL |
+| Hosting | AWS ECS Fargate + RDS PostgreSQL + ElastiCache Redis |
+| IaC | Terraform (`infrastructure/terraform/`) |
 
 ---
 
@@ -189,20 +189,41 @@ message → moderation API → risk classifier → policy check → AI response 
 
 ## Deployment
 
-### MVP: Railway
+### AWS (ECS Fargate)
 
-- Deploy Docker container from `ShantiSangha.Api`
-- Railway-managed PostgreSQL and Redis
-- Environment variables for secrets
-- Deploy via git push or `railway up`
+All infrastructure is defined as code in `infrastructure/terraform/`.
 
-### Growth: Azure
+| Resource | AWS Service |
+|---|---|
+| Container runtime | ECS Fargate |
+| Container registry | ECR |
+| Database | RDS PostgreSQL 16 (pgvector built-in) |
+| Cache / job queue | ElastiCache Redis 7 |
+| Load balancer | Application Load Balancer |
+| Secrets | Secrets Manager |
+| Logs | CloudWatch Logs |
+| Networking | VPC with public (ECS, ALB) + private (RDS, Redis) subnets |
 
-- Azure Container Apps (autoscaling, managed ingress)
-- Azure Database for PostgreSQL (pgvector supported)
-- Azure Cache for Redis
-- Azure Blob Storage (R2-compatible migration)
-- Azure OpenAI Service (optional for compliance)
+**Deploy flow:**
+1. GitHub Actions builds Docker image, pushes to ECR with `git sha` tag
+2. `aws ecs update-service --force-new-deployment` pulls latest image
+3. ECS performs rolling deployment (50% min healthy)
+
+**First-time setup:**
+```bash
+cd infrastructure/terraform
+cp ../terraform.tfvars.example terraform.tfvars
+# fill in terraform.tfvars
+terraform init
+terraform apply
+```
+
+### Scaling path
+
+- Increase `desired_count` for horizontal scale
+- Upgrade `db_instance_class` / `node_type` for DB scale
+- Add HTTPS listener to ALB with ACM certificate
+- Enable RDS Multi-AZ for high availability
 
 ---
 
@@ -219,49 +240,51 @@ message → moderation API → risk classifier → policy check → AI response 
 - [x] Wire environment config with validation
 
 ### Week 3–4: Conversations and Chat
-- [ ] Implement conversation CRUD endpoints
-- [ ] Implement message persistence
-- [ ] Integrate Semantic Kernel with OpenAI
-- [ ] Implement SSE streaming for chat responses
-- [ ] Build layered memory context builder (recent messages + summaries + insights)
-- [ ] Write system prompt and persona configuration
+- [x] Implement conversation CRUD endpoints
+- [x] Implement message persistence
+- [x] Integrate Semantic Kernel with OpenAI
+- [x] Implement SSE streaming for chat responses
+- [x] Build layered memory context builder (recent messages + summaries + insights)
+- [x] Write system prompt and persona configuration
 
 ### Week 5: Journals, Moods, Coping
-- [ ] Implement journal CRUD endpoints
-- [ ] Implement mood check-in endpoints and trends aggregation
-- [ ] Implement coping exercise catalog and session logging
+- [x] Implement journal CRUD endpoints
+- [x] Implement mood check-in endpoints and trends aggregation
+- [x] Implement coping exercise catalog and session logging
 
 ### Week 6: Safety Pipeline
-- [ ] Integrate OpenAI moderation API as request middleware
-- [ ] Build risk classifier for self-harm and crisis patterns
-- [ ] Implement safety escalation flow with support resource responses
-- [ ] Implement response-level safety review before delivery
-- [ ] Set up `safety_events` logging
+- [x] Integrate OpenAI moderation API as request middleware
+- [x] Build risk classifier for self-harm and crisis patterns
+- [x] Implement safety escalation flow with support resource responses
+- [x] Implement response-level safety review before delivery
+- [x] Set up `safety_events` logging
 
 ### Week 7: Background Jobs
-- [ ] Set up Hangfire with PostgreSQL storage
-- [ ] Implement `GenerateSummary` job
-- [ ] Implement `GenerateEmbedding` job
-- [ ] Implement `ExtractInsights` job
-- [ ] Wire job dispatch from API endpoints
+- [x] Set up Hangfire with PostgreSQL storage
+- [x] Implement `GenerateSummary` job
+- [x] Implement `GenerateEmbedding` job
+- [x] Implement `ExtractInsights` job
+- [x] Wire job dispatch from API endpoints
 
 ### Week 8: Voice
-- [ ] Set up Cloudflare R2 bucket
-- [ ] Implement presigned upload URL endpoint
-- [ ] Implement voice entry creation after upload
-- [ ] Implement `TranscribeVoice` job using Whisper API
-- [ ] Wire transcript back to journal draft creation
+- [x] Set up Cloudflare R2 bucket
+- [x] Implement presigned upload URL endpoint
+- [x] Implement voice entry creation after upload
+- [x] Implement `TranscribeVoice` job using Whisper API
+- [x] Wire transcript back to journal draft creation
 
 ### Week 9: Semantic Search
-- [ ] Implement pgvector similarity search queries
-- [ ] Use embeddings to surface relevant past insights in chat context
-- [ ] Add semantic search endpoint for insights and journals
+- [x] Implement pgvector similarity search queries
+- [x] Use embeddings to surface relevant past insights in chat context
+- [x] Add semantic search endpoint for insights and journals
 
 ### Week 10: Observability and Deploy
-- [ ] Wire Langfuse for AI call tracing
-- [ ] Set up OpenTelemetry for request tracing
-- [ ] Write Dockerfile for `ShantiSangha.Api`
-- [ ] Configure Railway project with managed Postgres and Redis
-- [ ] Set up environment variables and secrets
+- [x] Wire Langfuse for AI call tracing
+- [x] Set up OpenTelemetry for request tracing
+- [x] Write Dockerfile for `ShantiSangha.Api`
+- [x] Write Terraform IaC for AWS (ECS Fargate, RDS, ElastiCache, ALB, ECR, Secrets Manager)
+- [x] Add CI/CD workflow for backend (build + push to ECR + ECS deploy on push)
+- [ ] Create AWS account and IAM deploy user, add `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` to GitHub secrets
+- [ ] Run `terraform apply` to provision infrastructure
+- [ ] Run EF Core migration against RDS (`dotnet ef database update`)
 - [ ] Deploy and smoke test all endpoints
-- [ ] Add CI/CD workflow for backend (build + deploy on push)
