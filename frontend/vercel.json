@@ -1,6 +1,3 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "nuxtjs",
-  "buildCommand": "npm run generate",
-  "outputDirectory": ".output/public"
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }

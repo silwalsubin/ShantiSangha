@@ -12,8 +12,7 @@ RUN dotnet restore
 COPY . .
 RUN dotnet publish ShantiSangha.Api/ShantiSangha.Api.csproj \
     -c Release \
-    -o /app/publish \
-    --no-restore
+    -o /app/publish
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
