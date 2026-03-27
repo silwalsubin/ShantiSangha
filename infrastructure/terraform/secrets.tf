@@ -11,6 +11,21 @@ locals {
   langfuse_enabled = nonsensitive(var.langfuse_secret_key != "")
 }
 
+# Auto-generated database password — no manual management needed
+resource "random_password" "db" {
+  length  = 32
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "database_url" {
+  name = "${var.app_name}/database_url"
+}
+
+resource "aws_secretsmanager_secret_version" "database_url" {
+  secret_id     = aws_secretsmanager_secret.database_url.id
+  secret_string = "Host=${aws_db_instance.postgres.address};Port=5432;Database=shantisangha;Username=${var.db_username};Password=${random_password.db.result}"
+}
+
 # Required secrets
 
 resource "aws_secretsmanager_secret" "app" {

@@ -3,9 +3,6 @@ data "aws_caller_identity" "current" {}
 locals {
   account_id = data.aws_caller_identity.current.account_id
 
-  # Npgsql connection string built from RDS outputs
-  database_url = "Host=${aws_db_instance.postgres.address};Port=5432;Database=shantisangha;Username=${var.db_username};Password=${var.db_password}"
-
   # Redis URL from ElastiCache
   redis_url = "${aws_elasticache_cluster.redis.cache_nodes[0].address}:${aws_elasticache_cluster.redis.cache_nodes[0].port}"
 }
@@ -141,7 +138,6 @@ resource "aws_ecs_task_definition" "api" {
     }]
 
     environment = [
-      { name = "DATABASE_URL",           value = local.database_url },
       { name = "REDIS_URL",              value = local.redis_url },
       { name = "VOICE_BUCKET_NAME",      value = aws_s3_bucket.voice.bucket },
       { name = "AWS_REGION",             value = var.aws_region },
@@ -152,6 +148,10 @@ resource "aws_ecs_task_definition" "api" {
     ]
 
     secrets = [
+      {
+        name      = "DATABASE_URL"
+        valueFrom = aws_secretsmanager_secret.database_url.arn
+      },
       {
         name      = "CLERK_AUTHORITY"
         valueFrom = aws_secretsmanager_secret.app["clerk_authority"].arn

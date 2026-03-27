@@ -17,7 +17,7 @@ resource "aws_db_instance" "postgres" {
 
   db_name  = "shantisangha"
   username = var.db_username
-  password = var.db_password
+  password = random_password.db.result
 
   db_subnet_group_name   = aws_db_subnet_group.postgres.name
   vpc_security_group_ids = [aws_security_group.rds.id]

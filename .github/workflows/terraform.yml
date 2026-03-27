@@ -27,7 +27,6 @@ env:
   AWS_REGION: us-east-1
 
   # Sensitive Terraform variables from GitHub secrets
-  TF_VAR_db_password:          ${{ secrets.TF_VAR_DB_PASSWORD }}
   TF_VAR_clerk_authority:      ${{ secrets.TF_VAR_CLERK_AUTHORITY }}
   TF_VAR_clerk_webhook_secret: ${{ secrets.TF_VAR_CLERK_WEBHOOK_SECRET }}
   TF_VAR_openai_api_key:       ${{ secrets.TF_VAR_OPENAI_API_KEY }}
