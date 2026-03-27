@@ -51,8 +51,9 @@ try
         .AddOpenAIEmbeddingGenerator("text-embedding-3-small", appConfig.OpenAiApiKey);
 #pragma warning restore SKEXP0010
 
-    // Safety + Chat services
+    // Safety + Chat + Semantic Search services
     builder.Services.AddScoped<ISafetyService, SafetyService>();
+    builder.Services.AddScoped<ISemanticSearchService, SemanticSearchService>();
     builder.Services.AddScoped<IChatService, ChatService>();
 
     // R2 / S3-compatible storage
@@ -111,6 +112,7 @@ try
     app.MapMoodRoutes();
     app.MapCopingRoutes();
     app.MapVoiceRoutes();
+    app.MapSearchRoutes();
 
     app.Run();
 }

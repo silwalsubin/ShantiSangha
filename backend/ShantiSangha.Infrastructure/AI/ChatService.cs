@@ -13,6 +13,7 @@ public class ChatService(
     AppDbContext db,
     Kernel kernel,
     ISafetyService safety,
+    ISemanticSearchService semanticSearch,
     ILogger<ChatService> logger) : IChatService
 {
     private const int RecentMessageCount = 20;
@@ -61,7 +62,7 @@ public class ChatService(
         await db.SaveChangesAsync(cancellationToken);
 
         // --- Step 3: Build context and stream AI response ---
-        var chatHistory = await BuildChatHistoryAsync(userId, conversationId, cancellationToken);
+        var chatHistory = await BuildChatHistoryAsync(userId, conversationId, cancellationToken, userMessage);
         var chatCompletion = kernel.GetRequiredService<IChatCompletionService>();
         var responseChunks = new List<string>();
 
@@ -118,7 +119,8 @@ public class ChatService(
     private async Task<ChatHistory> BuildChatHistoryAsync(
         Guid userId,
         Guid conversationId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? currentMessage = null)
     {
         var profile = await db.Profiles
             .FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
@@ -130,12 +132,34 @@ public class ChatService(
             .Select(s => s.Content)
             .ToListAsync(cancellationToken);
 
-        var insights = await db.SavedInsights
-            .Where(i => i.UserId == userId)
-            .OrderByDescending(i => i.CreatedAt)
-            .Take(InsightCount)
-            .Select(i => i.Content)
-            .ToListAsync(cancellationToken);
+        // Use semantic search when we have a message to query with, otherwise fall back to recency
+        List<string> insights;
+        if (!string.IsNullOrWhiteSpace(currentMessage))
+        {
+            var semanticInsights = await semanticSearch.SearchInsightsAsync(
+                userId, currentMessage, InsightCount, cancellationToken);
+            insights = semanticInsights.Select(r => r.Content).ToList();
+
+            // If no embeddings exist yet (early user), fall back to recency
+            if (insights.Count == 0)
+            {
+                insights = await db.SavedInsights
+                    .Where(i => i.UserId == userId)
+                    .OrderByDescending(i => i.CreatedAt)
+                    .Take(InsightCount)
+                    .Select(i => i.Content)
+                    .ToListAsync(cancellationToken);
+            }
+        }
+        else
+        {
+            insights = await db.SavedInsights
+                .Where(i => i.UserId == userId)
+                .OrderByDescending(i => i.CreatedAt)
+                .Take(InsightCount)
+                .Select(i => i.Content)
+                .ToListAsync(cancellationToken);
+        }
 
         var recentMoods = await db.MoodCheckins
             .Where(m => m.UserId == userId && m.CreatedAt >= DateTime.UtcNow.AddDays(-7))
