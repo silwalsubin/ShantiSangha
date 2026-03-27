@@ -6,9 +6,6 @@ locals {
     clerk_authority      = var.clerk_authority
     clerk_webhook_secret = var.clerk_webhook_secret
     openai_api_key       = var.openai_api_key
-    r2_account_id        = var.r2_account_id
-    r2_access_key_id     = var.r2_access_key_id
-    r2_secret_access_key = var.r2_secret_access_key
     langfuse_secret_key  = var.langfuse_secret_key
   }
 }

@@ -31,9 +31,6 @@ env:
   TF_VAR_clerk_authority:      ${{ secrets.TF_VAR_CLERK_AUTHORITY }}
   TF_VAR_clerk_webhook_secret: ${{ secrets.TF_VAR_CLERK_WEBHOOK_SECRET }}
   TF_VAR_openai_api_key:       ${{ secrets.TF_VAR_OPENAI_API_KEY }}
-  TF_VAR_r2_account_id:        ${{ secrets.TF_VAR_R2_ACCOUNT_ID }}
-  TF_VAR_r2_access_key_id:     ${{ secrets.TF_VAR_R2_ACCESS_KEY_ID }}
-  TF_VAR_r2_secret_access_key: ${{ secrets.TF_VAR_R2_SECRET_ACCESS_KEY }}
   TF_VAR_langfuse_secret_key:  ${{ secrets.TF_VAR_LANGFUSE_SECRET_KEY }}
 
 jobs:

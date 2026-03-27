@@ -29,3 +29,8 @@ output "ecs_service_name" {
   description = "ECS service name — used in GitHub Actions deploy step"
   value       = aws_ecs_service.api.name
 }
+
+output "voice_bucket_name" {
+  description = "S3 bucket for voice file uploads"
+  value       = aws_s3_bucket.voice.bucket
+}

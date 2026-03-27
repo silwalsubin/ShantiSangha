@@ -72,12 +72,13 @@ try
     builder.Services.AddScoped<ISemanticSearchService, SemanticSearchService>();
     builder.Services.AddScoped<IChatService, ChatService>();
 
-    // R2 / S3-compatible storage
+    // AWS S3 voice storage — credentials come from ECS task role (no keys needed)
     builder.Services.AddSingleton(sp =>
     {
         var cfg = sp.GetRequiredService<AppConfig>();
         var log = sp.GetRequiredService<ILogger<StorageService>>();
-        return new StorageService(cfg.R2ServiceUrl, cfg.R2AccessKeyId, cfg.R2SecretAccessKey, cfg.R2BucketName, log);
+        var region = builder.Configuration["AWS_REGION"] ?? "us-east-1";
+        return new StorageService(cfg.VoiceBucketName, region, log);
     });
 
     // Background job classes (Hangfire resolves these via DI)

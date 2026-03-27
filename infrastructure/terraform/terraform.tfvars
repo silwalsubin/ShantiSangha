@@ -20,7 +20,11 @@ clerk_authority      = "https://grown-impala-35.clerk.accounts.dev"
 clerk_webhook_secret = "whsec_YOUR_CLERK_WEBHOOK_SECRET"
 openai_api_key       = "sk-proj-YOUR_OPENAI_KEY"
 
-# Voice storage is AWS S3 — bucket is created by Terraform, no extra config needed.
+# Cloudflare R2 (voice storage)
+r2_account_id        = "YOUR_R2_ACCOUNT_ID"
+r2_access_key_id     = "YOUR_R2_ACCESS_KEY_ID"
+r2_secret_access_key = "YOUR_R2_SECRET_ACCESS_KEY"
+r2_bucket_name       = "shantisangha-voice"
 
 # Langfuse (optional — leave empty to disable)
 langfuse_public_key = ""

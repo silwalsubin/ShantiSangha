@@ -141,11 +141,12 @@ resource "aws_ecs_task_definition" "api" {
     }]
 
     environment = [
-      { name = "DATABASE_URL",        value = local.database_url },
-      { name = "REDIS_URL",           value = local.redis_url },
-      { name = "R2_BUCKET_NAME",      value = var.r2_bucket_name },
-      { name = "LANGFUSE_BASE_URL",   value = "https://cloud.langfuse.com" },
-      { name = "LANGFUSE_PUBLIC_KEY", value = var.langfuse_public_key },
+      { name = "DATABASE_URL",           value = local.database_url },
+      { name = "REDIS_URL",              value = local.redis_url },
+      { name = "VOICE_BUCKET_NAME",      value = aws_s3_bucket.voice.bucket },
+      { name = "AWS_REGION",             value = var.aws_region },
+      { name = "LANGFUSE_BASE_URL",      value = "https://cloud.langfuse.com" },
+      { name = "LANGFUSE_PUBLIC_KEY",    value = var.langfuse_public_key },
       { name = "ASPNETCORE_ENVIRONMENT", value = "Production" }
     ]
 
@@ -161,18 +162,6 @@ resource "aws_ecs_task_definition" "api" {
       {
         name      = "OPENAI_API_KEY"
         valueFrom = aws_secretsmanager_secret.app["openai_api_key"].arn
-      },
-      {
-        name      = "R2_ACCOUNT_ID"
-        valueFrom = aws_secretsmanager_secret.app["r2_account_id"].arn
-      },
-      {
-        name      = "R2_ACCESS_KEY_ID"
-        valueFrom = aws_secretsmanager_secret.app["r2_access_key_id"].arn
-      },
-      {
-        name      = "R2_SECRET_ACCESS_KEY"
-        valueFrom = aws_secretsmanager_secret.app["r2_secret_access_key"].arn
       }
     ]
 

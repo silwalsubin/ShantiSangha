@@ -1,5 +1,4 @@
 using Amazon;
-using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Microsoft.Extensions.Logging;
@@ -12,18 +11,13 @@ public class StorageService : IDisposable
     private readonly string _bucket;
     private readonly ILogger<StorageService> _logger;
 
-    public StorageService(string serviceUrl, string accessKeyId, string secretAccessKey, string bucket, ILogger<StorageService> logger)
+    public StorageService(string bucket, string awsRegion, ILogger<StorageService> logger)
     {
         _bucket = bucket;
         _logger = logger;
-        _client = new AmazonS3Client(
-            new BasicAWSCredentials(accessKeyId, secretAccessKey),
-            new AmazonS3Config
-            {
-                ServiceURL = serviceUrl,
-                ForcePathStyle = true,   // Required for R2
-                AuthenticationRegion = "auto"
-            });
+        // On ECS Fargate the task role credentials are picked up automatically.
+        // Locally, the default credential chain (env vars / ~/.aws) is used.
+        _client = new AmazonS3Client(RegionEndpoint.GetBySystemName(awsRegion));
     }
 
     /// <summary>Generate a presigned PUT URL the client uploads to directly.</summary>

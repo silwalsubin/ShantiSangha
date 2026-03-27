@@ -13,5 +13,4 @@ desired_count = 1
 db_username       = "shantisangha"
 db_instance_class = "db.t3.micro"
 
-r2_bucket_name      = "shantisangha-voice"
 langfuse_public_key = ""

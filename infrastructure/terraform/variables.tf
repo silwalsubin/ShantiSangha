@@ -76,33 +76,6 @@ variable "openai_api_key" {
   sensitive   = true
 }
 
-variable "r2_account_id" {
-  description = "Cloudflare R2 account ID"
-  type        = string
-  sensitive   = true
-  default     = "placeholder"
-}
-
-variable "r2_access_key_id" {
-  description = "Cloudflare R2 access key ID"
-  type        = string
-  sensitive   = true
-  default     = "placeholder"
-}
-
-variable "r2_secret_access_key" {
-  description = "Cloudflare R2 secret access key"
-  type        = string
-  sensitive   = true
-  default     = "placeholder"
-}
-
-variable "r2_bucket_name" {
-  description = "Cloudflare R2 bucket name"
-  type        = string
-  default     = "shantisangha-voice"
-}
-
 variable "langfuse_public_key" {
   description = "Langfuse public key (optional, leave empty to disable)"
   type        = string
