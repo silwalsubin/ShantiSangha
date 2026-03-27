@@ -1,7 +1,7 @@
-using System.Security.Claims;
 using System.Text;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
+using ShantiSangha.Api.Services;
 using ShantiSangha.Core.Models;
 using ShantiSangha.Core.Services;
 using ShantiSangha.Infrastructure.Data;
@@ -23,9 +23,9 @@ public static class ConversationRoutes
     }
 
     private static async Task<IResult> ListConversations(
-        ClaimsPrincipal principal, AppDbContext db)
+        ICurrentUser currentUser, AppDbContext db)
     {
-        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
+        var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
 
         var conversations = await db.Conversations
@@ -49,9 +49,9 @@ public static class ConversationRoutes
     }
 
     private static async Task<IResult> CreateConversation(
-        ClaimsPrincipal principal, AppDbContext db)
+        ICurrentUser currentUser, AppDbContext db)
     {
-        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
+        var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
 
         var conversation = new Conversation
@@ -69,9 +69,9 @@ public static class ConversationRoutes
     }
 
     private static async Task<IResult> GetConversation(
-        Guid id, ClaimsPrincipal principal, AppDbContext db)
+        Guid id, ICurrentUser currentUser, AppDbContext db)
     {
-        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
+        var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
 
         var conversation = await db.Conversations
@@ -94,9 +94,9 @@ public static class ConversationRoutes
     }
 
     private static async Task<IResult> DeleteConversation(
-        Guid id, ClaimsPrincipal principal, AppDbContext db)
+        Guid id, ICurrentUser currentUser, AppDbContext db)
     {
-        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
+        var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
 
         var conversation = await db.Conversations
@@ -112,7 +112,7 @@ public static class ConversationRoutes
 
     private static async Task SendMessage(
         Guid id,
-        ClaimsPrincipal principal,
+        ICurrentUser currentUser,
         AppDbContext db,
         IChatService chatService,
         IBackgroundJobClient jobs,
@@ -120,7 +120,7 @@ public static class ConversationRoutes
         SendMessageRequest body,
         CancellationToken cancellationToken)
     {
-        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
+        var user = await currentUser.GetAsync();
         if (user is null)
         {
             httpContext.Response.StatusCode = 401;
@@ -169,7 +169,7 @@ public static class ConversationRoutes
         // Generate summary every 10 messages
         if (messageCount % 10 == 0)
         {
-            var userId = (await db.Users.FirstOrDefaultAsync(u => u.ClerkId == principal.FindFirst("sub")!.Value, CancellationToken.None))!.Id;
+            var userId = user.Id;
             var summaryJobId = jobs.Enqueue<GenerateSummaryJob>(j => j.RunForConversationAsync(id, userId));
             jobs.ContinueJobWith<ExtractInsightsJob>(summaryJobId, j =>
                 j.RunAsync(id, ShantiSangha.Core.Models.SummarySourceType.Conversation, userId));

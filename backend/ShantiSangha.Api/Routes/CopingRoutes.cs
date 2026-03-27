@@ -1,5 +1,5 @@
-using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using ShantiSangha.Api.Services;
 using ShantiSangha.Core.Models;
 using ShantiSangha.Infrastructure.Data;
 
@@ -49,11 +49,11 @@ public static class CopingRoutes
 
     private static async Task<IResult> LogSession(
         string slug,
-        ClaimsPrincipal principal,
+        ICurrentUser currentUser,
         AppDbContext db,
         LogSessionRequest body)
     {
-        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
+        var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
 
         if (!Catalog.Any(e => e.Slug == slug))
@@ -77,10 +77,10 @@ public static class CopingRoutes
     }
 
     private static async Task<IResult> ListSessions(
-        ClaimsPrincipal principal, AppDbContext db,
+        ICurrentUser currentUser, AppDbContext db,
         int page = 1, int pageSize = 20)
     {
-        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
+        var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
 
         pageSize = Math.Clamp(pageSize, 1, 50);

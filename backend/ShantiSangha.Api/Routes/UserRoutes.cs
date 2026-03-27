@@ -1,5 +1,5 @@
-using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using ShantiSangha.Api.Services;
 using ShantiSangha.Infrastructure.Data;
 
 namespace ShantiSangha.Api.Routes;
@@ -14,9 +14,9 @@ public static class UserRoutes
         group.MapPatch("/", UpdateMe);
     }
 
-    private static async Task<IResult> GetMe(ClaimsPrincipal principal, AppDbContext db)
+    private static async Task<IResult> GetMe(ICurrentUser currentUser, AppDbContext db)
     {
-        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
+        var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
 
         await db.Entry(user).Reference(u => u.Profile).LoadAsync();
@@ -36,11 +36,11 @@ public static class UserRoutes
     }
 
     private static async Task<IResult> UpdateMe(
-        ClaimsPrincipal principal,
+        ICurrentUser currentUser,
         AppDbContext db,
         UpdateMeRequest body)
     {
-        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
+        var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
 
         await db.Entry(user).Reference(u => u.Profile).LoadAsync();

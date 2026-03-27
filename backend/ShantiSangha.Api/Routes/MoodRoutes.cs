@@ -1,5 +1,5 @@
-using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using ShantiSangha.Api.Services;
 using ShantiSangha.Core.Models;
 using ShantiSangha.Infrastructure.Data;
 
@@ -17,10 +17,10 @@ public static class MoodRoutes
     }
 
     private static async Task<IResult> CreateCheckin(
-        ClaimsPrincipal principal, AppDbContext db,
+        ICurrentUser currentUser, AppDbContext db,
         CreateMoodCheckinRequest body)
     {
-        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
+        var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
 
         if (body.Score is < 1 or > 10)
@@ -42,11 +42,11 @@ public static class MoodRoutes
     }
 
     private static async Task<IResult> ListCheckins(
-        ClaimsPrincipal principal, AppDbContext db,
+        ICurrentUser currentUser, AppDbContext db,
         DateTime? from = null, DateTime? to = null,
         int page = 1, int pageSize = 30)
     {
-        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
+        var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
 
         pageSize = Math.Clamp(pageSize, 1, 100);
@@ -65,10 +65,10 @@ public static class MoodRoutes
     }
 
     private static async Task<IResult> GetTrends(
-        ClaimsPrincipal principal, AppDbContext db,
+        ICurrentUser currentUser, AppDbContext db,
         DateTime? from = null, DateTime? to = null)
     {
-        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
+        var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
 
         var start = from ?? DateTime.UtcNow.AddDays(-30);

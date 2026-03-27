@@ -9,6 +9,7 @@ using OpenTelemetry.Trace;
 using Serilog;
 using ShantiSangha.Api;
 using ShantiSangha.Api.Routes;
+using ShantiSangha.Api.Services;
 using ShantiSangha.Core.Services;
 using ShantiSangha.Infrastructure.AI;
 using ShantiSangha.Infrastructure.Data;
@@ -71,6 +72,10 @@ try
     builder.Services.AddScoped<ISafetyService, SafetyService>();
     builder.Services.AddScoped<ISemanticSearchService, SemanticSearchService>();
     builder.Services.AddScoped<IChatService, ChatService>();
+
+    // Current user — scoped, lazily resolved once per request
+    builder.Services.AddHttpContextAccessor();
+    builder.Services.AddScoped<ICurrentUser, CurrentUserService>();
 
     // AWS S3 voice storage — credentials come from ECS task role (no keys needed)
     builder.Services.AddSingleton(sp =>

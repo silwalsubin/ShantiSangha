@@ -1,6 +1,6 @@
-using System.Security.Claims;
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
+using ShantiSangha.Api.Services;
 using ShantiSangha.Core.Models;
 using ShantiSangha.Infrastructure.Data;
 using ShantiSangha.Infrastructure.Jobs;
@@ -27,12 +27,12 @@ public static class VoiceRoutes
     /// Client uploads directly to R2, then calls POST /voice/entries.
     /// </summary>
     private static async Task<IResult> GetUploadUrl(
-        ClaimsPrincipal principal,
+        ICurrentUser currentUser,
         AppDbContext db,
         StorageService storage,
         GetUploadUrlRequest body)
     {
-        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
+        var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
 
         var ext = body.Extension.ToLower().TrimStart('.');
@@ -60,12 +60,12 @@ public static class VoiceRoutes
     /// and enqueue the transcription job.
     /// </summary>
     private static async Task<IResult> CreateEntry(
-        ClaimsPrincipal principal,
+        ICurrentUser currentUser,
         AppDbContext db,
         IBackgroundJobClient jobs,
         CreateVoiceEntryRequest body)
     {
-        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
+        var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
 
         if (string.IsNullOrWhiteSpace(body.ObjectKey))
@@ -91,10 +91,10 @@ public static class VoiceRoutes
     }
 
     private static async Task<IResult> ListEntries(
-        ClaimsPrincipal principal, AppDbContext db,
+        ICurrentUser currentUser, AppDbContext db,
         int page = 1, int pageSize = 20)
     {
-        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
+        var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
 
         pageSize = Math.Clamp(pageSize, 1, 50);
@@ -119,9 +119,9 @@ public static class VoiceRoutes
     }
 
     private static async Task<IResult> GetEntry(
-        Guid id, ClaimsPrincipal principal, AppDbContext db)
+        Guid id, ICurrentUser currentUser, AppDbContext db)
     {
-        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
+        var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
 
         var entry = await db.VoiceEntries

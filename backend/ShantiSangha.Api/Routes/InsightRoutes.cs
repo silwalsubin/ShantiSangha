@@ -1,5 +1,5 @@
-using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using ShantiSangha.Api.Services;
 using ShantiSangha.Infrastructure.Data;
 
 namespace ShantiSangha.Api.Routes;
@@ -15,10 +15,10 @@ public static class InsightRoutes
     }
 
     private static async Task<IResult> ListInsights(
-        ClaimsPrincipal principal, AppDbContext db,
+        ICurrentUser currentUser, AppDbContext db,
         int page = 1, int pageSize = 20)
     {
-        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
+        var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
 
         pageSize = Math.Clamp(pageSize, 1, 50);
@@ -35,9 +35,9 @@ public static class InsightRoutes
     }
 
     private static async Task<IResult> DeleteInsight(
-        Guid id, ClaimsPrincipal principal, AppDbContext db)
+        Guid id, ICurrentUser currentUser, AppDbContext db)
     {
-        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
+        var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
 
         var insight = await db.SavedInsights

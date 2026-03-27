@@ -1,5 +1,5 @@
-using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using ShantiSangha.Api.Services;
 using ShantiSangha.Core.Services;
 using ShantiSangha.Infrastructure.Data;
 
@@ -13,7 +13,7 @@ public static class SearchRoutes
     }
 
     private static async Task<IResult> Search(
-        ClaimsPrincipal principal,
+        ICurrentUser currentUser,
         AppDbContext db,
         ISemanticSearchService searchService,
         string q,
@@ -25,7 +25,7 @@ public static class SearchRoutes
 
         limit = Math.Clamp(limit, 1, 50);
 
-        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
+        var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
 
         var results = type.ToLower() switch
