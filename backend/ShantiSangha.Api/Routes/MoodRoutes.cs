@@ -7,7 +7,7 @@ namespace ShantiSangha.Api.Routes;
 
 public static class MoodRoutes
 {
-    public static void MapMoodRoutes(this WebApplication app)
+    public static void MapMoodRoutes(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/moods").RequireAuthorization();
 

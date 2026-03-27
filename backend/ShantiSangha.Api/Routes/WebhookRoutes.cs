@@ -9,7 +9,7 @@ namespace ShantiSangha.Api.Routes;
 
 public static class WebhookRoutes
 {
-    public static void MapWebhookRoutes(this WebApplication app)
+    public static void MapWebhookRoutes(this IEndpointRouteBuilder app)
     {
         app.MapPost("/webhooks/clerk", HandleClerkWebhook)
             .AllowAnonymous();

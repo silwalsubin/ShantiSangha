@@ -114,6 +114,19 @@ try
         });
     builder.Services.AddAuthorization();
 
+    // CORS — allow frontend origin
+    var frontendOrigin = builder.Configuration["FRONTEND_ORIGIN"] ?? "https://shantisangha.org";
+    builder.Services.AddCors(options =>
+    {
+        options.AddDefaultPolicy(policy =>
+        {
+            policy.WithOrigins(frontendOrigin.Split(','))
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials();
+        });
+    });
+
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
 
@@ -127,6 +140,7 @@ try
     }
 
     app.UseSerilogRequestLogging();
+    app.UseCors();
 
     if (app.Environment.IsDevelopment())
     {
@@ -138,17 +152,19 @@ try
     app.UseAuthentication();
     app.UseAuthorization();
 
-    app.MapWebhookRoutes();
-    app.MapUserRoutes();
-    app.MapConversationRoutes();
-    app.MapJournalRoutes();
-    app.MapMoodRoutes();
-    app.MapCopingRoutes();
-    app.MapVoiceRoutes();
-    app.MapInsightRoutes();
-    app.MapSearchRoutes();
+    // All API routes under /api prefix
+    var api = app.MapGroup("/api");
+    api.MapWebhookRoutes();
+    api.MapUserRoutes();
+    api.MapConversationRoutes();
+    api.MapJournalRoutes();
+    api.MapMoodRoutes();
+    api.MapCopingRoutes();
+    api.MapVoiceRoutes();
+    api.MapInsightRoutes();
+    api.MapSearchRoutes();
 
-    // Health check — Railway uses this to confirm the container is up
+    // Health check at root (no /api prefix)
     app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
         .AllowAnonymous();
 

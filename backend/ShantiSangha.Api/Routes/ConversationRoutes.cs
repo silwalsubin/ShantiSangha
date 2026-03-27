@@ -11,7 +11,7 @@ namespace ShantiSangha.Api.Routes;
 
 public static class ConversationRoutes
 {
-    public static void MapConversationRoutes(this WebApplication app)
+    public static void MapConversationRoutes(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/conversations").RequireAuthorization();
 

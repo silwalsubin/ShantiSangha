@@ -12,7 +12,7 @@ public static class VoiceRoutes
 {
     private static readonly HashSet<string> AllowedExtensions = ["mp3", "mp4", "m4a", "wav", "webm", "ogg"];
 
-    public static void MapVoiceRoutes(this WebApplication app)
+    public static void MapVoiceRoutes(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/voice").RequireAuthorization();
 

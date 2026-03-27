@@ -6,7 +6,7 @@ namespace ShantiSangha.Api.Routes;
 
 public static class InsightRoutes
 {
-    public static void MapInsightRoutes(this WebApplication app)
+    public static void MapInsightRoutes(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/insights").RequireAuthorization();
 

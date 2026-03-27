@@ -36,7 +36,7 @@ public static class CopingRoutes
             "visualisation", 300),
     ];
 
-    public static void MapCopingRoutes(this WebApplication app)
+    public static void MapCopingRoutes(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/exercises").RequireAuthorization();
 

@@ -9,7 +9,7 @@ namespace ShantiSangha.Api.Routes;
 
 public static class JournalRoutes
 {
-    public static void MapJournalRoutes(this WebApplication app)
+    public static void MapJournalRoutes(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/journals").RequireAuthorization();
 

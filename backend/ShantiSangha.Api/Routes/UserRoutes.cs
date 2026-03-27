@@ -6,7 +6,7 @@ namespace ShantiSangha.Api.Routes;
 
 public static class UserRoutes
 {
-    public static void MapUserRoutes(this WebApplication app)
+    public static void MapUserRoutes(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/me").RequireAuthorization();
 

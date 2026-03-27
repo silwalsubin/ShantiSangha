@@ -7,7 +7,7 @@ namespace ShantiSangha.Api.Routes;
 
 public static class SearchRoutes
 {
-    public static void MapSearchRoutes(this WebApplication app)
+    public static void MapSearchRoutes(this IEndpointRouteBuilder app)
     {
         app.MapGet("/search", Search).RequireAuthorization();
     }
