@@ -20,7 +20,7 @@ public static class MoodRoutes
         ClaimsPrincipal principal, AppDbContext db,
         CreateMoodCheckinRequest body)
     {
-        var user = await GetUserAsync(principal, db);
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
         if (user is null) return Results.Unauthorized();
 
         if (body.Score is < 1 or > 10)
@@ -46,7 +46,7 @@ public static class MoodRoutes
         DateTime? from = null, DateTime? to = null,
         int page = 1, int pageSize = 30)
     {
-        var user = await GetUserAsync(principal, db);
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
         if (user is null) return Results.Unauthorized();
 
         pageSize = Math.Clamp(pageSize, 1, 100);
@@ -68,7 +68,7 @@ public static class MoodRoutes
         ClaimsPrincipal principal, AppDbContext db,
         DateTime? from = null, DateTime? to = null)
     {
-        var user = await GetUserAsync(principal, db);
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
         if (user is null) return Results.Unauthorized();
 
         var start = from ?? DateTime.UtcNow.AddDays(-30);
@@ -110,13 +110,6 @@ public static class MoodRoutes
             TotalCheckins = checkins.Count,
             DailyAverages = dailyAverages
         });
-    }
-
-    private static async Task<User?> GetUserAsync(ClaimsPrincipal principal, AppDbContext db)
-    {
-        var clerkId = principal.FindFirstValue("sub");
-        if (clerkId is null) return null;
-        return await db.Users.FirstOrDefaultAsync(u => u.ClerkId == clerkId);
     }
 }
 

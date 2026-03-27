@@ -53,7 +53,7 @@ public static class CopingRoutes
         AppDbContext db,
         LogSessionRequest body)
     {
-        var user = await GetUserAsync(principal, db);
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
         if (user is null) return Results.Unauthorized();
 
         if (!Catalog.Any(e => e.Slug == slug))
@@ -80,7 +80,7 @@ public static class CopingRoutes
         ClaimsPrincipal principal, AppDbContext db,
         int page = 1, int pageSize = 20)
     {
-        var user = await GetUserAsync(principal, db);
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
         if (user is null) return Results.Unauthorized();
 
         pageSize = Math.Clamp(pageSize, 1, 50);
@@ -94,13 +94,6 @@ public static class CopingRoutes
             .ToListAsync();
 
         return Results.Ok(sessions);
-    }
-
-    private static async Task<User?> GetUserAsync(ClaimsPrincipal principal, AppDbContext db)
-    {
-        var clerkId = principal.FindFirstValue("sub");
-        if (clerkId is null) return null;
-        return await db.Users.FirstOrDefaultAsync(u => u.ClerkId == clerkId);
     }
 }
 

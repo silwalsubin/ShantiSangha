@@ -32,7 +32,7 @@ public static class VoiceRoutes
         StorageService storage,
         GetUploadUrlRequest body)
     {
-        var user = await GetUserAsync(principal, db);
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
         if (user is null) return Results.Unauthorized();
 
         var ext = body.Extension.ToLower().TrimStart('.');
@@ -65,7 +65,7 @@ public static class VoiceRoutes
         IBackgroundJobClient jobs,
         CreateVoiceEntryRequest body)
     {
-        var user = await GetUserAsync(principal, db);
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
         if (user is null) return Results.Unauthorized();
 
         if (string.IsNullOrWhiteSpace(body.ObjectKey))
@@ -94,7 +94,7 @@ public static class VoiceRoutes
         ClaimsPrincipal principal, AppDbContext db,
         int page = 1, int pageSize = 20)
     {
-        var user = await GetUserAsync(principal, db);
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
         if (user is null) return Results.Unauthorized();
 
         pageSize = Math.Clamp(pageSize, 1, 50);
@@ -121,7 +121,7 @@ public static class VoiceRoutes
     private static async Task<IResult> GetEntry(
         Guid id, ClaimsPrincipal principal, AppDbContext db)
     {
-        var user = await GetUserAsync(principal, db);
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
         if (user is null) return Results.Unauthorized();
 
         var entry = await db.VoiceEntries
@@ -138,13 +138,6 @@ public static class VoiceRoutes
             .FirstOrDefaultAsync();
 
         return entry is null ? Results.NotFound() : Results.Ok(entry);
-    }
-
-    private static async Task<User?> GetUserAsync(ClaimsPrincipal principal, AppDbContext db)
-    {
-        var clerkId = principal.FindFirstValue("sub");
-        if (clerkId is null) return null;
-        return await db.Users.FirstOrDefaultAsync(u => u.ClerkId == clerkId);
     }
 }
 

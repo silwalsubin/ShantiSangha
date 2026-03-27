@@ -16,14 +16,10 @@ public static class UserRoutes
 
     private static async Task<IResult> GetMe(ClaimsPrincipal principal, AppDbContext db)
     {
-        var clerkId = principal.FindFirstValue("sub");
-        if (clerkId is null) return Results.Unauthorized();
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
+        if (user is null) return Results.Unauthorized();
 
-        var user = await db.Users
-            .Include(u => u.Profile)
-            .FirstOrDefaultAsync(u => u.ClerkId == clerkId);
-
-        if (user is null) return Results.NotFound();
+        await db.Entry(user).Reference(u => u.Profile).LoadAsync();
 
         return Results.Ok(new
         {
@@ -44,14 +40,10 @@ public static class UserRoutes
         AppDbContext db,
         UpdateMeRequest body)
     {
-        var clerkId = principal.FindFirstValue("sub");
-        if (clerkId is null) return Results.Unauthorized();
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
+        if (user is null) return Results.Unauthorized();
 
-        var user = await db.Users
-            .Include(u => u.Profile)
-            .FirstOrDefaultAsync(u => u.ClerkId == clerkId);
-
-        if (user is null) return Results.NotFound();
+        await db.Entry(user).Reference(u => u.Profile).LoadAsync();
         if (user.Profile is null) return Results.Problem("Profile not found");
 
         if (body.DisplayName is not null) user.Profile.DisplayName = body.DisplayName;

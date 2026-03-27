@@ -25,10 +25,7 @@ public static class SearchRoutes
 
         limit = Math.Clamp(limit, 1, 50);
 
-        var clerkId = principal.FindFirstValue("sub");
-        if (clerkId is null) return Results.Unauthorized();
-
-        var user = await db.Users.FirstOrDefaultAsync(u => u.ClerkId == clerkId);
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
         if (user is null) return Results.Unauthorized();
 
         var results = type.ToLower() switch

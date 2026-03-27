@@ -18,10 +18,7 @@ public static class InsightRoutes
         ClaimsPrincipal principal, AppDbContext db,
         int page = 1, int pageSize = 20)
     {
-        var clerkId = principal.FindFirstValue("sub");
-        if (clerkId is null) return Results.Unauthorized();
-
-        var user = await db.Users.FirstOrDefaultAsync(u => u.ClerkId == clerkId);
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
         if (user is null) return Results.Unauthorized();
 
         pageSize = Math.Clamp(pageSize, 1, 50);
@@ -40,10 +37,7 @@ public static class InsightRoutes
     private static async Task<IResult> DeleteInsight(
         Guid id, ClaimsPrincipal principal, AppDbContext db)
     {
-        var clerkId = principal.FindFirstValue("sub");
-        if (clerkId is null) return Results.Unauthorized();
-
-        var user = await db.Users.FirstOrDefaultAsync(u => u.ClerkId == clerkId);
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
         if (user is null) return Results.Unauthorized();
 
         var insight = await db.SavedInsights

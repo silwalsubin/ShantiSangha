@@ -24,7 +24,7 @@ public static class JournalRoutes
         ClaimsPrincipal principal, AppDbContext db,
         int page = 1, int pageSize = 20)
     {
-        var user = await GetUserAsync(principal, db);
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
         if (user is null) return Results.Unauthorized();
 
         pageSize = Math.Clamp(pageSize, 1, 50);
@@ -46,7 +46,7 @@ public static class JournalRoutes
         IBackgroundJobClient jobs,
         CreateJournalRequest body)
     {
-        var user = await GetUserAsync(principal, db);
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
         if (user is null) return Results.Unauthorized();
 
         var journal = new Journal
@@ -74,7 +74,7 @@ public static class JournalRoutes
     private static async Task<IResult> GetJournal(
         Guid id, ClaimsPrincipal principal, AppDbContext db)
     {
-        var user = await GetUserAsync(principal, db);
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
         if (user is null) return Results.Unauthorized();
 
         var journal = await db.Journals
@@ -89,7 +89,7 @@ public static class JournalRoutes
         Guid id, ClaimsPrincipal principal, AppDbContext db,
         UpdateJournalRequest body)
     {
-        var user = await GetUserAsync(principal, db);
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
         if (user is null) return Results.Unauthorized();
 
         var journal = await db.Journals
@@ -108,7 +108,7 @@ public static class JournalRoutes
     private static async Task<IResult> DeleteJournal(
         Guid id, ClaimsPrincipal principal, AppDbContext db)
     {
-        var user = await GetUserAsync(principal, db);
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
         if (user is null) return Results.Unauthorized();
 
         var journal = await db.Journals
@@ -119,13 +119,6 @@ public static class JournalRoutes
         db.Journals.Remove(journal);
         await db.SaveChangesAsync();
         return Results.NoContent();
-    }
-
-    private static async Task<User?> GetUserAsync(ClaimsPrincipal principal, AppDbContext db)
-    {
-        var clerkId = principal.FindFirstValue("sub");
-        if (clerkId is null) return null;
-        return await db.Users.FirstOrDefaultAsync(u => u.ClerkId == clerkId);
     }
 }
 

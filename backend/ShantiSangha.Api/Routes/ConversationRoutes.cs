@@ -25,7 +25,7 @@ public static class ConversationRoutes
     private static async Task<IResult> ListConversations(
         ClaimsPrincipal principal, AppDbContext db)
     {
-        var user = await GetUserAsync(principal, db);
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
         if (user is null) return Results.Unauthorized();
 
         var conversations = await db.Conversations
@@ -51,7 +51,7 @@ public static class ConversationRoutes
     private static async Task<IResult> CreateConversation(
         ClaimsPrincipal principal, AppDbContext db)
     {
-        var user = await GetUserAsync(principal, db);
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
         if (user is null) return Results.Unauthorized();
 
         var conversation = new Conversation
@@ -71,7 +71,7 @@ public static class ConversationRoutes
     private static async Task<IResult> GetConversation(
         Guid id, ClaimsPrincipal principal, AppDbContext db)
     {
-        var user = await GetUserAsync(principal, db);
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
         if (user is null) return Results.Unauthorized();
 
         var conversation = await db.Conversations
@@ -96,7 +96,7 @@ public static class ConversationRoutes
     private static async Task<IResult> DeleteConversation(
         Guid id, ClaimsPrincipal principal, AppDbContext db)
     {
-        var user = await GetUserAsync(principal, db);
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
         if (user is null) return Results.Unauthorized();
 
         var conversation = await db.Conversations
@@ -120,7 +120,7 @@ public static class ConversationRoutes
         SendMessageRequest body,
         CancellationToken cancellationToken)
     {
-        var user = await GetUserAsync(principal, db);
+        var user = await RouteHelper.GetOrCreateUserAsync(principal, db);
         if (user is null)
         {
             httpContext.Response.StatusCode = 401;
@@ -174,13 +174,6 @@ public static class ConversationRoutes
             jobs.ContinueJobWith<ExtractInsightsJob>(summaryJobId, j =>
                 j.RunAsync(id, ShantiSangha.Core.Models.SummarySourceType.Conversation, userId));
         }
-    }
-
-    private static async Task<User?> GetUserAsync(ClaimsPrincipal principal, AppDbContext db)
-    {
-        var clerkId = principal.FindFirstValue("sub");
-        if (clerkId is null) return null;
-        return await db.Users.FirstOrDefaultAsync(u => u.ClerkId == clerkId);
     }
 }
 
