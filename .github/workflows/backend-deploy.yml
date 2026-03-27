@@ -52,10 +52,19 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-      - name: Force new ECS deployment
+      - name: Deploy to ECS with latest task definition
         run: |
+          # Get the latest task definition revision
+          LATEST_TD=$(aws ecs describe-task-definition \
+            --task-definition shantisangha-api \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text \
+            --region us-east-1)
+          echo "Deploying task definition: $LATEST_TD"
+
           aws ecs update-service \
             --cluster shantisangha-cluster \
             --service shantisangha-api \
+            --task-definition "$LATEST_TD" \
             --force-new-deployment \
             --region us-east-1

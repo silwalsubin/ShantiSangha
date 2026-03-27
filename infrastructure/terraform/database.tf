@@ -16,8 +16,9 @@ resource "aws_db_instance" "postgres" {
   storage_type      = "gp2"
 
   db_name  = "shantisangha"
-  username = var.db_username
-  password = random_password.db.result
+  username          = var.db_username
+  password          = random_password.db.result
+  apply_immediately = true
 
   db_subnet_group_name   = aws_db_subnet_group.postgres.name
   vpc_security_group_ids = [aws_security_group.rds.id]
