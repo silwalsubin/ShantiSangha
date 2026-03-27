@@ -118,6 +118,19 @@ try
                     Log.Warning("JWT auth failed: {Error} | Authority: {Authority}",
                         context.Exception.Message, appConfig.ClerkAuthority);
                     return Task.CompletedTask;
+                },
+                OnMessageReceived = context =>
+                {
+                    var hasAuth = context.Request.Headers.ContainsKey("Authorization");
+                    var authHeader = context.Request.Headers["Authorization"].FirstOrDefault() ?? "(none)";
+                    Log.Information("JWT OnMessageReceived: HasAuth={HasAuth}, Header={Header}",
+                        hasAuth, authHeader.Length > 20 ? authHeader[..20] + "..." : authHeader);
+                    return Task.CompletedTask;
+                },
+                OnChallenge = context =>
+                {
+                    Log.Warning("JWT Challenge: {Error} {ErrorDescription}", context.Error, context.ErrorDescription);
+                    return Task.CompletedTask;
                 }
             };
         });
