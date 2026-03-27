@@ -3,6 +3,9 @@ using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.SemanticKernel;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Serilog;
 using ShantiSangha.Api;
 using ShantiSangha.Api.Routes;
@@ -46,10 +49,23 @@ try
 
     // Semantic Kernel + OpenAI (chat + embeddings)
 #pragma warning disable SKEXP0010
-    builder.Services.AddKernel()
+    var kernelBuilder = builder.Services.AddKernel()
         .AddOpenAIChatCompletion("gpt-4o", appConfig.OpenAiApiKey)
         .AddOpenAIEmbeddingGenerator("text-embedding-3-small", appConfig.OpenAiApiKey);
 #pragma warning restore SKEXP0010
+
+    // Langfuse AI observability filter — optional, best-effort
+    if (appConfig.LangfuseEnabled)
+    {
+        kernelBuilder.Services.AddSingleton<IFunctionInvocationFilter>(sp =>
+            new LangfuseFilter(
+                sp.GetRequiredService<IHttpClientFactory>(),
+                appConfig.LangfusePublicKey!,
+                appConfig.LangfuseSecretKey!,
+                appConfig.LangfuseBaseUrl,
+                sp.GetRequiredService<ILogger<LangfuseFilter>>()));
+        Log.Information("Langfuse AI tracing enabled");
+    }
 
     // Safety + Chat + Semantic Search services
     builder.Services.AddScoped<ISafetyService, SafetyService>();
@@ -78,6 +94,16 @@ try
         .UsePostgreSqlStorage(o => o.UseNpgsqlConnection(appConfig.DatabaseUrl)));
     builder.Services.AddHangfireServer();
 
+    // OpenTelemetry — traces and metrics
+    builder.Services.AddOpenTelemetry()
+        .ConfigureResource(r => r.AddService("ShantiSangha.Api"))
+        .WithTracing(tracing => tracing
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation())
+        .WithMetrics(metrics => metrics
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation());
+
     // Auth — Clerk issues standard JWTs validated here
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(opts =>
@@ -98,7 +124,6 @@ try
     {
         app.UseSwagger();
         app.UseSwaggerUI();
-        // Hangfire dashboard — dev only, no auth required in local
         app.UseHangfireDashboard("/hangfire");
     }
 
@@ -112,7 +137,12 @@ try
     app.MapMoodRoutes();
     app.MapCopingRoutes();
     app.MapVoiceRoutes();
+    app.MapInsightRoutes();
     app.MapSearchRoutes();
+
+    // Health check — Railway uses this to confirm the container is up
+    app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
+        .AllowAnonymous();
 
     app.Run();
 }

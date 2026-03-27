@@ -12,6 +12,14 @@ public class AppConfig
     public required string R2SecretAccessKey { get; init; }
     public required string R2BucketName { get; init; }
 
+    // Optional — Langfuse AI observability (app starts without these)
+    public string? LangfusePublicKey { get; init; }
+    public string? LangfuseSecretKey { get; init; }
+    public string LangfuseBaseUrl { get; init; } = "https://cloud.langfuse.com";
+
+    public bool LangfuseEnabled =>
+        !string.IsNullOrEmpty(LangfusePublicKey) && !string.IsNullOrEmpty(LangfuseSecretKey);
+
     // Derived: Cloudflare R2 S3-compatible endpoint
     public string R2ServiceUrl => $"https://{R2AccountId}.r2.cloudflarestorage.com";
 
@@ -37,7 +45,10 @@ public class AppConfig
             R2AccountId = r2AccountId,
             R2AccessKeyId = r2AccessKeyId,
             R2SecretAccessKey = r2SecretAccessKey,
-            R2BucketName = r2BucketName
+            R2BucketName = r2BucketName,
+            LangfusePublicKey = config["LANGFUSE_PUBLIC_KEY"],
+            LangfuseSecretKey = config["LANGFUSE_SECRET_KEY"],
+            LangfuseBaseUrl = config["LANGFUSE_BASE_URL"] ?? "https://cloud.langfuse.com"
         };
     }
 }
