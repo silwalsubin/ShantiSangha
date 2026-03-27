@@ -7,6 +7,7 @@ using ShantiSangha.Api.Routes;
 using ShantiSangha.Core.Services;
 using ShantiSangha.Infrastructure.AI;
 using ShantiSangha.Infrastructure.Data;
+using System.Net.Http.Headers;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -32,9 +33,19 @@ try
         opts.UseNpgsql(appConfig.DatabaseUrl, npgsql =>
             npgsql.UseVector()));
 
+    // HTTP client for OpenAI moderation API
+    builder.Services.AddHttpClient("OpenAI", client =>
+    {
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", appConfig.OpenAiApiKey);
+    });
+
     // Semantic Kernel + OpenAI
     builder.Services.AddKernel()
         .AddOpenAIChatCompletion("gpt-4o", appConfig.OpenAiApiKey);
+
+    // Safety + Chat services
+    builder.Services.AddScoped<ISafetyService, SafetyService>();
     builder.Services.AddScoped<IChatService, ChatService>();
 
     // Auth — Clerk issues standard JWTs validated here
