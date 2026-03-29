@@ -18,8 +18,6 @@ Every UI decision must honor these principles. See `docs/design-principles/` for
 - [Mobile First](docs/design-principles/mobile-first.md) — 375px minimum, 44px touch targets, design for phones.
 - [One Experience](docs/design-principles/one-experience.md) — screens flow into each other, no dead ends.
 
-Technical spec: [docs/design-system.md](docs/design-system.md) (exact colors, components, icon inventory)
-
 ## Tech Stack
 - **Frontend:** Vite + Vue 3 + TypeScript + Tailwind CSS v3 + Clerk auth
 - **Backend:** ASP.NET Core .NET 8 + EF Core + PostgreSQL (pgvector) + Redis + Hangfire

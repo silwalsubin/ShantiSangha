@@ -28,6 +28,14 @@ Not:
 - "This wants something from me"
 - "This is overwhelming"
 
-## Reference
+## Technical Quick Reference
 
-See [design-system.md](../design-system.md) for the full technical specification (exact color codes, component patterns, icon inventory, mobile rules).
+- **Backgrounds:** `#faf5ed → #f5ebe0 → #efe3d4`, cards `rgba(250,245,237,0.88)`
+- **Text:** primary `#2b1e10`, secondary `#6b5740`, muted `#9a8568`, subtle `#b5996f`
+- **Accent:** saffron `#c4873b`, deep saffron `#8b5a1b`
+- **Borders:** `rgba(139,90,43,0.12)`
+- **Icons:** `SacredIcons.vue` — lotus, dialogue, scroll, chakra, diya, shankha, om, dharma
+- **Cards:** `rounded-2xl`, `backdrop-blur-[20px]`, warm shadows `rgba(82,54,29,...)`
+- **Buttons:** `bg-gradient-to-r from-[#c4873b] to-[#8b5a1b]` with `min-h-[44px]`
+- **Inputs:** `border-[rgba(139,90,43,0.12)]`, `focus:border-[#c4873b]`
+- **Section labels:** `text-[9px] uppercase tracking-[0.2em] text-[#a38d6d]`
