@@ -10,46 +10,15 @@ See `docs/features/` for detailed feature documentation (purpose, value, how it 
 - [Insights](docs/features/insights.md) — AI-extracted takeaways from conversations and journals
 - [Voice](docs/features/voice.md) — audio notes with async transcription
 
-## Design System — Sacred Scripture Theme
+## Design System
+See [docs/design-system.md](docs/design-system.md) for the full sacred scripture theme specification (colors, icons, typography, components, mobile rules).
 
-All UI work MUST follow the Hindu scripture-inspired design language. This is a strict requirement for every frontend change.
-
-### Icons
-- Use `SacredIcons.vue` component (`src/components/icons/SacredIcons.vue`) for all navigation and feature icons
-- Available icons: `om`, `dialogue`, `scroll`, `chakra`, `lotus`, `diya`, `shankha`
-- NEVER use emojis as UI icons — add new SVG icons to `SacredIcons.vue` when needed
-- Icon style: thin line-art (stroke-width 1.5), sacred geometry motifs
-
-### Color Palette
-- **Background:** Parchment gradient `#faf5ed → #f5ebe0 → #efe3d4`
-- **Text primary:** `#2b1e10` (deep earth brown)
-- **Text secondary:** `#6b5740` (warm brown)
-- **Text muted:** `#9a8568`, `#b5996f`
-- **Accent/active:** Saffron `#c4873b`, deep saffron `#8b5a1b`
-- **Borders:** `rgba(139,90,43,0.12)` to `rgba(139,90,43,0.15)`
-- **Cards/surfaces:** `rgba(250,245,237,0.88)` to `rgba(250,245,237,0.95)`
-- **Active nav:** Gradient from `rgba(196,135,59,0.15)` with saffron left border
+**Key rules (always enforced):**
+- Hindu scripture-inspired aesthetic — saffron/gold/parchment palette
+- NEVER use emojis as UI icons — use `SacredIcons.vue` only
 - NEVER use blue, green, or cold/tech-feeling colors
-
-### Typography
-- Headings: `font-serif`, `font-bold`, with `tracking-wide`
-- Section labels: `text-[9px]` or `text-[10px]`, `uppercase`, `tracking-[0.2em]`, saffron/muted color
-- Body text: default sans-serif, warm brown colors
-- Quotes: `italic`, muted saffron tone (`#b5996f`)
-
-### UI Elements
-- Rounded corners: `rounded-xl` for nav items, `rounded-2xl` for cards
-- Shadows: warm-toned `rgba(82,54,29,...)` — never cool grey shadows
-- Dividers: dashed borders `border-dashed border-[rgba(139,90,43,0.12)]`
-- Backdrop blur: `backdrop-blur-[20px]`
-- Logo mark: Gradient circle `from-[#c4873b] to-[#8b5a1b]` with Om icon
-- Include wisdom quotes (Hindu/Buddhist scripture) in footer areas and auth pages
-
-### Tone
-- The app should feel like reading a sacred text — serene, warm, grounded
-- Avoid flashy animations, bright colors, or modern SaaS aesthetics
-- Prefer subtle transitions (`duration-200`)
-- Language should be gentle and reflective, not clinical or corporate
+- Mobile-first: 375px minimum, 44px touch targets
+- All UI changes MUST follow the design system
 
 ## Tech Stack
 - **Frontend:** Vite + Vue 3 + TypeScript + Tailwind CSS v3 + Clerk auth
