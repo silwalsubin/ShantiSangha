@@ -31,17 +31,27 @@ public class CurrentUserService : ICurrentUser
         var clerkId = _httpContextAccessor.HttpContext?.User.FindFirstValue("sub");
         if (clerkId is null) return null;
 
+        var email = _httpContextAccessor.HttpContext?.User.FindFirstValue("email");
+
         _cached = await _db.Users.FirstOrDefaultAsync(u => u.ClerkId == clerkId);
-        if (_cached is not null) return _cached;
+        if (_cached is not null)
+        {
+            // Update email if we now have a real one and the stored one is missing/placeholder
+            if (email is not null && (_cached.Email == "" || _cached.Email.EndsWith("@placeholder.local")))
+            {
+                _cached.Email = email;
+                _cached.UpdatedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+            }
+            return _cached;
+        }
 
         // Auto-create user on first API call (before Clerk webhook fires)
-        var email = _httpContextAccessor.HttpContext?.User.FindFirstValue("email")
-            ?? $"{clerkId}@placeholder.local";
         _cached = new User
         {
             Id = Guid.NewGuid(),
             ClerkId = clerkId,
-            Email = email,
+            Email = email ?? $"{clerkId}@placeholder.local",
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
