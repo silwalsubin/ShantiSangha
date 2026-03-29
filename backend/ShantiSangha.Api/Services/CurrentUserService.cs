@@ -35,16 +35,26 @@ public class CurrentUserService : ICurrentUser
         if (_cached is not null) return _cached;
 
         // Auto-create user on first API call (before Clerk webhook fires)
+        var email = _httpContextAccessor.HttpContext?.User.FindFirstValue("email") ?? "";
         _cached = new User
         {
             Id = Guid.NewGuid(),
             ClerkId = clerkId,
-            Email = _httpContextAccessor.HttpContext?.User.FindFirstValue("email") ?? "",
+            Email = email,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
         _db.Users.Add(_cached);
-        await _db.SaveChangesAsync();
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            // Duplicate email — detach and retry lookup (race condition or shared empty email)
+            _db.Entry(_cached).State = EntityState.Detached;
+            _cached = await _db.Users.FirstOrDefaultAsync(u => u.ClerkId == clerkId);
+        }
         return _cached;
     }
 }
