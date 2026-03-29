@@ -78,6 +78,82 @@ namespace ShantiSangha.Infrastructure.Migrations
                     b.ToTable("CopingSessions");
                 });
 
+            modelBuilder.Entity("ShantiSangha.Core.Models.Goal", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Frequency")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("FrequencyTarget")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly?>("TargetDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("UserId", "Title")
+                        .IsUnique();
+
+                    b.ToTable("Goals");
+                });
+
+            modelBuilder.Entity("ShantiSangha.Core.Models.GoalCheckIn", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Completed")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("GoalId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GoalId");
+
+                    b.HasIndex("GoalId", "Date")
+                        .IsUnique();
+
+                    b.ToTable("GoalCheckIns");
+                });
+
             modelBuilder.Entity("ShantiSangha.Core.Models.Journal", b =>
                 {
                     b.Property<Guid>("Id")
@@ -493,7 +569,36 @@ namespace ShantiSangha.Infrastructure.Migrations
 
                     b.Navigation("SavedInsights");
 
+                    b.Navigation("Goals");
+
                     b.Navigation("VoiceEntries");
+                });
+
+            modelBuilder.Entity("ShantiSangha.Core.Models.Goal", b =>
+                {
+                    b.HasOne("ShantiSangha.Core.Models.User", "User")
+                        .WithMany("Goals")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("ShantiSangha.Core.Models.GoalCheckIn", b =>
+                {
+                    b.HasOne("ShantiSangha.Core.Models.Goal", "Goal")
+                        .WithMany("CheckIns")
+                        .HasForeignKey("GoalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Goal");
+                });
+
+            modelBuilder.Entity("ShantiSangha.Core.Models.Goal", b =>
+                {
+                    b.Navigation("CheckIns");
                 });
 #pragma warning restore 612, 618
         }

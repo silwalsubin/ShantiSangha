@@ -3,7 +3,11 @@
     "allow": [
       "Bash(lsof -ti:5173)",
       "Bash(xargs kill:*)",
-      "Bash(dotnet ef:*)"
+      "Bash(dotnet ef:*)",
+      "Read(//opt/homebrew/bin/**)",
+      "Read(//opt/homebrew/Cellar/**)",
+      "Bash(/usr/local/share/dotnet/dotnet tool:*)",
+      "Bash(/usr/local/share/dotnet/dotnet ef:*)"
     ],
     "additionalDirectories": [
       "/Users/subinsilwal/Desktop/code/maiself/.claude"

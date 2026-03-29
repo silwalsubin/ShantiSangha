@@ -104,7 +104,7 @@ const personalFeedback = computed(() => {
   let verse: { text: string; source: string }
 
   if (recurring.length === 0 && all.length === 0) {
-    feedbackLine = 'Every journey begins with an intention.'
+    feedbackLine = 'Every journey begins with a goal.'
     verse = wisdomTemplates.noGoals[dayOfYear % wisdomTemplates.noGoals.length]
   } else if (bestStreak.currentStreak >= 7) {
     feedbackLine = `${bestStreak.currentStreak} days of "${bestStreak.title}". Your discipline is becoming who you are.`
@@ -341,7 +341,7 @@ onMounted(() => { loadGoals(); loadInsight(); loadRecent() })
       <!-- Card 2: Goals Check-in -->
       <div class="snap-center rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] p-6 sm:p-8 shadow-[0_4px_24px_rgba(82,54,29,0.06)] backdrop-blur-[20px] min-h-[280px] flex flex-col items-center justify-center text-center">
         <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a38d6d]">Daily discipline</p>
-        <p class="mt-4 font-serif text-xl sm:text-2xl font-bold tracking-wide text-[#2b1e10]">Your intentions</p>
+        <p class="mt-4 font-serif text-xl sm:text-2xl font-bold tracking-wide text-[#2b1e10]">Your goals</p>
 
         <!-- Loading -->
         <div v-if="goalsLoading" class="mt-6 w-full max-w-xs space-y-3">
@@ -350,9 +350,9 @@ onMounted(() => { loadGoals(); loadInsight(); loadRecent() })
 
         <!-- No goals -->
         <div v-else-if="recurringGoals.length === 0 && !showNewGoalForm" class="mt-6 w-full max-w-xs">
-          <p class="text-sm text-[#6b5740]">You haven't set any intentions yet.</p>
+          <p class="text-sm text-[#6b5740]">You haven't set any goals yet.</p>
           <button @click="showNewGoalForm = true" class="mt-4 min-h-[44px] rounded-full bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-6 py-3 text-sm font-semibold text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)] transition duration-200 active:scale-[0.97]">
-            Set your first intention
+            Set your first goal
           </button>
         </div>
 
@@ -406,7 +406,7 @@ onMounted(() => { loadGoals(); loadInsight(); loadRecent() })
         </div>
 
         <div v-if="allGoalsCheckedIn && recurringGoals.length > 0" class="mt-4">
-          <p class="text-sm text-[#6b5740]">All intentions accounted for. Well done.</p>
+          <p class="text-sm text-[#6b5740]">All goals accounted for. Well done.</p>
         </div>
 
         <button v-if="recurringGoals.length === 0 && !showNewGoalForm" @click="nextCard" class="mt-4 text-[12px] font-medium tracking-wide text-[#c4873b] transition duration-200 active:scale-95">
