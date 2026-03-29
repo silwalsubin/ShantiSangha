@@ -20,6 +20,7 @@ const router = createRouter({
         { path: 'reflect/journal/:id', component: () => import('@/pages/app/reflect/journal-edit.vue') },
         { path: 'reflect/voice/:id', component: () => import('@/pages/app/reflect/voice-detail.vue') },
         { path: 'journey', component: () => import('@/pages/app/journey.vue') },
+        { path: 'journey/goals/:id', component: () => import('@/pages/app/goal-detail.vue') },
         { path: 'journey/insights', component: () => import('@/pages/app/journey-insights.vue') },
         // Legacy redirects
         { path: 'dashboard', redirect: '/app/home' },

@@ -12,6 +12,7 @@ public class Goal
     public GoalFrequency? Frequency { get; set; }
     public int? FrequencyTarget { get; set; }
     public DateOnly? TargetDate { get; set; }
+    public string? DeeperWhy { get; set; }
     public DateTime? CompletedAt { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? ArchivedAt { get; set; }

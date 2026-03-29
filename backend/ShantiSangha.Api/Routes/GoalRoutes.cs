@@ -14,6 +14,7 @@ public static class GoalRoutes
         group.MapPost("/", CreateGoal);
         group.MapGet("/", ListGoals);
         group.MapGet("/today", GetToday);
+        group.MapGet("/{id:guid}", GetGoal);
         group.MapPatch("/{id:guid}", UpdateGoal);
         group.MapDelete("/{id:guid}", DeleteGoal);
         group.MapPost("/{id:guid}/checkin", CheckIn);
@@ -48,6 +49,7 @@ public static class GoalRoutes
             Frequency = body.Frequency,
             FrequencyTarget = body.FrequencyTarget,
             TargetDate = targetDate,
+            DeeperWhy = body.DeeperWhy?.Trim(),
             CreatedAt = DateTime.UtcNow
         };
 
@@ -65,7 +67,7 @@ public static class GoalRoutes
         return Results.Created($"/goals/{goal.Id}", new
         {
             goal.Id, goal.Title, goal.Type, goal.Frequency,
-            goal.FrequencyTarget, goal.TargetDate, goal.CreatedAt
+            goal.FrequencyTarget, goal.TargetDate, goal.DeeperWhy, goal.CreatedAt
         });
     }
 
@@ -149,6 +151,46 @@ public static class GoalRoutes
         return Results.Ok(goals);
     }
 
+    private static async Task<IResult> GetGoal(
+        Guid id, ICurrentUser currentUser, AppDbContext db)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Results.Unauthorized();
+
+        var goal = await db.Goals
+            .Include(g => g.CheckIns)
+            .FirstOrDefaultAsync(g => g.Id == id && g.UserId == user.Id);
+
+        if (goal is null) return Results.NotFound();
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        if (goal.Type == GoalType.OneTime)
+        {
+            var noteCount = goal.CheckIns.Count(c => c.Note is not null);
+            int? daysRemaining = goal.TargetDate.HasValue
+                ? goal.TargetDate.Value.DayNumber - today.DayNumber
+                : null;
+
+            return Results.Ok(new
+            {
+                goal.Id, goal.Title, goal.Type, goal.TargetDate, goal.DeeperWhy,
+                goal.CompletedAt, goal.CreatedAt,
+                DaysRemaining = daysRemaining, NoteCount = noteCount
+            });
+        }
+        else
+        {
+            var (current, longest) = ComputeStreaks(goal.CheckIns, today);
+            return Results.Ok(new
+            {
+                goal.Id, goal.Title, goal.Type, goal.Frequency,
+                goal.FrequencyTarget, goal.DeeperWhy, goal.CreatedAt,
+                CurrentStreak = current, LongestStreak = longest
+            });
+        }
+    }
+
     private static async Task<IResult> UpdateGoal(
         Guid id, ICurrentUser currentUser, AppDbContext db, UpdateGoalRequest body)
     {
@@ -176,6 +218,9 @@ public static class GoalRoutes
             goal.CompletedAt = DateTime.UtcNow;
         else if (body.Completed is false)
             goal.CompletedAt = null;
+
+        if (body.DeeperWhy is not null)
+            goal.DeeperWhy = body.DeeperWhy.Trim();
 
         try
         {
@@ -321,6 +366,7 @@ public record CreateGoalRequest(
     GoalType Type = GoalType.Recurring,
     GoalFrequency? Frequency = null,
     int? FrequencyTarget = null,
-    string? TargetDate = null);
-public record UpdateGoalRequest(string? Title, bool? Archived, bool? Completed);
+    string? TargetDate = null,
+    string? DeeperWhy = null);
+public record UpdateGoalRequest(string? Title, bool? Archived, bool? Completed, string? DeeperWhy = null);
 public record CheckInRequest(bool Completed, string? Note);

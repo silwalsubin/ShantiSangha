@@ -71,7 +71,8 @@ public static class SystemPrompt
         string? displayName,
         string? recentMoodSummary,
         IEnumerable<string>? savedInsights,
-        IEnumerable<string>? conversationSummaries)
+        IEnumerable<string>? conversationSummaries,
+        IEnumerable<GoalContext>? goals = null)
     {
         var parts = new List<string> { Base };
 
@@ -115,6 +116,65 @@ public static class SystemPrompt
                 """);
         }
 
+        var goalList = goals?.ToList();
+        if (goalList is { Count: > 0 })
+        {
+            var goalLines = goalList.Select(g =>
+            {
+                if (g.Type == "Recurring")
+                {
+                    var streakInfo = g.CurrentStreak > 0
+                        ? $" (current streak: {g.CurrentStreak} days, longest: {g.LongestStreak} days)"
+                        : " (no active streak)";
+                    var todayStatus = g.CheckedInToday switch
+                    {
+                        true => " — checked in today",
+                        false => " — not yet checked in today",
+                        _ => ""
+                    };
+                    var whyInfo = !string.IsNullOrWhiteSpace(g.DeeperWhy)
+                        ? $"\n  Why it matters to them: \"{g.DeeperWhy}\""
+                        : "";
+                    return $"- [Daily practice] {g.Title}{streakInfo}{todayStatus}{whyInfo}";
+                }
+                else
+                {
+                    var deadlineInfo = g.DaysRemaining.HasValue
+                        ? g.DaysRemaining.Value > 0
+                            ? $" ({g.DaysRemaining} days remaining)"
+                            : " (deadline passed)"
+                        : "";
+                    var completedInfo = g.IsCompleted ? " — COMPLETED" : "";
+                    var whyInfo = !string.IsNullOrWhiteSpace(g.DeeperWhy)
+                        ? $"\n  Why it matters to them: \"{g.DeeperWhy}\""
+                        : "";
+                    return $"- [Milestone] {g.Title}{deadlineInfo}{completedInfo}{whyInfo}";
+                }
+            });
+
+            parts.Add($"""
+                ## Their goals and intentions
+                These are the goals this person is actively working toward. Use this to understand
+                what matters to them right now. Weave goal awareness into conversation naturally —
+                celebrate streaks, gently check in on goals that seem stalled, and help them see
+                the spiritual dimension of their commitments. Do not list their goals back to them
+                unless they ask. Instead, let this knowledge inform how you respond — like a friend
+                who remembers what you're working on.
+
+                {string.Join("\n", goalLines)}
+                """);
+        }
+
         return string.Join("\n\n---\n\n", parts);
     }
 }
+
+public record GoalContext(
+    string Title,
+    string Type,
+    int CurrentStreak,
+    int LongestStreak,
+    bool? CheckedInToday,
+    int? DaysRemaining,
+    bool IsCompleted,
+    string? DeeperWhy);

@@ -171,11 +171,14 @@ public class ChatService(
             ? $"Over the past week their mood scores averaged {recentMoods.Average(m => m.Score):F1}/10."
             : null;
 
+        var goalContexts = await BuildGoalContextAsync(userId, cancellationToken);
+
         var systemPrompt = SystemPrompt.WithContext(
             displayName: profile?.DisplayName,
             recentMoodSummary: moodSummary,
             savedInsights: insights,
-            conversationSummaries: summaries);
+            conversationSummaries: summaries,
+            goals: goalContexts);
 
         var history = new ChatHistory(systemPrompt);
 
@@ -195,5 +198,94 @@ public class ChatService(
         }
 
         return history;
+    }
+
+    private async Task<List<GoalContext>> BuildGoalContextAsync(
+        Guid userId, CancellationToken cancellationToken)
+    {
+        var goals = await db.Goals
+            .Where(g => g.UserId == userId && g.ArchivedAt == null)
+            .Include(g => g.CheckIns)
+            .OrderBy(g => g.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        if (goals.Count == 0) return [];
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        return goals.Select(g =>
+        {
+            if (g.Type == GoalType.Recurring)
+            {
+                var (current, longest) = ComputeStreaks(g.CheckIns, today);
+                var todayCheckIn = g.CheckIns.FirstOrDefault(c => c.Date == today);
+
+                return new GoalContext(
+                    Title: g.Title,
+                    Type: "Recurring",
+                    CurrentStreak: current,
+                    LongestStreak: longest,
+                    CheckedInToday: todayCheckIn?.Completed,
+                    DaysRemaining: null,
+                    IsCompleted: false,
+                    DeeperWhy: g.DeeperWhy);
+            }
+            else
+            {
+                int? daysRemaining = g.TargetDate.HasValue
+                    ? g.TargetDate.Value.DayNumber - today.DayNumber
+                    : null;
+
+                return new GoalContext(
+                    Title: g.Title,
+                    Type: "OneTime",
+                    CurrentStreak: 0,
+                    LongestStreak: 0,
+                    CheckedInToday: null,
+                    DaysRemaining: daysRemaining,
+                    IsCompleted: g.CompletedAt.HasValue,
+                    DeeperWhy: g.DeeperWhy);
+            }
+        }).ToList();
+    }
+
+    private static (int CurrentStreak, int LongestStreak) ComputeStreaks(
+        ICollection<GoalCheckIn> checkIns, DateOnly today)
+    {
+        if (checkIns.Count == 0) return (0, 0);
+
+        var completedDates = checkIns
+            .Where(c => c.Completed)
+            .Select(c => c.Date)
+            .ToHashSet();
+
+        var currentStreak = 0;
+        var date = today;
+        while (completedDates.Contains(date))
+        {
+            currentStreak++;
+            date = date.AddDays(-1);
+        }
+
+        if (completedDates.Count == 0) return (0, 0);
+
+        var sorted = completedDates.OrderBy(d => d).ToList();
+        var longestStreak = 1;
+        var streak = 1;
+
+        for (var i = 1; i < sorted.Count; i++)
+        {
+            if (sorted[i].DayNumber - sorted[i - 1].DayNumber == 1)
+            {
+                streak++;
+                if (streak > longestStreak) longestStreak = streak;
+            }
+            else
+            {
+                streak = 1;
+            }
+        }
+
+        return (currentStreak, longestStreak);
     }
 }

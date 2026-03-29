@@ -1,18 +1,43 @@
-# Goals & Self-Discipline
+# Personal AI Assistant for Goals
 
 ## Purpose
 
-Help users define what matters to them — both the daily habits they want to build and the milestones they want to reach. This is not a task manager. It's a space for personal intentions backed by honest accountability.
+A spiritually intelligent AI assistant that helps users define, pursue, and achieve their goals — not through productivity hacks, but through deep understanding of who they are and what they need to grow. The assistant manages goals on the user's behalf, checks in with genuine care, offers spiritual wisdom when they're stuck, and celebrates their progress as a companion on the path.
+
+This is not a task manager. This is not a habit tracker with streaks. This is a personal guide that understands your goals, knows your patterns, and meets you where you are — spiritually, emotionally, and practically.
 
 ## Why this matters
 
-People don't lack goals. They lack consistency for recurring ones and follow-through for one-time ones. ShantiSangha bridges both gaps by making accountability feel like a spiritual practice, not a chore.
+People don't fail at goals because they lack tools. They fail because they lack understanding — of themselves, of what's blocking them, of why the goal matters in the first place. A to-do list can't ask "Why does this goal feel heavy today?" A habit tracker can't notice that you've been avoiding your creative goals since a difficult conversation last week.
 
-## Two Types of Goals
+ShantiSangha's AI assistant bridges the gap between intention and action by bringing spiritual intelligence to goal management:
 
-### 1. Recurring Goals (Discipline)
+- It understands the **deeper why** behind each goal — not just "exercise daily" but the desire for self-respect, energy, or healing
+- It recognizes **emotional and spiritual patterns** — when resistance is fear, when procrastination is grief, when overwork is avoidance
+- It offers **wisdom, not just reminders** — drawing from spiritual traditions to reframe struggle as growth
+- It holds the user **accountable with compassion** — honest without being harsh, encouraging without being hollow
 
-Things you commit to doing regularly to build who you want to become.
+## How It Works
+
+### The AI as Goal Manager
+
+The assistant is not a passive tracker. It actively manages the user's goal journey:
+
+1. **Goal Discovery** — When a user shares a goal, the AI explores it with them. "You want to meditate daily — what's drawing you to that? What would change in your life if you held this practice?" This conversation surfaces the deeper intention, which becomes the foundation for meaningful support.
+
+2. **Intelligent Check-ins** — The AI doesn't just ask "Did you do it?" It reads the moment. If the user has been journaling about stress, it might say: "I noticed you've been carrying a lot this week. How did your meditation practice hold up — was it a refuge or did it feel like one more thing?" The check-in adapts to context.
+
+3. **Spiritual Reframing** — When users struggle, the AI draws on spiritual wisdom to help them see their challenges differently. A broken streak isn't failure — it's information. A missed deadline isn't defeat — it's an invitation to examine what's truly important. The AI helps users find meaning in difficulty, not just push through it.
+
+4. **Pattern Recognition** — Over time, the AI learns the user's rhythms. It notices that they tend to drop exercise goals when work gets intense, or that they make the most progress on creative goals after journaling. These patterns become the basis for personalized guidance.
+
+5. **Proactive Support** — The AI doesn't wait for check-ins. It might surface a goal in conversation when the moment is right: "You mentioned wanting to read more — I noticed you haven't logged any reading this week. Is something getting in the way, or has the desire shifted?" It manages goals as a living, breathing practice, not a static list.
+
+### Two Types of Goals
+
+#### Recurring Goals (Daily Practice)
+
+Things you commit to doing regularly — the disciplines that shape who you're becoming.
 
 **Examples:**
 - "Meditate every day"
@@ -23,18 +48,13 @@ Things you commit to doing regularly to build who you want to become.
 
 **How they work:**
 - User sets a title and frequency (daily, or X times per week)
-- Daily check-in: "Did you do this today?" → Yes / Not today
-- Tracked by **streaks** — consecutive days/weeks of discipline
-- Longest streak is recorded as a personal record
-- Missing a day resets the streak (this is the motivation)
+- The AI manages daily check-ins conversationally — not as a checklist, but as a caring inquiry
+- Consistency is tracked, but the AI frames it as a practice, not a performance metric
+- When the user misses days, the AI explores what happened rather than shaming
 
-**What makes it sticky:**
-- The streak is the hook — you don't want to break a 15-day streak
-- The AI companion can reference it: "You've been meditating for 3 weeks straight. How has that changed things?"
+#### One-Time Goals (Milestones)
 
-### 2. One-Time Goals (Milestones)
-
-Things you want to achieve by a specific date.
+Things you want to achieve — the meaningful destinations on your path.
 
 **Examples:**
 - "Run a marathon by October 2026"
@@ -45,26 +65,21 @@ Things you want to achieve by a specific date.
 
 **How they work:**
 - User sets a title and a target date
-- Progress is tracked through **notes/updates** — the user logs progress whenever they want
-- No daily check-in pressure — just periodic reflection
-- When the date arrives or the goal is achieved, the user marks it complete or extends it
-- The Journey page shows time remaining and recent progress notes
+- The AI tracks progress through conversations, journal entries, and explicit updates
+- As deadlines approach, the AI brings natural awareness without creating anxiety
+- The AI helps break large goals into natural next steps when the user feels overwhelmed
 
-**What makes it sticky:**
-- Seeing the deadline approach creates natural urgency
-- Progress notes become a journal of the journey toward the goal
-- The AI companion can ask: "Your marathon is 4 months away. How's training going?"
+### The Spiritual Intelligence Layer
 
-## How They Differ
+What makes this different from every other goal tool is the spiritual dimension:
 
-| Aspect | Recurring | One-Time |
-|---|---|---|
-| Frequency | Daily / X per week | No schedule |
-| Tracking | Streaks + consistency | Progress notes + deadline |
-| Check-in | Daily Yes/No | Whenever you make progress |
-| Motivation | Don't break the streak | Deadline approaching |
-| Completion | Never "done" — it's a practice | Done when achieved or deadline passes |
-| Sacred Scrolls | Shows in daily flow | Shows only when user logs progress |
+- **Seeing the whole person** — Goals don't exist in isolation. The AI understands that a fitness goal connects to self-worth, a creative goal connects to purpose, a financial goal connects to security and freedom. It speaks to the whole person, not just the task.
+
+- **Honoring resistance** — When a user avoids a goal, the AI doesn't push harder. It gets curious. Sometimes resistance is wisdom — the goal has changed, or the approach needs adjusting. The AI helps users distinguish between fear that should be faced and intuition that should be followed.
+
+- **Finding meaning in struggle** — Spiritual traditions teach that difficulty is not the opposite of progress — it's often the substance of it. The AI helps users see their challenges through this lens, transforming frustration into growth.
+
+- **Celebrating the journey** — Not just "Congrats, you hit your streak!" but "You've shown up for your practice every day this week, even on the hard days. That's not discipline — that's devotion to yourself."
 
 ## Data Model
 
@@ -77,6 +92,7 @@ Goal
   - Frequency (enum?: Daily, Weekly) — only for Recurring
   - FrequencyTarget (int?) — e.g. 3 for "3 times per week", null for daily
   - TargetDate (DateOnly?) — only for OneTime
+  - DeeperWhy (string?) — the spiritual/emotional intention behind the goal, surfaced through AI conversation
   - CompletedAt (DateTime?) — when a OneTime goal is achieved
   - ArchivedAt (DateTime?) — null if active
   - CreatedAt (DateTime)
@@ -110,32 +126,34 @@ GET    /api/goals/today          — today's status for all active recurring goa
 ## UI Placement
 
 ### Sacred Scrolls (Home)
-- **Recurring goals** appear in the daily flow — "Did you do this today?" per goal
-- **One-time goals** do NOT appear in daily flow (no daily pressure). They appear only when the user adds a progress note from Reflect or Journey.
+- The AI assistant surfaces relevant goals naturally in the daily flow
+- Recurring goals appear as caring check-ins, not checkboxes
+- One-time goals surface when the AI senses it's the right moment
 
 ### Journey
-- **Recurring:** streaks, weekly discipline dots, longest streaks
-- **One-time:** list with progress bar (days elapsed / total), recent notes, days remaining
+- Recurring: consistency patterns, personal records, practice evolution
+- One-time: progress toward milestones, timeline, recent reflections
 - Both types show in the active goals section
 
 ### Reflect
 - Goal progress notes feed into the unified timeline
 - User can add a progress note from the Reflect hub
 
-### AI Companion
-- System prompt includes both types of goals
-- Recurring: "You've been exercising for 12 days straight"
-- One-time: "Your marathon is 4 months away. How's training?"
+### AI Companion (Chat)
+- The AI has full context of all goals, their deeper intentions, and check-in history
+- It weaves goal awareness into natural conversation
+- It proactively raises goals when context is right — not as reminders, but as genuine care
 
 ## What this replaces
 
-- **Mood check-in** — removed entirely. Recurring goal check-ins are the new daily ritual.
-- **Mood trends** — replaced by discipline streaks and goal progress in Journey
+- **Mood check-in** — removed entirely. Goal check-ins through AI conversation are the new daily ritual.
+- **Mood trends** — replaced by goal progress and practice consistency in Journey
 
 ## Open Questions
 
 1. **Grace days for recurring?** Allow 1 skip per week without breaking streak?
 2. **Goal limit?** Cap at 5-7 active goals, or unlimited?
-3. **Sub-goals/milestones?** Should one-time goals have sub-steps? (e.g. "Week 1: Run 5K, Week 4: Run 10K") — probably too complex for now
-4. **Reminders?** Should the app remind you about one-time goals as the deadline approaches?
-5. **Celebration?** What happens when you complete a one-time goal? Special card in Sacred Scrolls?
+3. **Sub-goals/milestones?** Should one-time goals have sub-steps? (probably too complex for now)
+4. **Proactive AI timing?** How aggressively should the AI raise goals in conversation? Should the user control this?
+5. **Celebration rituals?** What happens when you complete a one-time goal or hit a meaningful streak? A special moment in Sacred Scrolls?
+6. **DeeperWhy capture?** Should this happen during goal creation (structured) or emerge naturally through conversation over time?
