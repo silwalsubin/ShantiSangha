@@ -169,6 +169,7 @@ try
     api.MapVoiceRoutes();
     api.MapInsightRoutes();
     api.MapSearchRoutes();
+    api.MapGoalRoutes();
 
     // Health check at root (no /api prefix)
     app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))

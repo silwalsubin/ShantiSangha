@@ -33,30 +33,99 @@ const now = new Date()
 const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86400000)
 const dailyVerse = verses[dayOfYear % verses.length]
 
-// --- Mood (emotion picker) ---
-const emotions = [
-  { label: 'Peaceful', score: 8, color: 'from-[#c4873b]/20 to-[#c4873b]/5' },
-  { label: 'Grateful', score: 9, color: 'from-[#c4873b]/20 to-[#c4873b]/5' },
-  { label: 'Steady', score: 6, color: 'from-[#9a8568]/20 to-[#9a8568]/5' },
-  { label: 'Restless', score: 4, color: 'from-[#8b5a1b]/20 to-[#8b5a1b]/5' },
-  { label: 'Heavy', score: 3, color: 'from-[#6b5740]/20 to-[#6b5740]/5' },
-  { label: 'Anxious', score: 2, color: 'from-[#6b5740]/20 to-[#6b5740]/5' },
-]
-const selectedEmotion = ref<typeof emotions[0] | null>(null)
-const moodSaving = ref(false)
-const moodSaved = ref(false)
+// --- Goals check-in ---
+interface GoalToday {
+  id: string
+  title: string
+  currentStreak: number
+  longestStreak: number
+  checkedInToday: boolean
+  completedToday: boolean | null
+}
 
-async function selectEmotion(emotion: typeof emotions[0]) {
-  selectedEmotion.value = emotion
-  moodSaving.value = true
+const goals = ref<GoalToday[]>([])
+const goalsLoading = ref(true)
+const goalsCheckedIn = ref<Record<string, boolean>>({})
+const goalsSaving = ref<Record<string, boolean>>({})
+const allGoalsCheckedIn = ref(false)
+
+// New goal inline form
+const showNewGoalForm = ref(false)
+const newGoalTitle = ref('')
+const newGoalSaving = ref(false)
+
+async function loadGoals() {
+  goalsLoading.value = true
   try {
-    await api.post('/moods', { score: emotion.score, notes: emotion.label })
-    moodSaved.value = true
-    setTimeout(() => nextCard(), 1200)
+    const data = await api.get<any>('/goals/today')
+    const items = Array.isArray(data) ? data : (data?.goals || data?.items || [])
+    goals.value = items.map((g: any) => ({
+      id: g.id,
+      title: g.title,
+      currentStreak: g.currentStreak ?? g.current_streak ?? 0,
+      longestStreak: g.longestStreak ?? g.longest_streak ?? 0,
+      checkedInToday: g.checkedInToday ?? g.checked_in_today ?? false,
+      completedToday: g.completedToday ?? g.completed_today ?? null,
+    }))
+    // Mark already checked-in goals
+    for (const g of goals.value) {
+      if (g.checkedInToday) {
+        goalsCheckedIn.value[g.id] = true
+      }
+    }
+    checkAllDone()
   } catch {
-    // silently fail — don't block the flow
+    goals.value = []
   } finally {
-    moodSaving.value = false
+    goalsLoading.value = false
+  }
+}
+
+async function checkInGoal(goalId: string, completed: boolean) {
+  goalsSaving.value[goalId] = true
+  try {
+    await api.post(`/goals/${goalId}/checkin`, { completed })
+    goalsCheckedIn.value[goalId] = true
+    // Update streak locally
+    const goal = goals.value.find(g => g.id === goalId)
+    if (goal) {
+      goal.checkedInToday = true
+      goal.completedToday = completed
+      if (completed) {
+        goal.currentStreak += 1
+      } else {
+        goal.currentStreak = 0
+      }
+    }
+    checkAllDone()
+  } catch {
+    // silently fail
+  } finally {
+    goalsSaving.value[goalId] = false
+  }
+}
+
+function checkAllDone() {
+  if (goals.value.length === 0) return
+  const allDone = goals.value.every(g => goalsCheckedIn.value[g.id])
+  if (allDone && !allGoalsCheckedIn.value) {
+    allGoalsCheckedIn.value = true
+    setTimeout(() => nextCard(), 1200)
+  }
+}
+
+async function createGoal() {
+  if (!newGoalTitle.value.trim()) return
+  newGoalSaving.value = true
+  try {
+    await api.post('/goals', { title: newGoalTitle.value.trim() })
+    newGoalTitle.value = ''
+    showNewGoalForm.value = false
+    await loadGoals()
+  } catch {
+    // silently fail
+  } finally {
+    newGoalSaving.value = false
   }
 }
 
@@ -151,6 +220,7 @@ function handleScroll() {
 }
 
 onMounted(() => {
+  loadGoals()
   loadInsight()
   loadRecent()
 })
@@ -200,36 +270,114 @@ onMounted(() => {
         </button>
       </div>
 
-      <!-- Card 2: How are you feeling? (Emotion picker) -->
+      <!-- Card 2: Your Intentions (Goals check-in) -->
       <div class="snap-center rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] p-6 sm:p-8 shadow-[0_4px_24px_rgba(82,54,29,0.06)] backdrop-blur-[20px] min-h-[280px] flex flex-col items-center justify-center text-center">
-        <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a38d6d]">Check in</p>
+        <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a38d6d]">Daily discipline</p>
 
-        <p v-if="!moodSaved" class="mt-4 font-serif text-xl sm:text-2xl font-bold tracking-wide text-[#2b1e10]">
-          Right now, I feel...
+        <p class="mt-4 font-serif text-xl sm:text-2xl font-bold tracking-wide text-[#2b1e10]">
+          Your intentions
         </p>
 
-        <!-- Emotion grid -->
-        <div v-if="!moodSaved" class="mt-6 grid grid-cols-3 gap-2 w-full max-w-xs">
+        <!-- Loading -->
+        <div v-if="goalsLoading" class="mt-6 w-full max-w-xs space-y-3">
+          <div v-for="i in 2" :key="i" class="h-16 animate-pulse rounded-2xl bg-[rgba(139,90,43,0.06)]" />
+        </div>
+
+        <!-- No goals — empty state -->
+        <div v-else-if="goals.length === 0 && !showNewGoalForm" class="mt-6 w-full max-w-xs">
+          <p class="text-sm text-[#6b5740]">You haven't set any intentions yet.</p>
           <button
-            v-for="emotion in emotions"
-            :key="emotion.label"
-            @click="selectEmotion(emotion)"
-            :disabled="moodSaving"
-            class="rounded-xl border border-[rgba(139,90,43,0.12)] bg-gradient-to-b px-3 py-3 text-[13px] font-medium text-[#2b1e10] transition duration-200 active:scale-95 disabled:opacity-60"
-            :class="[
-              emotion.color,
-              selectedEmotion?.label === emotion.label ? 'ring-2 ring-[#c4873b] border-[#c4873b]' : 'hover:border-[rgba(139,90,43,0.25)]'
-            ]"
+            @click="showNewGoalForm = true"
+            class="mt-4 min-h-[44px] rounded-full bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-6 py-3 text-sm font-semibold text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)] transition duration-200 active:scale-[0.97]"
           >
-            {{ emotion.label }}
+            Set your first intention
           </button>
         </div>
 
-        <!-- Saved state -->
-        <div v-else class="mt-4">
-          <p class="font-serif text-xl font-bold text-[#2b1e10]">{{ selectedEmotion?.label }}</p>
-          <p class="mt-2 text-sm text-[#6b5740]">Noted. Thank you for checking in.</p>
+        <!-- New goal inline form -->
+        <div v-if="showNewGoalForm" class="mt-6 w-full max-w-xs">
+          <input
+            v-model="newGoalTitle"
+            type="text"
+            placeholder="I want to..."
+            class="w-full rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.95)] px-4 py-3 text-sm text-[#2b1e10] placeholder-[#b5996f] outline-none transition duration-200 focus:border-[#c4873b] focus:ring-1 focus:ring-[#c4873b]"
+            @keyup.enter="createGoal"
+          />
+          <div class="mt-3 flex justify-center gap-2">
+            <button
+              @click="createGoal"
+              :disabled="newGoalSaving || !newGoalTitle.trim()"
+              class="min-h-[44px] rounded-full bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-6 py-2.5 text-sm font-semibold text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)] transition duration-200 active:scale-[0.97] disabled:opacity-60"
+            >
+              {{ newGoalSaving ? 'Saving...' : 'Save' }}
+            </button>
+            <button
+              @click="showNewGoalForm = false"
+              class="min-h-[44px] rounded-full border border-[rgba(139,90,43,0.15)] px-5 py-2.5 text-sm font-medium text-[#6b5740] transition duration-200 active:scale-[0.97]"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
+
+        <!-- Goal list with check-in buttons -->
+        <div v-if="goals.length > 0" class="mt-6 w-full max-w-xs space-y-3">
+          <div
+            v-for="goal in goals"
+            :key="goal.id"
+            class="rounded-2xl border border-[rgba(139,90,43,0.1)] bg-[rgba(250,245,237,0.7)] px-4 py-3"
+          >
+            <div class="flex items-center justify-between">
+              <p class="text-left text-sm font-medium text-[#2b1e10]">{{ goal.title }}</p>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <SacredIcons name="flame" :size="14" class="text-[#c4873b]" />
+                <span class="font-serif font-bold text-[#c4873b] text-sm">{{ goal.currentStreak }}</span>
+              </div>
+            </div>
+
+            <!-- Already checked in -->
+            <div v-if="goalsCheckedIn[goal.id]" class="mt-2 flex items-center justify-center gap-2">
+              <SacredIcons name="check" :size="16" class="text-[#7aa87a]" />
+              <span class="text-xs text-[#6b5740]">
+                {{ goal.completedToday ? 'Done for today' : 'Noted. Rest well.' }}
+              </span>
+            </div>
+
+            <!-- Check-in buttons -->
+            <div v-else class="mt-2 flex justify-center gap-2">
+              <button
+                @click="checkInGoal(goal.id, true)"
+                :disabled="goalsSaving[goal.id]"
+                class="flex min-h-[44px] items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-4 py-2 text-xs font-semibold text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)] transition duration-200 active:scale-[0.97] disabled:opacity-60"
+              >
+                <SacredIcons name="check" :size="14" />
+                Done
+              </button>
+              <button
+                @click="checkInGoal(goal.id, false)"
+                :disabled="goalsSaving[goal.id]"
+                class="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-[rgba(139,90,43,0.15)] px-4 py-2 text-xs font-medium text-[#6b5740] transition duration-200 active:scale-[0.97] disabled:opacity-60 hover:bg-[rgba(196,135,59,0.06)]"
+              >
+                <SacredIcons name="skip" :size="12" />
+                Not today
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- All checked in message -->
+        <div v-if="allGoalsCheckedIn && goals.length > 0" class="mt-4">
+          <p class="text-sm text-[#6b5740]">All intentions accounted for. Well done.</p>
+        </div>
+
+        <!-- Skip if no goals and form not shown -->
+        <button
+          v-if="goals.length === 0 && !showNewGoalForm"
+          @click="nextCard"
+          class="mt-4 text-[12px] font-medium tracking-wide text-[#c4873b] transition duration-200 active:scale-95"
+        >
+          Skip for now
+        </button>
       </div>
 
       <!-- Card 3: Breathe -->

@@ -15,4 +15,5 @@ public class User
     public ICollection<CopingSession> CopingSessions { get; set; } = [];
     public ICollection<SavedInsight> SavedInsights { get; set; } = [];
     public ICollection<VoiceEntry> VoiceEntries { get; set; } = [];
+    public ICollection<Goal> Goals { get; set; } = [];
 }

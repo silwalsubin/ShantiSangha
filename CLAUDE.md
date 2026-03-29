@@ -5,7 +5,7 @@ See `docs/features/` for detailed feature documentation (purpose, value, how it 
 - [Dashboard](docs/features/dashboard.md) — daily landing page with verse, mood check-in, quick actions
 - [Chat](docs/features/chat.md) — AI spiritual companion (GPT-4o, SSE streaming)
 - [Journal](docs/features/journal.md) — private reflection writing with AI summaries/insights
-- [Mood](docs/features/mood.md) — daily emotional tracking with trends
+- [Goals](docs/features/goals.md) — daily intentions with streak-based discipline tracking
 - [Coping](docs/features/coping.md) — guided breathing/grounding exercises with timer
 - [Insights](docs/features/insights.md) — AI-extracted takeaways from conversations and journals
 - [Voice](docs/features/voice.md) — audio notes with async transcription

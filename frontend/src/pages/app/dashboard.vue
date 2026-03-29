@@ -18,13 +18,6 @@ const greeting = computed(() => {
 })
 const firstName = computed(() => user.value?.firstName || user.value?.username || 'friend')
 
-// Mood check-in
-const moodScore = ref(5)
-const moodNote = ref('')
-const moodSubmitting = ref(false)
-const moodDoneToday = ref(false)
-const moodError = ref('')
-
 // Recent conversations
 const conversations = ref<any[]>([])
 const convsLoading = ref(true)
@@ -33,23 +26,15 @@ const convsLoading = ref(true)
 const journals = ref<any[]>([])
 const journalsLoading = ref(true)
 
-// Mood trends
-const trends = ref<any>(null)
-const trendsLoading = ref(true)
-
-async function submitMood() {
-  moodSubmitting.value = true
-  moodError.value = ''
-  try {
-    await api.post('/moods', { score: moodScore.value, notes: moodNote.value })
-    moodDoneToday.value = true
-    await loadTrends()
-  } catch (e: any) {
-    moodError.value = 'Could not save check-in. Please try again.'
-  } finally {
-    moodSubmitting.value = false
-  }
+// Goals summary
+interface GoalSummary {
+  id: string
+  title: string
+  currentStreak: number
+  checkedInToday: boolean
 }
+const goals = ref<GoalSummary[]>([])
+const goalsLoading = ref(true)
 
 async function loadConversations() {
   try {
@@ -73,13 +58,21 @@ async function loadJournals() {
   }
 }
 
-async function loadTrends() {
+async function loadGoals() {
+  goalsLoading.value = true
   try {
-    trends.value = await api.get<any>('/moods/trends')
+    const data = await api.get<any>('/goals/today')
+    const items = Array.isArray(data) ? data : (data?.goals || data?.items || [])
+    goals.value = items.map((g: any) => ({
+      id: g.id,
+      title: g.title,
+      currentStreak: g.currentStreak ?? g.current_streak ?? 0,
+      checkedInToday: g.checkedInToday ?? g.checked_in_today ?? false,
+    }))
   } catch {
-    trends.value = null
+    goals.value = []
   } finally {
-    trendsLoading.value = false
+    goalsLoading.value = false
   }
 }
 
@@ -99,7 +92,7 @@ function formatDate(d: string) {
 onMounted(() => {
   loadConversations()
   loadJournals()
-  loadTrends()
+  loadGoals()
 })
 </script>
 
@@ -118,67 +111,42 @@ onMounted(() => {
       <p class="mt-1 text-[10px] uppercase tracking-[0.2em] text-[#9a8568]">-- Bhagavad Gita 2.47</p>
     </div>
 
-    <!-- Mood Check-in -->
-    <div v-if="!moodDoneToday" class="rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] p-4 sm:p-6 shadow-[0_8px_40px_rgba(82,54,29,0.08)] backdrop-blur-[20px]">
-      <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-[#a38d6d]">Today's Check-in</p>
-      <p class="mt-3 font-serif text-lg sm:text-xl font-bold tracking-wide text-[#2b1e10]">How would you rate your mood right now?</p>
-      <div class="mt-5 space-y-4">
-        <div class="flex items-center gap-4">
-          <span class="w-6 text-center text-sm font-semibold text-[#c4873b]">{{ moodScore }}</span>
-          <input
-            v-model.number="moodScore"
-            type="range" min="1" max="10" step="1"
-            class="h-2 w-full cursor-pointer appearance-none rounded-full bg-[#e6d5c3] accent-[#c4873b]"
-          />
-          <div class="flex justify-between w-full absolute pointer-events-none" />
-        </div>
-        <div class="flex justify-between text-xs text-[#6b5740]">
-          <span>1 -- Very low</span>
-          <span>10 -- Excellent</span>
-        </div>
-        <textarea
-          v-model="moodNote"
-          placeholder="Any notes? (optional)"
-          rows="2"
-          class="w-full resize-none rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.95)] px-4 py-3 text-sm text-[#2b1e10] placeholder-[#9a8568] outline-none focus:border-[#c4873b] focus:ring-1 focus:ring-[#c4873b]"
-        />
-        <p v-if="moodError" class="rounded-xl bg-[rgba(220,50,50,0.08)] px-4 py-2 text-sm text-red-700">{{ moodError }}</p>
-        <button
-          @click="submitMood"
-          :disabled="moodSubmitting"
-          class="min-h-[44px] rounded-full bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-6 py-2.5 text-sm font-semibold text-[#fff8f1] shadow-[0_4px_16px_rgba(139,90,43,0.25)] transition duration-200 hover:-translate-y-0.5 disabled:opacity-60"
-        >
-          {{ moodSubmitting ? 'Saving...' : 'Save Check-in' }}
-        </button>
-      </div>
-    </div>
-    <div v-else class="rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] px-4 sm:px-6 py-4 sm:py-5 shadow-[0_8px_40px_rgba(82,54,29,0.08)] backdrop-blur-[20px]">
-      <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-[#a38d6d]">Check-in</p>
-      <p class="mt-2 font-serif text-base sm:text-lg text-[#2b1e10]">You've checked in today. Well done.</p>
-    </div>
+    <!-- Goals Summary -->
+    <div class="rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] p-4 sm:p-6 shadow-[0_8px_40px_rgba(82,54,29,0.08)] backdrop-blur-[20px]">
+      <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-[#a38d6d]">Your Intentions</p>
 
-    <!-- Mood Trend -->
-    <div v-if="!trendsLoading && trends" class="rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] p-4 sm:p-6 shadow-[0_8px_40px_rgba(82,54,29,0.08)] backdrop-blur-[20px]">
-      <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-[#a38d6d]">Mood Trend</p>
-      <div class="mt-3 flex flex-wrap items-center gap-3 sm:gap-4">
-        <div class="rounded-2xl bg-[rgba(196,135,59,0.08)] px-4 sm:px-5 py-3 text-center">
-          <p class="text-2xl font-bold text-[#c4873b]">{{ trends.average?.toFixed(1) ?? '--' }}</p>
-          <p class="text-xs text-[#6b5740]">Average</p>
-        </div>
-        <div class="rounded-2xl bg-[rgba(196,135,59,0.08)] px-4 sm:px-5 py-3 text-center">
-          <p class="text-2xl font-bold text-[#c4873b] capitalize">{{ trends.trend ?? '--' }}</p>
-          <p class="text-xs text-[#6b5740]">Trend</p>
-        </div>
-        <div v-if="trends.daily_averages?.length" class="flex flex-1 items-end gap-1 min-w-0">
-          <div
-            v-for="day in trends.daily_averages.slice(-7)"
-            :key="day.date"
-            class="flex-1 rounded-t bg-gradient-to-t from-[#8b5a1b] to-[#c4873b] opacity-80 transition-all duration-200"
-            :style="{ height: `${(day.average / 10) * 48 + 4}px` }"
-            :title="`${day.date}: ${day.average?.toFixed(1)}`"
-          />
-        </div>
+      <div v-if="goalsLoading" class="mt-3 space-y-2">
+        <div v-for="i in 2" :key="i" class="h-12 animate-pulse rounded-2xl bg-[rgba(139,90,43,0.06)]" />
       </div>
+
+      <div v-else-if="goals.length === 0" class="mt-3">
+        <p class="text-sm text-[#6b5740]">No intentions set yet. Visit the Sacred Scrolls to begin.</p>
+      </div>
+
+      <ul v-else class="mt-3 space-y-2">
+        <li
+          v-for="goal in goals"
+          :key="goal.id"
+          class="flex items-center justify-between rounded-2xl border border-[rgba(139,90,43,0.1)] bg-[rgba(250,245,237,0.7)] px-4 py-3"
+        >
+          <div class="flex items-center gap-2 min-w-0">
+            <SacredIcons v-if="goal.checkedInToday" name="check" :size="16" class="shrink-0 text-[#7aa87a]" />
+            <SacredIcons v-else name="target" :size="16" class="shrink-0 text-[#b5996f]" />
+            <p class="truncate text-sm font-medium text-[#2b1e10]">{{ goal.title }}</p>
+          </div>
+          <div class="flex items-center gap-1 shrink-0 ml-3">
+            <SacredIcons name="flame" :size="14" class="text-[#c4873b]" />
+            <span class="font-serif font-bold text-[#c4873b] text-sm">{{ goal.currentStreak }}</span>
+          </div>
+        </li>
+      </ul>
+
+      <RouterLink
+        to="/app/home"
+        class="mt-3 block text-center text-xs text-[#c4873b] min-h-[44px] flex items-center justify-center hover:underline"
+      >
+        Open Sacred Scrolls
+      </RouterLink>
     </div>
 
     <!-- Recent Conversations -->

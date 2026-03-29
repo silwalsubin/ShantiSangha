@@ -58,7 +58,7 @@ defineProps<{ name: string; size?: number }>()
     <circle cx="15" cy="10" r="0.8" fill="currentColor" stroke="none" />
   </svg>
 
-  <!-- Mandala / Mood — sacred geometry -->
+  <!-- Mandala / sacred geometry -->
   <svg v-else-if="name === 'chakra'" :width="size || 22" :height="size || 22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
     <!-- Outer ring -->
     <circle cx="12" cy="12" r="9.5" />
@@ -110,6 +110,31 @@ defineProps<{ name: string; size?: number }>()
     <!-- Sound waves -->
     <path d="M19.5 8c.8.8 1.2 2 1 3.2" opacity="0.5" />
     <path d="M21 6.5c1 1.2 1.5 3 1.2 4.8" opacity="0.3" />
+  </svg>
+
+  <!-- Flame / Streaks — sacred fire -->
+  <svg v-if="name === 'flame'" :width="size || 22" :height="size || 22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2c1.5 3 5 6.5 5 11a5 5 0 0 1-10 0c0-4.5 3.5-8 5-11Z" />
+    <path d="M12 22c1.7 0 3-1.8 3-4 0-2.2-1.5-4-3-6-1.5 2-3 3.8-3 6 0 2.2 1.3 4 3 4Z" fill="currentColor" opacity="0.12" />
+  </svg>
+
+  <!-- Target / Goals — sacred intention -->
+  <svg v-else-if="name === 'target'" :width="size || 22" :height="size || 22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <circle cx="12" cy="12" r="6" />
+    <circle cx="12" cy="12" r="2" />
+    <circle cx="12" cy="12" r="0.6" fill="currentColor" stroke="none" />
+  </svg>
+
+  <!-- Check / Done — sacred completion -->
+  <svg v-else-if="name === 'check'" :width="size || 22" :height="size || 22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 13l4 4L19 7" />
+  </svg>
+
+  <!-- Skip / Not today -->
+  <svg v-else-if="name === 'skip'" :width="size || 22" :height="size || 22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 6L6 18" />
+    <path d="M6 6l12 12" />
   </svg>
 
   <!-- Dharma Wheel / alternate logo -->

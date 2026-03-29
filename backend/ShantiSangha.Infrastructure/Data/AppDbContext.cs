@@ -16,6 +16,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Summary> Summaries => Set<Summary>();
     public DbSet<VoiceEntry> VoiceEntries => Set<VoiceEntry>();
     public DbSet<SafetyEvent> SafetyEvents => Set<SafetyEvent>();
+    public DbSet<Goal> Goals => Set<Goal>();
+    public DbSet<GoalCheckIn> GoalCheckIns => Set<GoalCheckIn>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -58,6 +60,18 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.Property(s => s.EventType).HasConversion<string>();
             e.HasIndex(s => new { s.UserId, s.CreatedAt });
+        });
+
+        modelBuilder.Entity<Goal>(e =>
+        {
+            e.HasIndex(g => g.UserId);
+            e.HasIndex(g => new { g.UserId, g.Title }).IsUnique();
+        });
+
+        modelBuilder.Entity<GoalCheckIn>(e =>
+        {
+            e.HasIndex(c => c.GoalId);
+            e.HasIndex(c => new { c.GoalId, c.Date }).IsUnique();
         });
     }
 }

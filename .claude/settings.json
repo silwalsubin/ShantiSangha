@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(lsof -ti:5173)",
-      "Bash(xargs kill:*)"
+      "Bash(xargs kill:*)",
+      "Bash(dotnet ef:*)"
     ],
     "additionalDirectories": [
       "/Users/subinsilwal/Desktop/code/maiself/.claude"
