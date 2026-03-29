@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useApi } from '@/composables/useApi'
+import SacredIcons from '@/components/icons/SacredIcons.vue'
 
 const api = useApi()
 
@@ -86,12 +87,12 @@ function formatTime(s: number) {
 
 function categoryColor(cat: string) {
   const map: Record<string, string> = {
-    breathing: 'bg-[rgba(90,130,160,0.12)] text-[#3a7094]',
-    grounding: 'bg-[rgba(90,140,90,0.12)] text-[#3a7d3a]',
-    mindfulness: 'bg-[rgba(160,90,130,0.12)] text-[#8a3a6a]',
-    movement: 'bg-[rgba(201,146,98,0.14)] text-[#8a5b3f]',
+    breathing: 'bg-[rgba(196,135,59,0.12)] text-[#8b5a1b]',
+    grounding: 'bg-[rgba(139,90,43,0.12)] text-[#6b5740]',
+    mindfulness: 'bg-[rgba(196,135,59,0.15)] text-[#c4873b]',
+    movement: 'bg-[rgba(139,90,43,0.14)] text-[#8b5a1b]',
   }
-  return map[cat?.toLowerCase()] || 'bg-[rgba(138,91,63,0.1)] text-[#6c5c4d]'
+  return map[cat?.toLowerCase()] || 'bg-[rgba(139,90,43,0.1)] text-[#6b5740]'
 }
 
 onBeforeUnmount(() => {
@@ -102,41 +103,47 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl space-y-5">
-    <div>
-      <h1 class="font-serif text-2xl text-[#2b221a]">Coping Exercises</h1>
-      <p class="mt-1 text-sm text-[#6c5c4d]">Grounding tools for emotionally heavy moments.</p>
+  <div class="mx-auto max-w-3xl space-y-5 p-4 sm:p-6">
+    <!-- Header -->
+    <div class="flex items-center gap-3">
+      <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#c4873b] to-[#8b5a1b] text-white">
+        <SacredIcons name="lotus" :size="20" />
+      </div>
+      <div>
+        <h1 class="font-serif text-xl font-bold tracking-wide text-[#2b1e10] sm:text-2xl">Coping Exercises</h1>
+        <p class="mt-0.5 text-sm text-[#6b5740]">Grounding tools for emotionally heavy moments.</p>
+      </div>
     </div>
 
     <p v-if="error" class="rounded-2xl bg-[rgba(220,50,50,0.08)] px-4 py-3 text-sm text-red-700">{{ error }}</p>
 
     <div v-if="loading" class="grid gap-4 sm:grid-cols-2">
-      <div v-for="i in 4" :key="i" class="h-40 animate-pulse rounded-3xl bg-[rgba(138,91,63,0.08)]" />
+      <div v-for="i in 4" :key="i" class="h-40 animate-pulse rounded-2xl bg-[rgba(139,90,43,0.06)]" />
     </div>
 
-    <div v-else-if="exercises.length === 0" class="rounded-3xl border border-[rgba(101,76,52,0.14)] bg-[rgba(255,250,243,0.82)] px-6 py-12 text-center backdrop-blur-[14px]">
-      <p class="font-serif text-xl text-[#2b221a]">No exercises available</p>
-      <p class="mt-2 text-sm text-[#6c5c4d]">Check back soon for grounding and coping tools.</p>
+    <div v-else-if="exercises.length === 0" class="rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] px-6 py-12 text-center backdrop-blur-[20px]">
+      <p class="font-serif text-xl text-[#2b1e10]">No exercises available</p>
+      <p class="mt-2 text-sm text-[#6b5740]">Check back soon for grounding and coping tools.</p>
     </div>
 
     <div v-else class="grid gap-4 sm:grid-cols-2">
       <article
         v-for="exercise in exercises"
         :key="exercise.slug || exercise.id"
-        class="flex flex-col rounded-3xl border border-[rgba(101,76,52,0.12)] bg-[rgba(255,250,243,0.82)] p-5 shadow-[0_4px_24px_rgba(82,54,29,0.06)] backdrop-blur-[14px] transition hover:border-[rgba(138,91,63,0.24)] hover:shadow-[0_8px_32px_rgba(82,54,29,0.1)]"
+        class="flex flex-col rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] p-4 shadow-[0_4px_24px_rgba(82,54,29,0.06)] backdrop-blur-[20px] transition duration-200 hover:border-[rgba(139,90,43,0.24)] hover:shadow-[0_8px_32px_rgba(82,54,29,0.1)] sm:p-5"
       >
         <div class="flex items-start justify-between gap-2">
-          <h2 class="font-serif text-lg text-[#2b221a]">{{ exercise.name }}</h2>
-          <span v-if="exercise.category" class="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium" :class="categoryColor(exercise.category)">
+          <h2 class="font-serif text-lg font-bold text-[#2b1e10]">{{ exercise.name }}</h2>
+          <span v-if="exercise.category" class="shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.15em]" :class="categoryColor(exercise.category)">
             {{ exercise.category }}
           </span>
         </div>
-        <p class="mt-2 flex-1 text-sm leading-relaxed text-[#6c5c4d]">{{ exercise.description }}</p>
+        <p class="mt-2 flex-1 text-sm leading-relaxed text-[#6b5740]">{{ exercise.description }}</p>
         <div class="mt-4 flex items-center justify-between">
-          <span v-if="exercise.duration" class="text-xs text-[#b89c87]">⏱ {{ exercise.duration }}</span>
+          <span v-if="exercise.duration" class="text-xs text-[#9a8568]">{{ exercise.duration }}</span>
           <button
             @click="startExercise(exercise)"
-            class="rounded-full bg-[#8a5b3f] px-4 py-1.5 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#7a4c32]"
+            class="min-h-[44px] rounded-full bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-5 py-2 text-sm font-semibold text-white shadow-[0_4px_16px_rgba(139,90,43,0.25)] transition duration-200 hover:-translate-y-0.5"
           >
             Start
           </button>
@@ -148,16 +155,16 @@ onMounted(load)
     <Teleport to="body">
       <div
         v-if="activeExercise"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(43,34,26,0.5)] p-4 backdrop-blur-sm"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(43,30,16,0.55)] p-4 backdrop-blur-[20px]"
         @click.self="closeModal"
       >
-        <div class="w-full max-w-sm rounded-3xl border border-[rgba(101,76,52,0.16)] bg-[#f9f2e8] p-8 shadow-[0_32px_80px_rgba(43,34,26,0.2)]">
-          <p class="text-center text-xs font-bold uppercase tracking-widest text-[#8a5b3f]">{{ activeExercise.category }}</p>
-          <h2 class="mt-2 text-center font-serif text-2xl text-[#2b221a]">{{ activeExercise.name }}</h2>
-          <p class="mt-3 text-center text-sm leading-relaxed text-[#6c5c4d]">{{ activeExercise.description }}</p>
+        <div class="w-full max-w-sm rounded-2xl border border-[rgba(139,90,43,0.15)] bg-[rgba(250,245,237,0.97)] p-6 shadow-[0_32px_80px_rgba(43,30,16,0.25)] sm:p-8">
+          <p class="text-center text-[9px] font-bold uppercase tracking-[0.2em] text-[#a38d6d]">{{ activeExercise.category }}</p>
+          <h2 class="mt-2 text-center font-serif text-xl font-bold text-[#2b1e10] sm:text-2xl">{{ activeExercise.name }}</h2>
+          <p class="mt-3 text-center text-sm leading-relaxed text-[#6b5740]">{{ activeExercise.description }}</p>
 
           <div class="mt-6 text-center">
-            <p class="font-mono text-5xl font-bold text-[#8a5b3f]">{{ formatTime(timerSeconds) }}</p>
+            <p class="font-mono text-5xl font-bold text-[#c4873b]">{{ formatTime(timerSeconds) }}</p>
           </div>
 
           <div v-if="completeSuccess" class="mt-4 rounded-2xl bg-[rgba(90,160,90,0.12)] px-4 py-2 text-center text-sm text-green-700">
@@ -168,14 +175,14 @@ onMounted(load)
             <button
               v-if="timerRunning"
               @click="pauseTimer"
-              class="rounded-full border border-[rgba(101,76,52,0.16)] px-5 py-2 text-sm font-semibold text-[#6c5c4d] transition hover:bg-[rgba(138,91,63,0.06)]"
+              class="min-h-[44px] rounded-full border border-[rgba(139,90,43,0.15)] px-5 py-2 text-sm font-semibold text-[#6b5740] transition duration-200 hover:bg-[rgba(139,90,43,0.06)]"
             >
               Pause
             </button>
             <button
               v-else-if="!completeSuccess"
               @click="resumeTimer"
-              class="rounded-full border border-[rgba(101,76,52,0.16)] px-5 py-2 text-sm font-semibold text-[#6c5c4d] transition hover:bg-[rgba(138,91,63,0.06)]"
+              class="min-h-[44px] rounded-full border border-[rgba(139,90,43,0.15)] px-5 py-2 text-sm font-semibold text-[#6b5740] transition duration-200 hover:bg-[rgba(139,90,43,0.06)]"
             >
               Resume
             </button>
@@ -183,13 +190,13 @@ onMounted(load)
               v-if="!completeSuccess"
               @click="completeExercise"
               :disabled="completing"
-              class="rounded-full bg-[#2b221a] px-5 py-2 text-sm font-semibold text-[#fff8f1] transition hover:-translate-y-0.5 disabled:opacity-60"
+              class="min-h-[44px] rounded-full bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-5 py-2 text-sm font-semibold text-white shadow-[0_4px_16px_rgba(139,90,43,0.25)] transition duration-200 hover:-translate-y-0.5 disabled:opacity-60"
             >
-              {{ completing ? 'Saving…' : 'Complete' }}
+              {{ completing ? 'Saving...' : 'Complete' }}
             </button>
             <button
               @click="closeModal"
-              class="rounded-full border border-[rgba(101,76,52,0.12)] px-5 py-2 text-sm font-medium text-[#b89c87] transition hover:text-[#6c5c4d]"
+              class="min-h-[44px] rounded-full border border-[rgba(139,90,43,0.12)] px-5 py-2 text-sm font-medium text-[#9a8568] transition duration-200 hover:text-[#6b5740]"
             >
               Close
             </button>

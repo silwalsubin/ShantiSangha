@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useApi } from '@/composables/useApi'
+import SacredIcons from '@/components/icons/SacredIcons.vue'
 
 const api = useApi()
 const router = useRouter()
@@ -33,50 +34,78 @@ async function save() {
 </script>
 
 <template>
-  <div class="mx-auto max-w-2xl space-y-5">
-    <div class="flex items-center gap-3">
-      <RouterLink to="/app/journal" class="rounded-xl p-1.5 text-[#6c5c4d] transition hover:bg-[rgba(138,91,63,0.08)]">
+  <div class="mx-auto max-w-2xl px-4 py-4 sm:px-6 sm:py-6">
+    <!-- Header -->
+    <div class="mb-5 flex items-center gap-3">
+      <RouterLink
+        to="/app/journal"
+        class="flex h-11 w-11 items-center justify-center rounded-xl text-[#6b5740] transition duration-200 hover:bg-[rgba(139,90,43,0.08)]"
+      >
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
         </svg>
       </RouterLink>
-      <h1 class="font-serif text-2xl text-[#2b221a]">New Journal Entry</h1>
+      <div class="flex items-center gap-2.5">
+        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#c4873b] to-[#8b5a1b] text-white shadow-[0_2px_8px_rgba(139,90,43,0.25)]">
+          <SacredIcons name="scroll" :size="18" />
+        </div>
+        <div>
+          <h1 class="font-serif text-xl font-bold tracking-wide text-[#2b1e10] sm:text-2xl">New Entry</h1>
+          <p class="text-[9px] uppercase tracking-[0.2em] text-[#a38d6d]">Journal</p>
+        </div>
+      </div>
     </div>
 
-    <div class="rounded-3xl border border-[rgba(101,76,52,0.14)] bg-[rgba(255,250,243,0.82)] p-6 shadow-[0_8px_40px_rgba(82,54,29,0.08)] backdrop-blur-[14px]">
-      <div class="space-y-4">
+    <!-- Form card -->
+    <div class="rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] p-4 shadow-[0_4px_24px_rgba(82,54,29,0.06)] backdrop-blur-[20px] sm:p-6">
+      <div class="space-y-5">
+        <!-- Title field -->
         <div>
-          <label class="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-[#8a5b3f]">Title</label>
+          <label class="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a38d6d]">Title</label>
           <input
             v-model="title"
             type="text"
             placeholder="Give this entry a title (optional)"
-            class="w-full rounded-2xl border border-[rgba(101,76,52,0.14)] bg-[rgba(255,248,239,0.9)] px-4 py-3 text-[#2b221a] placeholder-[#b89c87] outline-none transition focus:border-[#c99262] focus:ring-1 focus:ring-[#c99262]"
+            class="min-h-[44px] w-full rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.9)] px-4 py-3 text-[#2b1e10] placeholder-[#b5996f] outline-none transition duration-200 focus:border-[#c4873b] focus:ring-1 focus:ring-[#c4873b]"
           />
         </div>
+
+        <!-- Content field -->
         <div>
-          <label class="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-[#8a5b3f]">Your thoughts</label>
+          <label class="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a38d6d]">Your thoughts</label>
           <textarea
             v-model="content"
-            placeholder="What's on your mind? Write freely — this is your private space."
+            placeholder="What is on your mind? Write freely -- this is your private space."
             rows="12"
-            class="w-full resize-y rounded-2xl border border-[rgba(101,76,52,0.14)] bg-[rgba(255,248,239,0.9)] px-4 py-3 text-[#2b221a] placeholder-[#b89c87] outline-none transition focus:border-[#c99262] focus:ring-1 focus:ring-[#c99262]"
+            class="w-full resize-y rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.9)] px-4 py-3 text-[#2b1e10] leading-relaxed placeholder-[#b5996f] outline-none transition duration-200 focus:border-[#c4873b] focus:ring-1 focus:ring-[#c4873b]"
           />
         </div>
-        <p v-if="error" class="rounded-xl bg-[rgba(220,50,50,0.08)] px-4 py-2 text-sm text-red-700">{{ error }}</p>
-        <div class="flex gap-3">
+
+        <!-- Error -->
+        <p v-if="error" class="rounded-xl border border-[rgba(220,50,50,0.15)] bg-[rgba(220,50,50,0.06)] px-4 py-2.5 text-sm text-red-700">{{ error }}</p>
+
+        <!-- Actions -->
+        <div class="flex flex-col gap-3 sm:flex-row">
           <button
             @click="save"
             :disabled="saving"
-            class="rounded-full bg-[#2b221a] px-6 py-2.5 text-sm font-semibold text-[#fff8f1] transition hover:-translate-y-0.5 disabled:opacity-60"
+            class="flex min-h-[44px] items-center justify-center rounded-xl bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-6 py-2.5 text-sm font-semibold text-white shadow-[0_2px_12px_rgba(139,90,43,0.3)] transition duration-200 hover:-translate-y-0.5 disabled:opacity-60"
           >
-            {{ saving ? 'Saving…' : 'Save Entry' }}
+            {{ saving ? 'Saving...' : 'Save Entry' }}
           </button>
-          <RouterLink to="/app/journal" class="rounded-full border border-[rgba(101,76,52,0.16)] px-6 py-2.5 text-sm font-semibold text-[#6c5c4d] transition hover:bg-[rgba(138,91,63,0.06)]">
+          <RouterLink
+            to="/app/journal"
+            class="flex min-h-[44px] items-center justify-center rounded-xl border border-[rgba(139,90,43,0.15)] px-6 py-2.5 text-sm font-semibold text-[#6b5740] transition duration-200 hover:bg-[rgba(139,90,43,0.05)]"
+          >
             Cancel
           </RouterLink>
         </div>
       </div>
     </div>
+
+    <!-- Footer wisdom -->
+    <p class="mt-8 text-center text-xs italic leading-relaxed text-[#b5996f]">
+      "Know thyself" -- the eternal call of Atma-Jnana
+    </p>
   </div>
 </template>

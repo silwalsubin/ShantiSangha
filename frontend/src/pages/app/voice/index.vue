@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useApi } from '@/composables/useApi'
+import SacredIcons from '@/components/icons/SacredIcons.vue'
 
 const api = useApi()
 
@@ -127,11 +128,11 @@ function formatDate(d: string) {
 function statusColor(status: string) {
   const map: Record<string, string> = {
     Completed: 'bg-[rgba(90,160,90,0.12)] text-green-700',
-    Transcribing: 'bg-[rgba(201,146,98,0.14)] text-[#8a5b3f]',
-    Pending: 'bg-[rgba(138,91,63,0.1)] text-[#6c5c4d]',
+    Transcribing: 'bg-[rgba(196,135,59,0.14)] text-[#8b5a1b]',
+    Pending: 'bg-[rgba(139,90,43,0.1)] text-[#6b5740]',
     Failed: 'bg-[rgba(220,50,50,0.1)] text-red-600',
   }
-  return map[status] || 'bg-[rgba(138,91,63,0.1)] text-[#6c5c4d]'
+  return map[status] || 'bg-[rgba(139,90,43,0.1)] text-[#6b5740]'
 }
 
 onBeforeUnmount(() => {
@@ -145,15 +146,21 @@ onMounted(loadEntries)
 </script>
 
 <template>
-  <div class="mx-auto max-w-2xl space-y-6">
-    <div>
-      <h1 class="font-serif text-2xl text-[#2b221a]">Voice Notes</h1>
-      <p class="mt-1 text-sm text-[#6c5c4d]">Speak your thoughts aloud and have them transcribed.</p>
+  <div class="mx-auto max-w-2xl space-y-5 p-4 sm:p-6">
+    <!-- Header -->
+    <div class="flex items-center gap-3">
+      <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#c4873b] to-[#8b5a1b] text-white">
+        <SacredIcons name="shankha" :size="20" />
+      </div>
+      <div>
+        <h1 class="font-serif text-xl font-bold tracking-wide text-[#2b1e10] sm:text-2xl">Voice Notes</h1>
+        <p class="mt-0.5 text-sm text-[#6b5740]">Speak your thoughts aloud and have them transcribed.</p>
+      </div>
     </div>
 
     <!-- Record section -->
-    <div class="rounded-3xl border border-[rgba(101,76,52,0.14)] bg-[rgba(255,250,243,0.82)] p-6 shadow-[0_8px_40px_rgba(82,54,29,0.08)] backdrop-blur-[14px]">
-      <p class="text-xs font-bold uppercase tracking-widest text-[#8a5b3f]">Record a Voice Note</p>
+    <div class="rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] p-4 shadow-[0_8px_40px_rgba(82,54,29,0.08)] backdrop-blur-[20px] sm:p-6">
+      <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-[#a38d6d]">Record a Voice Note</p>
 
       <div v-if="micDenied" class="mt-4 rounded-2xl bg-[rgba(220,50,50,0.08)] px-4 py-3 text-sm text-red-700">
         Microphone access was denied. Please allow microphone access in your browser settings.
@@ -166,7 +173,7 @@ onMounted(loadEntries)
             <span
               v-for="i in 12"
               :key="i"
-              class="w-1.5 rounded-full bg-gradient-to-t from-[#8a5b3f] to-[#c99262] animate-pulse"
+              class="w-1.5 rounded-full bg-gradient-to-t from-[#8b5a1b] to-[#c4873b] animate-pulse"
               :style="{
                 height: `${16 + Math.sin(i * 0.8) * 14 + Math.random() * 8}px`,
                 animationDelay: `${i * 80}ms`,
@@ -174,22 +181,22 @@ onMounted(loadEntries)
             />
           </template>
           <template v-else-if="uploading">
-            <span class="text-sm text-[#6c5c4d]">Processing…</span>
+            <span class="text-sm text-[#6b5740]">Processing...</span>
           </template>
           <template v-else>
             <div class="flex gap-1">
-              <span v-for="i in 12" :key="i" class="h-2 w-1.5 rounded-full bg-[rgba(138,91,63,0.2)]" />
+              <span v-for="i in 12" :key="i" class="h-2 w-1.5 rounded-full bg-[rgba(139,90,43,0.2)]" />
             </div>
           </template>
         </div>
 
-        <p v-if="recording" class="font-mono text-3xl font-bold text-[#8a5b3f]">{{ formatTime(recordingSeconds) }}</p>
+        <p v-if="recording" class="font-mono text-3xl font-bold text-[#c4873b]">{{ formatTime(recordingSeconds) }}</p>
 
         <div class="flex gap-3">
           <button
             v-if="!recording && !uploading"
             @click="startRecording"
-            class="flex items-center gap-2 rounded-full bg-[#8a5b3f] px-6 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#7a4c32]"
+            class="flex min-h-[44px] items-center gap-2 rounded-full bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-6 py-3 text-sm font-semibold text-white shadow-[0_4px_16px_rgba(139,90,43,0.25)] transition duration-200 hover:-translate-y-0.5"
           >
             <span class="h-2.5 w-2.5 rounded-full bg-white" />
             Record
@@ -197,14 +204,14 @@ onMounted(loadEntries)
           <button
             v-if="recording"
             @click="stopRecording"
-            class="flex items-center gap-2 rounded-full bg-red-600 px-6 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5"
+            class="flex min-h-[44px] items-center gap-2 rounded-full bg-red-600 px-6 py-3 text-sm font-semibold text-white transition duration-200 hover:-translate-y-0.5"
           >
             <span class="h-2.5 w-2.5 rounded bg-white" />
             Stop
           </button>
-          <div v-if="uploading" class="flex items-center gap-2 rounded-full bg-[rgba(138,91,63,0.08)] px-6 py-3 text-sm text-[#6c5c4d]">
-            <span class="h-4 w-4 animate-spin rounded-full border-2 border-[#c99262] border-t-transparent" />
-            Uploading…
+          <div v-if="uploading" class="flex items-center gap-2 rounded-full bg-[rgba(139,90,43,0.08)] px-6 py-3 text-sm text-[#6b5740]">
+            <span class="h-4 w-4 animate-spin rounded-full border-2 border-[#c4873b] border-t-transparent" />
+            Uploading...
           </div>
         </div>
 
@@ -214,41 +221,41 @@ onMounted(loadEntries)
     </div>
 
     <!-- Entries list -->
-    <div class="rounded-3xl border border-[rgba(101,76,52,0.14)] bg-[rgba(255,250,243,0.82)] p-6 shadow-[0_8px_40px_rgba(82,54,29,0.08)] backdrop-blur-[14px]">
+    <div class="rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] p-4 shadow-[0_8px_40px_rgba(82,54,29,0.08)] backdrop-blur-[20px] sm:p-6">
       <div class="flex items-center justify-between">
-        <p class="text-xs font-bold uppercase tracking-widest text-[#8a5b3f]">Your Voice Notes</p>
-        <button @click="loadEntries" class="text-xs text-[#8a5b3f] hover:underline">Refresh</button>
+        <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-[#a38d6d]">Your Voice Notes</p>
+        <button @click="loadEntries" class="min-h-[44px] px-2 text-xs text-[#c4873b] transition duration-200 hover:underline">Refresh</button>
       </div>
 
       <p v-if="error" class="mt-3 text-sm text-red-700">{{ error }}</p>
 
       <div v-if="loading" class="mt-4 space-y-3">
-        <div v-for="i in 3" :key="i" class="h-16 animate-pulse rounded-2xl bg-[rgba(138,91,63,0.08)]" />
+        <div v-for="i in 3" :key="i" class="h-16 animate-pulse rounded-2xl bg-[rgba(139,90,43,0.06)]" />
       </div>
 
       <div v-else-if="entries.length === 0" class="mt-6 text-center">
-        <p class="font-serif text-lg text-[#2b221a]">No voice notes yet</p>
-        <p class="mt-1 text-sm text-[#6c5c4d]">Record your first note above.</p>
+        <p class="font-serif text-lg text-[#2b1e10]">No voice notes yet</p>
+        <p class="mt-1 text-sm text-[#6b5740]">Record your first note above.</p>
       </div>
 
       <ul v-else class="mt-4 space-y-3">
         <li
           v-for="entry in entries"
           :key="entry.id"
-          class="rounded-2xl border border-[rgba(101,76,52,0.1)] bg-[rgba(255,248,239,0.7)] p-4"
+          class="rounded-2xl border border-[rgba(139,90,43,0.1)] bg-[rgba(250,245,237,0.7)] p-4"
         >
           <div class="flex items-start justify-between gap-3">
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2">
-                <span class="rounded-full px-2.5 py-0.5 text-xs font-medium" :class="statusColor(entry.status)">
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="rounded-full px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em]" :class="statusColor(entry.status)">
                   {{ entry.status || 'Pending' }}
                 </span>
-                <span class="text-xs text-[#b89c87]">{{ entry.created_at ? formatDate(entry.created_at) : '' }}</span>
-                <span v-if="entry.duration_seconds" class="text-xs text-[#b89c87]">· {{ formatTime(entry.duration_seconds) }}</span>
+                <span class="text-xs text-[#b5996f]">{{ entry.created_at ? formatDate(entry.created_at) : '' }}</span>
+                <span v-if="entry.duration_seconds" class="text-xs text-[#b5996f]">| {{ formatTime(entry.duration_seconds) }}</span>
               </div>
-              <p v-if="entry.transcript" class="mt-2 text-sm leading-relaxed text-[#2b221a]">{{ entry.transcript }}</p>
-              <p v-else-if="entry.status === 'Transcribing'" class="mt-2 text-sm italic text-[#b89c87]">Transcription in progress…</p>
-              <p v-else-if="entry.status === 'Pending'" class="mt-2 text-sm italic text-[#b89c87]">Waiting to be transcribed.</p>
+              <p v-if="entry.transcript" class="mt-2 text-sm leading-relaxed text-[#2b1e10]">{{ entry.transcript }}</p>
+              <p v-else-if="entry.status === 'Transcribing'" class="mt-2 text-sm italic text-[#9a8568]">Transcription in progress...</p>
+              <p v-else-if="entry.status === 'Pending'" class="mt-2 text-sm italic text-[#9a8568]">Waiting to be transcribed.</p>
               <p v-else-if="entry.status === 'Failed'" class="mt-2 text-sm text-red-500">Transcription failed.</p>
             </div>
           </div>

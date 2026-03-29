@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUser } from '@clerk/vue'
 import { useApi } from '@/composables/useApi'
+import SacredIcons from '@/components/icons/SacredIcons.vue'
 
 const { user } = useUser()
 const api = useApi()
@@ -103,69 +104,76 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl space-y-6">
+  <div class="mx-auto max-w-3xl space-y-4 sm:space-y-6 p-4 sm:p-6">
     <!-- Greeting -->
     <div>
-      <h1 class="font-serif text-3xl text-[#2b221a]">{{ greeting }}, {{ firstName }} 🌿</h1>
-      <p class="mt-1 text-sm text-[#6c5c4d]">How are you doing today?</p>
+      <h1 class="font-serif text-2xl sm:text-3xl font-bold tracking-wide text-[#2b1e10]">{{ greeting }}, {{ firstName }}</h1>
+      <p class="mt-1 text-sm text-[#6b5740]">How are you doing today?</p>
+    </div>
+
+    <!-- Daily Verse -->
+    <div class="rounded-2xl border border-dashed border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.95)] p-4 sm:p-5 backdrop-blur-[20px]">
+      <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-[#a38d6d]">Verse of the Day</p>
+      <p class="mt-2 font-serif italic text-sm sm:text-base text-[#b5996f] leading-relaxed">"You have the right to work, but never to the fruit of work."</p>
+      <p class="mt-1 text-[10px] uppercase tracking-[0.2em] text-[#9a8568]">-- Bhagavad Gita 2.47</p>
     </div>
 
     <!-- Mood Check-in -->
-    <div v-if="!moodDoneToday" class="rounded-3xl border border-[rgba(101,76,52,0.14)] bg-[rgba(255,250,243,0.82)] p-6 shadow-[0_8px_40px_rgba(82,54,29,0.08)] backdrop-blur-[14px]">
-      <p class="text-xs font-bold uppercase tracking-widest text-[#8a5b3f]">Today's Check-in</p>
-      <p class="mt-3 font-serif text-xl text-[#2b221a]">How would you rate your mood right now?</p>
+    <div v-if="!moodDoneToday" class="rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] p-4 sm:p-6 shadow-[0_8px_40px_rgba(82,54,29,0.08)] backdrop-blur-[20px]">
+      <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-[#a38d6d]">Today's Check-in</p>
+      <p class="mt-3 font-serif text-lg sm:text-xl font-bold tracking-wide text-[#2b1e10]">How would you rate your mood right now?</p>
       <div class="mt-5 space-y-4">
         <div class="flex items-center gap-4">
-          <span class="w-6 text-center text-sm font-semibold text-[#8a5b3f]">{{ moodScore }}</span>
+          <span class="w-6 text-center text-sm font-semibold text-[#c4873b]">{{ moodScore }}</span>
           <input
             v-model.number="moodScore"
             type="range" min="1" max="10" step="1"
-            class="h-2 w-full cursor-pointer appearance-none rounded-full bg-[#e6d5c3] accent-[#8a5b3f]"
+            class="h-2 w-full cursor-pointer appearance-none rounded-full bg-[#e6d5c3] accent-[#c4873b]"
           />
           <div class="flex justify-between w-full absolute pointer-events-none" />
         </div>
-        <div class="flex justify-between text-xs text-[#6c5c4d]">
-          <span>1 — Very low</span>
-          <span>10 — Excellent</span>
+        <div class="flex justify-between text-xs text-[#6b5740]">
+          <span>1 -- Very low</span>
+          <span>10 -- Excellent</span>
         </div>
         <textarea
           v-model="moodNote"
           placeholder="Any notes? (optional)"
           rows="2"
-          class="w-full resize-none rounded-2xl border border-[rgba(101,76,52,0.14)] bg-[rgba(255,248,239,0.9)] px-4 py-3 text-sm text-[#2b221a] placeholder-[#b89c87] outline-none focus:border-[#c99262] focus:ring-1 focus:ring-[#c99262]"
+          class="w-full resize-none rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.95)] px-4 py-3 text-sm text-[#2b1e10] placeholder-[#9a8568] outline-none focus:border-[#c4873b] focus:ring-1 focus:ring-[#c4873b]"
         />
         <p v-if="moodError" class="rounded-xl bg-[rgba(220,50,50,0.08)] px-4 py-2 text-sm text-red-700">{{ moodError }}</p>
         <button
           @click="submitMood"
           :disabled="moodSubmitting"
-          class="rounded-full bg-[#2b221a] px-6 py-2.5 text-sm font-semibold text-[#fff8f1] transition hover:-translate-y-0.5 disabled:opacity-60"
+          class="min-h-[44px] rounded-full bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-6 py-2.5 text-sm font-semibold text-[#fff8f1] shadow-[0_4px_16px_rgba(139,90,43,0.25)] transition duration-200 hover:-translate-y-0.5 disabled:opacity-60"
         >
-          {{ moodSubmitting ? 'Saving…' : 'Save Check-in' }}
+          {{ moodSubmitting ? 'Saving...' : 'Save Check-in' }}
         </button>
       </div>
     </div>
-    <div v-else class="rounded-3xl border border-[rgba(101,76,52,0.14)] bg-[rgba(255,250,243,0.82)] px-6 py-5 shadow-[0_8px_40px_rgba(82,54,29,0.08)] backdrop-blur-[14px]">
-      <p class="text-xs font-bold uppercase tracking-widest text-[#8a5b3f]">Check-in</p>
-      <p class="mt-2 font-serif text-lg text-[#2b221a]">You've checked in today. Well done ✨</p>
+    <div v-else class="rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] px-4 sm:px-6 py-4 sm:py-5 shadow-[0_8px_40px_rgba(82,54,29,0.08)] backdrop-blur-[20px]">
+      <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-[#a38d6d]">Check-in</p>
+      <p class="mt-2 font-serif text-base sm:text-lg text-[#2b1e10]">You've checked in today. Well done.</p>
     </div>
 
     <!-- Mood Trend -->
-    <div v-if="!trendsLoading && trends" class="rounded-3xl border border-[rgba(101,76,52,0.14)] bg-[rgba(255,250,243,0.82)] p-6 shadow-[0_8px_40px_rgba(82,54,29,0.08)] backdrop-blur-[14px]">
-      <p class="text-xs font-bold uppercase tracking-widest text-[#8a5b3f]">Mood Trend</p>
-      <div class="mt-3 flex flex-wrap items-center gap-4">
-        <div class="rounded-2xl bg-[rgba(138,91,63,0.08)] px-5 py-3 text-center">
-          <p class="text-2xl font-bold text-[#8a5b3f]">{{ trends.average?.toFixed(1) ?? '–' }}</p>
-          <p class="text-xs text-[#6c5c4d]">Average</p>
+    <div v-if="!trendsLoading && trends" class="rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] p-4 sm:p-6 shadow-[0_8px_40px_rgba(82,54,29,0.08)] backdrop-blur-[20px]">
+      <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-[#a38d6d]">Mood Trend</p>
+      <div class="mt-3 flex flex-wrap items-center gap-3 sm:gap-4">
+        <div class="rounded-2xl bg-[rgba(196,135,59,0.08)] px-4 sm:px-5 py-3 text-center">
+          <p class="text-2xl font-bold text-[#c4873b]">{{ trends.average?.toFixed(1) ?? '--' }}</p>
+          <p class="text-xs text-[#6b5740]">Average</p>
         </div>
-        <div class="rounded-2xl bg-[rgba(138,91,63,0.08)] px-5 py-3 text-center">
-          <p class="text-2xl font-bold text-[#8a5b3f] capitalize">{{ trends.trend ?? '–' }}</p>
-          <p class="text-xs text-[#6c5c4d]">Trend</p>
+        <div class="rounded-2xl bg-[rgba(196,135,59,0.08)] px-4 sm:px-5 py-3 text-center">
+          <p class="text-2xl font-bold text-[#c4873b] capitalize">{{ trends.trend ?? '--' }}</p>
+          <p class="text-xs text-[#6b5740]">Trend</p>
         </div>
         <div v-if="trends.daily_averages?.length" class="flex flex-1 items-end gap-1 min-w-0">
           <div
             v-for="day in trends.daily_averages.slice(-7)"
             :key="day.date"
-            class="flex-1 rounded-t bg-gradient-to-t from-[#8a5b3f] to-[#c99262] opacity-80 transition-all"
+            class="flex-1 rounded-t bg-gradient-to-t from-[#8b5a1b] to-[#c4873b] opacity-80 transition-all duration-200"
             :style="{ height: `${(day.average / 10) * 48 + 4}px` }"
             :title="`${day.date}: ${day.average?.toFixed(1)}`"
           />
@@ -174,61 +182,67 @@ onMounted(() => {
     </div>
 
     <!-- Recent Conversations -->
-    <div class="rounded-3xl border border-[rgba(101,76,52,0.14)] bg-[rgba(255,250,243,0.82)] p-6 shadow-[0_8px_40px_rgba(82,54,29,0.08)] backdrop-blur-[14px]">
+    <div class="rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] p-4 sm:p-6 shadow-[0_8px_40px_rgba(82,54,29,0.08)] backdrop-blur-[20px]">
       <div class="flex items-center justify-between">
-        <p class="text-xs font-bold uppercase tracking-widest text-[#8a5b3f]">Recent Conversations</p>
-        <button @click="newConversation" class="rounded-full bg-[#2b221a] px-4 py-1.5 text-xs font-semibold text-[#fff8f1] transition hover:-translate-y-0.5">
+        <div class="flex items-center gap-2">
+          <SacredIcons name="dialogue" :size="16" class="text-[#a38d6d]" />
+          <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a38d6d]">Recent Conversations</p>
+        </div>
+        <button @click="newConversation" class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-4 py-2 text-xs font-semibold text-[#fff8f1] shadow-[0_4px_16px_rgba(139,90,43,0.25)] transition duration-200 hover:-translate-y-0.5">
           + New
         </button>
       </div>
       <div v-if="convsLoading" class="mt-4 space-y-2">
-        <div v-for="i in 3" :key="i" class="h-12 animate-pulse rounded-2xl bg-[rgba(138,91,63,0.08)]" />
+        <div v-for="i in 3" :key="i" class="h-12 animate-pulse rounded-2xl bg-[rgba(196,135,59,0.08)]" />
       </div>
-      <div v-else-if="conversations.length === 0" class="mt-4 text-sm text-[#6c5c4d]">No conversations yet.</div>
+      <div v-else-if="conversations.length === 0" class="mt-4 text-sm text-[#6b5740]">No conversations yet.</div>
       <ul v-else class="mt-4 space-y-2">
         <li v-for="conv in conversations" :key="conv.id">
           <RouterLink
             :to="`/app/chat/${conv.id}`"
-            class="flex items-center justify-between rounded-2xl border border-[rgba(101,76,52,0.1)] bg-[rgba(255,248,239,0.7)] px-4 py-3 transition hover:bg-[rgba(255,248,239,0.95)]"
+            class="flex items-center justify-between rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.95)] min-h-[44px] px-4 py-3 transition duration-200 hover:bg-[rgba(245,235,224,1)]"
           >
             <div class="min-w-0">
-              <p class="truncate text-sm font-medium text-[#2b221a]">{{ conv.title || 'Conversation' }}</p>
-              <p class="mt-0.5 truncate text-xs text-[#6c5c4d]">{{ conv.last_message || conv.lastMessage || '' }}</p>
+              <p class="truncate text-sm font-medium text-[#2b1e10]">{{ conv.title || 'Conversation' }}</p>
+              <p class="mt-0.5 truncate text-xs text-[#6b5740]">{{ conv.last_message || conv.lastMessage || '' }}</p>
             </div>
-            <span class="ml-3 shrink-0 text-xs text-[#b89c87]">{{ conv.created_at ? formatDate(conv.created_at) : '' }}</span>
+            <span class="ml-3 shrink-0 text-xs text-[#9a8568]">{{ conv.created_at ? formatDate(conv.created_at) : '' }}</span>
           </RouterLink>
         </li>
       </ul>
-      <RouterLink to="/app/chat" class="mt-3 block text-center text-xs text-[#8a5b3f] hover:underline">View all →</RouterLink>
+      <RouterLink to="/app/chat" class="mt-3 block text-center text-xs text-[#c4873b] min-h-[44px] flex items-center justify-center hover:underline">View all</RouterLink>
     </div>
 
     <!-- Recent Journals -->
-    <div class="rounded-3xl border border-[rgba(101,76,52,0.14)] bg-[rgba(255,250,243,0.82)] p-6 shadow-[0_8px_40px_rgba(82,54,29,0.08)] backdrop-blur-[14px]">
+    <div class="rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] p-4 sm:p-6 shadow-[0_8px_40px_rgba(82,54,29,0.08)] backdrop-blur-[20px]">
       <div class="flex items-center justify-between">
-        <p class="text-xs font-bold uppercase tracking-widest text-[#8a5b3f]">Journal</p>
-        <RouterLink to="/app/journal/new" class="rounded-full bg-[#2b221a] px-4 py-1.5 text-xs font-semibold text-[#fff8f1] transition hover:-translate-y-0.5">
+        <div class="flex items-center gap-2">
+          <SacredIcons name="scroll" :size="16" class="text-[#a38d6d]" />
+          <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a38d6d]">Journal</p>
+        </div>
+        <RouterLink to="/app/journal/new" class="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-4 py-2 text-xs font-semibold text-[#fff8f1] shadow-[0_4px_16px_rgba(139,90,43,0.25)] transition duration-200 hover:-translate-y-0.5">
           + New Entry
         </RouterLink>
       </div>
       <div v-if="journalsLoading" class="mt-4 space-y-2">
-        <div v-for="i in 2" :key="i" class="h-12 animate-pulse rounded-2xl bg-[rgba(138,91,63,0.08)]" />
+        <div v-for="i in 2" :key="i" class="h-12 animate-pulse rounded-2xl bg-[rgba(196,135,59,0.08)]" />
       </div>
-      <div v-else-if="journals.length === 0" class="mt-4 text-sm text-[#6c5c4d]">No journal entries yet.</div>
+      <div v-else-if="journals.length === 0" class="mt-4 text-sm text-[#6b5740]">No journal entries yet.</div>
       <ul v-else class="mt-4 space-y-2">
         <li v-for="entry in journals" :key="entry.id">
           <RouterLink
             :to="`/app/journal/${entry.id}`"
-            class="flex items-center justify-between rounded-2xl border border-[rgba(101,76,52,0.1)] bg-[rgba(255,248,239,0.7)] px-4 py-3 transition hover:bg-[rgba(255,248,239,0.95)]"
+            class="flex items-center justify-between rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.95)] min-h-[44px] px-4 py-3 transition duration-200 hover:bg-[rgba(245,235,224,1)]"
           >
             <div class="min-w-0">
-              <p class="truncate text-sm font-medium text-[#2b221a]">{{ entry.title || 'Untitled' }}</p>
-              <p class="mt-0.5 truncate text-xs text-[#6c5c4d]">{{ (entry.content || '').slice(0, 60) }}</p>
+              <p class="truncate text-sm font-medium text-[#2b1e10]">{{ entry.title || 'Untitled' }}</p>
+              <p class="mt-0.5 truncate text-xs text-[#6b5740]">{{ (entry.content || '').slice(0, 60) }}</p>
             </div>
-            <span class="ml-3 shrink-0 text-xs text-[#b89c87]">{{ entry.created_at ? formatDate(entry.created_at) : '' }}</span>
+            <span class="ml-3 shrink-0 text-xs text-[#9a8568]">{{ entry.created_at ? formatDate(entry.created_at) : '' }}</span>
           </RouterLink>
         </li>
       </ul>
-      <RouterLink to="/app/journal" class="mt-3 block text-center text-xs text-[#8a5b3f] hover:underline">View all →</RouterLink>
+      <RouterLink to="/app/journal" class="mt-3 block text-center text-xs text-[#c4873b] min-h-[44px] flex items-center justify-center hover:underline">View all</RouterLink>
     </div>
   </div>
 </template>
