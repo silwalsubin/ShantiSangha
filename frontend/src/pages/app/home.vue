@@ -16,34 +16,32 @@ const currentCard = ref(0)
 const completed = ref(false)
 const scrollContainer = ref<HTMLElement | null>(null)
 
-// --- Daily Verse ---
-const verses = [
-  { text: 'You have the right to work, but never to the fruit of work.', source: 'Bhagavad Gita 2.47' },
-  { text: 'The mind is everything. What you think, you become.', source: 'Dhammapada 1.1' },
-  { text: 'Yoga is the stilling of the fluctuations of the mind.', source: 'Yoga Sutras 1.2' },
-  { text: 'When meditation is mastered, the mind is unwavering like the flame of a candle in a windless place.', source: 'Bhagavad Gita 6.19' },
-  { text: 'Better than a thousand hollow words is one word that brings peace.', source: 'Dhammapada 100' },
-  { text: 'The soul is neither born, nor does it die.', source: 'Bhagavad Gita 2.20' },
-  { text: 'Peace comes from within. Do not seek it without.', source: 'Buddha' },
-  { text: 'In the midst of movement and chaos, keep stillness inside of you.', source: 'Deepak Chopra' },
-  { text: 'The quieter you become, the more you can hear.', source: 'Rumi' },
-  { text: 'He who has conquered himself is a far greater hero than he who has defeated a thousand times a thousand men.', source: 'Dhammapada 103' },
-]
-const now = new Date()
-const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86400000)
-const dailyVerse = verses[dayOfYear % verses.length]
-
-// --- Goals check-in ---
+// --- Goals data (all goals for context) ---
 interface GoalToday {
   id: string
   title: string
+  type: string
   currentStreak: number
   longestStreak: number
   checkedInToday: boolean
   completedToday: boolean | null
+  targetDate?: string
+  daysRemaining?: number
 }
 
-const goals = ref<GoalToday[]>([])
+interface AllGoal {
+  id: string
+  title: string
+  type: string
+  currentStreak: number
+  longestStreak: number
+  targetDate?: string
+  completedAt?: string
+  daysRemaining?: number
+}
+
+const recurringGoals = ref<GoalToday[]>([])
+const allGoals = ref<AllGoal[]>([])
 const goalsLoading = ref(true)
 const goalsCheckedIn = ref<Record<string, boolean>>({})
 const goalsSaving = ref<Record<string, boolean>>({})
@@ -56,28 +54,119 @@ const newGoalType = ref<'Recurring' | 'OneTime'>('Recurring')
 const newGoalTargetDate = ref('')
 const newGoalSaving = ref(false)
 
+// --- Intelligent feedback ---
+const wisdomTemplates = {
+  streakCelebrate: [
+    { text: 'Discipline is choosing between what you want now and what you want most.', source: 'Abraham Lincoln' },
+    { text: 'Small daily improvements are the key to staggering long-term results.', source: 'Zen Proverb' },
+    { text: 'The secret of change is to focus all your energy not on fighting the old, but on building the new.', source: 'Socrates' },
+  ],
+  streakBroken: [
+    { text: 'A moment of patience in a moment of anger saves a thousand moments of regret.', source: 'Ali ibn Abi Talib' },
+    { text: 'Fall seven times, stand up eight.', source: 'Japanese Proverb' },
+    { text: 'The wound is the place where the light enters you.', source: 'Rumi' },
+  ],
+  noGoals: [
+    { text: 'The journey of a thousand miles begins with a single step.', source: 'Lao Tzu' },
+    { text: 'You have the right to work, but never to the fruit of work.', source: 'Bhagavad Gita 2.47' },
+  ],
+  milestoneClose: [
+    { text: 'It does not matter how slowly you go as long as you do not stop.', source: 'Confucius' },
+    { text: 'Yoga is the journey of the self, through the self, to the self.', source: 'Bhagavad Gita' },
+  ],
+  default: [
+    { text: 'The mind is everything. What you think, you become.', source: 'Dhammapada 1.1' },
+    { text: 'Peace comes from within. Do not seek it without.', source: 'Buddha' },
+    { text: 'Better than a thousand hollow words is one word that brings peace.', source: 'Dhammapada 100' },
+    { text: 'He who has conquered himself is a far greater hero than he who has defeated a thousand times a thousand men.', source: 'Dhammapada 103' },
+    { text: 'Yoga is the stilling of the fluctuations of the mind.', source: 'Yoga Sutras 1.2' },
+  ]
+}
+
+const now = new Date()
+const dayOfYear = Math.floor((now.getTime() - new Date(now.getFullYear(), 0, 0).getTime()) / 86400000)
+
+const personalFeedback = computed(() => {
+  const recurring = recurringGoals.value
+  const all = allGoals.value
+
+  // Strongest streak
+  const bestStreak = recurring.reduce((max, g) => g.currentStreak > max.currentStreak ? g : max, { currentStreak: 0, title: '' } as any)
+
+  // Any broken streaks (streak = 0 but has history)
+  const brokenStreaks = recurring.filter(g => g.currentStreak === 0 && g.longestStreak > 0)
+
+  // Milestone approaching
+  const urgentMilestone = all.find(g => g.type === 'OneTime' && !g.completedAt && g.daysRemaining !== undefined && g.daysRemaining > 0 && g.daysRemaining <= 30)
+
+  // Build feedback line
+  let feedbackLine = ''
+  let verse: { text: string; source: string }
+
+  if (recurring.length === 0 && all.length === 0) {
+    feedbackLine = 'Every journey begins with an intention.'
+    verse = wisdomTemplates.noGoals[dayOfYear % wisdomTemplates.noGoals.length]
+  } else if (bestStreak.currentStreak >= 7) {
+    feedbackLine = `${bestStreak.currentStreak} days of "${bestStreak.title}". Your discipline is becoming who you are.`
+    verse = wisdomTemplates.streakCelebrate[dayOfYear % wisdomTemplates.streakCelebrate.length]
+  } else if (bestStreak.currentStreak >= 3) {
+    feedbackLine = `${bestStreak.currentStreak} days strong on "${bestStreak.title}". Keep showing up.`
+    verse = wisdomTemplates.streakCelebrate[dayOfYear % wisdomTemplates.streakCelebrate.length]
+  } else if (brokenStreaks.length > 0) {
+    feedbackLine = `"${brokenStreaks[0].title}" streak paused. Today is a new beginning.`
+    verse = wisdomTemplates.streakBroken[dayOfYear % wisdomTemplates.streakBroken.length]
+  } else if (urgentMilestone) {
+    feedbackLine = `"${urgentMilestone.title}" — ${urgentMilestone.daysRemaining} days remaining. Stay on the path.`
+    verse = wisdomTemplates.milestoneClose[dayOfYear % wisdomTemplates.milestoneClose.length]
+  } else if (recurring.length > 0) {
+    const total = recurring.reduce((sum, g) => sum + g.currentStreak, 0)
+    feedbackLine = `${recurring.length} active practices. ${total} total streak days. You're building something real.`
+    verse = wisdomTemplates.default[dayOfYear % wisdomTemplates.default.length]
+  } else {
+    feedbackLine = ''
+    verse = wisdomTemplates.default[dayOfYear % wisdomTemplates.default.length]
+  }
+
+  return { feedbackLine, verse }
+})
+
+// --- Loaders ---
 async function loadGoals() {
   goalsLoading.value = true
   try {
-    const data = await api.get<any>('/goals/today')
-    const items = Array.isArray(data) ? data : (data?.goals || data?.items || [])
-    goals.value = items.map((g: any) => ({
+    // Load recurring goals for check-in
+    const todayData = await api.get<any>('/goals/today')
+    const todayItems = Array.isArray(todayData) ? todayData : (todayData?.goals || todayData?.items || [])
+    recurringGoals.value = todayItems.map((g: any) => ({
       id: g.id,
       title: g.title,
+      type: 'Recurring',
       currentStreak: g.currentStreak ?? g.current_streak ?? 0,
       longestStreak: g.longestStreak ?? g.longest_streak ?? 0,
-      checkedInToday: g.checkedInToday ?? g.checked_in_today ?? false,
-      completedToday: g.completedToday ?? g.completed_today ?? null,
+      checkedInToday: g.checkedInToday ?? g.checked_in_today ?? (g.checkIn != null),
+      completedToday: g.completedToday ?? g.completed_today ?? g.checkIn?.completed ?? null,
     }))
-    // Mark already checked-in goals
-    for (const g of goals.value) {
-      if (g.checkedInToday) {
-        goalsCheckedIn.value[g.id] = true
-      }
+    for (const g of recurringGoals.value) {
+      if (g.checkedInToday) goalsCheckedIn.value[g.id] = true
     }
     checkAllDone()
+
+    // Load all goals for context/feedback
+    const allData = await api.get<any>('/goals')
+    const allItems = Array.isArray(allData) ? allData : (allData?.goals || allData?.items || [])
+    allGoals.value = allItems.map((g: any) => ({
+      id: g.id,
+      title: g.title,
+      type: g.type ?? 'Recurring',
+      currentStreak: g.currentStreak ?? g.current_streak ?? 0,
+      longestStreak: g.longestStreak ?? g.longest_streak ?? 0,
+      targetDate: g.targetDate ?? g.target_date,
+      completedAt: g.completedAt ?? g.completed_at,
+      daysRemaining: g.daysRemaining ?? g.days_remaining,
+    }))
   } catch {
-    goals.value = []
+    recurringGoals.value = []
+    allGoals.value = []
   } finally {
     goalsLoading.value = false
   }
@@ -88,16 +177,12 @@ async function checkInGoal(goalId: string, completed: boolean) {
   try {
     await api.post(`/goals/${goalId}/checkin`, { completed })
     goalsCheckedIn.value[goalId] = true
-    // Update streak locally
-    const goal = goals.value.find(g => g.id === goalId)
+    const goal = recurringGoals.value.find(g => g.id === goalId)
     if (goal) {
       goal.checkedInToday = true
       goal.completedToday = completed
-      if (completed) {
-        goal.currentStreak += 1
-      } else {
-        goal.currentStreak = 0
-      }
+      if (completed) goal.currentStreak += 1
+      else goal.currentStreak = 0
     }
     checkAllDone()
   } catch {
@@ -108,8 +193,8 @@ async function checkInGoal(goalId: string, completed: boolean) {
 }
 
 function checkAllDone() {
-  if (goals.value.length === 0) return
-  const allDone = goals.value.every(g => goalsCheckedIn.value[g.id])
+  if (recurringGoals.value.length === 0) return
+  const allDone = recurringGoals.value.every(g => goalsCheckedIn.value[g.id])
   if (allDone && !allGoalsCheckedIn.value) {
     allGoalsCheckedIn.value = true
     setTimeout(() => nextCard(), 1200)
@@ -121,13 +206,8 @@ async function createGoal() {
   if (newGoalType.value === 'OneTime' && !newGoalTargetDate.value) return
   newGoalSaving.value = true
   try {
-    const payload: any = {
-      title: newGoalTitle.value.trim(),
-      type: newGoalType.value,
-    }
-    if (newGoalType.value === 'OneTime' && newGoalTargetDate.value) {
-      payload.targetDate = newGoalTargetDate.value
-    }
+    const payload: any = { title: newGoalTitle.value.trim(), type: newGoalType.value }
+    if (newGoalType.value === 'OneTime' && newGoalTargetDate.value) payload.targetDate = newGoalTargetDate.value
     await api.post('/goals', payload)
     newGoalTitle.value = ''
     newGoalType.value = 'Recurring'
@@ -152,47 +232,35 @@ function startBreathing() {
 }
 
 function runBreathCycle() {
-  if (breathCount.value >= 3) {
-    breathPhase.value = 'done'
-    return
-  }
+  if (breathCount.value >= 3) { breathPhase.value = 'done'; return }
   breathPhase.value = 'inhale'
   breathTimer.value = setTimeout(() => {
     breathPhase.value = 'hold'
     breathTimer.value = setTimeout(() => {
       breathPhase.value = 'exhale'
-      breathTimer.value = setTimeout(() => {
-        breathCount.value++
-        runBreathCycle()
-      }, 4000)
+      breathTimer.value = setTimeout(() => { breathCount.value++; runBreathCycle() }, 4000)
     }, 4000)
   }, 4000)
 }
 
 // --- Past insight ---
 const insight = ref<any>(null)
-
 async function loadInsight() {
   try {
     const data = await api.get<any>('/insights?page=1&pageSize=1')
     const items = Array.isArray(data) ? data : (data?.insights || data?.items || [])
     insight.value = items[0] || null
-  } catch {
-    insight.value = null
-  }
+  } catch { insight.value = null }
 }
 
-// --- Recent activity for final card ---
+// --- Recent activity ---
 const lastConversation = ref<any>(null)
-
 async function loadRecent() {
   try {
     const data = await api.get<any>('/conversations?limit=1')
     const items = Array.isArray(data) ? data : (data?.conversations || data?.items || [])
     lastConversation.value = items[0] || null
-  } catch {
-    lastConversation.value = null
-  }
+  } catch { lastConversation.value = null }
 }
 
 // --- Navigation ---
@@ -210,9 +278,7 @@ function scrollToCard(index: number) {
   const container = scrollContainer.value
   if (!container) return
   const cards = container.children
-  if (cards[index]) {
-    (cards[index] as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }
+  if (cards[index]) (cards[index] as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
 function handleScroll() {
@@ -221,21 +287,13 @@ function handleScroll() {
   const cards = container.children
   const containerRect = container.getBoundingClientRect()
   const center = containerRect.top + containerRect.height / 2
-
   for (let i = 0; i < cards.length; i++) {
     const rect = (cards[i] as HTMLElement).getBoundingClientRect()
-    if (rect.top <= center && rect.bottom >= center) {
-      currentCard.value = i
-      break
-    }
+    if (rect.top <= center && rect.bottom >= center) { currentCard.value = i; break }
   }
 }
 
-onMounted(() => {
-  loadGoals()
-  loadInsight()
-  loadRecent()
-})
+onMounted(() => { loadGoals(); loadInsight(); loadRecent() })
 </script>
 
 <template>
@@ -243,135 +301,86 @@ onMounted(() => {
     <!-- Progress dots -->
     <div class="mb-6 flex items-center justify-center gap-2">
       <div
-        v-for="i in 5"
-        :key="i"
+        v-for="i in 5" :key="i"
         class="h-1.5 rounded-full transition-all duration-300"
-        :class="i - 1 <= currentCard
-          ? 'w-6 bg-gradient-to-r from-[#c4873b] to-[#8b5a1b]'
-          : 'w-1.5 bg-[rgba(139,90,43,0.2)]'"
+        :class="i - 1 <= currentCard ? 'w-6 bg-gradient-to-r from-[#c4873b] to-[#8b5a1b]' : 'w-1.5 bg-[rgba(139,90,43,0.2)]'"
       />
     </div>
 
-    <!-- Scrollable cards -->
-    <div
-      ref="scrollContainer"
-      class="space-y-6 snap-y snap-mandatory"
-      @scroll="handleScroll"
-    >
-      <!-- Card 1: Greeting + Verse -->
-      <div class="snap-center rounded-2xl border border-dashed border-[rgba(139,90,43,0.15)] bg-[rgba(250,245,237,0.95)] p-6 sm:p-8 backdrop-blur-[20px] min-h-[280px] flex flex-col items-center justify-center text-center">
+    <div ref="scrollContainer" class="space-y-6 snap-y snap-mandatory" @scroll="handleScroll">
+
+      <!-- Card 1: Intelligent Greeting -->
+      <div class="snap-center rounded-2xl border border-dashed border-[rgba(139,90,43,0.15)] bg-[rgba(250,245,237,0.95)] p-6 sm:p-8 backdrop-blur-[20px] min-h-[300px] flex flex-col items-center justify-center text-center">
         <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a38d6d]">
           {{ new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) }}
         </p>
         <h1 class="mt-4 font-serif text-2xl sm:text-3xl font-bold tracking-wide text-[#2b1e10]">
           {{ firstName }}
         </h1>
-        <div class="mt-6 max-w-xs">
-          <p class="font-serif italic text-[15px] sm:text-base leading-relaxed text-[#9a8568]">
-            "{{ dailyVerse.text }}"
+
+        <!-- Personal feedback line -->
+        <p v-if="!goalsLoading && personalFeedback.feedbackLine" class="mt-4 text-[13px] leading-relaxed text-[#6b5740] max-w-xs">
+          {{ personalFeedback.feedbackLine }}
+        </p>
+
+        <!-- Contextual verse -->
+        <div class="mt-5 max-w-xs">
+          <p class="font-serif italic text-[14px] sm:text-[15px] leading-relaxed text-[#9a8568]">
+            "{{ personalFeedback.verse.text }}"
           </p>
-          <p class="mt-3 text-[10px] uppercase tracking-[0.2em] text-[#b5996f]">
-            {{ dailyVerse.source }}
+          <p class="mt-2 text-[10px] uppercase tracking-[0.2em] text-[#b5996f]">
+            {{ personalFeedback.verse.source }}
           </p>
         </div>
-        <button
-          @click="nextCard"
-          class="mt-8 text-[12px] font-medium tracking-wide text-[#c4873b] transition duration-200 active:scale-95"
-        >
+
+        <button @click="nextCard" class="mt-6 text-[12px] font-medium tracking-wide text-[#c4873b] transition duration-200 active:scale-95">
           Continue
         </button>
       </div>
 
-      <!-- Card 2: Your Intentions (Goals check-in) -->
+      <!-- Card 2: Goals Check-in -->
       <div class="snap-center rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] p-6 sm:p-8 shadow-[0_4px_24px_rgba(82,54,29,0.06)] backdrop-blur-[20px] min-h-[280px] flex flex-col items-center justify-center text-center">
         <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a38d6d]">Daily discipline</p>
-
-        <p class="mt-4 font-serif text-xl sm:text-2xl font-bold tracking-wide text-[#2b1e10]">
-          Your intentions
-        </p>
+        <p class="mt-4 font-serif text-xl sm:text-2xl font-bold tracking-wide text-[#2b1e10]">Your intentions</p>
 
         <!-- Loading -->
         <div v-if="goalsLoading" class="mt-6 w-full max-w-xs space-y-3">
           <div v-for="i in 2" :key="i" class="h-16 animate-pulse rounded-2xl bg-[rgba(139,90,43,0.06)]" />
         </div>
 
-        <!-- No goals — empty state -->
-        <div v-else-if="goals.length === 0 && !showNewGoalForm" class="mt-6 w-full max-w-xs">
+        <!-- No goals -->
+        <div v-else-if="recurringGoals.length === 0 && !showNewGoalForm" class="mt-6 w-full max-w-xs">
           <p class="text-sm text-[#6b5740]">You haven't set any intentions yet.</p>
-          <button
-            @click="showNewGoalForm = true"
-            class="mt-4 min-h-[44px] rounded-full bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-6 py-3 text-sm font-semibold text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)] transition duration-200 active:scale-[0.97]"
-          >
+          <button @click="showNewGoalForm = true" class="mt-4 min-h-[44px] rounded-full bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-6 py-3 text-sm font-semibold text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)] transition duration-200 active:scale-[0.97]">
             Set your first intention
           </button>
         </div>
 
-        <!-- New goal inline form -->
+        <!-- New goal form -->
         <div v-if="showNewGoalForm" class="mt-6 w-full max-w-xs">
-          <!-- Type selector -->
           <div class="mb-3 flex justify-center gap-2">
-            <button
-              @click="newGoalType = 'Recurring'"
-              class="flex min-h-[44px] items-center gap-1.5 rounded-2xl border px-4 py-2.5 text-xs font-semibold transition duration-200 active:scale-[0.97]"
-              :class="newGoalType === 'Recurring'
-                ? 'border-[#c4873b] text-[#c4873b] bg-[rgba(196,135,59,0.06)]'
-                : 'border-[rgba(139,90,43,0.12)] text-[#6b5740]'"
-            >
-              <SacredIcons name="flame" :size="14" />
-              Daily practice
+            <button @click="newGoalType = 'Recurring'" class="flex min-h-[44px] items-center gap-1.5 rounded-2xl border px-4 py-2.5 text-xs font-semibold transition duration-200 active:scale-[0.97]" :class="newGoalType === 'Recurring' ? 'border-[#c4873b] text-[#c4873b] bg-[rgba(196,135,59,0.06)]' : 'border-[rgba(139,90,43,0.12)] text-[#6b5740]'">
+              <SacredIcons name="flame" :size="14" /> Daily practice
             </button>
-            <button
-              @click="newGoalType = 'OneTime'"
-              class="flex min-h-[44px] items-center gap-1.5 rounded-2xl border px-4 py-2.5 text-xs font-semibold transition duration-200 active:scale-[0.97]"
-              :class="newGoalType === 'OneTime'
-                ? 'border-[#c4873b] text-[#c4873b] bg-[rgba(196,135,59,0.06)]'
-                : 'border-[rgba(139,90,43,0.12)] text-[#6b5740]'"
-            >
-              <SacredIcons name="target" :size="14" />
-              Reach a milestone
+            <button @click="newGoalType = 'OneTime'" class="flex min-h-[44px] items-center gap-1.5 rounded-2xl border px-4 py-2.5 text-xs font-semibold transition duration-200 active:scale-[0.97]" :class="newGoalType === 'OneTime' ? 'border-[#c4873b] text-[#c4873b] bg-[rgba(196,135,59,0.06)]' : 'border-[rgba(139,90,43,0.12)] text-[#6b5740]'">
+              <SacredIcons name="target" :size="14" /> Reach a milestone
             </button>
           </div>
-
-          <input
-            v-model="newGoalTitle"
-            type="text"
-            :placeholder="newGoalType === 'Recurring' ? 'I want to practice...' : 'I want to achieve...'"
-            class="w-full rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.95)] px-4 py-3 text-sm text-[#2b1e10] placeholder-[#b5996f] outline-none transition duration-200 focus:border-[#c4873b] focus:ring-1 focus:ring-[#c4873b]"
-            @keyup.enter="newGoalType === 'Recurring' ? createGoal() : undefined"
-          />
-
-          <!-- Target date for OneTime goals -->
-          <input
-            v-if="newGoalType === 'OneTime'"
-            v-model="newGoalTargetDate"
-            type="date"
-            class="mt-2 w-full rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.95)] px-4 py-3 text-sm text-[#2b1e10] outline-none transition duration-200 focus:border-[#c4873b] focus:ring-1 focus:ring-[#c4873b]"
-          />
-
+          <input v-model="newGoalTitle" type="text" :placeholder="newGoalType === 'Recurring' ? 'I want to practice...' : 'I want to achieve...'" class="w-full rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.95)] px-4 py-3 text-sm text-[#2b1e10] placeholder-[#b5996f] outline-none transition duration-200 focus:border-[#c4873b] focus:ring-1 focus:ring-[#c4873b]" @keyup.enter="newGoalType === 'Recurring' ? createGoal() : undefined" />
+          <input v-if="newGoalType === 'OneTime'" v-model="newGoalTargetDate" type="date" class="mt-2 w-full rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.95)] px-4 py-3 text-sm text-[#2b1e10] outline-none transition duration-200 focus:border-[#c4873b] focus:ring-1 focus:ring-[#c4873b]" />
           <div class="mt-3 flex justify-center gap-2">
-            <button
-              @click="createGoal"
-              :disabled="newGoalSaving || !newGoalTitle.trim() || (newGoalType === 'OneTime' && !newGoalTargetDate)"
-              class="min-h-[44px] rounded-full bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-6 py-2.5 text-sm font-semibold text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)] transition duration-200 active:scale-[0.97] disabled:opacity-60"
-            >
+            <button @click="createGoal" :disabled="newGoalSaving || !newGoalTitle.trim() || (newGoalType === 'OneTime' && !newGoalTargetDate)" class="min-h-[44px] rounded-full bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-6 py-2.5 text-sm font-semibold text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)] transition duration-200 active:scale-[0.97] disabled:opacity-60">
               {{ newGoalSaving ? 'Saving...' : 'Save' }}
             </button>
-            <button
-              @click="showNewGoalForm = false; newGoalType = 'Recurring'; newGoalTargetDate = ''"
-              class="min-h-[44px] rounded-full border border-[rgba(139,90,43,0.15)] px-5 py-2.5 text-sm font-medium text-[#6b5740] transition duration-200 active:scale-[0.97]"
-            >
+            <button @click="showNewGoalForm = false; newGoalType = 'Recurring'; newGoalTargetDate = ''" class="min-h-[44px] rounded-full border border-[rgba(139,90,43,0.15)] px-5 py-2.5 text-sm font-medium text-[#6b5740] transition duration-200 active:scale-[0.97]">
               Cancel
             </button>
           </div>
         </div>
 
-        <!-- Goal list with check-in buttons -->
-        <div v-if="goals.length > 0" class="mt-6 w-full max-w-xs space-y-3">
-          <div
-            v-for="goal in goals"
-            :key="goal.id"
-            class="rounded-2xl border border-[rgba(139,90,43,0.1)] bg-[rgba(250,245,237,0.7)] px-4 py-3"
-          >
+        <!-- Goal check-in list -->
+        <div v-if="recurringGoals.length > 0" class="mt-6 w-full max-w-xs space-y-3">
+          <div v-for="goal in recurringGoals" :key="goal.id" class="rounded-2xl border border-[rgba(139,90,43,0.1)] bg-[rgba(250,245,237,0.7)] px-4 py-3">
             <div class="flex items-center justify-between">
               <p class="text-left text-sm font-medium text-[#2b1e10]">{{ goal.title }}</p>
               <div class="flex items-center gap-1.5 shrink-0">
@@ -379,48 +388,28 @@ onMounted(() => {
                 <span class="font-serif font-bold text-[#c4873b] text-sm">{{ goal.currentStreak }}</span>
               </div>
             </div>
-
             <!-- Already checked in -->
             <div v-if="goalsCheckedIn[goal.id]" class="mt-2 flex items-center justify-center gap-2">
               <SacredIcons name="check" :size="16" class="text-[#7aa87a]" />
-              <span class="text-xs text-[#6b5740]">
-                {{ goal.completedToday ? 'Done for today' : 'Noted. Rest well.' }}
-              </span>
+              <span class="text-xs text-[#6b5740]">{{ goal.completedToday ? 'Done for today' : 'Noted. Rest well.' }}</span>
             </div>
-
-            <!-- Check-in buttons -->
+            <!-- Buttons -->
             <div v-else class="mt-2 flex justify-center gap-2">
-              <button
-                @click="checkInGoal(goal.id, true)"
-                :disabled="goalsSaving[goal.id]"
-                class="flex min-h-[44px] items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-4 py-2 text-xs font-semibold text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)] transition duration-200 active:scale-[0.97] disabled:opacity-60"
-              >
-                <SacredIcons name="check" :size="14" />
-                Done
+              <button @click="checkInGoal(goal.id, true)" :disabled="goalsSaving[goal.id]" class="flex min-h-[44px] items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-4 py-2 text-xs font-semibold text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)] transition duration-200 active:scale-[0.97] disabled:opacity-60">
+                <SacredIcons name="check" :size="14" /> Done
               </button>
-              <button
-                @click="checkInGoal(goal.id, false)"
-                :disabled="goalsSaving[goal.id]"
-                class="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-[rgba(139,90,43,0.15)] px-4 py-2 text-xs font-medium text-[#6b5740] transition duration-200 active:scale-[0.97] disabled:opacity-60 hover:bg-[rgba(196,135,59,0.06)]"
-              >
-                <SacredIcons name="skip" :size="12" />
-                Not today
+              <button @click="checkInGoal(goal.id, false)" :disabled="goalsSaving[goal.id]" class="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-[rgba(139,90,43,0.15)] px-4 py-2 text-xs font-medium text-[#6b5740] transition duration-200 active:scale-[0.97] disabled:opacity-60 hover:bg-[rgba(196,135,59,0.06)]">
+                <SacredIcons name="skip" :size="12" /> Not today
               </button>
             </div>
           </div>
         </div>
 
-        <!-- All checked in message -->
-        <div v-if="allGoalsCheckedIn && goals.length > 0" class="mt-4">
+        <div v-if="allGoalsCheckedIn && recurringGoals.length > 0" class="mt-4">
           <p class="text-sm text-[#6b5740]">All intentions accounted for. Well done.</p>
         </div>
 
-        <!-- Skip if no goals and form not shown -->
-        <button
-          v-if="goals.length === 0 && !showNewGoalForm"
-          @click="nextCard"
-          class="mt-4 text-[12px] font-medium tracking-wide text-[#c4873b] transition duration-200 active:scale-95"
-        >
+        <button v-if="recurringGoals.length === 0 && !showNewGoalForm" @click="nextCard" class="mt-4 text-[12px] font-medium tracking-wide text-[#c4873b] transition duration-200 active:scale-95">
           Skip for now
         </button>
       </div>
@@ -430,16 +419,9 @@ onMounted(() => {
         <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a38d6d]">Practice</p>
 
         <template v-if="breathPhase === 'idle'">
-          <p class="mt-4 font-serif text-xl sm:text-2xl font-bold tracking-wide text-[#2b1e10]">
-            Take 3 breaths
-          </p>
-          <p class="mt-2 text-sm text-[#6b5740]">
-            A moment of stillness before you continue.
-          </p>
-          <button
-            @click="startBreathing"
-            class="mt-6 min-h-[44px] rounded-full bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-8 py-3 text-sm font-semibold text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)] transition duration-200 active:scale-95"
-          >
+          <p class="mt-4 font-serif text-xl sm:text-2xl font-bold tracking-wide text-[#2b1e10]">Take 3 breaths</p>
+          <p class="mt-2 text-sm text-[#6b5740]">A moment of stillness before you continue.</p>
+          <button @click="startBreathing" class="mt-6 min-h-[44px] rounded-full bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-8 py-3 text-sm font-semibold text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)] transition duration-200 active:scale-95">
             Begin
           </button>
         </template>
@@ -450,20 +432,11 @@ onMounted(() => {
           </div>
           <p class="mt-4 font-serif text-xl font-bold text-[#2b1e10]">Well done</p>
           <p class="mt-2 text-sm text-[#6b5740]">Three breaths of peace.</p>
-          <button
-            @click="nextCard"
-            class="mt-6 text-[12px] font-medium tracking-wide text-[#c4873b] transition duration-200 active:scale-95"
-          >
-            Continue
-          </button>
+          <button @click="nextCard" class="mt-6 text-[12px] font-medium tracking-wide text-[#c4873b] transition duration-200 active:scale-95">Continue</button>
         </template>
 
         <template v-else>
-          <!-- Breathing circle -->
-          <div
-            class="mt-4 flex items-center justify-center rounded-full border-2 border-[#c4873b] transition-all duration-[4000ms] ease-in-out"
-            :class="breathPhase === 'inhale' ? 'h-36 w-36' : breathPhase === 'hold' ? 'h-36 w-36' : 'h-20 w-20'"
-          >
+          <div class="mt-4 flex items-center justify-center rounded-full border-2 border-[#c4873b] transition-all duration-[4000ms] ease-in-out" :class="breathPhase === 'inhale' ? 'h-36 w-36' : breathPhase === 'hold' ? 'h-36 w-36' : 'h-20 w-20'">
             <span class="text-sm font-semibold uppercase tracking-[0.15em] text-[#c4873b]">
               {{ breathPhase === 'inhale' ? 'Breathe in' : breathPhase === 'hold' ? 'Hold' : 'Breathe out' }}
             </span>
@@ -472,62 +445,56 @@ onMounted(() => {
         </template>
       </div>
 
-      <!-- Card 4: Your insight -->
+      <!-- Card 4: Your insight / milestone reminder -->
       <div class="snap-center rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] p-6 sm:p-8 shadow-[0_4px_24px_rgba(82,54,29,0.06)] backdrop-blur-[20px] min-h-[240px] flex flex-col items-center justify-center text-center">
-        <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a38d6d]">From your journey</p>
 
-        <template v-if="insight">
+        <!-- Show milestone reminder if one is approaching -->
+        <template v-if="allGoals.some(g => g.type === 'OneTime' && !g.completedAt && g.daysRemaining && g.daysRemaining > 0 && g.daysRemaining <= 60)">
+          <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a38d6d]">Milestone ahead</p>
+          <SacredIcons name="target" :size="28" class="mt-4 text-[#c4873b]" />
+          <div v-for="g in allGoals.filter(g => g.type === 'OneTime' && !g.completedAt && g.daysRemaining && g.daysRemaining > 0 && g.daysRemaining <= 60).slice(0, 1)" :key="g.id">
+            <p class="mt-4 font-serif text-[15px] sm:text-base font-bold text-[#2b1e10]">"{{ g.title }}"</p>
+            <p class="mt-2 font-serif text-2xl font-bold text-[#c4873b]">{{ g.daysRemaining }} days left</p>
+            <p class="mt-1 text-[11px] text-[#9a8568]">What can you do today to move closer?</p>
+          </div>
+        </template>
+
+        <!-- Otherwise show insight -->
+        <template v-else-if="insight">
+          <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a38d6d]">From your journey</p>
           <SacredIcons name="diya" :size="28" class="mt-4 text-[#c4873b]" />
-          <p class="mt-4 font-serif text-[15px] sm:text-base leading-relaxed text-[#2b1e10] max-w-sm">
-            "{{ insight.content }}"
-          </p>
-          <p class="mt-3 text-[10px] text-[#9a8568]">
-            From a past reflection
-          </p>
-        </template>
-        <template v-else>
-          <SacredIcons name="diya" :size="28" class="mt-4 text-[#b5996f]" />
-          <p class="mt-4 font-serif text-base text-[#6b5740]">
-            Your insights will appear here as you reflect.
-          </p>
+          <p class="mt-4 font-serif text-[15px] sm:text-base leading-relaxed text-[#2b1e10] max-w-sm">"{{ insight.content }}"</p>
+          <p class="mt-3 text-[10px] text-[#9a8568]">From a past reflection</p>
         </template>
 
-        <button
-          @click="nextCard"
-          class="mt-6 text-[12px] font-medium tracking-wide text-[#c4873b] transition duration-200 active:scale-95"
-        >
-          Continue
-        </button>
+        <template v-else>
+          <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a38d6d]">From your journey</p>
+          <SacredIcons name="diya" :size="28" class="mt-4 text-[#b5996f]" />
+          <p class="mt-4 font-serif text-base text-[#6b5740]">Your insights will appear here as you reflect.</p>
+        </template>
+
+        <button @click="nextCard" class="mt-6 text-[12px] font-medium tracking-wide text-[#c4873b] transition duration-200 active:scale-95">Continue</button>
       </div>
 
-      <!-- Card 5: What would you like to do? -->
+      <!-- Card 5: Summary + Actions -->
       <div class="snap-center rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] p-6 sm:p-8 shadow-[0_4px_24px_rgba(82,54,29,0.06)] backdrop-blur-[20px] min-h-[280px] flex flex-col items-center justify-center text-center">
-        <template v-if="!completed">
-          <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a38d6d]">Today's practice complete</p>
-          <div class="mt-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#c4873b] to-[#8b5a1b] text-white">
-            <SacredIcons name="lotus" :size="30" />
-          </div>
-          <p class="mt-4 font-serif text-xl font-bold text-[#2b1e10]">
-            Well done, {{ firstName }}
-          </p>
-          <p class="mt-2 text-sm text-[#6b5740]">
-            You showed up for yourself today.
-          </p>
-        </template>
+        <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a38d6d]">Today's practice complete</p>
+        <div class="mt-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#c4873b] to-[#8b5a1b] text-white">
+          <SacredIcons name="lotus" :size="30" />
+        </div>
+        <p class="mt-4 font-serif text-xl font-bold text-[#2b1e10]">Well done, {{ firstName }}</p>
+        <p class="mt-2 text-sm text-[#6b5740]">You showed up for yourself today.</p>
+
+        <!-- Goal summary -->
+        <div v-if="recurringGoals.length > 0" class="mt-4 text-xs text-[#9a8568]">
+          {{ recurringGoals.filter(g => g.completedToday === true).length }}/{{ recurringGoals.length }} practices completed today
+        </div>
 
         <div class="mt-6 flex flex-col gap-2 w-full max-w-xs">
-          <button
-            @click="router.push('/app/reflect')"
-            class="min-h-[48px] flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-5 py-3 text-sm font-semibold text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)] transition duration-200 active:scale-[0.97]"
-          >
-            <SacredIcons name="dialogue" :size="18" />
-            Start a reflection
+          <button @click="router.push('/app/reflect')" class="min-h-[48px] flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-5 py-3 text-sm font-semibold text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)] transition duration-200 active:scale-[0.97]">
+            <SacredIcons name="dialogue" :size="18" /> Start a reflection
           </button>
-          <RouterLink
-            v-if="lastConversation"
-            :to="`/app/reflect/chat/${lastConversation.id}`"
-            class="min-h-[48px] flex items-center justify-center gap-2 rounded-xl border border-[rgba(139,90,43,0.15)] px-5 py-3 text-sm font-medium text-[#6b5740] transition duration-200 active:scale-[0.97] hover:bg-[rgba(196,135,59,0.06)]"
-          >
+          <RouterLink v-if="lastConversation" :to="`/app/reflect/chat/${lastConversation.id}`" class="min-h-[48px] flex items-center justify-center gap-2 rounded-xl border border-[rgba(139,90,43,0.15)] px-5 py-3 text-sm font-medium text-[#6b5740] transition duration-200 active:scale-[0.97] hover:bg-[rgba(196,135,59,0.06)]">
             Continue last conversation
           </RouterLink>
         </div>
