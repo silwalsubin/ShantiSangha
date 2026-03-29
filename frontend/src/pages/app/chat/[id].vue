@@ -30,7 +30,10 @@ async function loadConversation() {
   try {
     const data = await api.get<any>(`/conversations/${id.value}`)
     conversation.value = data
-    messages.value = data.messages || []
+    messages.value = (data.messages || []).map((m: any) => ({
+      ...m,
+      role: typeof m.role === 'string' ? m.role.toLowerCase() : m.role === 0 ? 'user' : 'assistant'
+    }))
   } catch {
     error.value = 'Could not load conversation.'
   } finally {
