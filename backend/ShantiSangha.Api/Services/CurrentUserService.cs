@@ -35,7 +35,8 @@ public class CurrentUserService : ICurrentUser
         if (_cached is not null) return _cached;
 
         // Auto-create user on first API call (before Clerk webhook fires)
-        var email = _httpContextAccessor.HttpContext?.User.FindFirstValue("email") ?? "";
+        var email = _httpContextAccessor.HttpContext?.User.FindFirstValue("email")
+            ?? $"{clerkId}@placeholder.local";
         _cached = new User
         {
             Id = Guid.NewGuid(),
