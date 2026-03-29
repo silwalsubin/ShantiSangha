@@ -66,6 +66,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.HasIndex(g => g.UserId);
             e.HasIndex(g => new { g.UserId, g.Title }).IsUnique();
+            e.Property(g => g.Type).HasConversion<string>();
+            e.Property(g => g.Frequency).HasConversion<string>();
         });
 
         modelBuilder.Entity<GoalCheckIn>(e =>

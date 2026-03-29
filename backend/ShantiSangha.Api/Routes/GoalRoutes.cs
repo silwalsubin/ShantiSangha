@@ -35,11 +35,19 @@ public static class GoalRoutes
         if (activeCount >= 10)
             return Results.BadRequest(new { error = "Maximum of 10 active goals allowed." });
 
+        DateOnly? targetDate = null;
+        if (body.TargetDate is not null && DateOnly.TryParse(body.TargetDate, out var parsed))
+            targetDate = parsed;
+
         var goal = new Goal
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
             Title = body.Title.Trim(),
+            Type = body.Type,
+            Frequency = body.Frequency,
+            FrequencyTarget = body.FrequencyTarget,
+            TargetDate = targetDate,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -54,7 +62,11 @@ public static class GoalRoutes
             return Results.Conflict(new { error = "A goal with that title already exists." });
         }
 
-        return Results.Created($"/goals/{goal.Id}", new { goal.Id, goal.Title, goal.CreatedAt });
+        return Results.Created($"/goals/{goal.Id}", new
+        {
+            goal.Id, goal.Title, goal.Type, goal.Frequency,
+            goal.FrequencyTarget, goal.TargetDate, goal.CreatedAt
+        });
     }
 
     private static async Task<IResult> ListGoals(
@@ -73,15 +85,40 @@ public static class GoalRoutes
 
         var result = goals.Select(g =>
         {
-            var (current, longest) = ComputeStreaks(g.CheckIns, today);
-            return new
+            if (g.Type == GoalType.OneTime)
             {
-                g.Id,
-                g.Title,
-                g.CreatedAt,
-                CurrentStreak = current,
-                LongestStreak = longest
-            };
+                var noteCount = g.CheckIns.Count(c => c.Note is not null);
+                int? daysRemaining = g.TargetDate.HasValue
+                    ? g.TargetDate.Value.DayNumber - today.DayNumber
+                    : null;
+
+                return (object)new
+                {
+                    g.Id,
+                    g.Title,
+                    g.Type,
+                    g.TargetDate,
+                    g.CompletedAt,
+                    g.CreatedAt,
+                    DaysRemaining = daysRemaining,
+                    NoteCount = noteCount
+                };
+            }
+            else
+            {
+                var (current, longest) = ComputeStreaks(g.CheckIns, today);
+                return (object)new
+                {
+                    g.Id,
+                    g.Title,
+                    g.Type,
+                    g.Frequency,
+                    g.FrequencyTarget,
+                    g.CreatedAt,
+                    CurrentStreak = current,
+                    LongestStreak = longest
+                };
+            }
         });
 
         return Results.Ok(result);
@@ -96,7 +133,7 @@ public static class GoalRoutes
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
         var goals = await db.Goals
-            .Where(g => g.UserId == user.Id && g.ArchivedAt == null)
+            .Where(g => g.UserId == user.Id && g.ArchivedAt == null && g.Type == GoalType.Recurring)
             .OrderBy(g => g.CreatedAt)
             .Select(g => new
             {
@@ -134,6 +171,11 @@ public static class GoalRoutes
             goal.ArchivedAt = DateTime.UtcNow;
         else if (body.Archived is false)
             goal.ArchivedAt = null;
+
+        if (body.Completed is true)
+            goal.CompletedAt = DateTime.UtcNow;
+        else if (body.Completed is false)
+            goal.CompletedAt = null;
 
         try
         {
@@ -274,6 +316,11 @@ public static class GoalRoutes
     }
 }
 
-public record CreateGoalRequest(string Title);
-public record UpdateGoalRequest(string? Title, bool? Archived);
+public record CreateGoalRequest(
+    string Title,
+    GoalType Type = GoalType.Recurring,
+    GoalFrequency? Frequency = null,
+    int? FrequencyTarget = null,
+    string? TargetDate = null);
+public record UpdateGoalRequest(string? Title, bool? Archived, bool? Completed);
 public record CheckInRequest(bool Completed, string? Note);
