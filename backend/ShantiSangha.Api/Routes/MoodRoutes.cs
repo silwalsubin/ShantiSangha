@@ -91,15 +91,19 @@ public static class MoodRoutes
 
         // Simple trend: compare first half vs second half average
         var midpoint = checkins.Count / 2;
-        var firstHalfAvg = checkins.Take(midpoint).Average(m => m.Score);
-        var secondHalfAvg = checkins.Skip(midpoint).Average(m => m.Score);
-        var diff = secondHalfAvg - firstHalfAvg;
-        var trend = diff switch
+        var trend = "stable";
+        if (midpoint > 0)
         {
-            > 0.5 => "improving",
-            < -0.5 => "declining",
-            _ => "stable"
-        };
+            var firstHalfAvg = checkins.Take(midpoint).Average(m => m.Score);
+            var secondHalfAvg = checkins.Skip(midpoint).Average(m => m.Score);
+            var diff = secondHalfAvg - firstHalfAvg;
+            trend = diff switch
+            {
+                > 0.5 => "improving",
+                < -0.5 => "declining",
+                _ => "stable"
+            };
+        }
 
         return Results.Ok(new
         {
