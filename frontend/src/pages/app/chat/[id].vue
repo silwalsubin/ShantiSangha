@@ -76,10 +76,20 @@ async function sendMessage() {
     messages.value.push({ role: 'assistant', content: '' })
     nextTick(scrollToBottom)
 
+    let buffer = ''
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
-      messages.value[messages.value.length - 1].content += decoder.decode(value)
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const payload = line.slice(6)
+          if (payload === '[DONE]') continue
+          messages.value[messages.value.length - 1].content += payload
+        }
+      }
       nextTick(scrollToBottom)
     }
   } catch (e: any) {
