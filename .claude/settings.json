@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(lsof -ti:5173)",
+      "Bash(xargs kill:*)"
+    ],
+    "additionalDirectories": [
+      "/Users/subinsilwal/Desktop/code/maiself/.claude"
+    ]
+  }
+}

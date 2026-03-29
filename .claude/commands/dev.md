@@ -1,0 +1,1 @@
+Start the frontend dev server. Run `npm install` first if node_modules is missing, then run `npm run dev` from the `frontend/` directory. Run the dev server in the background so the user can continue working.

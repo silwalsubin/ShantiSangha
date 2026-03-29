@@ -14,12 +14,17 @@ defineProps<{ name: string; size?: number }>()
 
   <!-- Lotus / Coping -->
   <svg v-else-if="name === 'lotus'" :width="size || 22" :height="size || 22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M12 22c0-4-2-7-5-9 3-1 5 0 5 0s2-1 5 0c-3 2-5 5-5 9Z" />
-    <path d="M12 13c-1-4-4-7-8-8 2 4 4 6 8 8Z" />
-    <path d="M12 13c1-4 4-7 8-8-2 4-4 6-8 8Z" />
-    <path d="M12 13c-3-3-7-4-10-3 3 3 6 4 10 3Z" />
-    <path d="M12 13c3-3 7-4 10-3-3 3-6 4-10 3Z" />
-    <path d="M12 13V3" />
+    <!-- Center petal -->
+    <path d="M12 4c-1.2 2.5-2 5-2 7.5S11 15 12 15s2-1 2-3.5S13.2 6.5 12 4Z" />
+    <!-- Left petals -->
+    <path d="M8.5 6.5C7 9 6.5 11.5 7.5 13.5S10.5 15.5 12 15" />
+    <path d="M5.5 9C4 11.5 4 14 5.5 15.5S9.5 16.5 12 15.5" />
+    <!-- Right petals -->
+    <path d="M15.5 6.5C17 9 17.5 11.5 16.5 13.5S13.5 15.5 12 15" />
+    <path d="M18.5 9C20 11.5 20 14 18.5 15.5S14.5 16.5 12 15.5" />
+    <!-- Base -->
+    <path d="M8 17c1.5 1.5 2.5 3 4 3s2.5-1.5 4-3" />
+    <path d="M9 16.5c1 .8 2 1.5 3 1.5s2-.7 3-1.5" />
   </svg>
 
   <!-- Scroll / Journal -->
@@ -61,5 +66,20 @@ defineProps<{ name: string; size?: number }>()
     <path d="M9 12.5c1.5 1 4.5 1 6 0" />
     <path d="M7 7c-1 1-1.5 2.5-1 4" />
     <path d="M17 7c1 1 1.5 2.5 1 4" />
+  </svg>
+
+  <!-- Dharma Wheel / Logo -->
+  <svg v-else-if="name === 'dharma'" :width="size || 22" :height="size || 22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <circle cx="12" cy="12" r="3" />
+    <!-- 8 spokes -->
+    <path d="M12 2v7" />
+    <path d="M12 15v7" />
+    <path d="M2 12h7" />
+    <path d="M15 12h7" />
+    <path d="M4.93 4.93l4.95 4.95" />
+    <path d="M14.12 14.12l4.95 4.95" />
+    <path d="M4.93 19.07l4.95-4.95" />
+    <path d="M14.12 9.88l4.95-4.95" />
   </svg>
 </template>

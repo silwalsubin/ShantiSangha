@@ -8,8 +8,8 @@ import SacredIcons from '@/components/icons/SacredIcons.vue'
     <div class="w-full max-w-md">
       <div class="mb-8 text-center">
         <RouterLink to="/" class="inline-flex flex-col items-center gap-3">
-          <div class="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#c4873b] to-[#8b5a1b] text-white shadow-[0_4px_24px_rgba(139,90,27,0.25)]">
-            <SacredIcons name="om" :size="28" />
+          <div class="logo-glow flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#c4873b] to-[#8b5a1b] text-white">
+            <SacredIcons name="lotus" :size="36" />
           </div>
           <h1 class="font-serif text-3xl font-bold tracking-wide text-[#2b1e10]">ShantiSangha</h1>
         </RouterLink>
@@ -24,3 +24,18 @@ import SacredIcons from '@/components/icons/SacredIcons.vue'
     </div>
   </div>
 </template>
+
+<style scoped>
+.logo-glow {
+  animation: sacred-glow 3s ease-in-out infinite;
+}
+
+@keyframes sacred-glow {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(196, 135, 59, 0.3), 0 0 30px rgba(196, 135, 59, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(196, 135, 59, 0.5), 0 0 60px rgba(196, 135, 59, 0.2);
+  }
+}
+</style>

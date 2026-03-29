@@ -32,8 +32,8 @@ function isActive(href: string) {
       <!-- Logo -->
       <div class="flex h-20 items-center border-b border-[rgba(139,90,43,0.12)] px-6">
         <RouterLink to="/app/dashboard" class="flex items-center gap-3">
-          <div class="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#c4873b] to-[#8b5a1b] text-white">
-            <SacredIcons name="om" :size="18" />
+          <div class="logo-glow flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-[#c4873b] to-[#8b5a1b] text-white">
+            <SacredIcons name="lotus" :size="24" />
           </div>
           <div>
             <span class="font-serif text-lg font-bold tracking-wide text-[#2b1e10]">ShantiSangha</span>
@@ -91,8 +91,8 @@ function isActive(href: string) {
       <!-- Mobile top bar -->
       <div class="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.95)] px-4 backdrop-blur-[20px] lg:hidden">
         <div class="flex items-center gap-2">
-          <div class="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-[#c4873b] to-[#8b5a1b] text-white">
-            <SacredIcons name="om" :size="14" />
+          <div class="logo-glow flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#c4873b] to-[#8b5a1b] text-white">
+            <SacredIcons name="lotus" :size="20" />
           </div>
           <span class="font-serif text-lg font-bold text-[#2b1e10]">ShantiSangha</span>
         </div>
@@ -124,3 +124,18 @@ function isActive(href: string) {
     </div>
   </div>
 </template>
+
+<style scoped>
+.logo-glow {
+  animation: sacred-glow 3s ease-in-out infinite;
+}
+
+@keyframes sacred-glow {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(196, 135, 59, 0.3), 0 0 20px rgba(196, 135, 59, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(196, 135, 59, 0.5), 0 0 40px rgba(196, 135, 59, 0.2);
+  }
+}
+</style>
