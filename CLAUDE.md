@@ -10,17 +10,15 @@ See `docs/features/` for detailed feature documentation (purpose, value, how it 
 - [Insights](docs/features/insights.md) — AI-extracted takeaways from conversations and journals
 - [Voice](docs/features/voice.md) — audio notes with async transcription
 
-## Design System
-See [docs/design-system.md](docs/design-system.md) for the full sacred scripture theme specification (colors, icons, typography, components, mobile rules).
+## Design Principles
+Every UI decision must honor these principles. See `docs/design-principles/` for details:
+- [Simplicity](docs/design-principles/simplicity.md) — ONE experience, not modules. 3 tabs only. No bells and whistles.
+- [Privacy](docs/design-principles/privacy.md) — user data is never shared. This is their sacred private space.
+- [Sacred Aesthetic](docs/design-principles/sacred-aesthetic.md) — saffron/gold/parchment, no emojis, no cold colors.
+- [Mobile First](docs/design-principles/mobile-first.md) — 375px minimum, 44px touch targets, design for phones.
+- [One Experience](docs/design-principles/one-experience.md) — screens flow into each other, no dead ends.
 
-**Key rules (always enforced):**
-- **Simplicity is the key** — the app is ONE experience, not modules. 3 tabs only: Home, Reflect, Journey
-- Hindu scripture-inspired aesthetic — saffron/gold/parchment palette
-- NEVER use emojis as UI icons — use `SacredIcons.vue` only
-- NEVER use blue, green, or cold/tech-feeling colors
-- Mobile-first: 375px minimum, 44px touch targets
-- No redundant page titles, no decorative clutter, no bells and whistles
-- All UI changes MUST follow the design system
+Technical spec: [docs/design-system.md](docs/design-system.md) (exact colors, components, icon inventory)
 
 ## Tech Stack
 - **Frontend:** Vite + Vue 3 + TypeScript + Tailwind CSS v3 + Clerk auth
