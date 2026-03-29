@@ -2,125 +2,140 @@
 
 ## Purpose
 
-Help users define what matters to them and build the daily discipline to pursue it. This is not a task manager or a habit tracker — it's a space for personal intentions backed by honest daily accountability.
+Help users define what matters to them — both the daily habits they want to build and the milestones they want to reach. This is not a task manager. It's a space for personal intentions backed by honest accountability.
 
 ## Why this matters
 
-People don't lack goals. They lack consistency. The gap between "I want to get in shape" and actually doing it every day is where most people fail. ShantiSangha bridges that gap by making daily accountability feel like a spiritual practice, not a chore.
+People don't lack goals. They lack consistency for recurring ones and follow-through for one-time ones. ShantiSangha bridges both gaps by making accountability feel like a spiritual practice, not a chore.
 
-The mood tracker asked "how do you feel?" — nobody cares. Goals ask "who do you want to become?" — that's worth coming back for.
+## Two Types of Goals
 
-## Core Concepts
+### 1. Recurring Goals (Discipline)
 
-### Intentions (not tasks)
+Things you commit to doing regularly to build who you want to become.
 
-Users set **intentions** — things they want to become or achieve, in their own words:
-- "I want to get in shape"
-- "I want to build profit in stocks"
-- "I want to read more books"
-- "I want to be more present with my family"
-- "I want to learn Spanish"
-- "I want to meditate daily"
+**Examples:**
+- "Meditate every day"
+- "Exercise 3 times a week"
+- "Read for 30 minutes daily"
+- "No social media before noon"
+- "Practice gratitude daily"
 
-These are not SMART goals with deadlines. They are directions. The app doesn't judge whether the goal is specific enough — it respects the user's words.
+**How they work:**
+- User sets a title and frequency (daily, or X times per week)
+- Daily check-in: "Did you do this today?" → Yes / Not today
+- Tracked by **streaks** — consecutive days/weeks of discipline
+- Longest streak is recorded as a personal record
+- Missing a day resets the streak (this is the motivation)
 
-### Daily discipline check-in
+**What makes it sticky:**
+- The streak is the hook — you don't want to break a 15-day streak
+- The AI companion can reference it: "You've been meditating for 3 weeks straight. How has that changed things?"
 
-Each day, the user sees their active goals and answers one question per goal:
+### 2. One-Time Goals (Milestones)
 
-**"Did you work toward this today?"**
+Things you want to achieve by a specific date.
 
-- Yes — streak continues, optional note about what you did
-- Not today — streak resets (or pauses with grace days?), optional note about what got in the way
+**Examples:**
+- "Run a marathon by October 2026"
+- "Save $5000 by December"
+- "Launch my side project by Q3"
+- "Read 12 books this year"
+- "Learn to cook 10 recipes"
 
-That's it. No percentages, no progress bars, no gamification overload. Just honest daily accountability.
+**How they work:**
+- User sets a title and a target date
+- Progress is tracked through **notes/updates** — the user logs progress whenever they want
+- No daily check-in pressure — just periodic reflection
+- When the date arrives or the goal is achieved, the user marks it complete or extends it
+- The Journey page shows time remaining and recent progress notes
 
-### Streaks
+**What makes it sticky:**
+- Seeing the deadline approach creates natural urgency
+- Progress notes become a journal of the journey toward the goal
+- The AI companion can ask: "Your marathon is 4 months away. How's training going?"
 
-The streak is the core motivator:
-- Visual counter: "12 days" next to each goal
-- Longest streak recorded
-- The pain of breaking a streak is the motivation (loss aversion)
+## How They Differ
 
-### Reflection integration
+| Aspect | Recurring | One-Time |
+|---|---|---|
+| Frequency | Daily / X per week | No schedule |
+| Tracking | Streaks + consistency | Progress notes + deadline |
+| Check-in | Daily Yes/No | Whenever you make progress |
+| Motivation | Don't break the streak | Deadline approaching |
+| Completion | Never "done" — it's a practice | Done when achieved or deadline passes |
+| Sacred Scrolls | Shows in daily flow | Shows only when user logs progress |
 
-When a user checks in on goals, the data flows into the AI companion:
-- "I see you've been consistent with fitness for 15 days. What's been helping?"
-- "You mentioned stocks were frustrating yesterday. Want to talk through it?"
-- Goal check-in notes become searchable in the Journey
-
-## Open Questions
-
-1. **Grace days?** Should users get 1 rest day per week without breaking the streak? Or is strictness the point?
-2. **Goal limit?** Should we cap active goals at 3-5 to prevent overwhelm? Or let users decide?
-3. **Categories?** Should goals have categories (health, finance, learning, relationships) or stay freeform?
-4. **Archiving?** Can users archive/complete a goal? What does "done" look like for "I want to be healthier"?
-5. **Privacy?** Goals are deeply personal — same privacy rules as journals. Never shared, never analyzed for business.
-6. **Sacred Scrolls integration?** Should the daily goal check-in be a card in the scroll flow? Or its own space?
-7. **Weekly reflection?** Should the app generate a weekly discipline summary? "You worked toward fitness 5/7 days this week."
-8. **Accountability partner?** Future feature — could two people share accountability? Or does that violate the privacy principle?
-
-## Data Model (Draft)
+## Data Model
 
 ```
 Goal
   - Id (Guid)
   - UserId (Guid)
-  - Title (string) — "I want to get in shape"
-  - CreatedAt (DateTime)
+  - Title (string) — user's own words
+  - Type (enum: Recurring, OneTime)
+  - Frequency (enum?: Daily, Weekly) — only for Recurring
+  - FrequencyTarget (int?) — e.g. 3 for "3 times per week", null for daily
+  - TargetDate (DateOnly?) — only for OneTime
+  - CompletedAt (DateTime?) — when a OneTime goal is achieved
   - ArchivedAt (DateTime?) — null if active
-  - CurrentStreak (int) — computed or cached
-  - LongestStreak (int) — cached
+  - CreatedAt (DateTime)
 
 GoalCheckIn
   - Id (Guid)
   - GoalId (Guid)
   - Date (DateOnly) — one check-in per goal per day
   - Completed (bool) — did you work toward this today?
-  - Note (string?) — optional, what you did or what got in the way
+  - Note (string?) — what you did or what got in the way
   - CreatedAt (DateTime)
 ```
 
-## API Endpoints (Draft)
+Streak calculation (Recurring): count consecutive check-in days backwards from today where Completed == true.
+
+Progress tracking (OneTime): count of check-ins with notes, days remaining until TargetDate.
+
+## API Endpoints
 
 ```
-POST   /api/goals              — create a new goal
-GET    /api/goals              — list active goals with current streaks
-PATCH  /api/goals/{id}         — update title or archive
-DELETE /api/goals/{id}         — delete goal and all check-ins
+POST   /api/goals                — create goal (type, title, frequency?, targetDate?)
+GET    /api/goals                — list active goals with streaks/progress
+PATCH  /api/goals/{id}           — update title, frequency, targetDate, archive, or mark complete
+DELETE /api/goals/{id}           — delete goal and all check-ins
 
-POST   /api/goals/{id}/checkin — daily check-in (completed: true/false, note?)
-GET    /api/goals/{id}/history — check-in history for a goal
-GET    /api/goals/today        — today's check-in status for all active goals
+POST   /api/goals/{id}/checkin   — daily check-in (completed, note?)
+GET    /api/goals/{id}/history   — check-in history for a goal (paginated)
+GET    /api/goals/today          — today's status for all active recurring goals
 ```
 
 ## UI Placement
 
 ### Sacred Scrolls (Home)
-One card in the daily flow:
-- Shows active goals with today's status
-- Tap Yes/No per goal
-- See current streak update in real-time
+- **Recurring goals** appear in the daily flow — "Did you do this today?" per goal
+- **One-time goals** do NOT appear in daily flow (no daily pressure). They appear only when the user adds a progress note from Reflect or Journey.
 
 ### Journey
-- Discipline section showing streaks, consistency percentages, longest streaks
-- Calendar heatmap showing which days you checked in
+- **Recurring:** streaks, weekly discipline dots, longest streaks
+- **One-time:** list with progress bar (days elapsed / total), recent notes, days remaining
+- Both types show in the active goals section
 
 ### Reflect
-- Goal notes feed into the unified timeline alongside conversations and journals
+- Goal progress notes feed into the unified timeline
+- User can add a progress note from the Reflect hub
 
 ### AI Companion
-- System prompt includes active goals and recent check-ins
-- Can ask about goals naturally: "How's the reading going?"
-- Can offer encouragement when streaks are long or compassion when they break
+- System prompt includes both types of goals
+- Recurring: "You've been exercising for 12 days straight"
+- One-time: "Your marathon is 4 months away. How's training?"
 
 ## What this replaces
 
-- **Mood check-in** — removed entirely. The daily discipline check-in is the new daily ritual.
-- **Mood trends** — replaced by discipline streaks and consistency tracking in Journey
+- **Mood check-in** — removed entirely. Recurring goal check-ins are the new daily ritual.
+- **Mood trends** — replaced by discipline streaks and goal progress in Journey
 
-## What this does NOT replace
+## Open Questions
 
-- Chat, Journal, Voice — these remain as reflection tools
-- Insights — these still get extracted from conversations and journals
-- Coping exercises — these may be suggested by the AI when someone is struggling with discipline
+1. **Grace days for recurring?** Allow 1 skip per week without breaking streak?
+2. **Goal limit?** Cap at 5-7 active goals, or unlimited?
+3. **Sub-goals/milestones?** Should one-time goals have sub-steps? (e.g. "Week 1: Run 5K, Week 4: Run 10K") — probably too complex for now
+4. **Reminders?** Should the app remind you about one-time goals as the deadline approaches?
+5. **Celebration?** What happens when you complete a one-time goal? Special card in Sacred Scrolls?
