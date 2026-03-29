@@ -164,9 +164,9 @@ watch(id, loadConversation)
           class="flex"
           :class="msg.role === 'user' ? 'justify-end' : 'justify-start'"
         >
-          <div>
+          <div class="max-w-[85%] sm:max-w-[75%]">
             <div
-              class="max-w-[85%] rounded-2xl px-4 py-3 text-[14px] leading-relaxed sm:max-w-[75%]"
+              class="rounded-2xl px-4 py-3 text-[14px] leading-relaxed"
               :class="msg.role === 'user'
                 ? 'rounded-br-md bg-gradient-to-br from-[#c4873b] to-[#8b5a1b] text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)]'
                 : 'rounded-bl-md border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.95)] text-[#2b1e10] shadow-[0_1px_4px_rgba(82,54,29,0.06)]'"
@@ -179,7 +179,7 @@ watch(id, loadConversation)
               <span v-else class="whitespace-pre-wrap">{{ msg.content }}</span>
               <span v-if="msg.role === 'assistant' && streaming && i === messages.length - 1 && msg.content !== ''" class="ml-1 inline-block h-4 w-0.5 animate-pulse bg-[#c4873b] align-middle" />
             </div>
-            <p v-if="msg.created_at || msg.createdAt" class="mt-1 text-[10px] text-[#b5996f]" :class="msg.role === 'user' ? 'text-right' : 'text-left'">
+            <p v-if="msg.created_at || msg.createdAt" class="mt-1 px-1 text-[10px] text-[#b5996f]" :class="msg.role === 'user' ? 'text-right' : 'text-left'">
               {{ new Date(msg.created_at || msg.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) }}
             </p>
           </div>
