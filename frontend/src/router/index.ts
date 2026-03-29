@@ -5,7 +5,7 @@ import { watch } from 'vue'
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', redirect: '/app/dashboard' },
+    { path: '/', redirect: '/app/home' },
     { path: '/login', component: () => import('@/pages/login.vue'), meta: { guestOnly: true } },
     { path: '/signup', component: () => import('@/pages/signup.vue'), meta: { guestOnly: true } },
     {
@@ -13,17 +13,26 @@ const router = createRouter({
       component: () => import('@/layouts/AppLayout.vue'),
       meta: { requiresAuth: true },
       children: [
-        { path: 'dashboard', component: () => import('@/pages/app/dashboard.vue') },
-        { path: 'chat', component: () => import('@/pages/app/chat/index.vue') },
-        { path: 'chat/:id', component: () => import('@/pages/app/chat/[id].vue') },
-        { path: 'journal', component: () => import('@/pages/app/journal/index.vue') },
-        { path: 'journal/new', component: () => import('@/pages/app/journal/new.vue') },
-        { path: 'journal/:id', component: () => import('@/pages/app/journal/[id].vue') },
-        { path: 'mood', component: () => import('@/pages/app/mood/index.vue') },
-        { path: 'coping', component: () => import('@/pages/app/coping/index.vue') },
-        { path: 'insights', component: () => import('@/pages/app/insights/index.vue') },
-        { path: 'voice', component: () => import('@/pages/app/voice/index.vue') },
-        { path: '', redirect: 'dashboard' }
+        { path: 'home', component: () => import('@/pages/app/home.vue') },
+        { path: 'reflect', component: () => import('@/pages/app/reflect/index.vue') },
+        { path: 'reflect/chat/:id', component: () => import('@/pages/app/reflect/chat.vue') },
+        { path: 'reflect/journal/new', component: () => import('@/pages/app/reflect/journal-new.vue') },
+        { path: 'reflect/journal/:id', component: () => import('@/pages/app/reflect/journal-edit.vue') },
+        { path: 'reflect/voice/:id', component: () => import('@/pages/app/reflect/voice-detail.vue') },
+        { path: 'journey', component: () => import('@/pages/app/journey.vue') },
+        { path: 'journey/insights', component: () => import('@/pages/app/journey-insights.vue') },
+        // Legacy redirects
+        { path: 'dashboard', redirect: '/app/home' },
+        { path: 'chat', redirect: '/app/reflect' },
+        { path: 'chat/:id', redirect: to => `/app/reflect/chat/${to.params.id}` },
+        { path: 'journal', redirect: '/app/reflect' },
+        { path: 'journal/new', redirect: '/app/reflect/journal/new' },
+        { path: 'journal/:id', redirect: to => `/app/reflect/journal/${to.params.id}` },
+        { path: 'mood', redirect: '/app/journey' },
+        { path: 'coping', redirect: '/app/home' },
+        { path: 'insights', redirect: '/app/journey/insights' },
+        { path: 'voice', redirect: '/app/reflect' },
+        { path: '', redirect: 'home' }
       ]
     }
   ]
@@ -31,15 +40,12 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   const { isSignedIn, isLoaded } = useAuth()
-  // Wait for Clerk to initialize
   if (!isLoaded.value) {
     await new Promise<void>(resolve => {
       const unwatch = watch(isLoaded, (val) => { if (val) { unwatch(); resolve() } })
     })
   }
-  // Redirect authenticated users away from login/signup
-  if (to.meta.guestOnly && isSignedIn.value) return '/app/dashboard'
-  // Redirect unauthenticated users to login
+  if (to.meta.guestOnly && isSignedIn.value) return '/app/home'
   if (to.meta.requiresAuth && !isSignedIn.value) return '/login'
 })
 

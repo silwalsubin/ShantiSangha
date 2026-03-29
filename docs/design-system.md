@@ -2,6 +2,19 @@
 
 All UI work MUST follow the Hindu scripture-inspired design language. This is a strict requirement for every frontend change.
 
+## Core Design Principle: Simplicity
+
+**Simplicity is the key.** The app must feel like ONE calm experience, not a collection of modules. Every screen should flow naturally into the next. If a feature needs explanation, it's too complex.
+
+Rules:
+- **3 tabs maximum** — Home, Reflect, Journey. No more.
+- **No redundant page titles** — the nav tells you where you are. Use the space for content.
+- **One path, not seven doors** — guide users through a flow: ground yourself → reflect → see growth
+- **Every tappable card** must have `active:scale-[0.98]` or `active:scale-[0.99]` press feedback
+- **Smooth fade transitions** between tab switches (0.15s ease)
+- **Empty states** should guide toward the next action, not just say "nothing here"
+- **No decorative clutter** — if it doesn't help the user, remove it
+
 ## Philosophy
 
 The app should feel like reading a sacred text — serene, warm, grounded. Not a tech product. Not a clinical tool. A spiritual space that users feel is *theirs*.

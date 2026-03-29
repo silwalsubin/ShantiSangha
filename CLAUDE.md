@@ -14,10 +14,12 @@ See `docs/features/` for detailed feature documentation (purpose, value, how it 
 See [docs/design-system.md](docs/design-system.md) for the full sacred scripture theme specification (colors, icons, typography, components, mobile rules).
 
 **Key rules (always enforced):**
+- **Simplicity is the key** — the app is ONE experience, not modules. 3 tabs only: Home, Reflect, Journey
 - Hindu scripture-inspired aesthetic — saffron/gold/parchment palette
 - NEVER use emojis as UI icons — use `SacredIcons.vue` only
 - NEVER use blue, green, or cold/tech-feeling colors
 - Mobile-first: 375px minimum, 44px touch targets
+- No redundant page titles, no decorative clutter, no bells and whistles
 - All UI changes MUST follow the design system
 
 ## Tech Stack
