@@ -1,5 +1,15 @@
 # CLAUDE.md — Project Rules for ShantiSangha
 
+## Features
+See `docs/features/` for detailed feature documentation (purpose, value, how it works, key files, API endpoints).
+- [Dashboard](docs/features/dashboard.md) — daily landing page with verse, mood check-in, quick actions
+- [Chat](docs/features/chat.md) — AI spiritual companion (GPT-4o, SSE streaming)
+- [Journal](docs/features/journal.md) — private reflection writing with AI summaries/insights
+- [Mood](docs/features/mood.md) — daily emotional tracking with trends
+- [Coping](docs/features/coping.md) — guided breathing/grounding exercises with timer
+- [Insights](docs/features/insights.md) — AI-extracted takeaways from conversations and journals
+- [Voice](docs/features/voice.md) — audio notes with async transcription
+
 ## Design System — Sacred Scripture Theme
 
 All UI work MUST follow the Hindu scripture-inspired design language. This is a strict requirement for every frontend change.
