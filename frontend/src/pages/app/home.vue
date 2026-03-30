@@ -187,27 +187,47 @@ onMounted(() => { loadGoals() })
 
       <!-- Task check-in list -->
       <ul v-if="recurringGoals.length > 0" class="mt-6 space-y-3">
-        <li v-for="goal in recurringGoals" :key="goal.id" class="rounded-2xl border border-[rgba(139,90,43,0.1)] bg-[rgba(250,245,237,0.7)] px-4 py-3">
-          <div class="flex items-center justify-between">
-            <button class="text-left text-sm font-medium text-[#2b1e10] transition duration-200 hover:text-[#c4873b]" @click="router.push(`/app/journey/goals/${goal.id}`)">{{ goal.title }}</button>
-            <SacredIcons name="recurring" :size="16" class="shrink-0 text-[#b5996f]" />
-          </div>
-          <!-- Already checked in — spiritual feedback -->
-          <div v-if="goalsCheckedIn[goal.id]" class="mt-2">
-            <p class="font-serif text-xs italic leading-relaxed text-[#6b5740]">
-              {{ goalFeedbackMessages[goal.id] || (goal.completedToday ? 'Done for today.' : 'Rest well.') }}
-            </p>
-          </div>
-          <!-- Check-in flow -->
-          <div v-else>
-            <div class="mt-2 flex items-center justify-center gap-2">
-              <button @click="checkInGoal(goal.id, true)" :disabled="goalsSaving[goal.id]" class="flex min-h-[44px] items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-4 py-2 text-xs font-semibold text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)] transition duration-200 active:scale-[0.97] disabled:opacity-60">
-                <SacredIcons name="check" :size="14" /> Done
-              </button>
-              <button @click="checkInGoal(goal.id, false)" :disabled="goalsSaving[goal.id]" class="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-[rgba(139,90,43,0.15)] px-4 py-2 text-xs font-medium text-[#6b5740] transition duration-200 active:scale-[0.97] disabled:opacity-60 hover:bg-[rgba(196,135,59,0.06)]">
-                <SacredIcons name="skip" :size="12" /> Not today
-              </button>
+        <li
+          v-for="goal in recurringGoals"
+          :key="goal.id"
+          class="rounded-2xl border px-4 py-3 transition-all duration-300"
+          :class="goalsCheckedIn[goal.id]
+            ? 'border-[rgba(122,168,122,0.25)] bg-[rgba(122,168,122,0.06)]'
+            : 'border-[rgba(139,90,43,0.1)] bg-[rgba(250,245,237,0.7)]'"
+        >
+          <div class="flex items-center gap-3">
+            <!-- Check circle -->
+            <div
+              class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-all duration-300"
+              :class="goalsCheckedIn[goal.id]
+                ? (goal.completedToday
+                  ? 'bg-gradient-to-br from-[#7aa87a] to-[#5a8a5a]'
+                  : 'border-2 border-[rgba(139,90,43,0.2)] bg-[rgba(250,245,237,0.6)]')
+                : 'border-2 border-[rgba(139,90,43,0.15)] bg-[rgba(250,245,237,0.6)]'"
+            >
+              <SacredIcons v-if="goalsCheckedIn[goal.id] && goal.completedToday" name="check" :size="14" class="text-white" />
+              <SacredIcons v-else-if="goalsCheckedIn[goal.id]" name="skip" :size="12" class="text-[#b5996f]" />
             </div>
+            <!-- Title -->
+            <button
+              class="flex-1 text-left text-sm font-medium transition duration-200 hover:text-[#c4873b]"
+              :class="goalsCheckedIn[goal.id] && goal.completedToday ? 'text-[#7aa87a] line-through decoration-[rgba(122,168,122,0.4)]' : 'text-[#2b1e10]'"
+              @click="router.push(`/app/journey/goals/${goal.id}`)"
+            >{{ goal.title }}</button>
+            <SacredIcons name="recurring" :size="14" class="shrink-0 text-[#b5996f] opacity-40" />
+          </div>
+          <!-- Spiritual feedback after check-in -->
+          <p v-if="goalsCheckedIn[goal.id] && goalFeedbackMessages[goal.id]" class="mt-2 ml-10 font-serif text-xs italic leading-relaxed text-[#9a8568]">
+            {{ goalFeedbackMessages[goal.id] }}
+          </p>
+          <!-- Check-in buttons -->
+          <div v-if="!goalsCheckedIn[goal.id]" class="mt-2 ml-10 flex items-center gap-2">
+            <button @click="checkInGoal(goal.id, true)" :disabled="goalsSaving[goal.id]" class="flex min-h-[44px] items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-4 py-2 text-xs font-semibold text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)] transition duration-200 active:scale-[0.97] disabled:opacity-60">
+              <SacredIcons name="check" :size="14" /> Done
+            </button>
+            <button @click="checkInGoal(goal.id, false)" :disabled="goalsSaving[goal.id]" class="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-[rgba(139,90,43,0.15)] px-4 py-2 text-xs font-medium text-[#6b5740] transition duration-200 active:scale-[0.97] disabled:opacity-60 hover:bg-[rgba(196,135,59,0.06)]">
+              <SacredIcons name="skip" :size="12" /> Not today
+            </button>
           </div>
         </li>
       </ul>
