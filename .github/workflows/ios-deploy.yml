@@ -19,6 +19,12 @@ jobs:
 
       - name: Select Xcode
         run: |
+          # List available Xcode versions
+          ls -d /Applications/Xcode*.app 2>/dev/null || true
+          # Use Xcode 16.x (needed for fileSystemSynchronizedGroups)
+          sudo xcode-select -s /Applications/Xcode_16.app/Contents/Developer 2>/dev/null || \
+          sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer 2>/dev/null || \
+          sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer 2>/dev/null || \
           sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
           xcodebuild -version
 
