@@ -3,6 +3,8 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var auth: AuthService
     @State private var showSignOutConfirmation = false
+    @State private var serverVersion: ServerVersion?
+    private let api = ApiService.shared
 
     var body: some View {
         ScrollView {
@@ -43,10 +45,21 @@ struct SettingsView: View {
                     }
                 }
 
-                // About card
-                settingsCard(title: "ABOUT") {
+                // iOS Client
+                settingsCard(title: "IOS CLIENT") {
                     infoRow(icon: "square.stack", label: "Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
                     infoRow(icon: "hammer", label: "Build", value: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1")
+                }
+
+                // App Server
+                settingsCard(title: "APP SERVER") {
+                    if let sv = serverVersion {
+                        infoRow(icon: "server.rack", label: "Git hash", value: sv.gitHash)
+                        infoRow(icon: "clock", label: "Built", value: sv.buildTime)
+                    } else {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                    }
                 }
 
                 // Sign out
@@ -70,6 +83,11 @@ struct SettingsView: View {
         .background(Color.sacredBg.ignoresSafeArea())
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            do {
+                serverVersion = try await api.get("/version")
+            } catch {}
+        }
         .confirmationDialog("Are you sure you want to sign out?", isPresented: $showSignOutConfirmation, titleVisibility: .visible) {
             Button("Sign Out", role: .destructive) {
                 auth.signOut()
