@@ -165,7 +165,7 @@ struct TaskRow: View {
                       ? Color.sacredGreen.opacity(0.06)
                       : isOverdue
                       ? Color.sacredRed.opacity(0.06)
-                      : Color.sacredBg.opacity(0.7))
+                      : Color.sacredBgCard)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
                         .stroke(task.checkedIn

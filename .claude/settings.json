@@ -23,7 +23,9 @@
       "Bash(ls -t ~/Downloads/GoogleService*)",
       "Bash(cat \"/Users/subinsilwal/Downloads/GoogleService-Info \\(2\\).plist\")",
       "Bash(dig shantisangha.com A +short)",
-      "Bash(dig @8.8.8.8 shantisangha.com A +short)"
+      "Bash(dig @8.8.8.8 shantisangha.com A +short)",
+      "Bash(chmod +x /Users/subinsilwal/Desktop/code/maiself/ios/upload-testflight.sh)",
+      "Bash(find ShantiSangha/Views -name \"*.swift\" -exec sed -i '' -e 's/Color\\\\.sacredBg\\\\.opacity\\(0\\\\.88\\)/Color.sacredBgCard/g' -e 's/Color\\\\.sacredBg\\\\.opacity\\(0\\\\.95\\)/Color.sacredBgCard/g' -e 's/Color\\\\.sacredBg\\\\.opacity\\(0\\\\.7\\)/Color.sacredBgCard/g' -e 's/Color\\\\.sacredBg\\\\.opacity\\(0\\\\.6\\)/Color.sacredBgCard/g' -e 's/Color\\\\.sacredBg\\\\.opacity\\(0\\\\.5\\)/Color.sacredBgCard/g' {} +)"
     ],
     "additionalDirectories": [
       "/Users/subinsilwal/Desktop/code/maiself/.claude",

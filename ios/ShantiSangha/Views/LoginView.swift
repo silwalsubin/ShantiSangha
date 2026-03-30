@@ -48,7 +48,7 @@ struct LoginView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(Color.white)
+                .background(Color.sacredBgCard)
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .shadow(color: .sacredMuted.opacity(0.15), radius: 8, y: 4)
             }

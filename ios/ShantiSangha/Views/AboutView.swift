@@ -63,7 +63,7 @@ struct AboutView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBg.opacity(0.7)))
+        .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
         .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.1)))
     }
 

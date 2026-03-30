@@ -70,7 +70,7 @@ struct ReflectView: View {
                                     .foregroundColor(.sacredMuted)
                             }
                             .padding(14)
-                            .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBg.opacity(0.7)))
+                            .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBgCard))
                             .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.1)))
                         }
                     }

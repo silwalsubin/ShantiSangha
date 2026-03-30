@@ -57,7 +57,7 @@ struct JourneyView: View {
                                         }
                                     }
                                     .padding(12)
-                                    .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBg.opacity(0.7)))
+                                    .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBgCard))
                                     .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.1)))
                                 }
                             }
@@ -88,7 +88,7 @@ struct JourneyView: View {
                                         }
                                     }
                                     .padding(12)
-                                    .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBg.opacity(0.7)))
+                                    .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBgCard))
                                     .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.1)))
                                 }
                             }
@@ -119,7 +119,7 @@ struct JourneyView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBg.opacity(0.88)))
+        .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
         .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.12)))
     }
 

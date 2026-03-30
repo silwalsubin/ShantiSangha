@@ -68,7 +68,7 @@ struct GoalDetailView: View {
                         }
                     }
                     .padding(16)
-                    .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBg.opacity(0.88)))
+                    .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
                     .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.12)))
 
                     // History
@@ -105,13 +105,13 @@ struct GoalDetailView: View {
                                     }
                                 }
                                 .padding(12)
-                                .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBg.opacity(0.6)))
+                                .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBgCard))
                                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.08)))
                             }
                         }
                     }
                     .padding(16)
-                    .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBg.opacity(0.88)))
+                    .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
                     .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.12)))
 
                     Text("Started \(formatDate(goal.createdAt))")
@@ -155,7 +155,7 @@ struct GoalDetailView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBg.opacity(0.6)))
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBgCard))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.08)))
     }
 

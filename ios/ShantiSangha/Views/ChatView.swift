@@ -54,7 +54,7 @@ struct ChatView: View {
             .padding(.vertical, 12)
             .background(Color.sacredBg)
         }
-        .background(Color.sacredBg.opacity(0.5).ignoresSafeArea())
+        .background(Color.sacredBgCard.ignoresSafeArea())
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .task { await loadMessages() }
@@ -71,7 +71,7 @@ struct ChatView: View {
                     RoundedRectangle(cornerRadius: 16)
                         .fill(msg.role == "user"
                               ? LinearGradient(colors: [.sacredGold, .sacredGoldDark], startPoint: .topLeading, endPoint: .bottomTrailing)
-                              : LinearGradient(colors: [Color.sacredBg.opacity(0.95), Color.sacredBg.opacity(0.95)], startPoint: .top, endPoint: .bottom))
+                              : LinearGradient(colors: [Color.sacredBgCard, Color.sacredBgCard], startPoint: .top, endPoint: .bottom))
                 )
                 .overlay(
                     msg.role == "assistant"
