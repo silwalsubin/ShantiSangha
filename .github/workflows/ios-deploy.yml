@@ -75,7 +75,7 @@ jobs:
             DEVELOPMENT_TEAM=${{ secrets.IOS_TEAM_ID }} \
             CODE_SIGN_STYLE=Manual \
             "CODE_SIGN_IDENTITY=iPhone Distribution" \
-            "PROVISIONING_PROFILE[sdk=iphoneos*]=${{ env.PP_UUID }}" \
+            "PROVISIONING_PROFILE_SPECIFIER=ShantiSangha AppStore" \
             COMPILER_INDEX_STORE_ENABLE=NO \
             archive 2>&1 | tee build.log
 
