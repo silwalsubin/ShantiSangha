@@ -53,7 +53,7 @@ struct LoginView: View {
             .padding(.horizontal, 32)
 
             // Quote
-            Text(""Peace comes from within. Do not seek it without." — Buddha")
+            Text("\u{201C}Peace comes from within. Do not seek it without.\u{201D} \u{2014} Buddha")
                 .font(.system(size: 11, design: .serif))
                 .italic()
                 .foregroundColor(.sacredMutedLight)
