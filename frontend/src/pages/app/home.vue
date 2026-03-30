@@ -46,6 +46,9 @@ const goalsLoading = ref(true)
 const goalsCheckedIn = ref<Record<string, boolean>>({})
 const goalsSaving = ref<Record<string, boolean>>({})
 const allGoalsCheckedIn = ref(false)
+const goalNotes = ref<Record<string, string>>({})
+const showNoteInput = ref<Record<string, boolean>>({})
+const goalFeedbackMessages = ref<Record<string, string>>({})
 
 // New goal inline form
 const showNewGoalForm = ref(false)
@@ -172,18 +175,62 @@ async function loadGoals() {
   }
 }
 
+function getCheckInFeedback(goal: GoalToday, completed: boolean): string {
+  const streak = completed ? goal.currentStreak + 1 : 0
+  const longest = goal.longestStreak
+
+  if (completed) {
+    if (streak === 1) {
+      const fresh = [
+        'A single step. That is all it ever takes.',
+        'The seed has been planted. Trust the process.',
+        'Today you chose yourself. That matters.',
+      ]
+      return fresh[Math.floor(Math.random() * fresh.length)]
+    }
+    if (streak === 3) return 'Three days. A pattern is forming. Stay with it.'
+    if (streak === 7) return 'One full week. Your discipline is becoming devotion.'
+    if (streak === 14) return 'Two weeks of showing up. This is no longer effort — it is who you are becoming.'
+    if (streak === 21) return 'Twenty-one days. What began as a goal is now a practice. The Gita teaches: the self is its own friend and its own enemy.'
+    if (streak === 30) return 'A full month. You have proven something to yourself that no one can take away.'
+    if (streak > 30 && streak % 10 === 0) return `${streak} days. Your consistency speaks louder than any intention ever could.`
+    if (streak > longest && longest > 0) return `A new personal record — ${streak} days. You have surpassed your past self.`
+    const ongoing = [
+      `${streak} days and counting. Keep showing up.`,
+      'Another day honored. The practice deepens.',
+      'Consistency is the quiet form of courage.',
+      'You showed up again. That is the whole practice.',
+    ]
+    return ongoing[Math.floor(Math.random() * ongoing.length)]
+  } else {
+    if (longest >= 7) {
+      return 'A pause is not a failure. Even the river rests in still pools before flowing on.'
+    }
+    const missed = [
+      'Rest is also practice. Tomorrow is a new beginning.',
+      'Not today — and that is honest. Honesty is the first discipline.',
+      'The path does not disappear because you paused. It waits.',
+      'Be gentle with yourself. Even the moon wanes before it grows full again.',
+    ]
+    return missed[Math.floor(Math.random() * missed.length)]
+  }
+}
+
 async function checkInGoal(goalId: string, completed: boolean) {
   goalsSaving.value[goalId] = true
   try {
-    await api.post(`/goals/${goalId}/checkin`, { completed })
-    goalsCheckedIn.value[goalId] = true
+    const note = goalNotes.value[goalId]?.trim() || undefined
+    await api.post(`/goals/${goalId}/checkin`, { completed, note })
     const goal = recurringGoals.value.find(g => g.id === goalId)
     if (goal) {
+      goalFeedbackMessages.value[goalId] = getCheckInFeedback(goal, completed)
       goal.checkedInToday = true
       goal.completedToday = completed
       if (completed) goal.currentStreak += 1
       else goal.currentStreak = 0
     }
+    goalsCheckedIn.value[goalId] = true
+    showNoteInput.value[goalId] = false
     checkAllDone()
   } catch {
     // silently fail
@@ -382,25 +429,47 @@ onMounted(() => { loadGoals(); loadInsight(); loadRecent() })
         <div v-if="recurringGoals.length > 0" class="mt-6 w-full max-w-xs space-y-3">
           <div v-for="goal in recurringGoals" :key="goal.id" class="rounded-2xl border border-[rgba(139,90,43,0.1)] bg-[rgba(250,245,237,0.7)] px-4 py-3">
             <div class="flex items-center justify-between">
-              <p class="text-left text-sm font-medium text-[#2b1e10]">{{ goal.title }}</p>
+              <button class="text-left text-sm font-medium text-[#2b1e10] transition duration-200 hover:text-[#c4873b]" @click="router.push(`/app/journey/goals/${goal.id}`)">{{ goal.title }}</button>
               <div class="flex items-center gap-1.5 shrink-0">
                 <SacredIcons name="flame" :size="14" class="text-[#c4873b]" />
                 <span class="font-serif font-bold text-[#c4873b] text-sm">{{ goal.currentStreak }}</span>
               </div>
             </div>
-            <!-- Already checked in -->
-            <div v-if="goalsCheckedIn[goal.id]" class="mt-2 flex items-center justify-center gap-2">
-              <SacredIcons name="check" :size="16" class="text-[#7aa87a]" />
-              <span class="text-xs text-[#6b5740]">{{ goal.completedToday ? 'Done for today' : 'Noted. Rest well.' }}</span>
+            <!-- Already checked in — spiritual feedback -->
+            <div v-if="goalsCheckedIn[goal.id]" class="mt-2">
+              <p class="font-serif text-xs italic leading-relaxed text-[#6b5740]">
+                {{ goalFeedbackMessages[goal.id] || (goal.completedToday ? 'Done for today.' : 'Rest well.') }}
+              </p>
             </div>
-            <!-- Buttons -->
-            <div v-else class="mt-2 flex justify-center gap-2">
-              <button @click="checkInGoal(goal.id, true)" :disabled="goalsSaving[goal.id]" class="flex min-h-[44px] items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-4 py-2 text-xs font-semibold text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)] transition duration-200 active:scale-[0.97] disabled:opacity-60">
-                <SacredIcons name="check" :size="14" /> Done
-              </button>
-              <button @click="checkInGoal(goal.id, false)" :disabled="goalsSaving[goal.id]" class="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-[rgba(139,90,43,0.15)] px-4 py-2 text-xs font-medium text-[#6b5740] transition duration-200 active:scale-[0.97] disabled:opacity-60 hover:bg-[rgba(196,135,59,0.06)]">
-                <SacredIcons name="skip" :size="12" /> Not today
-              </button>
+            <!-- Check-in flow -->
+            <div v-else>
+              <!-- Optional note -->
+              <div v-if="showNoteInput[goal.id]" class="mt-2">
+                <input
+                  v-model="goalNotes[goal.id]"
+                  type="text"
+                  placeholder="A brief reflection (optional)"
+                  class="w-full rounded-xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.95)] px-3 py-2 text-xs text-[#2b1e10] placeholder-[#b5996f] outline-none transition duration-200 focus:border-[#c4873b]"
+                  @keyup.enter="checkInGoal(goal.id, true)"
+                />
+              </div>
+              <!-- Buttons -->
+              <div class="mt-2 flex items-center justify-center gap-2">
+                <button @click="checkInGoal(goal.id, true)" :disabled="goalsSaving[goal.id]" class="flex min-h-[44px] items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-4 py-2 text-xs font-semibold text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)] transition duration-200 active:scale-[0.97] disabled:opacity-60">
+                  <SacredIcons name="check" :size="14" /> Done
+                </button>
+                <button @click="checkInGoal(goal.id, false)" :disabled="goalsSaving[goal.id]" class="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-[rgba(139,90,43,0.15)] px-4 py-2 text-xs font-medium text-[#6b5740] transition duration-200 active:scale-[0.97] disabled:opacity-60 hover:bg-[rgba(196,135,59,0.06)]">
+                  <SacredIcons name="skip" :size="12" /> Not today
+                </button>
+                <button
+                  v-if="!showNoteInput[goal.id]"
+                  @click="showNoteInput[goal.id] = true"
+                  class="flex min-h-[44px] items-center justify-center rounded-xl border border-[rgba(139,90,43,0.1)] px-2.5 py-2 text-[#9a8568] transition duration-200 hover:bg-[rgba(196,135,59,0.06)]"
+                  title="Add a note"
+                >
+                  <SacredIcons name="scroll" :size="14" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
