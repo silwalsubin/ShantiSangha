@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <rect width="1024" height="1024" rx="224" fill="url(#bg)"/>
+  <g transform="translate(512,512)" stroke="#fff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <!-- Central orb -->
+    <circle cx="0" cy="0" r="90" fill="#fff" fill-opacity="0.25" stroke="#fff" stroke-width="16"/>
+    <circle cx="0" cy="0" r="32" fill="#fff" stroke="none"/>
+    <!-- Lotus petals around orb -->
+    <path d="M0-90 C-52-152-52-200 0-200 C52-200 52-152 0-90" fill="#fff" fill-opacity="0.2" stroke-width="12"/>
+    <path d="M0 90 C-52 152-52 200 0 200 C52 200 52 152 0 90" fill="#fff" fill-opacity="0.2" stroke-width="12"/>
+    <path d="M-90 0 C-152-52-200-52-200 0 C-200 52-152 52-90 0" fill="#fff" fill-opacity="0.2" stroke-width="12"/>
+    <path d="M90 0 C152-52 200-52 200 0 C200 52 152 52 90 0" fill="#fff" fill-opacity="0.2" stroke-width="12"/>
+    <!-- Up prong -->
+    <path d="M-52-200 C-80-260-160-320-180-360 C-160-400-100-400 0-480"/>
+    <path d="M52-200 C80-260 160-320 180-360 C160-400 100-400 0-480"/>
+    <path d="M0-200 L0-480" stroke-width="12"/>
+    <path d="M0-480L-32-540"/><path d="M0-480L32-540"/>
+    <path d="M-32-540L0-580L32-540" stroke-width="16"/>
+    <!-- Down prong -->
+    <path d="M-52 200 C-80 260-160 320-180 360 C-160 400-100 400 0 480"/>
+    <path d="M52 200 C80 260 160 320 180 360 C160 400 100 400 0 480"/>
+    <path d="M0 200 L0 480" stroke-width="12"/>
+    <path d="M0 480L-32 540"/><path d="M0 480L32 540"/>
+    <path d="M-32 540L0 580L32 540" stroke-width="16"/>
+    <!-- Left prong -->
+    <path d="M-200-52 C-260-80-320-160-360-180 C-400-160-400-100-480 0"/>
+    <path d="M-200 52 C-260 80-320 160-360 180 C-400 160-400 100-480 0"/>
+    <path d="M-200 0 L-480 0" stroke-width="12"/>
+    <path d="M-480 0L-540-32"/><path d="M-480 0L-540 32"/>
+    <path d="M-540-32L-580 0L-540 32" stroke-width="16"/>
+    <!-- Right prong -->
+    <path d="M200-52 C260-80 320-160 360-180 C400-160 400-100 480 0"/>
+    <path d="M200 52 C260 80 320 160 360 180 C400 160 400 100 480 0"/>
+    <path d="M200 0 L480 0" stroke-width="12"/>
+    <path d="M480 0L540-32"/><path d="M480 0L540 32"/>
+    <path d="M540-32L580 0L540 32" stroke-width="16"/>
+  </g>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1024" y2="1024">
+      <stop offset="0%" stop-color="#c4873b"/>
+      <stop offset="100%" stop-color="#8b5a1b"/>
+    </linearGradient>
+  </defs>
+</svg>
