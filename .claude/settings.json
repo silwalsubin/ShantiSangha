@@ -21,7 +21,9 @@
       "Bash(/usr/libexec/PlistBuddy -c \"Print :REVERSED_CLIENT_ID\" /Users/subinsilwal/Desktop/code/maiself/ios/ShantiSangha/GoogleService-Info.plist)",
       "Bash(cat ~/Downloads/\"client_476549159082-k7ql964hu0j0isjmu94gro7nqks3mp5p.apps.googleusercontent.com \\(1\\).plist\")",
       "Bash(ls -t ~/Downloads/GoogleService*)",
-      "Bash(cat \"/Users/subinsilwal/Downloads/GoogleService-Info \\(2\\).plist\")"
+      "Bash(cat \"/Users/subinsilwal/Downloads/GoogleService-Info \\(2\\).plist\")",
+      "Bash(dig shantisangha.com A +short)",
+      "Bash(dig @8.8.8.8 shantisangha.com A +short)"
     ],
     "additionalDirectories": [
       "/Users/subinsilwal/Desktop/code/maiself/.claude",
