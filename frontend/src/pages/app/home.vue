@@ -377,7 +377,7 @@ onMounted(() => { loadTasks() })
         class="flex min-h-[44px] items-center gap-1.5 text-xs font-medium text-[#7aa87a] transition duration-200 hover:text-[#5a8a5a]"
       >
         <SacredIcons name="check" :size="12" />
-        {{ completedTasks.length }} completed today
+        {{ completedTasks.length }} completed
         <span class="text-[10px]">{{ showCompleted ? '&#9650;' : '&#9660;' }}</span>
       </button>
       <ul v-if="showCompleted" class="mt-2 space-y-2 opacity-60">
@@ -402,7 +402,7 @@ onMounted(() => { loadTasks() })
         class="flex min-h-[44px] items-center gap-1.5 text-xs font-medium text-[#9a8568] transition duration-200 hover:text-[#6b5740]"
       >
         <SacredIcons name="skip" :size="12" />
-        {{ skippedTasks.length }} skipped for today
+        {{ skippedTasks.length }} skipped
         <span class="text-[10px]">{{ showSkipped ? '&#9650;' : '&#9660;' }}</span>
       </button>
       <ul v-if="showSkipped" class="mt-2 space-y-2 opacity-60">
