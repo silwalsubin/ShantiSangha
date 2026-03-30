@@ -37,13 +37,27 @@ const newGoalType = ref<'Recurring' | 'OneTime'>('Recurring')
 const newGoalTargetDate = ref('')
 const newGoalSaving = ref(false)
 
-// Computed task list with live state
+// Computed task list with live state — hide skipped tasks
+const showSkipped = ref(false)
+
 const taskList = computed<Task[]>(() =>
-  tasks.value.map((t: Task) => ({
-    ...t,
-    feedbackMessage: feedbackMessages.value[t.id] ?? null,
-    saving: saving.value[t.id] ?? false,
-  }))
+  tasks.value
+    .filter((t: Task) => !(t.checkedIn && t.completedToday === false))
+    .map((t: Task) => ({
+      ...t,
+      feedbackMessage: feedbackMessages.value[t.id] ?? null,
+      saving: saving.value[t.id] ?? false,
+    }))
+)
+
+const skippedTasks = computed<Task[]>(() =>
+  tasks.value
+    .filter((t: Task) => t.checkedIn && t.completedToday === false)
+    .map((t: Task) => ({
+      ...t,
+      feedbackMessage: feedbackMessages.value[t.id] ?? null,
+      saving: saving.value[t.id] ?? false,
+    }))
 )
 
 // --- Loaders ---
@@ -287,6 +301,29 @@ onMounted(() => { loadTasks() })
         @navigate="onNavigate"
       />
     </ul>
+
+    <!-- Skipped tasks collapsed -->
+    <div v-if="skippedTasks.length > 0" class="mt-4">
+      <button
+        @click="showSkipped = !showSkipped"
+        class="flex min-h-[44px] items-center gap-1.5 text-xs font-medium text-[#9a8568] transition duration-200 hover:text-[#6b5740]"
+      >
+        <SacredIcons name="skip" :size="12" />
+        {{ skippedTasks.length }} skipped for today
+        <span class="text-[10px]">{{ showSkipped ? '&#9650;' : '&#9660;' }}</span>
+      </button>
+      <ul v-if="showSkipped" class="mt-2 space-y-2 opacity-60">
+        <TaskItem
+          v-for="task in skippedTasks"
+          :key="task.id"
+          :task="task"
+          @done="onDone"
+          @skip="onSkip"
+          @undo="onUndo"
+          @navigate="onNavigate"
+        />
+      </ul>
+    </div>
 
     <!-- Add task button -->
     <button
