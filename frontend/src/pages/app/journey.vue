@@ -182,11 +182,11 @@ onMounted(async () => {
     <!-- Header -->
     <p class="text-[13px] sm:text-sm text-[#6b5740]">See how you're growing over time.</p>
 
-    <!-- Daily Discipline (Recurring Goals) -->
+    <!-- Your Dharma (Recurring Goals) -->
     <div class="rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] p-4 shadow-[0_4px_24px_rgba(82,54,29,0.06)] backdrop-blur-[20px] sm:p-6">
       <div class="flex items-center gap-1.5">
         <SacredIcons name="flame" :size="14" class="text-[#c4873b]" />
-        <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-[#a38d6d]">Daily Discipline</p>
+        <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-[#a38d6d]">Your Dharma</p>
       </div>
 
       <div v-if="goalsLoading" class="mt-4 space-y-3">
@@ -194,7 +194,7 @@ onMounted(async () => {
       </div>
 
       <div v-else-if="recurringGoals.length === 0" class="mt-4 text-sm text-[#6b5740]">
-        No daily practices yet. Set one from the Sacred Scrolls.
+        No tasks yet. Set one from the Sacred Scrolls.
       </div>
 
       <ul v-else class="mt-4 space-y-2">
@@ -222,16 +222,16 @@ onMounted(async () => {
       </ul>
     </div>
 
-    <!-- Discipline This Week (Recurring only) -->
+    <!-- Dharma This Week (Recurring only) -->
     <div class="rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] p-4 shadow-[0_4px_24px_rgba(82,54,29,0.06)] backdrop-blur-[20px] sm:p-6">
-      <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-[#a38d6d]">Discipline This Week</p>
+      <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-[#a38d6d]">Dharma This Week</p>
 
       <div v-if="goalsLoading || weekHistoryLoading" class="mt-4 space-y-3">
         <div v-for="i in 2" :key="i" class="h-12 animate-pulse rounded-2xl bg-[rgba(139,90,43,0.06)]" />
       </div>
 
       <div v-else-if="recurringGoals.length === 0" class="mt-4 text-sm text-[#6b5740]">
-        Set daily practices to see your weekly discipline here.
+        Set your tasks to see your weekly progress here.
       </div>
 
       <div v-else class="mt-4 space-y-4">

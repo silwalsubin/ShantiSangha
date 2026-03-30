@@ -146,7 +146,7 @@ onMounted(() => {
 
     <!-- Not found -->
     <div v-else-if="!goal" class="rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] p-6 text-center">
-      <p class="text-sm text-[#6b5740]">Goal not found.</p>
+      <p class="text-sm text-[#6b5740]">Task not found.</p>
     </div>
 
     <template v-else>
@@ -225,7 +225,7 @@ onMounted(() => {
             v-model="whyInput"
             rows="3"
             class="w-full rounded-xl border border-[rgba(139,90,43,0.15)] bg-[rgba(250,245,237,0.6)] px-3 py-2 text-sm text-[#2b1e10] placeholder-[#b5996f] outline-none transition duration-200 focus:border-[#c4873b] focus:ring-1 focus:ring-[rgba(196,135,59,0.3)]"
-            placeholder="Why does this goal matter to you? What deeper intention does it serve?"
+            placeholder="Why does this task matter to you? What deeper intention does it serve?"
           />
           <div class="mt-2 flex gap-2 justify-end">
             <button
@@ -249,7 +249,7 @@ onMounted(() => {
         </p>
 
         <p v-else class="mt-3 text-sm text-[#9a8568]">
-          What draws you to this goal? Understanding the deeper intention behind your commitments can transform discipline into devotion.
+          What draws you to this task? Understanding the deeper intention behind your commitments can transform discipline into devotion.
         </p>
       </div>
 

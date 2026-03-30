@@ -107,7 +107,7 @@ const personalFeedback = computed(() => {
   let verse: { text: string; source: string }
 
   if (recurring.length === 0 && all.length === 0) {
-    feedbackLine = 'Every journey begins with a goal.'
+    feedbackLine = 'Every journey begins with a single task.'
     verse = wisdomTemplates.noGoals[dayOfYear % wisdomTemplates.noGoals.length]
   } else if (bestStreak.currentStreak >= 7) {
     feedbackLine = `${bestStreak.currentStreak} days of "${bestStreak.title}". Your discipline is becoming who you are.`
@@ -191,7 +191,7 @@ function getCheckInFeedback(goal: GoalToday, completed: boolean): string {
     if (streak === 3) return 'Three days. A pattern is forming. Stay with it.'
     if (streak === 7) return 'One full week. Your discipline is becoming devotion.'
     if (streak === 14) return 'Two weeks of showing up. This is no longer effort — it is who you are becoming.'
-    if (streak === 21) return 'Twenty-one days. What began as a goal is now a practice. The Gita teaches: the self is its own friend and its own enemy.'
+    if (streak === 21) return 'Twenty-one days. What began as intention is now dharma. The Gita teaches: the self is its own friend and its own enemy.'
     if (streak === 30) return 'A full month. You have proven something to yourself that no one can take away.'
     if (streak > 30 && streak % 10 === 0) return `${streak} days. Your consistency speaks louder than any intention ever could.`
     if (streak > longest && longest > 0) return `A new personal record — ${streak} days. You have surpassed your past self.`
@@ -268,28 +268,6 @@ async function createGoal() {
   }
 }
 
-// --- Breathing exercise ---
-const breathPhase = ref<'idle' | 'inhale' | 'hold' | 'exhale' | 'done'>('idle')
-const breathCount = ref(0)
-const breathTimer = ref<ReturnType<typeof setTimeout> | null>(null)
-
-function startBreathing() {
-  breathCount.value = 0
-  runBreathCycle()
-}
-
-function runBreathCycle() {
-  if (breathCount.value >= 3) { breathPhase.value = 'done'; return }
-  breathPhase.value = 'inhale'
-  breathTimer.value = setTimeout(() => {
-    breathPhase.value = 'hold'
-    breathTimer.value = setTimeout(() => {
-      breathPhase.value = 'exhale'
-      breathTimer.value = setTimeout(() => { breathCount.value++; runBreathCycle() }, 4000)
-    }, 4000)
-  }, 4000)
-}
-
 // --- Past insight ---
 const insight = ref<any>(null)
 async function loadInsight() {
@@ -312,7 +290,7 @@ async function loadRecent() {
 
 // --- Navigation ---
 function nextCard() {
-  const totalCards = 5
+  const totalCards = 4
   if (currentCard.value < totalCards - 1) {
     currentCard.value++
     scrollToCard(currentCard.value)
@@ -348,7 +326,7 @@ onMounted(() => { loadGoals(); loadInsight(); loadRecent() })
     <!-- Progress dots -->
     <div class="mb-6 flex items-center justify-center gap-2">
       <div
-        v-for="i in 5" :key="i"
+        v-for="i in 4" :key="i"
         class="h-1.5 rounded-full transition-all duration-300"
         :class="i - 1 <= currentCard ? 'w-6 bg-gradient-to-r from-[#c4873b] to-[#8b5a1b]' : 'w-1.5 bg-[rgba(139,90,43,0.2)]'"
       />
@@ -385,10 +363,10 @@ onMounted(() => { loadGoals(); loadInsight(); loadRecent() })
         </button>
       </div>
 
-      <!-- Card 2: Goals Check-in -->
+      <!-- Card 2: Dharma Check-in -->
       <div class="snap-center rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] p-6 sm:p-8 shadow-[0_4px_24px_rgba(82,54,29,0.06)] backdrop-blur-[20px] min-h-[280px] flex flex-col items-center justify-center text-center">
-        <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a38d6d]">Daily discipline</p>
-        <p class="mt-4 font-serif text-xl sm:text-2xl font-bold tracking-wide text-[#2b1e10]">Your goals</p>
+        <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a38d6d]">Your Dharma</p>
+        <p class="mt-4 font-serif text-xl sm:text-2xl font-bold tracking-wide text-[#2b1e10]">What needs your attention?</p>
 
         <!-- Loading -->
         <div v-if="goalsLoading" class="mt-6 w-full max-w-xs space-y-3">
@@ -397,9 +375,9 @@ onMounted(() => { loadGoals(); loadInsight(); loadRecent() })
 
         <!-- No goals -->
         <div v-else-if="recurringGoals.length === 0 && !showNewGoalForm" class="mt-6 w-full max-w-xs">
-          <p class="text-sm text-[#6b5740]">You haven't set any goals yet.</p>
+          <p class="text-sm text-[#6b5740]">You haven't set any tasks yet.</p>
           <button @click="showNewGoalForm = true" class="mt-4 min-h-[44px] rounded-full bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-6 py-3 text-sm font-semibold text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)] transition duration-200 active:scale-[0.97]">
-            Set your first goal
+            Set your first task
           </button>
         </div>
 
@@ -475,7 +453,7 @@ onMounted(() => { loadGoals(); loadInsight(); loadRecent() })
         </div>
 
         <div v-if="allGoalsCheckedIn && recurringGoals.length > 0" class="mt-4">
-          <p class="text-sm text-[#6b5740]">All goals accounted for. Well done.</p>
+          <p class="text-sm text-[#6b5740]">All tasks accounted for. Well done.</p>
         </div>
 
         <button v-if="recurringGoals.length === 0 && !showNewGoalForm" @click="nextCard" class="mt-4 text-[12px] font-medium tracking-wide text-[#c4873b] transition duration-200 active:scale-95">
@@ -483,39 +461,8 @@ onMounted(() => { loadGoals(); loadInsight(); loadRecent() })
         </button>
       </div>
 
-      <!-- Card 3: Breathe -->
-      <div class="snap-center rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] p-6 sm:p-8 shadow-[0_4px_24px_rgba(82,54,29,0.06)] backdrop-blur-[20px] min-h-[320px] flex flex-col items-center justify-center text-center">
-        <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a38d6d]">Practice</p>
-
-        <template v-if="breathPhase === 'idle'">
-          <p class="mt-4 font-serif text-xl sm:text-2xl font-bold tracking-wide text-[#2b1e10]">Take 3 breaths</p>
-          <p class="mt-2 text-sm text-[#6b5740]">A moment of stillness before you continue.</p>
-          <button @click="startBreathing" class="mt-6 min-h-[44px] rounded-full bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-8 py-3 text-sm font-semibold text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)] transition duration-200 active:scale-95">
-            Begin
-          </button>
-        </template>
-
-        <template v-else-if="breathPhase === 'done'">
-          <div class="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-[#c4873b] to-[#8b5a1b] text-white">
-            <SacredIcons name="lotus" :size="36" />
-          </div>
-          <p class="mt-4 font-serif text-xl font-bold text-[#2b1e10]">Well done</p>
-          <p class="mt-2 text-sm text-[#6b5740]">Three breaths of peace.</p>
-          <button @click="nextCard" class="mt-6 text-[12px] font-medium tracking-wide text-[#c4873b] transition duration-200 active:scale-95">Continue</button>
-        </template>
-
-        <template v-else>
-          <div class="mt-4 flex items-center justify-center rounded-full border-2 border-[#c4873b] transition-all duration-[4000ms] ease-in-out" :class="breathPhase === 'inhale' ? 'h-36 w-36' : breathPhase === 'hold' ? 'h-36 w-36' : 'h-20 w-20'">
-            <span class="text-sm font-semibold uppercase tracking-[0.15em] text-[#c4873b]">
-              {{ breathPhase === 'inhale' ? 'Breathe in' : breathPhase === 'hold' ? 'Hold' : 'Breathe out' }}
-            </span>
-          </div>
-          <p class="mt-4 text-xs text-[#9a8568]">Breath {{ breathCount + 1 }} of 3</p>
-        </template>
-      </div>
-
-      <!-- Card 4: Your insight / milestone reminder -->
-      <div class="snap-center rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] p-6 sm:p-8 shadow-[0_4px_24px_rgba(82,54,29,0.06)] backdrop-blur-[20px] min-h-[240px] flex flex-col items-center justify-center text-center">
+      <!-- Card 3: Your insight / milestone reminder (only if there's something to show) -->
+      <div v-if="allGoals.some(g => g.type === 'OneTime' && !g.completedAt && g.daysRemaining && g.daysRemaining > 0 && g.daysRemaining <= 60) || insight" class="snap-center rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] p-6 sm:p-8 shadow-[0_4px_24px_rgba(82,54,29,0.06)] backdrop-blur-[20px] min-h-[240px] flex flex-col items-center justify-center text-center">
 
         <!-- Show milestone reminder if one is approaching -->
         <template v-if="allGoals.some(g => g.type === 'OneTime' && !g.completedAt && g.daysRemaining && g.daysRemaining > 0 && g.daysRemaining <= 60)">
@@ -534,12 +481,6 @@ onMounted(() => { loadGoals(); loadInsight(); loadRecent() })
           <SacredIcons name="diya" :size="28" class="mt-4 text-[#c4873b]" />
           <p class="mt-4 font-serif text-[15px] sm:text-base leading-relaxed text-[#2b1e10] max-w-sm">"{{ insight.content }}"</p>
           <p class="mt-3 text-[10px] text-[#9a8568]">From a past reflection</p>
-        </template>
-
-        <template v-else>
-          <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a38d6d]">From your journey</p>
-          <SacredIcons name="diya" :size="28" class="mt-4 text-[#b5996f]" />
-          <p class="mt-4 font-serif text-base text-[#6b5740]">Your insights will appear here as you reflect.</p>
         </template>
 
         <button @click="nextCard" class="mt-6 text-[12px] font-medium tracking-wide text-[#c4873b] transition duration-200 active:scale-95">Continue</button>
