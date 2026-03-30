@@ -291,7 +291,7 @@ onMounted(() => { loadTasks() })
 <template>
   <div class="mx-auto max-w-lg px-4 py-6 sm:py-10">
     <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a38d6d]">Your Dharma</p>
-    <p class="mt-3 font-serif text-xl sm:text-2xl font-bold tracking-wide text-[#2b1e10]">What needs your attention today?</p>
+    <p class="mt-3 text-xl sm:text-2xl font-semibold text-[#2b1e10]">What needs your attention today?</p>
 
     <!-- Loading -->
     <div v-if="loading" class="mt-6 space-y-3">
