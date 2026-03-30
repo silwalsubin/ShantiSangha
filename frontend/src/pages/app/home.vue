@@ -17,7 +17,16 @@ interface GoalToday {
   completedToday: boolean | null
 }
 
+interface Milestone {
+  id: string
+  title: string
+  targetDate: string | null
+  completedAt: string | null
+  daysRemaining: number | null
+}
+
 const recurringGoals = ref<GoalToday[]>([])
+const milestones = ref<Milestone[]>([])
 const goalsLoading = ref(true)
 const goalsCheckedIn = ref<Record<string, boolean>>({})
 const goalsSaving = ref<Record<string, boolean>>({})
@@ -49,8 +58,22 @@ async function loadGoals() {
     for (const g of recurringGoals.value) {
       if (g.checkedInToday) goalsCheckedIn.value[g.id] = true
     }
+
+    // Load milestones
+    const allData = await api.get<any>('/goals')
+    const allItems = Array.isArray(allData) ? allData : (allData?.goals || allData?.items || [])
+    milestones.value = allItems
+      .filter((g: any) => (g.type ?? '') === 'OneTime' && !g.completedAt && !g.completed_at)
+      .map((g: any) => ({
+        id: g.id,
+        title: g.title,
+        targetDate: g.targetDate ?? g.target_date ?? null,
+        completedAt: g.completedAt ?? g.completed_at ?? null,
+        daysRemaining: g.daysRemaining ?? g.days_remaining ?? null,
+      }))
   } catch {
     recurringGoals.value = []
+    milestones.value = []
   } finally {
     goalsLoading.value = false
   }
@@ -145,7 +168,7 @@ onMounted(() => { loadGoals() })
 <template>
   <div class="mx-auto max-w-lg px-4 py-6 sm:py-10">
     <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#a38d6d]">Your Dharma</p>
-    <p class="mt-3 font-serif text-xl sm:text-2xl font-bold tracking-wide text-[#2b1e10]">What needs your attention?</p>
+    <p class="mt-3 font-serif text-xl sm:text-2xl font-bold tracking-wide text-[#2b1e10]">What needs your attention today?</p>
 
       <!-- Loading -->
       <div v-if="goalsLoading" class="mt-6 space-y-3">
@@ -153,7 +176,7 @@ onMounted(() => { loadGoals() })
       </div>
 
       <!-- No tasks -->
-      <div v-else-if="recurringGoals.length === 0 && !showNewGoalForm" class="mt-6 text-center">
+      <div v-else-if="recurringGoals.length === 0 && milestones.length === 0 && !showNewGoalForm" class="mt-6 text-center">
         <p class="text-sm text-[#6b5740]">You haven't set any tasks yet.</p>
         <button
           @click="showNewGoalForm = true"
@@ -232,9 +255,27 @@ onMounted(() => { loadGoals() })
         </li>
       </ul>
 
+      <!-- Milestones -->
+      <ul v-if="milestones.length > 0" class="mt-6 space-y-3">
+        <li
+          v-for="m in milestones"
+          :key="m.id"
+          class="cursor-pointer rounded-2xl border border-[rgba(139,90,43,0.1)] bg-[rgba(250,245,237,0.7)] px-4 py-3 transition duration-200 active:scale-[0.99]"
+          @click="router.push(`/app/journey/goals/${m.id}`)"
+        >
+          <div class="flex items-center gap-3">
+            <SacredIcons name="target" :size="16" class="shrink-0 text-[#c4873b]" />
+            <p class="flex-1 text-sm font-medium text-[#2b1e10]">{{ m.title }}</p>
+            <span v-if="m.daysRemaining != null" class="shrink-0 font-serif text-xs text-[#c4873b]">
+              {{ m.daysRemaining > 0 ? `${m.daysRemaining}d left` : m.daysRemaining === 0 ? 'Today' : 'Overdue' }}
+            </span>
+          </div>
+        </li>
+      </ul>
+
       <!-- Add task button (when tasks exist and form is hidden) -->
       <button
-        v-if="recurringGoals.length > 0 && !showNewGoalForm"
+        v-if="(recurringGoals.length > 0 || milestones.length > 0) && !showNewGoalForm"
         @click="showNewGoalForm = true"
         class="mt-4 flex min-h-[44px] items-center justify-center gap-1.5 text-xs font-medium text-[#c4873b] transition duration-200 hover:text-[#8b5a1b] active:scale-[0.97]"
       >
