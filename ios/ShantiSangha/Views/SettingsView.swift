@@ -3,8 +3,15 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var auth: AuthService
     @State private var showSignOutConfirmation = false
-    @State private var serverVersion: ServerVersion?
+    @State private var showErrorDetail = false
+    @State private var serverStatus: ServerStatus = .loading
     private let api = ApiService.shared
+
+    enum ServerStatus {
+        case loading
+        case connected(ServerVersion)
+        case unreachable(String)
+    }
 
     var body: some View {
         ScrollView {
@@ -52,15 +59,7 @@ struct SettingsView: View {
                 }
 
                 // App Server
-                settingsCard(title: "APP SERVER") {
-                    if let sv = serverVersion {
-                        infoRow(icon: "server.rack", label: "Git hash", value: sv.gitHash)
-                        infoRow(icon: "clock", label: "Built", value: sv.buildTime)
-                    } else {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                    }
-                }
+                serverCard
 
                 // Sign out
                 Button {
@@ -83,16 +82,101 @@ struct SettingsView: View {
         .background(Color.sacredBg.ignoresSafeArea())
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
-        .task {
-            do {
-                serverVersion = try await api.get("/version")
-            } catch {}
+        .task { await fetchServerVersion() }
+        .alert("Server Error", isPresented: $showErrorDetail) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            if case .unreachable(let msg) = serverStatus {
+                Text(msg)
+            }
         }
         .confirmationDialog("Are you sure you want to sign out?", isPresented: $showSignOutConfirmation, titleVisibility: .visible) {
             Button("Sign Out", role: .destructive) {
                 auth.signOut()
             }
             Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    // MARK: - Server card with status dot
+
+    private var serverCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                statusDot
+                Text("APP SERVER")
+                    .font(.sacredSectionLabel)
+                    .tracking(3)
+                    .foregroundColor(.sacredLabel)
+            }
+
+            switch serverStatus {
+            case .loading:
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+            case .connected(let sv):
+                infoRow(icon: "server.rack", label: "Git hash", value: sv.gitHash)
+                infoRow(icon: "clock", label: "Built", value: sv.buildTime)
+            case .unreachable:
+                VStack(spacing: 8) {
+                    Text("Unable to reach server")
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredRed)
+                    HStack(spacing: 16) {
+                        Button {
+                            serverStatus = .loading
+                            Task { await fetchServerVersion() }
+                        } label: {
+                            Text("Retry")
+                                .font(.sacredSmallSemibold)
+                                .foregroundColor(.sacredGold)
+                        }
+                        Button {
+                            showErrorDetail = true
+                        } label: {
+                            Text("View Error")
+                                .font(.sacredSmallSemibold)
+                                .foregroundColor(.sacredMuted)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.1)))
+    }
+
+    @ViewBuilder
+    private var statusDot: some View {
+        switch serverStatus {
+        case .loading:
+            Circle()
+                .fill(Color.sacredGold)
+                .frame(width: 6, height: 6)
+                .opacity(0.8)
+                .modifier(PulseModifier())
+        case .connected:
+            Circle()
+                .fill(Color.sacredGreen)
+                .frame(width: 6, height: 6)
+        case .unreachable(_):
+            Circle()
+                .fill(Color.sacredRed)
+                .frame(width: 6, height: 6)
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func fetchServerVersion() async {
+        do {
+            let version: ServerVersion = try await api.get("/version")
+            serverStatus = .connected(version)
+        } catch {
+            serverStatus = .unreachable(error.localizedDescription)
         }
     }
 
@@ -123,5 +207,19 @@ struct SettingsView: View {
                 .font(.sacredText)
                 .foregroundColor(.sacredText)
         }
+    }
+}
+
+// MARK: - Pulse animation for loading dot
+
+private struct PulseModifier: ViewModifier {
+    @State private var pulsing = false
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(pulsing ? 1.4 : 1.0)
+            .opacity(pulsing ? 0.5 : 1.0)
+            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: pulsing)
+            .onAppear { pulsing = true }
     }
 }

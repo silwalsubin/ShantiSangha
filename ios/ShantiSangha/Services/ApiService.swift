@@ -14,10 +14,15 @@ actor ApiService {
         return d
     }()
 
+    private let session: URLSession
     private var tokenProvider: (() async -> String?)?
 
     init(baseURL: String = "https://shantisangha.com/api") {
         self.baseURL = baseURL
+        let config = URLSessionConfiguration.default
+        config.waitsForConnectivity = true
+        config.timeoutIntervalForResource = 30
+        self.session = URLSession(configuration: config)
     }
 
     func setTokenProvider(_ provider: @escaping () async -> String?) {
@@ -71,7 +76,7 @@ actor ApiService {
             request.httpBody = try JSONEncoder().encode(body)
         }
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
 
         guard let http = response as? HTTPURLResponse else {
             throw ApiError.invalidResponse
@@ -103,7 +108,7 @@ actor ApiService {
 
         request.httpBody = body
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
 
         guard let http = response as? HTTPURLResponse else {
             throw ApiError.invalidResponse
