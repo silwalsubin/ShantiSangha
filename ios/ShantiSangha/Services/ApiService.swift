@@ -79,7 +79,7 @@ actor ApiService {
     }
 }
 
-nonisolated struct EmptyResponse: Decodable, Sendable {}
+struct EmptyResponse: Decodable, Sendable {}
 
 enum ApiError: LocalizedError {
     case invalidURL
