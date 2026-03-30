@@ -282,13 +282,13 @@ onMounted(() => { loadGoals() })
           <p v-if="goalsCheckedIn[goal.id] && goalFeedbackMessages[goal.id]" class="mt-2 ml-10 font-serif text-xs italic leading-relaxed text-[#9a8568]">
             {{ goalFeedbackMessages[goal.id] }}
           </p>
-          <!-- Check-in buttons -->
-          <div v-if="!goalsCheckedIn[goal.id]" class="mt-2 ml-10 flex items-center gap-2">
-            <button @click="checkInGoal(goal.id, true)" :disabled="goalsSaving[goal.id]" class="flex min-h-[44px] items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-4 py-2 text-xs font-semibold text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)] transition duration-200 active:scale-[0.97] disabled:opacity-60">
-              <SacredIcons name="check" :size="14" /> Done
+          <!-- Check-in icons -->
+          <div v-if="!goalsCheckedIn[goal.id]" class="mt-1 ml-10 flex items-center gap-3">
+            <button @click="checkInGoal(goal.id, true)" :disabled="goalsSaving[goal.id]" title="Done" class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#7aa87a] to-[#5a8a5a] text-white shadow-sm transition duration-200 active:scale-[0.93] disabled:opacity-60 hover:from-[#6a9a6a] hover:to-[#4a7a4a]">
+              <SacredIcons name="check" :size="14" />
             </button>
-            <button @click="checkInGoal(goal.id, false)" :disabled="goalsSaving[goal.id]" class="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-[rgba(139,90,43,0.15)] px-4 py-2 text-xs font-medium text-[#6b5740] transition duration-200 active:scale-[0.97] disabled:opacity-60 hover:bg-[rgba(196,135,59,0.06)]">
-              <SacredIcons name="skip" :size="12" /> Not today
+            <button @click="checkInGoal(goal.id, false)" :disabled="goalsSaving[goal.id]" title="Not today" class="flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(139,90,43,0.2)] text-[#b5996f] transition duration-200 active:scale-[0.93] disabled:opacity-60 hover:bg-[rgba(139,90,43,0.06)]">
+              <SacredIcons name="skip" :size="12" />
             </button>
           </div>
         </li>
