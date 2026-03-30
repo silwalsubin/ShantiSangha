@@ -15,9 +15,9 @@ struct ReflectView: View {
                 } label: {
                     HStack {
                         Image(systemName: "plus.bubble")
-                            .font(.system(size: 16))
+                            .font(.sacredIcon)
                         Text("New Conversation")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.sacredTextSemibold)
                     }
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
@@ -32,20 +32,20 @@ struct ReflectView: View {
                 } else if conversations.isEmpty {
                     VStack(spacing: 8) {
                         Image(systemName: "bubble.left.and.bubble.right")
-                            .font(.system(size: 28))
+                            .font(.sacredHero)
                             .foregroundColor(.sacredMutedLight)
                         Text("No conversations yet.")
-                            .font(.system(size: 14))
+                            .font(.sacredText)
                             .foregroundColor(.sacredTextSecondary)
                         Text("Start a reflection to begin your journey.")
-                            .font(.system(size: 12))
+                            .font(.sacredSmall)
                             .foregroundColor(.sacredMuted)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 40)
                 } else {
                     Text("RECENT CONVERSATIONS")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.sacredSectionLabel)
                         .tracking(3)
                         .foregroundColor(.sacredLabel)
 
@@ -54,19 +54,19 @@ struct ReflectView: View {
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(conv.title)
-                                        .font(.system(size: 14, weight: .medium))
+                                        .font(.sacredTextMedium)
                                         .foregroundColor(.sacredText)
                                         .lineLimit(1)
                                     if !conv.lastMessage.isEmpty {
                                         Text(conv.lastMessage)
-                                            .font(.system(size: 12))
+                                            .font(.sacredSmall)
                                             .foregroundColor(.sacredTextSecondary)
                                             .lineLimit(2)
                                     }
                                 }
                                 Spacer()
                                 Image(systemName: "chevron.right")
-                                    .font(.system(size: 12))
+                                    .font(.sacredSmall)
                                     .foregroundColor(.sacredMuted)
                             }
                             .padding(14)

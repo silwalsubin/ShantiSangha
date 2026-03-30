@@ -10,11 +10,11 @@ struct SettingsView: View {
                 // Header
                 VStack(alignment: .leading, spacing: 6) {
                     Text("SETTINGS")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.sacredSectionLabel)
                         .tracking(3)
                         .foregroundColor(.sacredLabel)
                     Text("Your sacred space")
-                        .font(.system(size: 22, weight: .semibold, design: .serif))
+                        .font(.sacredTitle)
                         .foregroundColor(.sacredText)
                 }
                 .padding(.top, 24)
@@ -28,15 +28,15 @@ struct SettingsView: View {
                                 .frame(width: 40, height: 40)
                                 .overlay(
                                     Text(String(email.prefix(1)).uppercased())
-                                        .font(.system(size: 16, weight: .semibold))
+                                        .font(.sacredButtonLabel)
                                         .foregroundColor(.white)
                                 )
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("Email")
-                                    .font(.system(size: 12))
+                                    .font(.sacredSmall)
                                     .foregroundColor(.sacredMuted)
                                 Text(email)
-                                    .font(.system(size: 14, weight: .medium))
+                                    .font(.sacredTextMedium)
                                     .foregroundColor(.sacredText)
                             }
                         }
@@ -56,7 +56,7 @@ struct SettingsView: View {
                     HStack {
                         Spacer()
                         Text("Sign Out")
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.sacredTextMedium)
                             .foregroundColor(.sacredRed)
                         Spacer()
                     }
@@ -81,7 +81,7 @@ struct SettingsView: View {
     private func settingsCard<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
-                .font(.system(size: 9, weight: .bold))
+                .font(.sacredSectionLabel)
                 .tracking(3)
                 .foregroundColor(.sacredLabel)
             content()
@@ -95,14 +95,14 @@ struct SettingsView: View {
     private func infoRow(icon: String, label: String, value: String) -> some View {
         HStack {
             Image(systemName: icon)
-                .font(.system(size: 12))
+                .font(.sacredSmall)
                 .foregroundColor(.sacredMuted)
             Text(label)
-                .font(.system(size: 14))
+                .font(.sacredText)
                 .foregroundColor(.sacredTextSecondary)
             Spacer()
             Text(value)
-                .font(.system(size: 14, design: .monospaced))
+                .font(.sacredText)
                 .foregroundColor(.sacredText)
         }
     }

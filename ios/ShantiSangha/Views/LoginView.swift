@@ -18,11 +18,11 @@ struct LoginView: View {
                     )
 
                 Text("ShantiSangha")
-                    .font(.system(size: 28, weight: .bold, design: .serif))
+                    .font(.sacredHero)
                     .foregroundColor(.sacredText)
 
                 Text("A calmer place to return to.")
-                    .font(.system(size: 14))
+                    .font(.sacredText)
                     .foregroundColor(.sacredMuted)
             }
 
@@ -39,10 +39,10 @@ struct LoginView: View {
                     } else {
                         // Google logo
                         Image(systemName: "g.circle.fill")
-                            .font(.system(size: 20))
+                            .font(.sacredHeading)
                             .foregroundColor(.sacredText)
                         Text("Continue with Google")
-                            .font(.system(size: 16, weight: .semibold))
+                            .font(.sacredButtonLabel)
                             .foregroundColor(.sacredText)
                     }
                 }
@@ -57,7 +57,7 @@ struct LoginView: View {
 
             // Quote
             Text("\u{201C}Peace comes from within. Do not seek it without.\u{201D} \u{2014} Buddha")
-                .font(.system(size: 11, design: .serif))
+                .font(.sacredFinePrint)
                 .italic()
                 .foregroundColor(.sacredMutedLight)
                 .multilineTextAlignment(.center)

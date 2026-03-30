@@ -21,12 +21,12 @@ struct GoalDetailView: View {
                             Image(systemName: goal.type == .recurring ? "arrow.triangle.2.circlepath" : "target")
                                 .foregroundColor(.sacredGold)
                             Text(goal.type == .recurring ? "DAILY PRACTICE" : "MILESTONE")
-                                .font(.system(size: 9, weight: .bold))
+                                .font(.sacredSectionLabel)
                                 .tracking(3)
                                 .foregroundColor(.sacredLabel)
                         }
                         Text(goal.title)
-                            .font(.system(size: 20, weight: .bold, design: .serif))
+                            .font(.sacredHeading)
                             .foregroundColor(.sacredText)
                     }
 
@@ -49,21 +49,21 @@ struct GoalDetailView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 6) {
                             Image(systemName: "leaf")
-                                .font(.system(size: 12))
+                                .font(.sacredSmall)
                                 .foregroundColor(.sacredGold)
                             Text("THE DEEPER WHY")
-                                .font(.system(size: 9, weight: .bold))
+                                .font(.sacredSectionLabel)
                                 .tracking(3)
                                 .foregroundColor(.sacredLabel)
                         }
                         if let why = goal.deeperWhy, !why.isEmpty {
                             Text("\"\(why)\"")
-                                .font(.system(size: 14, design: .serif))
+                                .font(.sacredBody)
                                 .italic()
                                 .foregroundColor(.sacredText)
                         } else {
                             Text("What draws you to this task? Understanding the deeper intention behind your commitments can transform discipline into devotion.")
-                                .font(.system(size: 14))
+                                .font(.sacredText)
                                 .foregroundColor(.sacredMuted)
                         }
                     }
@@ -74,13 +74,13 @@ struct GoalDetailView: View {
                     // History
                     VStack(alignment: .leading, spacing: 12) {
                         Text("HISTORY")
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.sacredSectionLabel)
                             .tracking(3)
                             .foregroundColor(.sacredLabel)
 
                         if history.isEmpty {
                             Text("No check-ins yet.")
-                                .font(.system(size: 14))
+                                .font(.sacredText)
                                 .foregroundColor(.sacredTextSecondary)
                         } else {
                             ForEach(history) { checkin in
@@ -90,16 +90,16 @@ struct GoalDetailView: View {
                                         .frame(width: 28, height: 28)
                                         .overlay(
                                             Image(systemName: checkin.completed ? "checkmark" : "forward.fill")
-                                                .font(.system(size: 12))
+                                                .font(.sacredSmall)
                                                 .foregroundColor(checkin.completed ? .white : .sacredMutedLight)
                                         )
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(formatDate(checkin.date))
-                                            .font(.system(size: 12, weight: .medium))
+                                            .font(.sacredSmallMedium)
                                             .foregroundColor(.sacredText)
                                         if let note = checkin.note, !note.isEmpty {
                                             Text(note)
-                                                .font(.system(size: 12))
+                                                .font(.sacredSmall)
                                                 .foregroundColor(.sacredTextSecondary)
                                         }
                                     }
@@ -115,7 +115,7 @@ struct GoalDetailView: View {
                     .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.12)))
 
                     Text("Started \(formatDate(goal.createdAt))")
-                        .font(.system(size: 10))
+                        .font(.sacredMicro)
                         .foregroundColor(.sacredLabel)
                         .textCase(.uppercase)
                         .tracking(1)
@@ -145,10 +145,10 @@ struct GoalDetailView: View {
     private func statCard(value: String, label: String) -> some View {
         VStack(spacing: 4) {
             Text(value)
-                .font(.system(size: 24, weight: .bold))
+                .font(.sacredDisplayNumber)
                 .foregroundColor(.sacredGold)
             Text(label)
-                .font(.system(size: 9, weight: .bold))
+                .font(.sacredSectionLabel)
                 .tracking(2)
                 .foregroundColor(.sacredMuted)
                 .textCase(.uppercase)

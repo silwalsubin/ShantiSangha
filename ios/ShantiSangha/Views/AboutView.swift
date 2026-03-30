@@ -16,10 +16,10 @@ struct AboutView: View {
                         .overlay(VajraIcon(size: 28, color: .white))
                     VStack(alignment: .leading) {
                         Text("ShantiSangha")
-                            .font(.system(size: 18, weight: .bold, design: .serif))
+                            .font(.sacredSubheading)
                             .foregroundColor(.sacredText)
                         Text("Version info")
-                            .font(.system(size: 12))
+                            .font(.sacredSmall)
                             .foregroundColor(.sacredMuted)
                     }
                 }
@@ -56,7 +56,7 @@ struct AboutView: View {
     private func infoCard<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
-                .font(.system(size: 9, weight: .bold))
+                .font(.sacredSectionLabel)
                 .tracking(3)
                 .foregroundColor(.sacredLabel)
             content()
@@ -70,11 +70,11 @@ struct AboutView: View {
     private func infoRow(_ label: String, _ value: String) -> some View {
         HStack {
             Text(label)
-                .font(.system(size: 14))
+                .font(.sacredText)
                 .foregroundColor(.sacredTextSecondary)
             Spacer()
             Text(value)
-                .font(.system(size: 14, design: .monospaced))
+                .font(.sacredText)
                 .foregroundColor(.sacredText)
         }
     }

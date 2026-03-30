@@ -16,12 +16,12 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: 0) {
                 // Header
                 Text("YOUR DHARMA")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.sacredMicroBold)
                     .tracking(3)
                     .foregroundColor(.sacredLabel)
 
                 Text("What needs your attention today?")
-                    .font(.system(size: 22, weight: .semibold))
+                    .font(.sacredTitle)
                     .foregroundColor(.sacredText)
                     .padding(.top, 12)
 
@@ -39,12 +39,12 @@ struct HomeView: View {
                     // Empty state
                     VStack(spacing: 16) {
                         Text("You haven't set any tasks yet.")
-                            .font(.system(size: 14))
+                            .font(.sacredText)
                             .foregroundColor(.sacredTextSecondary)
 
                         Button { showNewTask = true } label: {
                             Text("Set your first task")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.sacredTextSemibold)
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 24)
                                 .padding(.vertical, 12)
@@ -99,7 +99,7 @@ struct HomeView: View {
                     if vm.hasTasks && !showNewTask {
                         Button { showNewTask = true } label: {
                             Text("+ Add task")
-                                .font(.system(size: 12, weight: .medium))
+                                .font(.sacredSmallMedium)
                                 .foregroundColor(.sacredGold)
                         }
                         .frame(maxWidth: .infinity)
@@ -121,10 +121,10 @@ struct HomeView: View {
     private func sectionHeader(icon: String, label: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 12))
+                .font(.sacredSmall)
                 .foregroundColor(.sacredLabel)
             Text(label)
-                .font(.system(size: 9, weight: .bold))
+                .font(.sacredSectionLabel)
                 .tracking(3)
                 .foregroundColor(.sacredLabel)
         }
@@ -156,11 +156,11 @@ struct HomeView: View {
             Button { isExpanded.wrappedValue.toggle() } label: {
                 HStack(spacing: 6) {
                     Image(systemName: icon)
-                        .font(.system(size: 12))
+                        .font(.sacredSmall)
                     Text(label)
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.sacredSmallMedium)
                     Image(systemName: isExpanded.wrappedValue ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 10))
+                        .font(.sacredMicro)
                 }
                 .foregroundColor(color)
             }
@@ -184,14 +184,14 @@ struct HomeView: View {
 
             TextField(newType == .recurring ? "I want to practice..." : "I want to achieve...", text: $newTitle)
                 .textFieldStyle(.plain)
-                .font(.system(size: 14))
+                .font(.sacredText)
                 .padding(12)
                 .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBg))
                 .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.12)))
 
             if newType == .oneTime {
                 DatePicker("Target date", selection: $newTargetDate, displayedComponents: .date)
-                    .font(.system(size: 14))
+                    .font(.sacredText)
                     .foregroundColor(.sacredText)
             }
 
@@ -207,7 +207,7 @@ struct HomeView: View {
                     }
                 } label: {
                     Text("Save")
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.sacredTextSemibold)
                         .foregroundColor(.white)
                         .padding(.horizontal, 24)
                         .padding(.vertical, 10)
@@ -221,7 +221,7 @@ struct HomeView: View {
                     newType = .recurring
                 } label: {
                     Text("Cancel")
-                        .font(.system(size: 14, weight: .medium))
+                        .font(.sacredTextMedium)
                         .foregroundColor(.sacredTextSecondary)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
@@ -235,9 +235,9 @@ struct HomeView: View {
         Button { newType = type } label: {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 12))
+                    .font(.sacredSmall)
                 Text(label)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.sacredSmallSemibold)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)

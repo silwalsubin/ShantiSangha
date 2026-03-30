@@ -1,22 +1,51 @@
 import SwiftUI
 
-/// Sacred typography — reusable font styles for the sacred theme.
+/// Sacred typography — all serif (New York), no sans-serif anywhere.
+/// All app text should use these tokens instead of raw .system() calls.
 extension Font {
+    /// 32pt serif regular — large icons
+    static let sacredIconLarge = Font.system(size: 32, design: .serif)
     /// 28pt serif bold — login hero, large titles
     static let sacredHero = Font.system(size: 28, weight: .bold, design: .serif)
+    /// 24pt serif bold — large display numbers
+    static let sacredDisplayNumber = Font.system(size: 24, weight: .bold, design: .serif)
     /// 22pt serif semibold — page titles ("Your sacred space")
     static let sacredTitle = Font.system(size: 22, weight: .semibold, design: .serif)
     /// 20pt serif bold — section hero (goal name)
     static let sacredHeading = Font.system(size: 20, weight: .bold, design: .serif)
     /// 18pt serif bold — card titles (app name)
     static let sacredSubheading = Font.system(size: 18, weight: .bold, design: .serif)
-    /// 14pt serif regular — body serif (quotes, spiritual text)
+    /// 16pt serif semibold — button labels, prominent UI text
+    static let sacredButtonLabel = Font.system(size: 16, weight: .semibold, design: .serif)
+    /// 16pt serif regular — icon-sized text
+    static let sacredIcon = Font.system(size: 16, design: .serif)
+    /// 14pt serif bold — emphasis (streak counts)
+    static let sacredBodyBold = Font.system(size: 14, weight: .bold, design: .serif)
+    /// 14pt serif semibold — emphasized body text
+    static let sacredTextSemibold = Font.system(size: 14, weight: .semibold, design: .serif)
+    /// 14pt serif medium — medium body text
+    static let sacredTextMedium = Font.system(size: 14, weight: .medium, design: .serif)
+    /// 14pt serif regular — standard body text
+    static let sacredText = Font.system(size: 14, design: .serif)
+    /// 14pt serif regular — alias for sacredText
     static let sacredBody = Font.system(size: 14, design: .serif)
-    /// 12pt serif regular — small serif (feedback, captions)
+    /// 12pt serif semibold — emphasized small text
+    static let sacredSmallSemibold = Font.system(size: 12, weight: .semibold, design: .serif)
+    /// 12pt serif medium — medium small text
+    static let sacredSmallMedium = Font.system(size: 12, weight: .medium, design: .serif)
+    /// 12pt serif regular — small text, captions
+    static let sacredSmall = Font.system(size: 12, design: .serif)
+    /// 12pt serif regular — alias for sacredSmall
     static let sacredCaption = Font.system(size: 12, design: .serif)
-    /// 9pt bold — section labels ("ACCOUNT", "YOUR DHARMA")
+    /// 11pt serif regular — fine print
+    static let sacredFinePrint = Font.system(size: 11, design: .serif)
+    /// 10pt serif bold — uppercase micro labels
+    static let sacredMicroBold = Font.system(size: 10, weight: .bold, design: .serif)
+    /// 10pt serif regular — micro text
+    static let sacredMicro = Font.system(size: 10, design: .serif)
+    /// 9pt serif bold — section labels ("ACCOUNT", "YOUR DHARMA")
     /// Use with .tracking(3) and .foregroundColor(.sacredLabel)
-    static let sacredSectionLabel = Font.system(size: 9, weight: .bold)
+    static let sacredSectionLabel = Font.system(size: 9, weight: .bold, design: .serif)
 }
 
 /// Sacred design tokens — single source of truth for colors.

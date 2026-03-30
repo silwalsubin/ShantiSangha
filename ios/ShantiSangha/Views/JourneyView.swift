@@ -13,7 +13,7 @@ struct JourneyView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Text("See how you're growing over time.")
-                    .font(.system(size: 14))
+                    .font(.sacredText)
                     .foregroundColor(.sacredTextSecondary)
 
                 if loading {
@@ -26,7 +26,7 @@ struct JourneyView: View {
 
                         if recurringGoals.isEmpty {
                             Text("No tasks yet. Set one from Home.")
-                                .font(.system(size: 14))
+                                .font(.sacredText)
                                 .foregroundColor(.sacredTextSecondary)
                                 .padding(.top, 8)
                         } else {
@@ -35,10 +35,10 @@ struct JourneyView: View {
                                     HStack {
                                         VStack(alignment: .leading, spacing: 4) {
                                             Text(goal.title)
-                                                .font(.system(size: 14, weight: .medium))
+                                                .font(.sacredTextMedium)
                                                 .foregroundColor(.sacredText)
                                             Text("Longest: \(goal.longestStreak) days")
-                                                .font(.system(size: 10))
+                                                .font(.sacredMicro)
                                                 .foregroundColor(.sacredLabel)
                                                 .textCase(.uppercase)
                                                 .tracking(1)
@@ -46,13 +46,13 @@ struct JourneyView: View {
                                         Spacer()
                                         HStack(spacing: 4) {
                                             Image(systemName: "flame.fill")
-                                                .font(.system(size: 12))
+                                                .font(.sacredSmall)
                                                 .foregroundColor(.sacredGold)
                                             Text("\(goal.currentStreak)")
-                                                .font(.system(size: 14, weight: .bold, design: .serif))
+                                                .font(.sacredBodyBold)
                                                 .foregroundColor(.sacredGold)
                                             Text("days")
-                                                .font(.system(size: 10))
+                                                .font(.sacredMicro)
                                                 .foregroundColor(.sacredMuted)
                                         }
                                     }
@@ -70,7 +70,7 @@ struct JourneyView: View {
 
                         if milestoneGoals.isEmpty {
                             Text("No milestones yet. Set one from Home.")
-                                .font(.system(size: 14))
+                                .font(.sacredText)
                                 .foregroundColor(.sacredTextSecondary)
                                 .padding(.top, 8)
                         } else {
@@ -78,12 +78,12 @@ struct JourneyView: View {
                                 NavigationLink(destination: GoalDetailView(goalId: goal.id)) {
                                     HStack {
                                         Text(goal.title)
-                                            .font(.system(size: 14, weight: .medium))
+                                            .font(.sacredTextMedium)
                                             .foregroundColor(.sacredText)
                                         Spacer()
                                         if let days = goal.daysRemaining {
                                             Text(days > 0 ? "\(days)d left" : days == 0 ? "Today" : "\(abs(days))d over")
-                                                .font(.system(size: 12, weight: days <= 0 ? .bold : .regular, design: .serif))
+                                                .font(days <= 0 ? .sacredSmallSemibold : .sacredSmall)
                                                 .foregroundColor(days <= 0 ? .sacredRed : .sacredGold)
                                         }
                                     }
@@ -127,10 +127,10 @@ struct JourneyView: View {
     private func sectionLabel(icon: String, text: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 12))
+                .font(.sacredSmall)
                 .foregroundColor(.sacredGold)
             Text(text)
-                .font(.system(size: 9, weight: .bold))
+                .font(.sacredSectionLabel)
                 .tracking(3)
                 .foregroundColor(.sacredLabel)
         }

@@ -23,13 +23,13 @@ struct TaskRow: View {
             HStack(spacing: 12) {
                 // Type icon
                 Image(systemName: task.type == .recurring ? "arrow.triangle.2.circlepath" : "target")
-                    .font(.system(size: 14))
+                    .font(.sacredText)
                     .foregroundColor(task.type == .recurring ? .sacredMutedLight : .sacredGold)
                     .frame(width: 24, height: 24)
 
                 // Title
                 Text(task.title)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.sacredTextMedium)
                     .foregroundColor(task.checkedIn && task.completedToday == true ? .sacredGreen : .sacredText)
                     .strikethrough(task.checkedIn && task.completedToday == true, color: .sacredGreen.opacity(0.4))
 
@@ -38,7 +38,7 @@ struct TaskRow: View {
                 // Milestone days remaining
                 if task.type == .oneTime, let days = task.daysRemaining {
                     Text(days > 0 ? "\(days)d" : days == 0 ? "Today" : "\(abs(days))d over")
-                        .font(.system(size: 12, weight: days <= 0 ? .bold : .regular))
+                        .font(days <= 0 ? .sacredSmallSemibold : .sacredSmall)
                         .foregroundColor(days <= 0 ? .sacredRed : .sacredGold)
                 }
 
@@ -70,7 +70,7 @@ struct TaskRow: View {
                         }
                     } label: {
                         Image(systemName: "ellipsis")
-                            .font(.system(size: 14))
+                            .font(.sacredText)
                             .foregroundColor(.sacredMuted)
                             .frame(width: 28, height: 28)
                     }
@@ -94,7 +94,7 @@ struct TaskRow: View {
                     .padding(.leading, 36)
 
                     Text("\(task.progress)% complete")
-                        .font(.system(size: 10))
+                        .font(.sacredMicro)
                         .foregroundColor(.sacredMuted)
                         .padding(.leading, 36)
                 }
@@ -108,17 +108,17 @@ struct TaskRow: View {
 
                     HStack {
                         Text("\(Int(progressValue))%")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.sacredSmallMedium)
                             .foregroundColor(.sacredGold)
                         Spacer()
                         Button("Cancel") { showProgress = false }
-                            .font(.system(size: 12))
+                            .font(.sacredSmall)
                             .foregroundColor(.sacredMuted)
                         Button("Save") {
                             showProgress = false
                             onProgressUpdate(Int(progressValue))
                         }
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.sacredSmallSemibold)
                         .foregroundColor(.sacredGold)
                     }
                 }
@@ -128,7 +128,7 @@ struct TaskRow: View {
             // Spiritual feedback
             if task.checkedIn, let msg = task.feedbackMessage {
                 Text(msg)
-                    .font(.system(size: 12, design: .serif))
+                    .font(.sacredCaption)
                     .italic()
                     .foregroundColor(.sacredMuted)
                     .padding(.leading, 36)
@@ -139,7 +139,7 @@ struct TaskRow: View {
                 HStack(spacing: 12) {
                     Button { onDone() } label: {
                         Image(systemName: "checkmark")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.sacredTextSemibold)
                             .foregroundColor(.white)
                             .frame(width: 32, height: 32)
                             .background(LinearGradient(colors: [.sacredGreen, .sacredGreenDark], startPoint: .topLeading, endPoint: .bottomTrailing))
@@ -148,7 +148,7 @@ struct TaskRow: View {
 
                     Button { onSkip() } label: {
                         Image(systemName: "forward.fill")
-                            .font(.system(size: 12))
+                            .font(.sacredSmall)
                             .foregroundColor(.sacredMutedLight)
                             .frame(width: 32, height: 32)
                             .overlay(Circle().stroke(Color.sacredMuted.opacity(0.2), lineWidth: 1))

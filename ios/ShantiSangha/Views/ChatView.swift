@@ -35,7 +35,7 @@ struct ChatView: View {
             // Input
             HStack(spacing: 12) {
                 TextField("Share what's on your mind...", text: $inputText, axis: .vertical)
-                    .font(.system(size: 14))
+                    .font(.sacredText)
                     .lineLimit(1...4)
                     .padding(12)
                     .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBg))
@@ -45,7 +45,7 @@ struct ChatView: View {
                     Task { await sendMessage() }
                 } label: {
                     Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 32))
+                        .font(.sacredIconLarge)
                         .foregroundColor(inputText.trimmingCharacters(in: .whitespaces).isEmpty || sending ? .sacredMuted.opacity(0.3) : .sacredGold)
                 }
                 .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty || sending)
@@ -64,7 +64,7 @@ struct ChatView: View {
         HStack {
             if msg.role == "user" { Spacer() }
             Text(msg.content)
-                .font(.system(size: 14))
+                .font(.sacredText)
                 .foregroundColor(msg.role == "user" ? .white : .sacredText)
                 .padding(12)
                 .background(
