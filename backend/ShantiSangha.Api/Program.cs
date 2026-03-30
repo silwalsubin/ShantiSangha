@@ -133,6 +133,12 @@ try
         });
     });
 
+    // JSON — accept string enum values from frontend (e.g. "Recurring" instead of 0)
+    builder.Services.ConfigureHttpJsonOptions(opts =>
+    {
+        opts.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    });
+
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
 
