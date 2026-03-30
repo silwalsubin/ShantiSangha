@@ -190,10 +190,7 @@ onMounted(() => { loadGoals() })
         <li v-for="goal in recurringGoals" :key="goal.id" class="rounded-2xl border border-[rgba(139,90,43,0.1)] bg-[rgba(250,245,237,0.7)] px-4 py-3">
           <div class="flex items-center justify-between">
             <button class="text-left text-sm font-medium text-[#2b1e10] transition duration-200 hover:text-[#c4873b]" @click="router.push(`/app/journey/goals/${goal.id}`)">{{ goal.title }}</button>
-            <div class="flex items-center gap-1.5 shrink-0">
-              <SacredIcons name="flame" :size="14" class="text-[#c4873b]" />
-              <span class="font-serif font-bold text-[#c4873b] text-sm">{{ goal.currentStreak }}</span>
-            </div>
+            <SacredIcons name="recurring" :size="16" class="shrink-0 text-[#b5996f]" />
           </div>
           <!-- Already checked in — spiritual feedback -->
           <div v-if="goalsCheckedIn[goal.id]" class="mt-2">
@@ -203,29 +200,12 @@ onMounted(() => { loadGoals() })
           </div>
           <!-- Check-in flow -->
           <div v-else>
-            <div v-if="showNoteInput[goal.id]" class="mt-2">
-              <input
-                v-model="goalNotes[goal.id]"
-                type="text"
-                placeholder="A brief reflection (optional)"
-                class="w-full rounded-xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.95)] px-3 py-2 text-xs text-[#2b1e10] placeholder-[#b5996f] outline-none transition duration-200 focus:border-[#c4873b]"
-                @keyup.enter="checkInGoal(goal.id, true)"
-              />
-            </div>
             <div class="mt-2 flex items-center justify-center gap-2">
               <button @click="checkInGoal(goal.id, true)" :disabled="goalsSaving[goal.id]" class="flex min-h-[44px] items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-4 py-2 text-xs font-semibold text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)] transition duration-200 active:scale-[0.97] disabled:opacity-60">
                 <SacredIcons name="check" :size="14" /> Done
               </button>
               <button @click="checkInGoal(goal.id, false)" :disabled="goalsSaving[goal.id]" class="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-[rgba(139,90,43,0.15)] px-4 py-2 text-xs font-medium text-[#6b5740] transition duration-200 active:scale-[0.97] disabled:opacity-60 hover:bg-[rgba(196,135,59,0.06)]">
                 <SacredIcons name="skip" :size="12" /> Not today
-              </button>
-              <button
-                v-if="!showNoteInput[goal.id]"
-                @click="showNoteInput[goal.id] = true"
-                class="flex min-h-[44px] items-center justify-center rounded-xl border border-[rgba(139,90,43,0.1)] px-2.5 py-2 text-[#9a8568] transition duration-200 hover:bg-[rgba(196,135,59,0.06)]"
-                title="Add a note"
-              >
-                <SacredIcons name="scroll" :size="14" />
               </button>
             </div>
           </div>

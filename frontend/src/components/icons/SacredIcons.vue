@@ -137,6 +137,14 @@ defineProps<{ name: string; size?: number }>()
     <path d="M6 6l12 12" />
   </svg>
 
+  <!-- Recurring / repeat cycle -->
+  <svg v-else-if="name === 'recurring'" :width="size || 22" :height="size || 22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M17 2l4 4-4 4" />
+    <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+    <path d="M7 22l-4-4 4-4" />
+    <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+  </svg>
+
   <!-- Dharma Wheel / alternate logo -->
   <svg v-else-if="name === 'dharma'" :width="size || 22" :height="size || 22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
     <!-- Outer rim -->
