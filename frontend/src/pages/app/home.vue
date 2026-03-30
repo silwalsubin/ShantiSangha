@@ -383,7 +383,7 @@ onMounted(() => { loadTasks() })
         {{ completedTasks.length }} completed
         <span class="text-[10px]">{{ showCompleted ? '&#9650;' : '&#9660;' }}</span>
       </button>
-      <ul v-if="showCompleted" class="mt-2 space-y-2 opacity-60">
+      <ul v-if="showCompleted" class="mt-2 space-y-3">
         <TaskItem
           v-for="task in completedTasks"
           :key="task.id"
@@ -408,7 +408,7 @@ onMounted(() => { loadTasks() })
         {{ skippedTasks.length }} skipped
         <span class="text-[10px]">{{ showSkipped ? '&#9650;' : '&#9660;' }}</span>
       </button>
-      <ul v-if="showSkipped" class="mt-2 space-y-2 opacity-60">
+      <ul v-if="showSkipped" class="mt-2 space-y-3">
         <TaskItem
           v-for="task in skippedTasks"
           :key="task.id"

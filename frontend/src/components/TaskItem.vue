@@ -152,14 +152,14 @@ function saveProgress() {
         Skip for today
       </button>
 
-      <!-- Undo -->
+      <!-- Move back to pending -->
       <button
         v-if="task.checkedIn"
         @click="onAction('undo')"
         class="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-[#2b1e10] transition duration-200 hover:bg-[rgba(139,90,43,0.06)]"
       >
-        <SacredIcons name="recurring" :size="14" class="text-[#c4873b]" />
-        Undo
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a4 4 0 010 8h-1"/></svg>
+        Move to pending
       </button>
 
       <!-- Divider -->
