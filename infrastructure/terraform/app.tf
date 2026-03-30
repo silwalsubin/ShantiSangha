@@ -144,6 +144,7 @@ resource "aws_ecs_task_definition" "api" {
       { name = "LANGFUSE_BASE_URL",      value = "https://cloud.langfuse.com" },
       { name = "LANGFUSE_PUBLIC_KEY",    value = var.langfuse_public_key },
       { name = "ASPNETCORE_ENVIRONMENT", value = "Production" },
+      { name = "EXPOSE_ERRORS",          value = "true" },
       { name = "FRONTEND_ORIGIN",       value = "https://${var.domain_name},https://${aws_cloudfront_distribution.frontend.domain_name}" }
     ]
 

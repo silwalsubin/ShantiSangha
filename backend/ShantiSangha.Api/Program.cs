@@ -145,6 +145,32 @@ try
         await db.Database.MigrateAsync();
     }
 
+    // Global error handler — returns full error details when EXPOSE_ERRORS=true
+    if (appConfig.ExposeErrors)
+    {
+        Log.Warning("EXPOSE_ERRORS is enabled — error details will be returned in API responses");
+        app.Use(async (context, next) =>
+        {
+            try
+            {
+                await next();
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Unhandled exception on {Method} {Path}", context.Request.Method, context.Request.Path);
+                context.Response.StatusCode = 500;
+                context.Response.ContentType = "application/json";
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    error = ex.Message,
+                    type = ex.GetType().Name,
+                    stackTrace = ex.StackTrace,
+                    inner = ex.InnerException?.Message
+                });
+            }
+        });
+    }
+
     app.UseSerilogRequestLogging();
     app.UseCors();
 

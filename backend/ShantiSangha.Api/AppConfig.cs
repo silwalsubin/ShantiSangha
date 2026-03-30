@@ -14,6 +14,9 @@ public class AppConfig
     public string? LangfuseSecretKey { get; init; }
     public string LangfuseBaseUrl { get; init; } = "https://cloud.langfuse.com";
 
+    // When true, unhandled exceptions return full details in API responses
+    public bool ExposeErrors { get; init; }
+
     public bool LangfuseEnabled =>
         !string.IsNullOrEmpty(LangfusePublicKey) && !string.IsNullOrEmpty(LangfuseSecretKey);
 
@@ -36,7 +39,8 @@ public class AppConfig
             VoiceBucketName = voiceBucket,
             LangfusePublicKey = config["LANGFUSE_PUBLIC_KEY"],
             LangfuseSecretKey = config["LANGFUSE_SECRET_KEY"],
-            LangfuseBaseUrl = config["LANGFUSE_BASE_URL"] ?? "https://cloud.langfuse.com"
+            LangfuseBaseUrl = config["LANGFUSE_BASE_URL"] ?? "https://cloud.langfuse.com",
+            ExposeErrors = string.Equals(config["EXPOSE_ERRORS"], "true", StringComparison.OrdinalIgnoreCase)
         };
     }
 }
