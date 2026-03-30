@@ -41,14 +41,24 @@ const newGoalSaving = ref(false)
 // Computed task list with live state — hide skipped tasks
 const showSkipped = ref(false)
 
-const taskList = computed<Task[]>(() =>
-  tasks.value
-    .filter((t: Task) => !(t.checkedIn && t.completedToday === false))
-    .map((t: Task) => ({
-      ...t,
-      feedbackMessage: feedbackMessages.value[t.id] ?? null,
-      saving: saving.value[t.id] ?? false,
-    }))
+function withLiveState(list: Task[]): Task[] {
+  return list.map((t: Task) => ({
+    ...t,
+    feedbackMessage: feedbackMessages.value[t.id] ?? null,
+    saving: saving.value[t.id] ?? false,
+  }))
+}
+
+const activeTasks = computed(() =>
+  tasks.value.filter((t: Task) => !(t.checkedIn && t.completedToday === false))
+)
+
+const recurringTasks = computed(() =>
+  withLiveState(activeTasks.value.filter((t: Task) => t.type === 'Recurring'))
+)
+
+const milestoneTasks = computed(() =>
+  withLiveState(activeTasks.value.filter((t: Task) => t.type === 'OneTime'))
 )
 
 const skippedTasks = computed<Task[]>(() =>
@@ -312,20 +322,47 @@ onMounted(() => { loadTasks() })
       </div>
     </div>
 
-    <!-- Unified task list -->
-    <ul v-if="taskList.length > 0" class="mt-6 space-y-3">
-      <TaskItem
-        v-for="task in taskList"
-        :key="task.id"
-        :task="task"
-        @done="onDone"
-        @skip="onSkip"
-        @undo="onUndo"
-        @navigate="onNavigate"
-        @progress="onProgress"
-        @delete="onDelete"
-      />
-    </ul>
+    <!-- Recurring Tasks -->
+    <div v-if="recurringTasks.length > 0" class="mt-6">
+      <div class="flex items-center gap-1.5 mb-3">
+        <SacredIcons name="recurring" :size="14" class="text-[#a38d6d]" />
+        <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-[#a38d6d]">Recurring Tasks</p>
+      </div>
+      <ul class="space-y-3">
+        <TaskItem
+          v-for="task in recurringTasks"
+          :key="task.id"
+          :task="task"
+          @done="onDone"
+          @skip="onSkip"
+          @undo="onUndo"
+          @navigate="onNavigate"
+          @progress="onProgress"
+          @delete="onDelete"
+        />
+      </ul>
+    </div>
+
+    <!-- Milestones -->
+    <div v-if="milestoneTasks.length > 0" class="mt-6">
+      <div class="flex items-center gap-1.5 mb-3">
+        <SacredIcons name="target" :size="14" class="text-[#a38d6d]" />
+        <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-[#a38d6d]">Milestones</p>
+      </div>
+      <ul class="space-y-3">
+        <TaskItem
+          v-for="task in milestoneTasks"
+          :key="task.id"
+          :task="task"
+          @done="onDone"
+          @skip="onSkip"
+          @undo="onUndo"
+          @navigate="onNavigate"
+          @progress="onProgress"
+          @delete="onDelete"
+        />
+      </ul>
+    </div>
 
     <!-- Skipped tasks collapsed -->
     <div v-if="skippedTasks.length > 0" class="mt-4">
