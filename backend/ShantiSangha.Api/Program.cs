@@ -203,7 +203,6 @@ try
 
     // All API routes under /api prefix
     var api = app.MapGroup("/api");
-    // api.MapWebhookRoutes(); // Removed — was for Clerk webhooks
     api.MapUserRoutes();
     api.MapConversationRoutes();
     api.MapJournalRoutes();
