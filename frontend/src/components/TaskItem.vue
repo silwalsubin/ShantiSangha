@@ -63,20 +63,9 @@ function saveProgress() {
     "
   >
     <div class="flex items-center gap-3">
-      <!-- Type icon / status -->
-      <div
-        class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-all duration-300"
-        :class="
-          task.checkedIn && task.completedToday
-            ? 'bg-gradient-to-br from-[#7aa87a] to-[#5a8a5a]'
-            : task.checkedIn
-              ? 'bg-[rgba(139,90,43,0.08)]'
-              : ''
-        "
-      >
-        <SacredIcons v-if="task.checkedIn && task.completedToday" name="check" :size="12" class="text-white" />
-        <SacredIcons v-else-if="task.checkedIn" name="skip" :size="12" class="text-[#b5996f]" />
-        <SacredIcons v-else :name="task.type === 'Recurring' ? 'recurring' : 'target'" :size="14" :class="task.type === 'Recurring' ? 'text-[#b5996f]' : 'text-[#c4873b]'" />
+      <!-- Type icon -->
+      <div class="flex h-6 w-6 shrink-0 items-center justify-center">
+        <SacredIcons :name="task.type === 'Recurring' ? 'recurring' : 'target'" :size="14" :class="task.type === 'Recurring' ? 'text-[#b5996f]' : 'text-[#c4873b]'" />
       </div>
 
       <!-- Title -->

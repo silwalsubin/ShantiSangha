@@ -50,7 +50,7 @@ function withLiveState(list: Task[]): Task[] {
 }
 
 const activeTasks = computed(() =>
-  tasks.value.filter((t: Task) => !(t.checkedIn && t.completedToday === false))
+  tasks.value.filter((t: Task) => !t.checkedIn)
 )
 
 const recurringTasks = computed(() =>
@@ -60,6 +60,12 @@ const recurringTasks = computed(() =>
 const milestoneTasks = computed(() =>
   withLiveState(activeTasks.value.filter((t: Task) => t.type === 'OneTime'))
 )
+
+const completedTasks = computed<Task[]>(() =>
+  withLiveState(tasks.value.filter((t: Task) => t.checkedIn && t.completedToday === true))
+)
+
+const showCompleted = ref(false)
 
 const skippedTasks = computed<Task[]>(() =>
   tasks.value
@@ -364,8 +370,33 @@ onMounted(() => { loadTasks() })
       </ul>
     </div>
 
+    <!-- Completed tasks collapsed -->
+    <div v-if="completedTasks.length > 0" class="mt-4">
+      <button
+        @click="showCompleted = !showCompleted"
+        class="flex min-h-[44px] items-center gap-1.5 text-xs font-medium text-[#7aa87a] transition duration-200 hover:text-[#5a8a5a]"
+      >
+        <SacredIcons name="check" :size="12" />
+        {{ completedTasks.length }} completed today
+        <span class="text-[10px]">{{ showCompleted ? '&#9650;' : '&#9660;' }}</span>
+      </button>
+      <ul v-if="showCompleted" class="mt-2 space-y-2 opacity-60">
+        <TaskItem
+          v-for="task in completedTasks"
+          :key="task.id"
+          :task="task"
+          @done="onDone"
+          @skip="onSkip"
+          @undo="onUndo"
+          @navigate="onNavigate"
+          @progress="onProgress"
+          @delete="onDelete"
+        />
+      </ul>
+    </div>
+
     <!-- Skipped tasks collapsed -->
-    <div v-if="skippedTasks.length > 0" class="mt-4">
+    <div v-if="skippedTasks.length > 0" class="mt-2">
       <button
         @click="showSkipped = !showSkipped"
         class="flex min-h-[44px] items-center gap-1.5 text-xs font-medium text-[#9a8568] transition duration-200 hover:text-[#6b5740]"
