@@ -145,7 +145,7 @@ resource "aws_ecs_task_definition" "api" {
       { name = "LANGFUSE_PUBLIC_KEY",    value = var.langfuse_public_key },
       { name = "ASPNETCORE_ENVIRONMENT", value = "Production" },
       { name = "EXPOSE_ERRORS",          value = "true" },
-      { name = "FRONTEND_ORIGIN",       value = "https://${var.domain_name},https://${aws_cloudfront_distribution.frontend.domain_name}" }
+      { name = "FRONTEND_ORIGIN",       value = "https://${var.domain_name},https://${aws_cloudfront_distribution.frontend.domain_name},http://localhost:5173" }
     ]
 
     secrets = [

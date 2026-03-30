@@ -231,5 +231,14 @@ onMounted(() => { loadGoals() })
           </div>
         </li>
       </ul>
+
+      <!-- Add task button (when tasks exist and form is hidden) -->
+      <button
+        v-if="recurringGoals.length > 0 && !showNewGoalForm"
+        @click="showNewGoalForm = true"
+        class="mt-4 flex min-h-[44px] items-center justify-center gap-1.5 text-xs font-medium text-[#c4873b] transition duration-200 hover:text-[#8b5a1b] active:scale-[0.97]"
+      >
+        + Add task
+      </button>
   </div>
 </template>
