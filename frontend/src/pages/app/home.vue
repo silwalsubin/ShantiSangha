@@ -62,7 +62,7 @@ onMounted(() => load())
 
     <!-- Loading -->
     <div v-if="loading" class="mt-6 space-y-3">
-      <div v-for="i in 2" :key="i" class="h-14 animate-pulse rounded-2xl bg-[rgba(139,90,43,0.06)]" />
+      <div v-for="i in 2" :key="i" class="h-14 animate-pulse rounded-2xl bg-sacred-bg-pulse" />
     </div>
 
     <!-- No tasks -->
@@ -79,20 +79,20 @@ onMounted(() => load())
     <!-- New task form -->
     <div v-if="showNewGoalForm" class="mt-6">
       <div class="mb-3 flex justify-center gap-2">
-        <button @click="newGoalType = 'Recurring'" class="flex min-h-[44px] items-center gap-1.5 rounded-2xl border px-4 py-2.5 text-xs font-semibold transition duration-200 active:scale-[0.97]" :class="newGoalType === 'Recurring' ? 'border-sacred-gold text-sacred-gold bg-[rgba(196,135,59,0.06)]' : 'border-sacred-border text-sacred-text-secondary'">
+        <button @click="newGoalType = 'Recurring'" class="flex min-h-[44px] items-center gap-1.5 rounded-2xl border px-4 py-2.5 text-xs font-semibold transition duration-200 active:scale-[0.97]" :class="newGoalType === 'Recurring' ? 'border-sacred-gold text-sacred-gold bg-sacred-gold-light' : 'border-sacred-border text-sacred-text-secondary'">
           <SacredIcons name="flame" :size="14" /> Daily practice
         </button>
-        <button @click="newGoalType = 'OneTime'" class="flex min-h-[44px] items-center gap-1.5 rounded-2xl border px-4 py-2.5 text-xs font-semibold transition duration-200 active:scale-[0.97]" :class="newGoalType === 'OneTime' ? 'border-sacred-gold text-sacred-gold bg-[rgba(196,135,59,0.06)]' : 'border-sacred-border text-sacred-text-secondary'">
+        <button @click="newGoalType = 'OneTime'" class="flex min-h-[44px] items-center gap-1.5 rounded-2xl border px-4 py-2.5 text-xs font-semibold transition duration-200 active:scale-[0.97]" :class="newGoalType === 'OneTime' ? 'border-sacred-gold text-sacred-gold bg-sacred-gold-light' : 'border-sacred-border text-sacred-text-secondary'">
           <SacredIcons name="target" :size="14" /> Reach a milestone
         </button>
       </div>
-      <input v-model="newGoalTitle" type="text" :placeholder="newGoalType === 'Recurring' ? 'I want to practice...' : 'I want to achieve...'" class="w-full rounded-2xl border border-sacred-border bg-[rgba(250,245,237,0.95)] px-4 py-3 text-sm text-sacred-text placeholder-sacred-muted-light outline-none transition duration-200 focus:border-sacred-gold focus:ring-1 focus:ring-sacred-gold" @keyup.enter="newGoalType === 'Recurring' ? onCreateGoal() : undefined" />
-      <input v-if="newGoalType === 'OneTime'" v-model="newGoalTargetDate" type="date" class="mt-2 w-full rounded-2xl border border-sacred-border bg-[rgba(250,245,237,0.95)] px-4 py-3 text-sm text-sacred-text outline-none transition duration-200 focus:border-sacred-gold focus:ring-1 focus:ring-sacred-gold" />
+      <input v-model="newGoalTitle" type="text" :placeholder="newGoalType === 'Recurring' ? 'I want to practice...' : 'I want to achieve...'" class="w-full rounded-2xl border border-sacred-border bg-sacred-bg-warm px-4 py-3 text-sm text-sacred-text placeholder-sacred-muted-light outline-none transition duration-200 focus:border-sacred-gold focus:ring-1 focus:ring-sacred-gold" @keyup.enter="newGoalType === 'Recurring' ? onCreateGoal() : undefined" />
+      <input v-if="newGoalType === 'OneTime'" v-model="newGoalTargetDate" type="date" class="mt-2 w-full rounded-2xl border border-sacred-border bg-sacred-bg-warm px-4 py-3 text-sm text-sacred-text outline-none transition duration-200 focus:border-sacred-gold focus:ring-1 focus:ring-sacred-gold" />
       <div class="mt-3 flex justify-center gap-2">
         <button @click="onCreateGoal" :disabled="newGoalSaving || !newGoalTitle.trim() || (newGoalType === 'OneTime' && !newGoalTargetDate)" class="min-h-[44px] rounded-full bg-gradient-to-r from-sacred-gold to-sacred-gold-dark px-6 py-2.5 text-sm font-semibold text-white shadow-sacred-button transition duration-200 active:scale-[0.97] disabled:opacity-60">
           {{ newGoalSaving ? 'Saving...' : 'Save' }}
         </button>
-        <button @click="showNewGoalForm = false; newGoalType = 'Recurring'; newGoalTargetDate = ''" class="min-h-[44px] rounded-full border border-[rgba(139,90,43,0.15)] px-5 py-2.5 text-sm font-medium text-sacred-text-secondary transition duration-200 active:scale-[0.97]">
+        <button @click="showNewGoalForm = false; newGoalType = 'Recurring'; newGoalTargetDate = ''" class="min-h-[44px] rounded-full border border-sacred-border-strong px-5 py-2.5 text-sm font-medium text-sacred-text-secondary transition duration-200 active:scale-[0.97]">
           Cancel
         </button>
       </div>

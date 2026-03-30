@@ -119,9 +119,21 @@ Defined in `tailwind.config.js` under `theme.extend.colors.sacred`:
 | `sacred-muted` | `#9a8568` | Subtle text, timestamps |
 | `sacred-label` | `#a38d6d` | Section labels, uppercase headings |
 | `sacred-bg` | `#faf5ed` | Page background |
+| `sacred-bg-warm` | `rgba(250,245,237,0.95)` | Input backgrounds, overlays |
+| `sacred-bg-card` | `rgba(250,245,237,0.88)` | Card backgrounds |
+| `sacred-bg-card-inner` | `rgba(250,245,237,0.7)` | Inner card / task rows |
+| `sacred-bg-hover` | `rgba(139,90,43,0.06)` | Hover states |
+| `sacred-gold-light` | `rgba(196,135,59,0.06)` | Active pill backgrounds |
 | `sacred-green` | `#7aa87a` | Success, completed state |
+| `sacred-green-bg` | `rgba(122,168,122,0.06)` | Completed task background |
+| `sacred-green-border` | `rgba(122,168,122,0.25)` | Completed task border |
 | `sacred-red` | `#b45a3c` | Overdue, danger |
+| `sacred-red-bg` | `rgba(180,90,60,0.06)` | Overdue task background |
 | `sacred-border` | `rgba(139,90,43,0.12)` | Card borders |
+| `sacred-border-subtle` | `rgba(139,90,43,0.1)` | Task row borders |
+| `sacred-border-strong` | `rgba(139,90,43,0.15)` | Emphasized borders |
+
+**RULE: No raw hex colors or rgba values in .vue files.** Every color must use a `sacred-*` token from `tailwind.config.js`. If a new color is needed, add it to the config first.
 
 ### Shadows
 
@@ -130,13 +142,24 @@ Defined in `tailwind.config.js` under `theme.extend.colors.sacred`:
 | `shadow-sacred` | Cards |
 | `shadow-sacred-lg` | Elevated cards |
 | `shadow-sacred-button` | CTA buttons |
+| `shadow-sacred-dropdown` | Dropdown menus |
 
 ### Typography
 
-- **Headings**: Sans-serif (system default), `font-semibold`
-- **Section labels**: `text-[9px] font-bold uppercase tracking-[0.2em]`
-- **Spiritual feedback**: `font-serif italic`
-- **Body**: `text-sm` (14px)
+All font size tokens defined in `tailwind.config.js`:
+
+| Token | Size | Usage |
+|---|---|---|
+| `text-sacred-xs` | 9px, uppercase, bold, tracked | Section group labels |
+| `text-sacred-label` | 10px, uppercase, semibold, tracked | Page-level labels ("Your Dharma") |
+| `text-sacred-caption` | 10px, uppercase, medium, tracked | Timestamps, metadata |
+| `text-sacred-body` | 14px, relaxed line height | Body text |
+| `text-sacred-heading` | 24px, semibold | Page headings |
+| `text-sacred-heading-sm` | 20px, semibold | Section headings |
+
+Standard Tailwind `text-sm`, `text-xs`, `font-serif`, `font-semibold` are still used for one-off sizing. The `sacred-*` tokens are for recurring patterns.
+
+**RULE: No arbitrary font sizes like `text-[9px]` or `text-[10px]` in .vue files.** Use the `text-sacred-*` tokens instead.
 
 ### Icons
 

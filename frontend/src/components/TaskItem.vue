@@ -42,30 +42,30 @@ function saveProgress() {
 
 <template>
   <li
-    class="relative rounded-2xl border px-4 py-3 transition-all duration-300"
+    class="relative rounded-sacred-lg border px-4 py-3 transition-all duration-300"
     :class="
       task.checkedIn
-        ? 'border-[rgba(122,168,122,0.25)] bg-[rgba(122,168,122,0.06)]'
+        ? 'border-sacred-green-border bg-sacred-green-bg'
         : isOverdue
-          ? 'border-[rgba(180,90,60,0.25)] bg-[rgba(180,90,60,0.06)]'
-          : 'border-[rgba(139,90,43,0.1)] bg-[rgba(250,245,237,0.7)]'
+          ? 'border-sacred-red-border bg-sacred-red-bg'
+          : 'border-sacred-border-subtle bg-sacred-bg-card-inner'
     "
   >
     <div class="flex items-center gap-3">
       <!-- Type icon -->
       <div class="flex h-6 w-6 shrink-0 items-center justify-center">
-        <SacredIcons :name="task.type === 'Recurring' ? 'recurring' : 'target'" :size="14" :class="task.type === 'Recurring' ? 'text-[#b5996f]' : 'text-[#c4873b]'" />
+        <SacredIcons :name="task.type === 'Recurring' ? 'recurring' : 'target'" :size="14" :class="task.type === 'Recurring' ? 'text-sacred-muted-light' : 'text-sacred-gold'" />
       </div>
 
       <!-- Title -->
       <button
-        class="flex-1 text-left text-sm font-medium transition duration-200 hover:text-[#c4873b]"
-        :class="task.checkedIn && task.completedToday ? 'text-[#7aa87a] line-through decoration-[rgba(122,168,122,0.4)]' : 'text-[#2b1e10]'"
+        class="flex-1 text-left text-sm font-medium transition duration-200 hover:text-sacred-gold"
+        :class="task.checkedIn && task.completedToday ? 'text-sacred-green line-through decoration-sacred-green-border' : 'text-sacred-text'"
         @click="emit('navigate', task.id)"
       >{{ task.title }}</button>
 
       <!-- Milestone info -->
-      <span v-if="task.type === 'OneTime' && task.daysRemaining != null" class="shrink-0 font-serif text-xs" :class="task.daysRemaining <= 0 ? 'font-bold text-[#b45a3c]' : 'text-[#c4873b]'">
+      <span v-if="task.type === 'OneTime' && task.daysRemaining != null" class="shrink-0 font-serif text-xs" :class="task.daysRemaining <= 0 ? 'font-bold text-sacred-red' : 'text-sacred-gold'">
         {{ task.daysRemaining > 0 ? `${task.daysRemaining}d` : task.daysRemaining === 0 ? 'Today' : `${Math.abs(task.daysRemaining)}d over` }}
       </span>
 
@@ -73,7 +73,7 @@ function saveProgress() {
       <button
         v-if="!task.saving"
         @click.stop="showMenu = !showMenu"
-        class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[#9a8568] transition duration-200 hover:bg-[rgba(139,90,43,0.08)]"
+        class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sacred-muted transition duration-200 hover:bg-sacred-bg-hover-strong"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
       </button>
@@ -81,27 +81,24 @@ function saveProgress() {
 
     <!-- Progress bar for milestones -->
     <div v-if="task.type === 'OneTime' && !showProgress" class="mt-2 ml-9">
-      <div class="h-1.5 w-full rounded-full bg-[rgba(139,90,43,0.1)]">
-        <div class="h-1.5 rounded-full bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] transition-all duration-300" :style="{ width: `${task.progress}%` }" />
+      <div class="h-1.5 w-full rounded-full bg-sacred-border-subtle">
+        <div class="h-1.5 rounded-full bg-gradient-to-r from-sacred-gold to-sacred-gold-dark transition-all duration-300" :style="{ width: `${task.progress}%` }" />
       </div>
-      <p class="mt-1 text-[10px] text-[#9a8568]">{{ task.progress }}% complete</p>
+      <p class="mt-1 text-[10px] text-sacred-muted">{{ task.progress }}% complete</p>
     </div>
 
     <!-- Progress slider (inline edit) -->
     <div v-if="showProgress" class="mt-3 ml-9">
       <input
         v-model.number="progressValue"
-        type="range"
-        min="0"
-        max="100"
-        step="5"
-        class="w-full accent-[#c4873b]"
+        type="range" min="0" max="100" step="5"
+        class="w-full accent-sacred-gold"
       />
       <div class="mt-1 flex items-center justify-between">
-        <span class="text-xs font-medium text-[#c4873b]">{{ progressValue }}%</span>
+        <span class="text-xs font-medium text-sacred-gold">{{ progressValue }}%</span>
         <div class="flex gap-2">
-          <button @click="showProgress = false" class="text-xs text-[#9a8568] hover:text-[#6b5740]">Cancel</button>
-          <button @click="saveProgress" class="text-xs font-semibold text-[#c4873b] hover:text-[#8b5a1b]">Save</button>
+          <button @click="showProgress = false" class="text-xs text-sacred-muted hover:text-sacred-text-secondary">Cancel</button>
+          <button @click="saveProgress" class="text-xs font-semibold text-sacred-gold hover:text-sacred-gold-dark">Save</button>
         </div>
       </div>
     </div>
@@ -109,72 +106,66 @@ function saveProgress() {
     <!-- Dropdown menu -->
     <div
       v-if="showMenu"
-      class="absolute right-4 top-12 z-10 min-w-[180px] rounded-xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.98)] py-1 shadow-[0_4px_16px_rgba(82,54,29,0.12)] backdrop-blur-[20px]"
+      class="absolute right-4 top-12 z-10 min-w-[180px] rounded-xl border border-sacred-border bg-sacred-bg-warm py-1 shadow-sacred-dropdown backdrop-blur-[20px]"
     >
-      <!-- Mark complete -->
       <button
         v-if="!task.checkedIn"
         @click="onAction('done')"
-        class="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-[#2b1e10] transition duration-200 hover:bg-[rgba(139,90,43,0.06)]"
+        class="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-sacred-text transition duration-200 hover:bg-sacred-bg-hover"
       >
-        <SacredIcons name="check" :size="14" class="text-[#7aa87a]" />
+        <SacredIcons name="check" :size="14" class="text-sacred-green" />
         Mark complete
       </button>
 
-      <!-- Update progress (milestone only) -->
       <button
         v-if="task.type === 'OneTime' && !task.checkedIn"
         @click="openProgress"
-        class="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-[#2b1e10] transition duration-200 hover:bg-[rgba(139,90,43,0.06)]"
+        class="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-sacred-text transition duration-200 hover:bg-sacred-bg-hover"
       >
-        <SacredIcons name="dharma" :size="14" class="text-[#c4873b]" />
+        <SacredIcons name="dharma" :size="14" class="text-sacred-gold" />
         Update progress
       </button>
 
-      <!-- Skip for today -->
       <button
         v-if="!task.checkedIn"
         @click="onAction('skip')"
-        class="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-[#2b1e10] transition duration-200 hover:bg-[rgba(139,90,43,0.06)]"
+        class="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-sacred-text transition duration-200 hover:bg-sacred-bg-hover"
       >
-        <SacredIcons name="skip" :size="14" class="text-[#b5996f]" />
+        <SacredIcons name="skip" :size="14" class="text-sacred-muted-light" />
         Skip for today
       </button>
 
-      <!-- Move back to pending -->
       <button
         v-if="task.checkedIn"
         @click="onAction('undo')"
-        class="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-[#2b1e10] transition duration-200 hover:bg-[rgba(139,90,43,0.06)]"
+        class="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-sacred-text transition duration-200 hover:bg-sacred-bg-hover"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a4 4 0 010 8h-1"/></svg>
         Move to pending
       </button>
 
-      <!-- Divider -->
-      <div class="my-1 border-t border-[rgba(139,90,43,0.08)]" />
+      <div class="my-1 border-t border-sacred-border-light" />
 
-      <!-- Delete -->
       <button
         v-if="!confirmDelete"
         @click="confirmDelete = true"
-        class="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-[#b45a3c] transition duration-200 hover:bg-[rgba(180,90,60,0.06)]"
+        class="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-sacred-red transition duration-200 hover:bg-sacred-red-bg"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
         Delete
       </button>
       <div v-if="confirmDelete" class="px-4 py-2.5">
-        <p class="text-xs text-[#6b5740]">This will delete the task and all its history.</p>
+        <p class="text-xs text-sacred-text-secondary">This will delete the task and all its history.</p>
         <div class="mt-2 flex gap-2">
           <button
             @click="confirmDelete = false; showMenu = false; emit('delete', task.id)"
-            class="rounded-lg bg-[#b45a3c] px-3 py-1.5 text-xs font-semibold text-white transition duration-200 active:scale-[0.95]"
+            class="rounded-lg bg-sacred-red px-3 py-1.5 text-xs font-semibold text-white transition duration-200 active:scale-[0.95]"
           >
             Delete
           </button>
           <button
             @click="confirmDelete = false"
-            class="rounded-lg px-3 py-1.5 text-xs text-[#6b5740] transition duration-200 hover:bg-[rgba(139,90,43,0.06)]"
+            class="rounded-lg px-3 py-1.5 text-xs text-sacred-text-secondary transition duration-200 hover:bg-sacred-bg-hover"
           >
             Cancel
           </button>
@@ -182,11 +173,9 @@ function saveProgress() {
       </div>
     </div>
 
-    <!-- Click outside to close menu -->
     <div v-if="showMenu" class="fixed inset-0 z-[5]" @click="showMenu = false" />
 
-    <!-- Spiritual feedback after check-in -->
-    <p v-if="task.checkedIn && task.feedbackMessage" class="mt-2 ml-9 font-serif text-xs italic leading-relaxed text-[#9a8568]">
+    <p v-if="task.checkedIn && task.feedbackMessage" class="mt-2 ml-9 font-serif text-xs italic leading-relaxed text-sacred-muted">
       {{ task.feedbackMessage }}
     </p>
   </li>
