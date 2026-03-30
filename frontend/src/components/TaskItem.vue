@@ -102,7 +102,7 @@ function saveProgress() {
     </div>
 
     <!-- Progress bar for milestones -->
-    <div v-if="task.type === 'OneTime' && task.progress > 0 && !showProgress" class="mt-2 ml-9">
+    <div v-if="task.type === 'OneTime' && !showProgress" class="mt-2 ml-9">
       <div class="h-1.5 w-full rounded-full bg-[rgba(139,90,43,0.1)]">
         <div class="h-1.5 rounded-full bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] transition-all duration-300" :style="{ width: `${task.progress}%` }" />
       </div>
