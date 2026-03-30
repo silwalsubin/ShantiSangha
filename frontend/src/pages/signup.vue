@@ -10,7 +10,7 @@ import SacredIcons from '@/components/icons/SacredIcons.vue'
       <div class="mb-5 sm:mb-8 text-center">
         <RouterLink to="/" class="inline-flex flex-col items-center gap-2">
           <div class="logo-glow flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#c4873b] to-[#8b5a1b] text-white">
-            <SacredIcons name="lotus" :size="26" />
+            <SacredIcons name="vajra" :size="26" />
           </div>
           <h1 class="font-serif text-xl sm:text-3xl font-bold tracking-wide text-[#2b1e10]">ShantiSangha</h1>
         </RouterLink>
