@@ -122,17 +122,20 @@ async function loadTasks() {
     const allItems = Array.isArray(allData) ? allData : (allData?.goals || allData?.items || [])
     const milestones: Task[] = allItems
       .filter((g: any) => (g.type ?? '') === 'OneTime' && !g.completedAt && !g.completed_at)
-      .map((g: any) => ({
-        id: g.id,
-        title: g.title,
-        type: 'OneTime' as const,
-        checkedIn: false,
-        completedToday: null,
-        daysRemaining: g.daysRemaining ?? g.days_remaining ?? null,
-        progress: g.progress ?? 0,
-        feedbackMessage: null,
-        saving: false,
-      }))
+      .map((g: any) => {
+        const checkIn = g.checkIn ?? g.check_in ?? null
+        return {
+          id: g.id,
+          title: g.title,
+          type: 'OneTime' as const,
+          checkedIn: checkIn != null,
+          completedToday: checkIn?.completed ?? null,
+          daysRemaining: g.daysRemaining ?? g.days_remaining ?? null,
+          progress: g.progress ?? 0,
+          feedbackMessage: null,
+          saving: false,
+        }
+      })
       .sort((a: Task, b: Task) => {
         const aD = a.daysRemaining ?? 9999
         const bD = b.daysRemaining ?? 9999

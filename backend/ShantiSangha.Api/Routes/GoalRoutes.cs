@@ -94,6 +94,7 @@ public static class GoalRoutes
                 int? daysRemaining = g.TargetDate.HasValue
                     ? g.TargetDate.Value.DayNumber - today.DayNumber
                     : null;
+                var todayCheckIn = g.CheckIns.FirstOrDefault(c => c.Date == today);
 
                 return (object)new
                 {
@@ -105,7 +106,8 @@ public static class GoalRoutes
                     g.CompletedAt,
                     g.CreatedAt,
                     DaysRemaining = daysRemaining,
-                    NoteCount = noteCount
+                    NoteCount = noteCount,
+                    CheckIn = todayCheckIn != null ? new { todayCheckIn.Completed, todayCheckIn.Note } : null
                 };
             }
             else
