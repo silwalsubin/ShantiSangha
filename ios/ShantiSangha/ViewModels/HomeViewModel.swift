@@ -41,9 +41,6 @@ class HomeViewModel: ObservableObject {
 
             // Load milestones
             let allGoals: [AppTask] = try await api.get("/goals")
-            let milestones = allGoals.filter { $0.type == .oneTime && $0.completedToday == nil || $0.type == .oneTime }
-                .filter { goal in !goal.checkedIn || goal.checkedIn } // include all for skip state
-
             tasks = recurring + allGoals.filter { $0.type == .oneTime }
         } catch {
             print("Failed to load tasks: \(error)")
