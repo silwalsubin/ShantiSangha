@@ -117,6 +117,15 @@ try
             opts.Authority = appConfig.ClerkAuthority;
             opts.TokenValidationParameters.ValidateAudience = false;
             opts.MapInboundClaims = false;
+            opts.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+            {
+                OnAuthenticationFailed = context =>
+                {
+                    Log.Error(context.Exception, "JWT auth failed for {Path}: {Message}",
+                        context.Request.Path, context.Exception.Message);
+                    return Task.CompletedTask;
+                },
+            };
         });
     builder.Services.AddAuthorization();
 
