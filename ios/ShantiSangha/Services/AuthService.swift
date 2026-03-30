@@ -13,7 +13,7 @@ class AuthService: ObservableObject {
     @Published var sessionToken: String?
     @Published var isLoading = false
 
-    private let clerkDomain = "clerk.shantisangha.com"
+    private let clerkAccountsDomain = "accounts.shantisangha.com"
     private let redirectScheme = "shantisangha"
 
     // Keychain key for persisting the session
@@ -35,7 +35,7 @@ class AuthService: ObservableObject {
     func signIn() {
         isLoading = true
 
-        let signInURL = "https://\(clerkDomain)/sign-in?redirect_url=\(redirectScheme)://auth/callback"
+        let signInURL = "https://\(clerkAccountsDomain)/sign-in?redirect_url=\(redirectScheme)://auth/callback"
 
         guard let url = URL(string: signInURL) else {
             isLoading = false
