@@ -27,6 +27,10 @@ USER appuser
 
 COPY --from=build /app/publish .
 
+ARG GIT_HASH=dev
+ARG BUILD_TIME=unknown
+ENV GIT_HASH=${GIT_HASH}
+ENV BUILD_TIME=${BUILD_TIME}
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 

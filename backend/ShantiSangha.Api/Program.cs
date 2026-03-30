@@ -212,6 +212,16 @@ try
     api.MapSearchRoutes();
     api.MapGoalRoutes();
 
+    // Server version info
+    var serverGitHash = builder.Configuration["GIT_HASH"] ?? "dev";
+    var serverBuildTime = builder.Configuration["BUILD_TIME"] ?? "unknown";
+    api.MapGet("/version", () => Results.Ok(new
+    {
+        gitHash = serverGitHash.Length > 7 ? serverGitHash[..7] : serverGitHash,
+        gitHashFull = serverGitHash,
+        buildTime = serverBuildTime
+    })).AllowAnonymous();
+
     // Health check at root (no /api prefix)
     app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
         .AllowAnonymous();

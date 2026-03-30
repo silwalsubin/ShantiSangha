@@ -6,11 +6,6 @@ import NotificationToast from '@/components/NotificationToast.vue'
 
 const route = useRoute()
 
-const rawBuildTime = import.meta.env.VITE_BUILD_TIME || ''
-const buildTime = rawBuildTime
-  ? new Date(rawBuildTime).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-  : 'dev'
-
 const navItems = [
   { icon: 'vajra', label: 'Home', href: '/app/home' },
   { icon: 'dialogue', label: 'Reflect', href: '/app/reflect' },
@@ -63,9 +58,11 @@ function isActive(href: string) {
         <UserButton />
       </div>
 
-      <!-- Build info -->
-      <div class="border-t border-sacred-border-light px-5 py-2 text-[9px] tracking-wide text-sacred-muted-light">
-        &copy; ShantiSangha &middot; {{ buildTime }}
+      <!-- About link -->
+      <div class="border-t border-sacred-border-light px-5 py-2">
+        <RouterLink to="/app/about" class="text-[9px] tracking-wide text-sacred-muted-light hover:text-sacred-muted transition duration-200">
+          About
+        </RouterLink>
       </div>
     </aside>
 

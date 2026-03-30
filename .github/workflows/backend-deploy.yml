@@ -46,6 +46,8 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build \
+            --build-arg GIT_HASH=${{ github.sha }} \
+            --build-arg BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
             .

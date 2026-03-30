@@ -41,6 +41,9 @@ const router = createRouter({
         { path: 'journey/goals/:id', component: () => import('@/pages/app/goal-detail.vue') },
         { path: 'journey/insights', component: () => import('@/pages/app/journey-insights.vue') },
 
+        // About
+        { path: 'about', component: () => import('@/pages/app/about.vue') },
+
         // Catch-all
         { path: '', redirect: 'home' },
       ],
