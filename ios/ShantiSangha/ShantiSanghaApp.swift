@@ -1,8 +1,14 @@
 import SwiftUI
+import FirebaseCore
+import GoogleSignIn
 
 @main
 struct ShantiSanghaApp: App {
     @StateObject private var auth = AuthService.shared
+
+    init() {
+        FirebaseApp.configure()
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -14,5 +20,6 @@ struct ShantiSanghaApp: App {
                     .environmentObject(auth)
             }
         }
+        .handlesExternalEvents(preferring: Set(), allowing: Set())
     }
 }

@@ -4,8 +4,7 @@ public class AppConfig
 {
     public required string DatabaseUrl { get; init; }
     public required string RedisUrl { get; init; }
-    public required string ClerkAuthority { get; init; }
-    public required string ClerkWebhookSecret { get; init; }
+    public required string FirebaseProjectId { get; init; }
     public required string OpenAiApiKey { get; init; }
     public required string VoiceBucketName { get; init; }
 
@@ -24,8 +23,7 @@ public class AppConfig
     {
         var db = config["DATABASE_URL"] ?? throw new InvalidOperationException("DATABASE_URL is required");
         var redis = config["REDIS_URL"] ?? throw new InvalidOperationException("REDIS_URL is required");
-        var clerkAuthority = config["CLERK_AUTHORITY"] ?? throw new InvalidOperationException("CLERK_AUTHORITY is required");
-        var clerkWebhookSecret = config["CLERK_WEBHOOK_SECRET"] ?? throw new InvalidOperationException("CLERK_WEBHOOK_SECRET is required");
+        var firebaseProjectId = config["FIREBASE_PROJECT_ID"] ?? throw new InvalidOperationException("FIREBASE_PROJECT_ID is required");
         var openAiKey = config["OPENAI_API_KEY"] ?? throw new InvalidOperationException("OPENAI_API_KEY is required");
         var voiceBucket = config["VOICE_BUCKET_NAME"] ?? throw new InvalidOperationException("VOICE_BUCKET_NAME is required");
 
@@ -33,8 +31,7 @@ public class AppConfig
         {
             DatabaseUrl = db,
             RedisUrl = redis,
-            ClerkAuthority = clerkAuthority,
-            ClerkWebhookSecret = clerkWebhookSecret,
+            FirebaseProjectId = firebaseProjectId,
             OpenAiApiKey = openAiKey,
             VoiceBucketName = voiceBucket,
             LangfusePublicKey = config["LANGFUSE_PUBLIC_KEY"],

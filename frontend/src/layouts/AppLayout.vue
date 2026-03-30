@@ -1,8 +1,15 @@
 <script setup lang="ts">
-import { useRoute } from 'vue-router'
-import { UserButton } from '@clerk/vue'
+import { useRoute, useRouter } from 'vue-router'
+import { signOut, currentUser } from '@/services/firebase'
 import SacredIcons from '@/components/icons/SacredIcons.vue'
 import NotificationToast from '@/components/NotificationToast.vue'
+
+const routerNav = useRouter()
+
+async function handleSignOut() {
+  await signOut()
+  routerNav.push('/login')
+}
 
 const route = useRoute()
 
@@ -55,7 +62,10 @@ function isActive(href: string) {
 
       <!-- User -->
       <div class="border-t border-sacred-border px-5 py-4">
-        <UserButton />
+        <button @click="handleSignOut" class="flex items-center gap-2 text-xs text-sacred-muted hover:text-sacred-text transition">
+          <img v-if="currentUser?.photoURL" :src="currentUser.photoURL" class="h-7 w-7 rounded-full" />
+          <span v-else class="h-7 w-7 rounded-full bg-sacred-gold text-white flex items-center justify-center text-xs font-bold">{{ currentUser?.email?.[0]?.toUpperCase() }}</span>
+        </button>
       </div>
 
       <!-- About link -->
@@ -76,7 +86,10 @@ function isActive(href: string) {
           </div>
           <span class="font-serif text-lg font-bold text-sacred-text">ShantiSangha</span>
         </div>
-        <UserButton />
+        <button @click="handleSignOut" class="flex items-center gap-2 text-xs text-sacred-muted hover:text-sacred-text transition">
+          <img v-if="currentUser?.photoURL" :src="currentUser.photoURL" class="h-7 w-7 rounded-full" />
+          <span v-else class="h-7 w-7 rounded-full bg-sacred-gold text-white flex items-center justify-center text-xs font-bold">{{ currentUser?.email?.[0]?.toUpperCase() }}</span>
+        </button>
       </div>
 
       <main class="min-h-screen">

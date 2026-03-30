@@ -110,12 +110,14 @@ try
             .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation());
 
-    // Auth — Clerk issues standard JWTs validated here
+    // Auth — Firebase issues JWTs validated here
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(opts =>
         {
-            opts.Authority = appConfig.ClerkAuthority;
-            opts.TokenValidationParameters.ValidateAudience = false;
+            opts.Authority = $"https://securetoken.google.com/{appConfig.FirebaseProjectId}";
+            opts.TokenValidationParameters.ValidateAudience = true;
+            opts.TokenValidationParameters.ValidAudience = appConfig.FirebaseProjectId;
+            opts.TokenValidationParameters.ValidIssuer = $"https://securetoken.google.com/{appConfig.FirebaseProjectId}";
             opts.MapInboundClaims = false;
             opts.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
             {
@@ -201,7 +203,7 @@ try
 
     // All API routes under /api prefix
     var api = app.MapGroup("/api");
-    api.MapWebhookRoutes();
+    // api.MapWebhookRoutes(); // Removed — was for Clerk webhooks
     api.MapUserRoutes();
     api.MapConversationRoutes();
     api.MapJournalRoutes();

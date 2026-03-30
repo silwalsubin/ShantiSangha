@@ -145,6 +145,7 @@ resource "aws_ecs_task_definition" "api" {
       { name = "LANGFUSE_PUBLIC_KEY",    value = var.langfuse_public_key },
       { name = "ASPNETCORE_ENVIRONMENT", value = "Production" },
       { name = "EXPOSE_ERRORS",          value = "true" },
+      { name = "FIREBASE_PROJECT_ID",   value = "shantisangha-bc0f9" },
       { name = "FRONTEND_ORIGIN",       value = "https://${var.domain_name},https://${aws_cloudfront_distribution.frontend.domain_name},http://localhost:5173" }
     ]
 
@@ -152,14 +153,6 @@ resource "aws_ecs_task_definition" "api" {
       {
         name      = "DATABASE_URL"
         valueFrom = aws_secretsmanager_secret.database_url.arn
-      },
-      {
-        name      = "CLERK_AUTHORITY"
-        valueFrom = aws_secretsmanager_secret.app["clerk_authority"].arn
-      },
-      {
-        name      = "CLERK_WEBHOOK_SECRET"
-        valueFrom = aws_secretsmanager_secret.app["clerk_webhook_secret"].arn
       },
       {
         name      = "OPENAI_API_KEY"

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Login screen — mirrors frontend/src/pages/login.vue
+/// Login screen with native Google Sign-In via Firebase
 struct LoginView: View {
     @EnvironmentObject var auth: AuthService
 
@@ -30,22 +30,27 @@ struct LoginView: View {
 
             // Sign in button
             Button {
-                auth.signIn()
+                Task { await auth.signInWithGoogle() }
             } label: {
-                HStack(spacing: 8) {
+                HStack(spacing: 12) {
                     if auth.isLoading {
                         ProgressView()
-                            .tint(.white)
+                            .tint(.sacredText)
                     } else {
-                        Text("Sign in with Google")
+                        // Google logo
+                        Image(systemName: "g.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(.sacredText)
+                        Text("Continue with Google")
                             .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.sacredText)
                     }
                 }
-                .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(LinearGradient(colors: [.sacredGold, .sacredGoldDark], startPoint: .leading, endPoint: .trailing))
+                .background(Color.white)
                 .clipShape(RoundedRectangle(cornerRadius: 16))
+                .shadow(color: .sacredMuted.opacity(0.15), radius: 8, y: 4)
             }
             .disabled(auth.isLoading)
             .padding(.horizontal, 32)

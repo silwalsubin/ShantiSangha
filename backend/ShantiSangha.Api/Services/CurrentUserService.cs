@@ -12,9 +12,8 @@ public interface ICurrentUser
 }
 
 /// <summary>
-/// Resolves the current user by email from the JWT session.
-/// Email must be a valid email address — rejects template strings,
-/// empty values, and malformed emails.
+/// Resolves the current user by email from the Firebase JWT.
+/// Firebase tokens include email and user_id (sub) claims.
 /// </summary>
 public class CurrentUserService : ICurrentUser
 {
@@ -37,14 +36,13 @@ public class CurrentUserService : ICurrentUser
         _resolved = true;
 
         var email = _httpContextAccessor.HttpContext?.User.FindFirstValue("email");
-        var clerkId = _httpContextAccessor.HttpContext?.User.FindFirstValue("sub") ?? "";
+        var firebaseUid = _httpContextAccessor.HttpContext?.User.FindFirstValue("user_id")
+                       ?? _httpContextAccessor.HttpContext?.User.FindFirstValue("sub")
+                       ?? "";
 
         if (!IsValidEmail(email))
         {
-            _logger.LogWarning(
-                "Invalid or missing email claim for sub={ClerkId}. Got: {Email}. " +
-                "Check Clerk Dashboard → Sessions → Customize session token.",
-                clerkId, email ?? "(null)");
+            _logger.LogWarning("Invalid or missing email in JWT. sub={Uid}, email={Email}", firebaseUid, email ?? "(null)");
             return null;
         }
 
@@ -52,9 +50,10 @@ public class CurrentUserService : ICurrentUser
         _cached = await _db.Users.FirstOrDefaultAsync(u => u.Email == email);
         if (_cached is not null)
         {
-            if (_cached.ClerkId != clerkId && clerkId != "")
+            // Keep auth provider ID in sync
+            if (_cached.ClerkId != firebaseUid && firebaseUid != "")
             {
-                _cached.ClerkId = clerkId;
+                _cached.ClerkId = firebaseUid;
                 _cached.UpdatedAt = DateTime.UtcNow;
                 await _db.SaveChangesAsync();
             }
@@ -65,7 +64,7 @@ public class CurrentUserService : ICurrentUser
         _cached = new User
         {
             Id = Guid.NewGuid(),
-            ClerkId = clerkId,
+            ClerkId = firebaseUid,
             Email = email!,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -79,7 +78,6 @@ public class CurrentUserService : ICurrentUser
     private static bool IsValidEmail(string? email)
     {
         if (string.IsNullOrWhiteSpace(email)) return false;
-        if (email.Contains("{{")) return false; // Reject unresolved Clerk templates
         if (!email.Contains('@')) return false;
         if (email.Contains(' ')) return false;
         return true;

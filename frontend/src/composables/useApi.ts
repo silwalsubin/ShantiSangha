@@ -1,11 +1,17 @@
-import { useAuth } from '@clerk/vue'
+/**
+ * HTTP client for the ShantiSangha API.
+ *
+ * Automatically attaches Firebase JWT for authenticated requests.
+ * All API calls go through this composable.
+ */
+
+import { getToken } from '@/services/firebase'
 
 export function useApi() {
-  const { getToken } = useAuth()
   const base = import.meta.env.VITE_API_BASE_URL || '/api'
 
   async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const token = await getToken.value()
+    const token = await getToken()
     const res = await fetch(`${base}${path}`, {
       method,
       headers: {
@@ -25,6 +31,5 @@ export function useApi() {
     patch: <T>(path: string, body: unknown) => request<T>('PATCH', path, body),
     delete: <T>(path: string) => request<T>('DELETE', path),
     base,
-    getToken: () => getToken.value(),
   }
 }

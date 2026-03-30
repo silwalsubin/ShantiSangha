@@ -7,10 +7,23 @@
       "Read(//opt/homebrew/bin/**)",
       "Read(//opt/homebrew/Cellar/**)",
       "Bash(/usr/local/share/dotnet/dotnet tool:*)",
-      "Bash(/usr/local/share/dotnet/dotnet ef:*)"
+      "Bash(/usr/local/share/dotnet/dotnet ef:*)",
+      "Bash(dig clerk.shantisangha.com CNAME +short)",
+      "Bash(/usr/bin/qlmanage -t -s 1024 -o /tmp appicon.svg)",
+      "Bash(cp /tmp/appicon.svg.png ShantiSangha/Assets.xcassets/AppIcon.appiconset/AppIcon.png)",
+      "Bash(node -e \":*)",
+      "Bash(/opt/homebrew/bin/convert -background none -density 300 -resize 1024x1024 /Users/subinsilwal/Desktop/code/maiself/ios/appicon.svg /Users/subinsilwal/Desktop/code/maiself/ios/ShantiSangha/Assets.xcassets/AppIcon.appiconset/AppIcon.png)",
+      "Bash(\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\" --headless=new --disable-gpu --screenshot=/tmp/appicon.png --window-size=1024,1024 --force-device-scale-factor=1 /tmp/render-icon.html)",
+      "Read(//tmp/**)",
+      "Bash(magick identify:*)",
+      "Bash(magick ios/ShantiSangha/Assets.xcassets/AppIcon.appiconset/AppIcon.png -alpha off -background '#8b5a1b' -flatten -resize 1024x1024 ios/ShantiSangha/Assets.xcassets/AppIcon.appiconset/AppIcon.png)",
+      "Bash(magick ios/ShantiSangha/Assets.xcassets/AppIcon.appiconset/AppIcon.png -background '#8b5a1b' -flatten -alpha remove -alpha off PNG24:ios/ShantiSangha/Assets.xcassets/AppIcon.appiconset/AppIcon.png)"
     ],
     "additionalDirectories": [
-      "/Users/subinsilwal/Desktop/code/maiself/.claude"
+      "/Users/subinsilwal/Desktop/code/maiself/.claude",
+      "/Users/subinsilwal/Desktop/code/maiself/ios/ShantiSangha/ShantiSangha/.git",
+      "/private/tmp",
+      "/Users/subinsilwal/Downloads"
     ]
   }
 }
