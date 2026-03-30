@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using ShantiSangha.Core.Models;
 using ShantiSangha.Infrastructure.Data;
 
@@ -11,21 +12,23 @@ public interface ICurrentUser
 }
 
 /// <summary>
-/// Resolves the current user from the JWT session.
-/// Lookup order: ClerkId (sub claim) → email fallback (domain migration).
-/// Email is kept in sync on every request.
+/// Resolves the current user by email from the JWT session.
+/// Email must be a valid email address — rejects template strings,
+/// empty values, and malformed emails.
 /// </summary>
 public class CurrentUserService : ICurrentUser
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly AppDbContext _db;
+    private readonly ILogger<CurrentUserService> _logger;
     private User? _cached;
     private bool _resolved;
 
-    public CurrentUserService(IHttpContextAccessor httpContextAccessor, AppDbContext db)
+    public CurrentUserService(IHttpContextAccessor httpContextAccessor, AppDbContext db, ILogger<CurrentUserService> logger)
     {
         _httpContextAccessor = httpContextAccessor;
         _db = db;
+        _logger = logger;
     }
 
     public async Task<User?> GetAsync()
@@ -33,35 +36,29 @@ public class CurrentUserService : ICurrentUser
         if (_resolved) return _cached;
         _resolved = true;
 
-        var clerkId = _httpContextAccessor.HttpContext?.User.FindFirstValue("sub");
-        if (clerkId is null) return null;
-
         var email = _httpContextAccessor.HttpContext?.User.FindFirstValue("email");
+        var clerkId = _httpContextAccessor.HttpContext?.User.FindFirstValue("sub") ?? "";
 
-        // Primary lookup: by ClerkId
-        _cached = await _db.Users.FirstOrDefaultAsync(u => u.ClerkId == clerkId);
-        if (_cached is not null)
+        if (!IsValidEmail(email))
         {
-            if (email is not null && _cached.Email != email)
-            {
-                _cached.Email = email;
-                _cached.UpdatedAt = DateTime.UtcNow;
-                await _db.SaveChangesAsync();
-            }
-            return _cached;
+            _logger.LogWarning(
+                "Invalid or missing email claim for sub={ClerkId}. Got: {Email}. " +
+                "Check Clerk Dashboard → Sessions → Customize session token.",
+                clerkId, email ?? "(null)");
+            return null;
         }
 
-        // Fallback: by email (handles Clerk domain migration where ClerkId changes)
-        if (email is not null)
+        // Look up by email
+        _cached = await _db.Users.FirstOrDefaultAsync(u => u.Email == email);
+        if (_cached is not null)
         {
-            _cached = await _db.Users.FirstOrDefaultAsync(u => u.Email == email);
-            if (_cached is not null)
+            if (_cached.ClerkId != clerkId && clerkId != "")
             {
                 _cached.ClerkId = clerkId;
                 _cached.UpdatedAt = DateTime.UtcNow;
                 await _db.SaveChangesAsync();
-                return _cached;
             }
+            return _cached;
         }
 
         // New user
@@ -69,20 +66,22 @@ public class CurrentUserService : ICurrentUser
         {
             Id = Guid.NewGuid(),
             ClerkId = clerkId,
-            Email = email ?? $"{clerkId}@placeholder.local",
+            Email = email!,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
         _db.Users.Add(_cached);
-        try
-        {
-            await _db.SaveChangesAsync();
-        }
-        catch (DbUpdateException)
-        {
-            _db.Entry(_cached).State = EntityState.Detached;
-            _cached = await _db.Users.FirstOrDefaultAsync(u => u.ClerkId == clerkId);
-        }
+        await _db.SaveChangesAsync();
+
         return _cached;
+    }
+
+    private static bool IsValidEmail(string? email)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return false;
+        if (email.Contains("{{")) return false; // Reject unresolved Clerk templates
+        if (!email.Contains('@')) return false;
+        if (email.Contains(' ')) return false;
+        return true;
     }
 }
