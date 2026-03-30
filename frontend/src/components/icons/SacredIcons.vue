@@ -3,18 +3,26 @@ defineProps<{ name: string; size?: number }>()
 </script>
 
 <template>
-  <!-- Vajra (Bajra) — diamond thunderbolt -->
-  <svg v-if="name === 'vajra'" :width="size || 22" :height="size || 22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="2.5" />
-    <circle cx="12" cy="12" r="0.7" fill="currentColor" stroke="none" />
-    <path d="M12 9.5V3" />
-    <path d="M12 7.5C9.5 5.5 10 3.5 12 3" />
-    <path d="M12 7.5C14.5 5.5 14 3.5 12 3" />
-    <path d="M12 14.5V21" />
-    <path d="M12 16.5C9.5 18.5 10 20.5 12 21" />
-    <path d="M12 16.5C14.5 18.5 14 20.5 12 21" />
-    <line x1="9.5" y1="12" x2="10.5" y2="12" stroke-width="1" />
-    <line x1="13.5" y1="12" x2="14.5" y2="12" stroke-width="1" />
+  <!-- Vishwa Vajra (Four-faced Bajra) — crossed diamond thunderbolt -->
+  <svg v-if="name === 'vajra'" :width="size || 22" :height="size || 22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="2" />
+    <circle cx="12" cy="12" r="0.6" fill="currentColor" stroke="none" />
+    <!-- Up -->
+    <path d="M12 10V2.5" />
+    <path d="M12 8C10 6.5 10.3 3.5 12 2.5" />
+    <path d="M12 8C14 6.5 13.7 3.5 12 2.5" />
+    <!-- Down -->
+    <path d="M12 14V21.5" />
+    <path d="M12 16C10 17.5 10.3 20.5 12 21.5" />
+    <path d="M12 16C14 17.5 13.7 20.5 12 21.5" />
+    <!-- Left -->
+    <path d="M10 12H2.5" />
+    <path d="M8 12C6.5 10 3.5 10.3 2.5 12" />
+    <path d="M8 12C6.5 14 3.5 13.7 2.5 12" />
+    <!-- Right -->
+    <path d="M14 12H21.5" />
+    <path d="M16 12C17.5 10 20.5 10.3 21.5 12" />
+    <path d="M16 12C17.5 14 20.5 13.7 21.5 12" />
   </svg>
 
   <!-- Lotus / Coping — refined sacred lotus -->
