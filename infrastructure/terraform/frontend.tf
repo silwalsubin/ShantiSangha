@@ -68,9 +68,10 @@ resource "aws_acm_certificate" "frontend" {
   }
 }
 
-# Waits for ACM certificate to be validated (you must add the DNS record in Cloudflare first)
+# Waits for ACM certificate to be validated via Route 53 DNS records
 resource "aws_acm_certificate_validation" "frontend" {
-  certificate_arn = aws_acm_certificate.frontend.arn
+  certificate_arn         = aws_acm_certificate.frontend.arn
+  validation_record_fqdns = [for record in aws_route53_record.acm_validation : record.fqdn]
   timeouts {
     create = "10m"
   }

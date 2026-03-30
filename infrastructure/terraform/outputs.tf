@@ -50,13 +50,7 @@ output "frontend_bucket_name" {
   value       = aws_s3_bucket.frontend.bucket
 }
 
-output "acm_certificate_validation" {
-  description = "DNS records to add in Cloudflare for ACM certificate validation"
-  value = {
-    for dvo in aws_acm_certificate.frontend.domain_validation_options : dvo.domain_name => {
-      type  = dvo.resource_record_type
-      name  = dvo.resource_record_name
-      value = dvo.resource_record_value
-    }
-  }
+output "route53_nameservers" {
+  description = "Nameservers — update these in Route 53 Registered Domains"
+  value       = aws_route53_zone.main.name_servers
 }
