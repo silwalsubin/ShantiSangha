@@ -63,19 +63,20 @@ function saveProgress() {
     "
   >
     <div class="flex items-center gap-3">
-      <!-- Status indicator -->
+      <!-- Type icon / status -->
       <div
-        class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full"
+        class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-all duration-300"
         :class="
           task.checkedIn && task.completedToday
             ? 'bg-gradient-to-br from-[#7aa87a] to-[#5a8a5a]'
             : task.checkedIn
-              ? 'border-2 border-[rgba(139,90,43,0.2)] bg-[rgba(250,245,237,0.6)]'
-              : 'border-2 border-[rgba(139,90,43,0.15)] bg-[rgba(250,245,237,0.6)]'
+              ? 'bg-[rgba(139,90,43,0.08)]'
+              : ''
         "
       >
         <SacredIcons v-if="task.checkedIn && task.completedToday" name="check" :size="12" class="text-white" />
-        <SacredIcons v-else-if="task.checkedIn" name="skip" :size="10" class="text-[#b5996f]" />
+        <SacredIcons v-else-if="task.checkedIn" name="skip" :size="12" class="text-[#b5996f]" />
+        <SacredIcons v-else :name="task.type === 'Recurring' ? 'recurring' : 'target'" :size="14" :class="task.type === 'Recurring' ? 'text-[#b5996f]' : 'text-[#c4873b]'" />
       </div>
 
       <!-- Title -->
@@ -89,9 +90,6 @@ function saveProgress() {
       <span v-if="task.type === 'OneTime' && task.daysRemaining != null" class="shrink-0 font-serif text-xs" :class="task.daysRemaining <= 0 ? 'font-bold text-[#b45a3c]' : 'text-[#c4873b]'">
         {{ task.daysRemaining > 0 ? `${task.daysRemaining}d` : task.daysRemaining === 0 ? 'Today' : `${Math.abs(task.daysRemaining)}d over` }}
       </span>
-
-      <!-- Type badge -->
-      <SacredIcons :name="task.type === 'Recurring' ? 'recurring' : 'target'" :size="14" class="shrink-0 opacity-40" :class="task.type === 'Recurring' ? 'text-[#b5996f]' : 'text-[#c4873b]'" />
 
       <!-- Three-dot menu -->
       <button
