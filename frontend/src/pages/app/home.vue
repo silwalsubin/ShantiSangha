@@ -7,6 +7,11 @@ import SacredIcons from '@/components/icons/SacredIcons.vue'
 const api = useApi()
 const router = useRouter()
 
+function localDateStr(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 // --- Goals data ---
 interface GoalToday {
   id: string
@@ -45,7 +50,7 @@ const newGoalSaving = ref(false)
 async function loadGoals() {
   goalsLoading.value = true
   try {
-    const todayData = await api.get<any>('/goals/today')
+    const todayData = await api.get<any>(`/goals/today?date=${localDateStr()}`)
     const todayItems = Array.isArray(todayData) ? todayData : (todayData?.goals || todayData?.items || [])
     recurringGoals.value = todayItems.map((g: any) => ({
       id: g.id,
@@ -56,7 +61,13 @@ async function loadGoals() {
       completedToday: g.completedToday ?? g.completed_today ?? g.checkIn?.completed ?? null,
     }))
     for (const g of recurringGoals.value) {
-      if (g.checkedInToday) goalsCheckedIn.value[g.id] = true
+      if (g.checkedInToday) {
+        goalsCheckedIn.value[g.id] = true
+        goalFeedbackMessages.value[g.id] = getCheckInFeedback(
+          { ...g, currentStreak: g.completedToday ? g.currentStreak - 1 : 0, longestStreak: g.longestStreak },
+          g.completedToday ?? false
+        )
+      }
     }
 
     // Load milestones
@@ -71,6 +82,14 @@ async function loadGoals() {
         completedAt: g.completedAt ?? g.completed_at ?? null,
         daysRemaining: g.daysRemaining ?? g.days_remaining ?? null,
       }))
+      .sort((a: Milestone, b: Milestone) => {
+        // Overdue first, then by days remaining ascending
+        const aD = a.daysRemaining ?? 9999
+        const bD = b.daysRemaining ?? 9999
+        if (aD <= 0 && bD > 0) return -1
+        if (bD <= 0 && aD > 0) return 1
+        return aD - bD
+      })
   } catch {
     recurringGoals.value = []
     milestones.value = []
@@ -124,7 +143,7 @@ async function checkInGoal(goalId: string, completed: boolean) {
   goalsSaving.value[goalId] = true
   try {
     const note = goalNotes.value[goalId]?.trim() || undefined
-    await api.post(`/goals/${goalId}/checkin`, { completed, note })
+    await api.post(`/goals/${goalId}/checkin`, { completed, note, date: localDateStr() })
     const goal = recurringGoals.value.find(g => g.id === goalId)
     if (goal) {
       goalFeedbackMessages.value[goalId] = getCheckInFeedback(goal, completed)
@@ -135,6 +154,24 @@ async function checkInGoal(goalId: string, completed: boolean) {
     }
     goalsCheckedIn.value[goalId] = true
     showNoteInput.value[goalId] = false
+  } catch {
+    // silently fail
+  } finally {
+    goalsSaving.value[goalId] = false
+  }
+}
+
+async function undoCheckIn(goalId: string) {
+  goalsSaving.value[goalId] = true
+  try {
+    await api.delete(`/goals/${goalId}/checkin?date=${localDateStr()}`)
+    const goal = recurringGoals.value.find(g => g.id === goalId)
+    if (goal) {
+      goal.checkedInToday = false
+      goal.completedToday = null
+    }
+    delete goalsCheckedIn.value[goalId]
+    delete goalFeedbackMessages.value[goalId]
   } catch {
     // silently fail
   } finally {
@@ -219,18 +256,20 @@ onMounted(() => { loadGoals() })
             : 'border-[rgba(139,90,43,0.1)] bg-[rgba(250,245,237,0.7)]'"
         >
           <div class="flex items-center gap-3">
-            <!-- Check circle -->
-            <div
+            <!-- Check circle (tap to undo) -->
+            <button
               class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-all duration-300"
               :class="goalsCheckedIn[goal.id]
                 ? (goal.completedToday
-                  ? 'bg-gradient-to-br from-[#7aa87a] to-[#5a8a5a]'
-                  : 'border-2 border-[rgba(139,90,43,0.2)] bg-[rgba(250,245,237,0.6)]')
+                  ? 'bg-gradient-to-br from-[#7aa87a] to-[#5a8a5a] hover:from-[#6a9a6a] hover:to-[#4a7a4a]'
+                  : 'border-2 border-[rgba(139,90,43,0.2)] bg-[rgba(250,245,237,0.6)] hover:bg-[rgba(139,90,43,0.08)]')
                 : 'border-2 border-[rgba(139,90,43,0.15)] bg-[rgba(250,245,237,0.6)]'"
+              :disabled="!goalsCheckedIn[goal.id] || goalsSaving[goal.id]"
+              @click.stop="goalsCheckedIn[goal.id] ? undoCheckIn(goal.id) : undefined"
             >
               <SacredIcons v-if="goalsCheckedIn[goal.id] && goal.completedToday" name="check" :size="14" class="text-white" />
               <SacredIcons v-else-if="goalsCheckedIn[goal.id]" name="skip" :size="12" class="text-[#b5996f]" />
-            </div>
+            </button>
             <!-- Title -->
             <button
               class="flex-1 text-left text-sm font-medium transition duration-200 hover:text-[#c4873b]"
@@ -260,14 +299,17 @@ onMounted(() => { loadGoals() })
         <li
           v-for="m in milestones"
           :key="m.id"
-          class="cursor-pointer rounded-2xl border border-[rgba(139,90,43,0.1)] bg-[rgba(250,245,237,0.7)] px-4 py-3 transition duration-200 active:scale-[0.99]"
+          class="cursor-pointer rounded-2xl border px-4 py-3 transition duration-200 active:scale-[0.99]"
+          :class="m.daysRemaining != null && m.daysRemaining <= 0
+            ? 'border-[rgba(180,90,60,0.25)] bg-[rgba(180,90,60,0.06)]'
+            : 'border-[rgba(139,90,43,0.1)] bg-[rgba(250,245,237,0.7)]'"
           @click="router.push(`/app/journey/goals/${m.id}`)"
         >
           <div class="flex items-center gap-3">
             <SacredIcons name="target" :size="16" class="shrink-0 text-[#c4873b]" />
             <p class="flex-1 text-sm font-medium text-[#2b1e10]">{{ m.title }}</p>
-            <span v-if="m.daysRemaining != null" class="shrink-0 font-serif text-xs text-[#c4873b]">
-              {{ m.daysRemaining > 0 ? `${m.daysRemaining}d left` : m.daysRemaining === 0 ? 'Today' : 'Overdue' }}
+            <span v-if="m.daysRemaining != null" class="shrink-0 font-serif text-xs" :class="m.daysRemaining <= 0 ? 'font-bold text-[#b45a3c]' : 'text-[#c4873b]'">
+              {{ m.daysRemaining > 0 ? `${m.daysRemaining}d left` : m.daysRemaining === 0 ? 'Due today' : `${Math.abs(m.daysRemaining)}d overdue` }}
             </span>
           </div>
         </li>

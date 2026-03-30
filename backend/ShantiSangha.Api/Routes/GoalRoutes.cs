@@ -18,6 +18,7 @@ public static class GoalRoutes
         group.MapPatch("/{id:guid}", UpdateGoal);
         group.MapDelete("/{id:guid}", DeleteGoal);
         group.MapPost("/{id:guid}/checkin", CheckIn);
+        group.MapDelete("/{id:guid}/checkin", UndoCheckIn);
         group.MapGet("/{id:guid}/history", GetHistory);
     }
 
@@ -127,12 +128,14 @@ public static class GoalRoutes
     }
 
     private static async Task<IResult> GetToday(
-        ICurrentUser currentUser, AppDbContext db)
+        ICurrentUser currentUser, AppDbContext db, string? date = null)
     {
         var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = date is not null && DateOnly.TryParse(date, out var parsed)
+            ? parsed
+            : DateOnly.FromDateTime(DateTime.UtcNow);
 
         var goals = await db.Goals
             .Where(g => g.UserId == user.Id && g.ArchivedAt == null && g.Type == GoalType.Recurring)
@@ -264,7 +267,9 @@ public static class GoalRoutes
 
         if (goal is null) return Results.NotFound();
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = body.Date is not null && DateOnly.TryParse(body.Date, out var parsed)
+            ? parsed
+            : DateOnly.FromDateTime(DateTime.UtcNow);
 
         var existing = await db.GoalCheckIns
             .FirstOrDefaultAsync(c => c.GoalId == id && c.Date == today);
@@ -291,6 +296,32 @@ public static class GoalRoutes
         await db.SaveChangesAsync();
 
         return Results.Created($"/goals/{id}/checkin", new { checkIn.Id, checkIn.Date, checkIn.Completed, checkIn.Note });
+    }
+
+    private static async Task<IResult> UndoCheckIn(
+        Guid id, ICurrentUser currentUser, AppDbContext db, string? date = null)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Results.Unauthorized();
+
+        var goal = await db.Goals
+            .FirstOrDefaultAsync(g => g.Id == id && g.UserId == user.Id);
+
+        if (goal is null) return Results.NotFound();
+
+        var today = date is not null && DateOnly.TryParse(date, out var parsed)
+            ? parsed
+            : DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var existing = await db.GoalCheckIns
+            .FirstOrDefaultAsync(c => c.GoalId == id && c.Date == today);
+
+        if (existing is null) return Results.NotFound();
+
+        db.GoalCheckIns.Remove(existing);
+        await db.SaveChangesAsync();
+
+        return Results.NoContent();
     }
 
     private static async Task<IResult> GetHistory(
@@ -369,4 +400,4 @@ public record CreateGoalRequest(
     string? TargetDate = null,
     string? DeeperWhy = null);
 public record UpdateGoalRequest(string? Title, bool? Archived, bool? Completed, string? DeeperWhy = null);
-public record CheckInRequest(bool Completed, string? Note);
+public record CheckInRequest(bool Completed, string? Note, string? Date = null);
