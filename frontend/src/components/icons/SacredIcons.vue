@@ -3,30 +3,40 @@ defineProps<{ name: string; size?: number }>()
 </script>
 
 <template>
-  <!-- Vishwa Vajra (Four-faced Bajra) — crossed diamond thunderbolt -->
-  <svg v-if="name === 'vajra'" :width="size || 22" :height="size || 22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="2" />
-    <circle cx="12" cy="12" r="0.6" fill="currentColor" stroke="none" />
-    <!-- Up -->
-    <path d="M12 10V3.5" />
-    <path d="M12 8C9 6 9.5 4 12 3.5" />
-    <path d="M12 8C15 6 14.5 4 12 3.5" />
-    <path d="M12 3.5L11.2 1.5" /><path d="M12 3.5L12.8 1.5" />
-    <!-- Down -->
-    <path d="M12 14V20.5" />
-    <path d="M12 16C9 18 9.5 20 12 20.5" />
-    <path d="M12 16C15 18 14.5 20 12 20.5" />
-    <path d="M12 20.5L11.2 22.5" /><path d="M12 20.5L12.8 22.5" />
-    <!-- Left -->
-    <path d="M10 12H3.5" />
-    <path d="M8 12C6 9 4 9.5 3.5 12" />
-    <path d="M8 12C6 15 4 14.5 3.5 12" />
-    <path d="M3.5 12L1.5 11.2" /><path d="M3.5 12L1.5 12.8" />
-    <!-- Right -->
-    <path d="M14 12H20.5" />
-    <path d="M16 12C18 9 20 9.5 20.5 12" />
-    <path d="M16 12C18 15 20 14.5 20.5 12" />
-    <path d="M20.5 12L22.5 11.2" /><path d="M20.5 12L22.5 12.8" />
+  <!-- Vishwa Vajra (Four-faced Bajra) — traditional relief style -->
+  <svg v-if="name === 'vajra'" :width="size || 22" :height="size || 22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0.9" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Central orb -->
+    <circle cx="12" cy="12" r="1.8" stroke-width="0.8"/>
+    <circle cx="12" cy="12" r="0.6" fill="currentColor" stroke="none"/>
+    <!-- Lotus petals around orb -->
+    <path d="M12 10.2C11.2 9.6 11.2 8.8 12 8.8 C12.8 8.8 12.8 9.6 12 10.2" fill="currentColor" fill-opacity="0.15"/>
+    <path d="M12 13.8C11.2 14.4 11.2 15.2 12 15.2 C12.8 15.2 12.8 14.4 12 13.8" fill="currentColor" fill-opacity="0.15"/>
+    <path d="M10.2 12C9.6 11.2 8.8 11.2 8.8 12 C8.8 12.8 9.6 12.8 10.2 12" fill="currentColor" fill-opacity="0.15"/>
+    <path d="M13.8 12C14.4 11.2 15.2 11.2 15.2 12 C15.2 12.8 14.4 12.8 13.8 12" fill="currentColor" fill-opacity="0.15"/>
+    <!-- Up prong: open leaf -->
+    <path d="M11.2 8.8 C10.8 7.8 9.5 6.5 9.2 5.8 C9.5 5.2 10.5 5.2 12 3.5"/>
+    <path d="M12.8 8.8 C13.2 7.8 14.5 6.5 14.8 5.8 C14.5 5.2 13.5 5.2 12 3.5"/>
+    <path d="M12 8.8 L12 3.5" stroke-width="0.5"/>
+    <path d="M12 3.5L11.5 2.3"/><path d="M12 3.5L12.5 2.3"/>
+    <path d="M11.5 2.3L12 1.5L12.5 2.3"/>
+    <!-- Down prong -->
+    <path d="M11.2 15.2 C10.8 16.2 9.5 17.5 9.2 18.2 C9.5 18.8 10.5 18.8 12 20.5"/>
+    <path d="M12.8 15.2 C13.2 16.2 14.5 17.5 14.8 18.2 C14.5 18.8 13.5 18.8 12 20.5"/>
+    <path d="M12 15.2 L12 20.5" stroke-width="0.5"/>
+    <path d="M12 20.5L11.5 21.7"/><path d="M12 20.5L12.5 21.7"/>
+    <path d="M11.5 21.7L12 22.5L12.5 21.7"/>
+    <!-- Left prong -->
+    <path d="M8.8 11.2 C7.8 10.8 6.5 9.5 5.8 9.2 C5.2 9.5 5.2 10.5 3.5 12"/>
+    <path d="M8.8 12.8 C7.8 13.2 6.5 14.5 5.8 14.8 C5.2 14.5 5.2 13.5 3.5 12"/>
+    <path d="M8.8 12 L3.5 12" stroke-width="0.5"/>
+    <path d="M3.5 12L2.3 11.5"/><path d="M3.5 12L2.3 12.5"/>
+    <path d="M2.3 11.5L1.5 12L2.3 12.5"/>
+    <!-- Right prong -->
+    <path d="M15.2 11.2 C16.2 10.8 17.5 9.5 18.2 9.2 C18.8 9.5 18.8 10.5 20.5 12"/>
+    <path d="M15.2 12.8 C16.2 13.2 17.5 14.5 18.2 14.8 C18.8 14.5 18.8 13.5 20.5 12"/>
+    <path d="M15.2 12 L20.5 12" stroke-width="0.5"/>
+    <path d="M20.5 12L21.7 11.5"/><path d="M20.5 12L21.7 12.5"/>
+    <path d="M21.7 11.5L22.5 12L21.7 12.5"/>
   </svg>
 
   <!-- Lotus / Coping — refined sacred lotus -->
