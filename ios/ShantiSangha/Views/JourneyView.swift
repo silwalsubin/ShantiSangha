@@ -99,6 +99,7 @@ struct JourneyView: View {
             .padding(16)
         }
         .background(Color.sacredBg.ignoresSafeArea())
+        .refreshable { await loadGoals() }
         .navigationTitle("Journey")
         .navigationBarTitleDisplayMode(.inline)
         .task { await loadGoals() }

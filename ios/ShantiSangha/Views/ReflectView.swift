@@ -79,6 +79,7 @@ struct ReflectView: View {
             .padding(16)
         }
         .background(Color.sacredBg.ignoresSafeArea())
+        .refreshable { await loadConversations() }
         .navigationTitle("Reflect")
         .navigationBarTitleDisplayMode(.inline)
         .task { await loadConversations() }

@@ -112,6 +112,7 @@ struct HomeView: View {
             .padding(.bottom, 40)
         }
         .background(Color.sacredBg.ignoresSafeArea())
+        .refreshable { await vm.load() }
         .task { await vm.load() }
     }
 

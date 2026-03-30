@@ -2,9 +2,9 @@ import Foundation
 
 /// Mirrors frontend/src/types/index.ts — Task interface
 struct AppTask: Codable, Identifiable {
-    let id: String
-    let title: String
-    let type: TaskType
+    var id: String
+    var title: String
+    var type: TaskType
     var checkedIn: Bool
     var completedToday: Bool?
     var daysRemaining: Int?
@@ -22,6 +22,36 @@ struct AppTask: Codable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case id, title, type, checkedIn, completedToday, daysRemaining, progress, checkIn
         case currentStreak, longestStreak
+    }
+
+    /// Create from local cache
+    static func local(id: String, title: String, type: String,
+                      currentStreak: Int = 0, longestStreak: Int = 0,
+                      daysRemaining: Int? = nil, progress: Int = 0,
+                      checkedIn: Bool = false, completedToday: Bool? = nil) -> AppTask {
+        AppTask(
+            id: id, title: title,
+            type: type == "OneTime" ? .oneTime : .recurring,
+            checkedIn: checkedIn, completedToday: completedToday,
+            daysRemaining: daysRemaining, progress: progress,
+            checkIn: nil, currentStreak: currentStreak, longestStreak: longestStreak
+        )
+    }
+
+    init(id: String = "", title: String = "", type: TaskType = .recurring,
+         checkedIn: Bool = false, completedToday: Bool? = nil,
+         daysRemaining: Int? = nil, progress: Int = 0,
+         checkIn: CheckInData? = nil, currentStreak: Int = 0, longestStreak: Int = 0) {
+        self.id = id
+        self.title = title
+        self.type = type
+        self.checkedIn = checkedIn
+        self.completedToday = completedToday
+        self.daysRemaining = daysRemaining
+        self.progress = progress
+        self.checkIn = checkIn
+        self.currentStreak = currentStreak
+        self.longestStreak = longestStreak
     }
 
     init(from decoder: Decoder) throws {

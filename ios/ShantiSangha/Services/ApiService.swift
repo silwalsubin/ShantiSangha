@@ -42,6 +42,16 @@ actor ApiService {
         let _: EmptyResponse = try await request("DELETE", path: path)
     }
 
+    /// POST with raw Data body (for sync queue)
+    func postRaw<T: Decodable>(_ path: String, body: Data) async throws -> T {
+        try await requestRaw("POST", path: path, body: body)
+    }
+
+    /// PATCH with raw Data body (for sync queue)
+    func patchRaw<T: Decodable>(_ path: String, body: Data) async throws -> T {
+        try await requestRaw("PATCH", path: path, body: body)
+    }
+
     // MARK: - Internal
 
     private func request<T: Decodable>(_ method: String, path: String, body: Encodable? = nil) async throws -> T {
@@ -60,6 +70,38 @@ actor ApiService {
         if let body = body {
             request.httpBody = try JSONEncoder().encode(body)
         }
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let http = response as? HTTPURLResponse else {
+            throw ApiError.invalidResponse
+        }
+
+        guard (200...299).contains(http.statusCode) else {
+            throw ApiError.httpError(statusCode: http.statusCode, data: data)
+        }
+
+        if T.self == EmptyResponse.self {
+            return EmptyResponse() as! T
+        }
+
+        return try decoder.decode(T.self, from: data)
+    }
+
+    private func requestRaw<T: Decodable>(_ method: String, path: String, body: Data) async throws -> T {
+        guard let url = URL(string: "\(baseURL)\(path)") else {
+            throw ApiError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        if let token = await tokenProvider?() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        request.httpBody = body
 
         let (data, response) = try await URLSession.shared.data(for: request)
 

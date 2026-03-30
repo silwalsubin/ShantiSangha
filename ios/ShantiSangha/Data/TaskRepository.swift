@@ -1,0 +1,228 @@
+import Foundation
+import SwiftData
+
+/// Repository pattern — single interface for task data.
+/// Reads from local SwiftData, writes locally + queues sync.
+@MainActor
+class TaskRepository: ObservableObject {
+    static let shared = TaskRepository()
+
+    @Published var tasks: [AppTask] = []
+    @Published var loading = true
+
+    private var modelContext: ModelContext?
+    private let api = ApiService.shared
+    private let sync = SyncService.shared
+
+    func configure(context: ModelContext) {
+        self.modelContext = context
+        loadFromLocal()
+    }
+
+    // MARK: - Reads (always local)
+
+    func loadFromLocal() {
+        guard let ctx = modelContext else { return }
+        let descriptor = FetchDescriptor<CachedTask>(sortBy: [SortDescriptor(\.title)])
+        guard let cached = try? ctx.fetch(descriptor) else { return }
+        tasks = cached.map { $0.toAppTask() }
+        if !tasks.isEmpty { loading = false }
+    }
+
+    // MARK: - Sync (pull from server)
+
+    func refreshFromServer() async {
+        let dateStr = localDateStr()
+
+        do {
+            // Fetch recurring
+            let todayItems: [AppTask] = try await api.get("/goals/today?date=\(dateStr)")
+
+            // Fetch all (for milestones)
+            let allGoals: [AppTask] = try await api.get("/goals")
+            let milestones = allGoals.filter { $0.type == .oneTime }
+
+            let allTasks = todayItems + milestones
+
+            // Update local DB
+            guard let ctx = modelContext else { return }
+            for task in allTasks {
+                let descriptor = FetchDescriptor<CachedTask>(
+                    predicate: #Predicate { $0.id == task.id }
+                )
+                if let existing = try? ctx.fetch(descriptor).first {
+                    existing.update(from: task)
+                } else {
+                    let cached = CachedTask(
+                        id: task.id, title: task.title,
+                        type: task.type.rawValue,
+                        currentStreak: task.currentStreak,
+                        longestStreak: task.longestStreak,
+                        daysRemaining: task.daysRemaining,
+                        progress: task.progress,
+                        checkedIn: task.checkedIn,
+                        completedToday: task.completedToday
+                    )
+                    ctx.insert(cached)
+                }
+            }
+
+            // Remove tasks that no longer exist on server
+            let serverIds = Set(allTasks.map(\.id))
+            let allLocal = FetchDescriptor<CachedTask>()
+            if let localTasks = try? ctx.fetch(allLocal) {
+                for local in localTasks where !serverIds.contains(local.id) {
+                    ctx.delete(local)
+                }
+            }
+
+            try? ctx.save()
+
+            // Generate feedback for checked-in tasks
+            var result = allTasks
+            for i in result.indices where result[i].checkedIn {
+                let streak = result[i].completedToday == true ? result[i].currentStreak - 1 : 0
+                result[i].feedbackMessage = FeedbackService.generate(
+                    currentStreak: streak,
+                    longestStreak: result[i].longestStreak,
+                    completed: result[i].completedToday ?? false
+                )
+            }
+
+            tasks = result
+        } catch {
+            print("[Repository] Failed to refresh: \(error)")
+            // Keep showing local data
+        }
+
+        loading = false
+    }
+
+    // MARK: - Writes (local first + queue sync)
+
+    func checkIn(id: String, completed: Bool) async {
+        // Update local
+        if let idx = tasks.firstIndex(where: { $0.id == id }) {
+            tasks[idx].feedbackMessage = FeedbackService.generate(
+                currentStreak: tasks[idx].currentStreak,
+                longestStreak: tasks[idx].longestStreak,
+                completed: completed
+            )
+            tasks[idx].checkedIn = true
+            tasks[idx].completedToday = completed
+            if completed { tasks[idx].currentStreak += 1 }
+            else { tasks[idx].currentStreak = 0 }
+            updateLocal(tasks[idx])
+        }
+
+        // Queue sync
+        let body = ["completed": completed, "date": localDateStr()] as [String: Any]
+        if let data = try? JSONSerialization.data(withJSONObject: body) {
+            await sync.enqueue(method: "POST", path: "/goals/\(id)/checkin", body: RawData(data: data))
+        }
+    }
+
+    func undoCheckIn(id: String) async {
+        if let idx = tasks.firstIndex(where: { $0.id == id }) {
+            tasks[idx].checkedIn = false
+            tasks[idx].completedToday = nil
+            tasks[idx].feedbackMessage = nil
+            updateLocal(tasks[idx])
+        }
+
+        await sync.enqueue(method: "DELETE", path: "/goals/\(id)/checkin?date=\(localDateStr())")
+    }
+
+    func deleteTask(id: String) async {
+        tasks.removeAll { $0.id == id }
+        deleteLocal(id: id)
+        await sync.enqueue(method: "DELETE", path: "/goals/\(id)")
+    }
+
+    func updateProgress(id: String, value: Int) async {
+        if let idx = tasks.firstIndex(where: { $0.id == id }) {
+            tasks[idx].progress = value
+            updateLocal(tasks[idx])
+        }
+
+        let body = ["progress": value]
+        if let data = try? JSONSerialization.data(withJSONObject: body) {
+            await sync.enqueue(method: "PATCH", path: "/goals/\(id)", body: RawData(data: data))
+        }
+    }
+
+    func createTask(title: String, type: TaskType, targetDate: String? = nil) async {
+        // Create locally with temp ID
+        let tempId = UUID().uuidString
+        let newTask = AppTask(
+            id: tempId, title: title, type: type,
+            daysRemaining: nil, progress: 0
+        )
+        tasks.append(newTask)
+        insertLocal(newTask)
+
+        // Sync to server and get real ID
+        do {
+            var body: [String: String] = ["title": title, "type": type.rawValue]
+            if let date = targetDate { body["targetDate"] = date }
+            let created: AppTask = try await api.post("/goals", body: body)
+
+            // Replace temp with real
+            if let idx = tasks.firstIndex(where: { $0.id == tempId }) {
+                tasks[idx] = created
+            }
+            deleteLocal(id: tempId)
+            insertLocal(created)
+        } catch {
+            print("[Repository] Failed to create task: \(error)")
+        }
+    }
+
+    // MARK: - Local DB helpers
+
+    private func updateLocal(_ task: AppTask) {
+        guard let ctx = modelContext else { return }
+        let id = task.id
+        let descriptor = FetchDescriptor<CachedTask>(predicate: #Predicate { $0.id == id })
+        if let existing = try? ctx.fetch(descriptor).first {
+            existing.update(from: task)
+            try? ctx.save()
+        }
+    }
+
+    private func insertLocal(_ task: AppTask) {
+        guard let ctx = modelContext else { return }
+        let cached = CachedTask(
+            id: task.id, title: task.title, type: task.type.rawValue,
+            currentStreak: task.currentStreak, longestStreak: task.longestStreak,
+            daysRemaining: task.daysRemaining, progress: task.progress,
+            checkedIn: task.checkedIn, completedToday: task.completedToday
+        )
+        ctx.insert(cached)
+        try? ctx.save()
+    }
+
+    private func deleteLocal(id: String) {
+        guard let ctx = modelContext else { return }
+        let descriptor = FetchDescriptor<CachedTask>(predicate: #Predicate { $0.id == id })
+        if let existing = try? ctx.fetch(descriptor).first {
+            ctx.delete(existing)
+            try? ctx.save()
+        }
+    }
+
+    private func localDateStr() -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: Date())
+    }
+}
+
+/// Wrapper to make raw Data conform to Encodable for SyncService
+struct RawData: Encodable {
+    let data: Data
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(data)
+    }
+}
