@@ -4,7 +4,11 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - 'ios/**'
   pull_request:
+    paths-ignore:
+      - 'ios/**'
 
 jobs:
   build:
