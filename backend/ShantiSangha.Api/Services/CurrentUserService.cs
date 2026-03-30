@@ -29,15 +29,15 @@ public class CurrentUserService : ICurrentUser
         _resolved = true;
 
         var clerkId = _httpContextAccessor.HttpContext?.User.FindFirstValue("sub");
-        if (clerkId is null) return null;
-
         var email = _httpContextAccessor.HttpContext?.User.FindFirstValue("email");
 
+        if (clerkId is null || email is null) return null;
+
+        // Look up by ClerkId first
         _cached = await _db.Users.FirstOrDefaultAsync(u => u.ClerkId == clerkId);
         if (_cached is not null)
         {
-            // Update email if we now have a real one and the stored one is missing/placeholder
-            if (email is not null && (_cached.Email == "" || _cached.Email.EndsWith("@placeholder.local")))
+            if (_cached.Email != email)
             {
                 _cached.Email = email;
                 _cached.UpdatedAt = DateTime.UtcNow;
@@ -46,37 +46,28 @@ public class CurrentUserService : ICurrentUser
             return _cached;
         }
 
-        // Auto-create user on first API call (before Clerk webhook fires)
+        // ClerkId not found — check if email exists (user from a previous Clerk instance)
+        _cached = await _db.Users.FirstOrDefaultAsync(u => u.Email == email);
+        if (_cached is not null)
+        {
+            _cached.ClerkId = clerkId;
+            _cached.UpdatedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+            return _cached;
+        }
+
+        // New user — create
         _cached = new User
         {
             Id = Guid.NewGuid(),
             ClerkId = clerkId,
-            Email = email ?? $"{clerkId}@placeholder.local",
+            Email = email,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
         _db.Users.Add(_cached);
-        try
-        {
-            await _db.SaveChangesAsync();
-        }
-        catch (DbUpdateException)
-        {
-            // Duplicate email — user exists from a previous Clerk instance (e.g. domain change)
-            // or race condition. Look up by email and update ClerkId to the new one.
-            _db.Entry(_cached).State = EntityState.Detached;
-            _cached = await _db.Users.FirstOrDefaultAsync(u => u.ClerkId == clerkId);
-            if (_cached is null && email is not null)
-            {
-                _cached = await _db.Users.FirstOrDefaultAsync(u => u.Email == email);
-                if (_cached is not null)
-                {
-                    _cached.ClerkId = clerkId;
-                    _cached.UpdatedAt = DateTime.UtcNow;
-                    await _db.SaveChangesAsync();
-                }
-            }
-        }
+        await _db.SaveChangesAsync();
+
         return _cached;
     }
 }
