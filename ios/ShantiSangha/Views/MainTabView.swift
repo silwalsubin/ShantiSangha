@@ -1,73 +1,48 @@
 import SwiftUI
 
 /// Main tab navigation — mirrors AppLayout.vue nav items
+/// Custom sacred icons matching the web app's SacredIcons.vue
 struct MainTabView: View {
     @EnvironmentObject var auth: AuthService
-    @State private var showAccountMenu = false
+    @State private var selectedTab = 0
 
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             NavigationStack {
                 HomeView()
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            accountButton
-                        }
-                    }
             }
             .tabItem {
-                Image(systemName: "square.grid.2x2")
-                Text("Home")
+                Label("Dharma", image: "tab.vajra")
             }
+            .tag(0)
 
             NavigationStack {
                 ReflectView()
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            accountButton
-                        }
-                    }
             }
             .tabItem {
-                Image(systemName: "bubble.left.and.bubble.right")
-                Text("Reflect")
+                Label("Reflect", image: "tab.dialogue")
             }
+            .tag(1)
 
             NavigationStack {
                 JourneyView()
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            accountButton
-                        }
-                    }
             }
             .tabItem {
-                Image(systemName: "flame")
-                Text("Journey")
+                Label("Journey", image: "tab.diya")
             }
+            .tag(2)
+
+            NavigationStack {
+                SettingsView()
+            }
+            .tabItem {
+                Label("Settings", image: "tab.chakra")
+            }
+            .tag(3)
         }
         .tint(.sacredGold)
-        .confirmationDialog("Account", isPresented: $showAccountMenu) {
-            if let email = auth.user?.email {
-                Button(email) {}
-            }
-            NavigationLink("About") {
-                AboutView()
-            }
-            Button("Sign out", role: .destructive) {
-                auth.signOut()
-            }
-            Button("Cancel", role: .cancel) {}
-        }
-    }
-
-    private var accountButton: some View {
-        Button {
-            showAccountMenu = true
-        } label: {
-            Image(systemName: "person.circle")
-                .font(.system(size: 22))
-                .foregroundColor(.sacredGold)
+        .onChange(of: selectedTab) { _, _ in
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
     }
 }

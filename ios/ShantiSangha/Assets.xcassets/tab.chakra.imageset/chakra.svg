@@ -1,0 +1,23 @@
+<svg width="25" height="25" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer ring -->
+  <circle cx="12" cy="12" r="9.5" stroke="black" stroke-width="1.2"/>
+  <!-- Inner ring -->
+  <circle cx="12" cy="12" r="5" stroke="black" stroke-width="1.2"/>
+  <!-- Center -->
+  <circle cx="12" cy="12" r="1.5" stroke="black" stroke-width="1.2"/>
+  <!-- Cardinal spokes -->
+  <line x1="12" y1="2.5" x2="12" y2="6.5" stroke="black" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="12" y1="17.5" x2="12" y2="21.5" stroke="black" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="2.5" y1="12" x2="6.5" y2="12" stroke="black" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="17.5" y1="12" x2="21.5" y2="12" stroke="black" stroke-width="1.2" stroke-linecap="round"/>
+  <!-- Diagonal spokes -->
+  <line x1="5.3" y1="5.3" x2="8.1" y2="8.1" stroke="black" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="15.9" y1="15.9" x2="18.7" y2="18.7" stroke="black" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="5.3" y1="18.7" x2="8.1" y2="15.9" stroke="black" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="15.9" y1="8.1" x2="18.7" y2="5.3" stroke="black" stroke-width="1.2" stroke-linecap="round"/>
+  <!-- Petal accents -->
+  <circle cx="12" cy="7" r="0.5" fill="black"/>
+  <circle cx="12" cy="17" r="0.5" fill="black"/>
+  <circle cx="7" cy="12" r="0.5" fill="black"/>
+  <circle cx="17" cy="12" r="0.5" fill="black"/>
+</svg>
