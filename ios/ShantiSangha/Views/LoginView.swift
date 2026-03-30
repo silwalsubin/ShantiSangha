@@ -14,9 +14,7 @@ struct LoginView: View {
                     .fill(LinearGradient(colors: [.sacredGold, .sacredGoldDark], startPoint: .topLeading, endPoint: .bottomTrailing))
                     .frame(width: 64, height: 64)
                     .overlay(
-                        Image(systemName: "shield.fill")
-                            .font(.system(size: 28))
-                            .foregroundColor(.white)
+                        VajraIcon(size: 44, color: .white)
                     )
 
                 Text("ShantiSangha")

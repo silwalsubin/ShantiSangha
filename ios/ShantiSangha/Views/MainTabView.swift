@@ -6,7 +6,7 @@ struct MainTabView: View {
         TabView {
             HomeView()
                 .tabItem {
-                    Image(systemName: "shield.fill")
+                    Image(systemName: "square.grid.2x2")
                     Text("Home")
                 }
 
