@@ -1,38 +1,45 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <rect width="1024" height="1024" rx="224" fill="url(#bg)"/>
-  <g transform="translate(512,512)" stroke="#fff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" fill="none">
+  <g transform="translate(512,512)" fill="#fff" stroke="#fff" stroke-width="4" stroke-linejoin="round">
     <!-- Central orb -->
-    <circle cx="0" cy="0" r="90" fill="#fff" fill-opacity="0.25" stroke="#fff" stroke-width="16"/>
-    <circle cx="0" cy="0" r="32" fill="#fff" stroke="none"/>
-    <!-- Lotus petals around orb -->
-    <path d="M0-90 C-52-152-52-200 0-200 C52-200 52-152 0-90" fill="#fff" fill-opacity="0.2" stroke-width="12"/>
-    <path d="M0 90 C-52 152-52 200 0 200 C52 200 52 152 0 90" fill="#fff" fill-opacity="0.2" stroke-width="12"/>
-    <path d="M-90 0 C-152-52-200-52-200 0 C-200 52-152 52-90 0" fill="#fff" fill-opacity="0.2" stroke-width="12"/>
-    <path d="M90 0 C152-52 200-52 200 0 C200 52 152 52 90 0" fill="#fff" fill-opacity="0.2" stroke-width="12"/>
-    <!-- Up prong -->
-    <path d="M-52-200 C-80-260-160-320-180-360 C-160-400-100-400 0-480"/>
-    <path d="M52-200 C80-260 160-320 180-360 C160-400 100-400 0-480"/>
-    <path d="M0-200 L0-480" stroke-width="12"/>
-    <path d="M0-480L-32-540"/><path d="M0-480L32-540"/>
-    <path d="M-32-540L0-580L32-540" stroke-width="16"/>
-    <!-- Down prong -->
-    <path d="M-52 200 C-80 260-160 320-180 360 C-160 400-100 400 0 480"/>
-    <path d="M52 200 C80 260 160 320 180 360 C160 400 100 400 0 480"/>
-    <path d="M0 200 L0 480" stroke-width="12"/>
-    <path d="M0 480L-32 540"/><path d="M0 480L32 540"/>
-    <path d="M-32 540L0 580L32 540" stroke-width="16"/>
-    <!-- Left prong -->
-    <path d="M-200-52 C-260-80-320-160-360-180 C-400-160-400-100-480 0"/>
-    <path d="M-200 52 C-260 80-320 160-360 180 C-400 160-400 100-480 0"/>
-    <path d="M-200 0 L-480 0" stroke-width="12"/>
-    <path d="M-480 0L-540-32"/><path d="M-480 0L-540 32"/>
-    <path d="M-540-32L-580 0L-540 32" stroke-width="16"/>
-    <!-- Right prong -->
-    <path d="M200-52 C260-80 320-160 360-180 C400-160 400-100 480 0"/>
-    <path d="M200 52 C260 80 320 160 360 180 C400 160 400 100 480 0"/>
-    <path d="M200 0 L480 0" stroke-width="12"/>
-    <path d="M480 0L540-32"/><path d="M480 0L540 32"/>
-    <path d="M540-32L580 0L540 32" stroke-width="16"/>
+    <circle cx="0" cy="0" r="72" fill="#fff" opacity="0.95"/>
+    <circle cx="0" cy="0" r="90" fill="none" stroke="#fff" stroke-width="12" opacity="0.6"/>
+
+    <!-- Lotus petals around orb (filled) -->
+    <path d="M0-90 C-40-130-40-170 0-170 C40-170 40-130 0-90Z" opacity="0.5"/>
+    <path d="M0 90 C-40 130-40 170 0 170 C40 170 40 130 0 90Z" opacity="0.5"/>
+    <path d="M-90 0 C-130-40-170-40-170 0 C-170 40-130 40-90 0Z" opacity="0.5"/>
+    <path d="M90 0 C130-40 170-40 170 0 C170 40 130 40 90 0Z" opacity="0.5"/>
+
+    <!-- Up prong (filled) -->
+    <path d="M-20-170 C-30-220-100-290-120-330 C-100-380-50-380 0-440
+             C50-380 100-380 120-330 C100-290 30-220 20-170Z" opacity="0.85"/>
+    <!-- Up tip -->
+    <path d="M-16-440 L0-490 L16-440Z" opacity="0.9"/>
+
+    <!-- Down prong (filled) -->
+    <path d="M-20 170 C-30 220-100 290-120 330 C-100 380-50 380 0 440
+             C50 380 100 380 120 330 C100 290 30 220 20 170Z" opacity="0.85"/>
+    <!-- Down tip -->
+    <path d="M-16 440 L0 490 L16 440Z" opacity="0.9"/>
+
+    <!-- Left prong (filled) -->
+    <path d="M-170-20 C-220-30-290-100-330-120 C-380-100-380-50-440 0
+             C-380 50-380 100-330 120 C-290 100-220 30-170 20Z" opacity="0.85"/>
+    <!-- Left tip -->
+    <path d="M-440-16 L-490 0 L-440 16Z" opacity="0.9"/>
+
+    <!-- Right prong (filled) -->
+    <path d="M170-20 C220-30 290-100 330-120 C380-100 380-50 440 0
+             C380 50 380 100 330 120 C290 100 220 30 170 20Z" opacity="0.85"/>
+    <!-- Right tip -->
+    <path d="M440-16 L490 0 L440 16Z" opacity="0.9"/>
+
+    <!-- Center line accents -->
+    <line x1="0" y1="-170" x2="0" y2="-440" stroke="#fff" stroke-width="6" opacity="0.4"/>
+    <line x1="0" y1="170" x2="0" y2="440" stroke="#fff" stroke-width="6" opacity="0.4"/>
+    <line x1="-170" y1="0" x2="-440" y2="0" stroke="#fff" stroke-width="6" opacity="0.4"/>
+    <line x1="170" y1="0" x2="440" y2="0" stroke="#fff" stroke-width="6" opacity="0.4"/>
   </g>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1024" y2="1024">
