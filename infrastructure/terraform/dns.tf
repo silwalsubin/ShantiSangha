@@ -4,6 +4,18 @@ resource "aws_route53_zone" "main" {
   name = var.domain_name
 }
 
+# Point the registered domain's nameservers to this hosted zone
+resource "aws_route53domains_registered_domain" "main" {
+  domain_name = var.domain_name
+
+  dynamic "name_server" {
+    for_each = aws_route53_zone.main.name_servers
+    content {
+      name = name_server.value
+    }
+  }
+}
+
 # A record — root domain → CloudFront
 resource "aws_route53_record" "root" {
   zone_id = aws_route53_zone.main.zone_id
