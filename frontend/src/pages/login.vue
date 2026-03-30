@@ -9,21 +9,21 @@ import SacredIcons from '@/components/icons/SacredIcons.vue'
       <!-- Logo -->
       <div class="mb-5 sm:mb-8 text-center">
         <RouterLink to="/" class="inline-flex flex-col items-center gap-2">
-          <div class="logo-glow flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#c4873b] to-[#8b5a1b] text-white">
+          <div class="logo-glow flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-gradient-to-br from-sacred-gold to-sacred-gold-dark text-white">
             <SacredIcons name="vajra" :size="26" />
           </div>
-          <h1 class="font-serif text-xl sm:text-3xl font-bold tracking-wide text-[#2b1e10]">ShantiSangha</h1>
+          <h1 class="font-serif text-xl sm:text-3xl font-bold tracking-wide text-sacred-text">ShantiSangha</h1>
         </RouterLink>
-        <p class="mt-1 text-[11px] sm:text-sm text-[#9a8568]">Welcome back. A calmer place to return to.</p>
+        <p class="mt-1 text-[11px] sm:text-sm text-sacred-muted">Welcome back. A calmer place to return to.</p>
       </div>
 
       <!-- Auth card -->
-      <div class="clerk-card overflow-hidden rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] shadow-[0_16px_60px_rgba(82,54,29,0.1)] backdrop-blur-[20px]">
+      <div class="clerk-card overflow-hidden rounded-2xl border border-sacred-border bg-sacred-bg-card shadow-sacred-lg backdrop-blur-[20px]">
         <SignIn />
       </div>
 
       <!-- Quote -->
-      <p class="mt-4 sm:mt-6 text-center text-[10px] italic leading-relaxed text-[#b5996f]">
+      <p class="mt-4 sm:mt-6 text-center text-[10px] italic leading-relaxed text-sacred-muted-light">
         "Peace comes from within. Do not seek it without." — Buddha
       </p>
     </div>
@@ -35,6 +35,7 @@ import SacredIcons from '@/components/icons/SacredIcons.vue'
   animation: sacred-glow 3s ease-in-out infinite;
 }
 
+/* Animation keyframes use raw rgba -- these are CSS-only values, not Tailwind classes */
 @keyframes sacred-glow {
   0%, 100% {
     box-shadow: 0 0 12px rgba(196, 135, 59, 0.3), 0 0 30px rgba(196, 135, 59, 0.1);

@@ -54,6 +54,18 @@ export default {
           'red-bg': 'rgba(180,90,60,0.06)',
           'red-border': 'rgba(180,90,60,0.25)',
 
+          // Error states (system red/green for validation)
+          'error': 'rgba(220,50,50,0.06)',
+          'error-border': 'rgba(220,50,50,0.12)',
+          'error-strong': 'rgba(220,50,50,0.08)',
+          'success-bg': 'rgba(90,160,90,0.12)',
+
+          // Gradient helpers
+          'gold-15': 'rgba(196,135,59,0.15)',
+          'gold-05': 'rgba(196,135,59,0.05)',
+          'gold-30': 'rgba(196,135,59,0.3)',
+          'gold-14': 'rgba(196,135,59,0.14)',
+
           // Misc
           white: '#fff8f1',
         },

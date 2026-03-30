@@ -15,6 +15,7 @@
 import { ref, computed } from 'vue'
 import { useApi } from '@/composables/useApi'
 import { useLocalDate } from '@/composables/useLocalDate'
+import { useNotification } from '@/composables/useNotification'
 import type { Task } from '@/types'
 
 // Internal type with streak data for feedback generation
@@ -26,6 +27,7 @@ interface TaskInternal extends Task {
 export function useGoals() {
   const api = useApi()
   const { today } = useLocalDate()
+  const { notify } = useNotification()
 
   const tasks = ref<TaskInternal[]>([])
   const loading = ref(true)
@@ -74,10 +76,10 @@ export function useGoals() {
       const todayItems = Array.isArray(todayData) ? todayData : (todayData?.goals || todayData?.items || [])
 
       const recurring: TaskInternal[] = todayItems.map((g: any) => {
-        const checkedIn = g.checkedInToday ?? g.checked_in_today ?? (g.checkIn != null)
-        const completedToday = g.completedToday ?? g.completed_today ?? g.checkIn?.completed ?? null
-        const currentStreak = g.currentStreak ?? g.current_streak ?? 0
-        const longestStreak = g.longestStreak ?? g.longest_streak ?? 0
+        const checkedIn = g.checkIn != null
+        const completedToday = g.checkIn?.completed ?? null
+        const currentStreak = g.currentStreak ?? 0
+        const longestStreak = g.longestStreak ?? 0
         return {
           id: g.id,
           title: g.title,
@@ -111,14 +113,14 @@ export function useGoals() {
       const milestones: TaskInternal[] = allItems
         .filter((g: any) => (g.type ?? '') === 'OneTime' && !g.completedAt && !g.completed_at)
         .map((g: any) => {
-          const checkIn = g.checkIn ?? g.check_in ?? null
+          const checkIn = g.checkIn ?? null
           return {
             id: g.id,
             title: g.title,
             type: 'OneTime' as const,
             checkedIn: checkIn != null,
             completedToday: checkIn?.completed ?? null,
-            daysRemaining: g.daysRemaining ?? g.days_remaining ?? null,
+            daysRemaining: g.daysRemaining ?? null,
             progress: g.progress ?? 0,
             feedbackMessage: null,
             saving: false,
@@ -136,6 +138,7 @@ export function useGoals() {
 
       tasks.value = [...recurring, ...milestones]
     } catch {
+      notify.error('Failed to load tasks')
       tasks.value = []
     } finally {
       loading.value = false
@@ -158,7 +161,9 @@ export function useGoals() {
         if (completed) task._currentStreak += 1
         else task._currentStreak = 0
       }
-    } catch {} finally {
+    } catch {
+      notify.error('Failed to check in')
+    } finally {
       savingState.value[id] = false
     }
   }
@@ -173,7 +178,9 @@ export function useGoals() {
         task.completedToday = null
       }
       delete feedbackMessages.value[id]
-    } catch {} finally {
+    } catch {
+      notify.error('Failed to undo check-in')
+    } finally {
       savingState.value[id] = false
     }
   }
@@ -184,7 +191,9 @@ export function useGoals() {
       await api.patch(`/goals/${id}`, { progress: value })
       const task = tasks.value.find(t => t.id === id)
       if (task) task.progress = value
-    } catch {} finally {
+    } catch {
+      notify.error('Failed to update progress')
+    } finally {
       savingState.value[id] = false
     }
   }
@@ -195,7 +204,9 @@ export function useGoals() {
       tasks.value = tasks.value.filter(t => t.id !== id)
       delete feedbackMessages.value[id]
       delete savingState.value[id]
-    } catch {}
+    } catch {
+      notify.error('Failed to delete task')
+    }
   }
 
   async function createGoal(title: string, type: 'Recurring' | 'OneTime', targetDate?: string) {

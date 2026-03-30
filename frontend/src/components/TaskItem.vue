@@ -23,10 +23,9 @@ const progressValue = ref(props.task.progress)
 
 const isOverdue = props.task.type === 'OneTime' && props.task.daysRemaining != null && props.task.daysRemaining <= 0
 
-function onAction(action: 'done' | 'skip' | 'undo') {
-  showMenu.value = false
-  emit(action, props.task.id)
-}
+function onDone() { showMenu.value = false; emit('done', props.task.id) }
+function onSkip() { showMenu.value = false; emit('skip', props.task.id) }
+function onUndo() { showMenu.value = false; emit('undo', props.task.id) }
 
 function openProgress() {
   showMenu.value = false
@@ -61,6 +60,7 @@ function saveProgress() {
       <button
         class="flex-1 text-left text-sm font-medium transition duration-200 hover:text-sacred-gold"
         :class="task.checkedIn && task.completedToday ? 'text-sacred-green line-through decoration-sacred-green-border' : 'text-sacred-text'"
+        :aria-label="`View details for ${task.title}`"
         @click="emit('navigate', task.id)"
       >{{ task.title }}</button>
 
@@ -73,6 +73,10 @@ function saveProgress() {
       <button
         v-if="!task.saving"
         @click.stop="showMenu = !showMenu"
+        @keydown.escape="showMenu = false"
+        :aria-label="`Actions for ${task.title}`"
+        :aria-expanded="showMenu"
+        aria-haspopup="true"
         class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sacred-muted transition duration-200 hover:bg-sacred-bg-hover-strong"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
@@ -106,11 +110,15 @@ function saveProgress() {
     <!-- Dropdown menu -->
     <div
       v-if="showMenu"
+      role="menu"
+      :aria-label="`Actions for ${task.title}`"
+      @keydown.escape="showMenu = false"
       class="absolute right-4 top-12 z-10 min-w-[180px] rounded-xl border border-sacred-border bg-sacred-bg-warm py-1 shadow-sacred-dropdown backdrop-blur-[20px]"
     >
       <button
         v-if="!task.checkedIn"
-        @click="onAction('done')"
+        @click="onDone"
+        role="menuitem"
         class="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-sacred-text transition duration-200 hover:bg-sacred-bg-hover"
       >
         <SacredIcons name="check" :size="14" class="text-sacred-green" />
@@ -120,6 +128,7 @@ function saveProgress() {
       <button
         v-if="task.type === 'OneTime' && !task.checkedIn"
         @click="openProgress"
+        role="menuitem"
         class="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-sacred-text transition duration-200 hover:bg-sacred-bg-hover"
       >
         <SacredIcons name="dharma" :size="14" class="text-sacred-gold" />
@@ -128,7 +137,8 @@ function saveProgress() {
 
       <button
         v-if="!task.checkedIn"
-        @click="onAction('skip')"
+        @click="onSkip"
+        role="menuitem"
         class="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-sacred-text transition duration-200 hover:bg-sacred-bg-hover"
       >
         <SacredIcons name="skip" :size="14" class="text-sacred-muted-light" />
@@ -137,7 +147,8 @@ function saveProgress() {
 
       <button
         v-if="task.checkedIn"
-        @click="onAction('undo')"
+        @click="onUndo"
+        role="menuitem"
         class="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-sacred-text transition duration-200 hover:bg-sacred-bg-hover"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a4 4 0 010 8h-1"/></svg>

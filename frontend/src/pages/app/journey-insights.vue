@@ -95,7 +95,7 @@ onMounted(() => load(true))
     <!-- Back link -->
     <router-link
       to="/app/journey"
-      class="inline-flex min-h-[44px] items-center gap-1.5 text-sm font-medium text-[#c4873b] transition duration-200 hover:text-[#8b5a1b]"
+      class="inline-flex min-h-[44px] items-center gap-1.5 text-sm font-medium text-sacred-gold transition duration-200 hover:text-sacred-gold-dark"
     >
       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
@@ -105,19 +105,19 @@ onMounted(() => load(true))
 
     <!-- Header -->
     <div class="flex items-center gap-3">
-      <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#c4873b] to-[#8b5a1b] text-white">
+      <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sacred-gold to-sacred-gold-dark text-white">
         <SacredIcons name="diya" :size="20" />
       </div>
       <div>
-        <h1 class="font-serif text-2xl font-bold tracking-wide text-[#2b1e10] sm:text-3xl">Insights</h1>
-        <p class="mt-0.5 text-sm text-[#6b5740]">Saved reflections and meaningful takeaways</p>
+        <h1 class="font-serif text-2xl font-bold tracking-wide text-sacred-text sm:text-3xl">Insights</h1>
+        <p class="mt-0.5 text-sm text-sacred-text-secondary">Saved reflections and meaningful takeaways</p>
       </div>
     </div>
 
     <!-- Search -->
     <div class="relative">
       <div class="pointer-events-none absolute inset-y-0 left-4 flex items-center">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-[#b5996f]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-sacred-muted-light" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
       </div>
@@ -127,37 +127,37 @@ onMounted(() => load(true))
         @keydown.enter="search"
         type="search"
         placeholder="Search insights..."
-        class="min-h-[44px] w-full rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.95)] py-3 pl-10 pr-4 text-sm text-[#2b1e10] placeholder-[#b5996f] outline-none transition duration-200 focus:border-[#c4873b] focus:ring-1 focus:ring-[#c4873b]"
+        class="min-h-[44px] w-full rounded-2xl border border-sacred-border bg-sacred-bg-warm py-3 pl-10 pr-4 text-sm text-sacred-text placeholder-sacred-muted-light outline-none transition duration-200 focus:border-sacred-gold focus:ring-1 focus:ring-sacred-gold"
       />
     </div>
 
-    <p v-if="error" class="rounded-2xl bg-[rgba(220,50,50,0.08)] px-4 py-3 text-sm text-red-700">{{ error }}</p>
+    <p v-if="error" class="rounded-2xl bg-sacred-error-strong px-4 py-3 text-sm text-red-700">{{ error }}</p>
 
     <!-- Loading skeleton -->
     <div v-if="loading && insights.length === 0" class="space-y-3">
-      <div v-for="i in 5" :key="i" class="h-24 animate-pulse rounded-2xl bg-[rgba(139,90,43,0.06)]" />
+      <div v-for="i in 5" :key="i" class="h-24 animate-pulse rounded-2xl bg-sacred-bg-hover" />
     </div>
 
     <!-- Empty state -->
-    <div v-else-if="insights.length === 0 && !loading" class="rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] px-6 py-12 text-center backdrop-blur-[20px]">
-      <p class="font-serif text-xl text-[#2b1e10]">{{ searchQuery ? 'No results found' : 'No insights yet' }}</p>
-      <p class="mt-2 text-sm text-[#6b5740]">{{ searchQuery ? 'Try a different search term.' : 'Insights are saved during conversations and journal sessions.' }}</p>
+    <div v-else-if="insights.length === 0 && !loading" class="rounded-2xl border border-sacred-border bg-sacred-bg-card px-6 py-12 text-center backdrop-blur-[20px]">
+      <p class="font-serif text-xl text-sacred-text">{{ searchQuery ? 'No results found' : 'No insights yet' }}</p>
+      <p class="mt-2 text-sm text-sacred-text-secondary">{{ searchQuery ? 'Try a different search term.' : 'Insights are saved during conversations and journal sessions.' }}</p>
     </div>
 
     <!-- Insights list -->
     <ul v-else class="space-y-3">
       <li v-for="insight in insights" :key="insight.id">
-        <div class="group rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] px-4 py-4 shadow-[0_4px_24px_rgba(82,54,29,0.06)] backdrop-blur-[20px] sm:px-5">
-          <p class="text-sm leading-relaxed text-[#2b1e10]">{{ insight.content }}</p>
+        <div class="group rounded-2xl border border-sacred-border bg-sacred-bg-card px-4 py-4 shadow-sacred backdrop-blur-[20px] sm:px-5">
+          <p class="text-sm leading-relaxed text-sacred-text">{{ insight.content }}</p>
           <div class="mt-2 flex items-center justify-between">
             <div class="flex items-center gap-2">
-              <span class="text-[10px] uppercase tracking-[0.15em] text-[#a38d6d]">{{ sourceLabel(insight.source) }}</span>
-              <span class="text-xs text-[rgba(139,90,43,0.25)]">|</span>
-              <span class="text-xs text-[#b5996f]">{{ insight.created_at ? formatDate(insight.created_at) : '' }}</span>
+              <span class="text-[10px] uppercase tracking-[0.15em] text-sacred-label">{{ sourceLabel(insight.source) }}</span>
+              <span class="text-xs text-sacred-border-focus">|</span>
+              <span class="text-xs text-sacred-muted-light">{{ insight.created_at ? formatDate(insight.created_at) : '' }}</span>
             </div>
             <button
               @click="deleteInsight(insight.id)"
-              class="min-h-[44px] min-w-[44px] rounded-full p-2 text-[#b5996f] opacity-0 transition duration-200 hover:bg-[rgba(220,50,50,0.1)] hover:text-red-500 group-hover:opacity-100"
+              class="min-h-[44px] min-w-[44px] rounded-full p-2 text-sacred-muted-light opacity-0 transition duration-200 hover:bg-sacred-error-strong hover:text-red-500 group-hover:opacity-100"
               title="Delete"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -173,7 +173,7 @@ onMounted(() => load(true))
     <div v-if="hasMore && !loading" class="text-center">
       <button
         @click="loadMore"
-        class="min-h-[44px] rounded-full border border-[rgba(139,90,43,0.15)] px-6 py-2.5 text-sm font-medium text-[#6b5740] transition duration-200 hover:bg-[rgba(196,135,59,0.06)]"
+        class="min-h-[44px] rounded-full border border-sacred-border-strong px-6 py-2.5 text-sm font-medium text-sacred-text-secondary transition duration-200 hover:bg-sacred-gold-light"
       >
         Load more
       </button>
@@ -182,9 +182,9 @@ onMounted(() => load(true))
     <!-- Loading indicator for pagination -->
     <div v-if="loading && insights.length > 0" class="py-4 text-center">
       <div class="inline-flex gap-1">
-        <span class="h-2 w-2 animate-bounce rounded-full bg-[#c4873b]" style="animation-delay:0ms" />
-        <span class="h-2 w-2 animate-bounce rounded-full bg-[#c4873b]" style="animation-delay:150ms" />
-        <span class="h-2 w-2 animate-bounce rounded-full bg-[#c4873b]" style="animation-delay:300ms" />
+        <span class="h-2 w-2 animate-bounce rounded-full bg-sacred-gold" style="animation-delay:0ms" />
+        <span class="h-2 w-2 animate-bounce rounded-full bg-sacred-gold" style="animation-delay:150ms" />
+        <span class="h-2 w-2 animate-bounce rounded-full bg-sacred-gold" style="animation-delay:300ms" />
       </div>
     </div>
   </div>

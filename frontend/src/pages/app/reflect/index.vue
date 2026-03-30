@@ -216,11 +216,11 @@ onMounted(loadTimeline)
 
     <!-- Header -->
     <div class="mb-6">
-      <p class="text-[13px] sm:text-sm text-[#6b5740]">How would you like to reflect today?</p>
+      <p class="text-[13px] sm:text-sm text-sacred-text-secondary">How would you like to reflect today?</p>
     </div>
 
     <!-- Error -->
-    <p v-if="error" class="mb-4 rounded-2xl border border-[rgba(220,50,50,0.12)] bg-[rgba(220,50,50,0.06)] px-4 py-3 text-[13px] text-red-700">{{ error }}</p>
+    <p v-if="error" class="mb-4 rounded-2xl border border-sacred-error-border bg-sacred-error px-4 py-3 text-[13px] text-red-700">{{ error }}</p>
 
     <!-- Action Cards -->
     <div class="space-y-3">
@@ -229,16 +229,16 @@ onMounted(loadTimeline)
       <button
         @click="startConversation"
         :disabled="creating"
-        class="flex w-full min-h-[68px] items-center gap-4 rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] px-4 py-4 shadow-[0_4px_24px_rgba(82,54,29,0.06)] backdrop-blur-[20px] transition duration-200 hover:border-[rgba(139,90,43,0.25)] hover:shadow-[0_4px_20px_rgba(82,54,29,0.1)] active:scale-[0.99] disabled:opacity-60 sm:px-5"
+        class="flex w-full min-h-[68px] items-center gap-4 rounded-2xl border border-sacred-border bg-sacred-bg-card px-4 py-4 shadow-sacred backdrop-blur-[20px] transition duration-200 hover:border-sacred-border-focus hover:shadow-[0_4px_20px_rgba(82,54,29,0.1)] active:scale-[0.99] disabled:opacity-60 sm:px-5"
       >
-        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#c4873b] to-[#8b5a1b] text-white shadow-[0_2px_8px_rgba(139,90,43,0.25)]">
+        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sacred-gold to-sacred-gold-dark text-white shadow-sacred-glow">
           <SacredIcons name="dialogue" :size="20" />
         </div>
         <div class="min-w-0 flex-1 text-left">
-          <p class="font-serif text-[16px] font-bold text-[#2b1e10]">{{ creating ? 'Starting...' : 'Talk' }}</p>
-          <p class="text-[13px] text-[#6b5740]">Have a conversation with your companion</p>
+          <p class="font-serif text-[16px] font-bold text-sacred-text">{{ creating ? 'Starting...' : 'Talk' }}</p>
+          <p class="text-[13px] text-sacred-text-secondary">Have a conversation with your companion</p>
         </div>
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0 text-[#b5996f]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0 text-sacred-muted-light" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5l7 7-7 7" />
         </svg>
       </button>
@@ -246,34 +246,34 @@ onMounted(loadTimeline)
       <!-- Write -->
       <RouterLink
         to="/app/reflect/journal/new"
-        class="flex min-h-[68px] items-center gap-4 rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] px-4 py-4 shadow-[0_4px_24px_rgba(82,54,29,0.06)] backdrop-blur-[20px] transition duration-200 hover:border-[rgba(139,90,43,0.25)] hover:shadow-[0_4px_20px_rgba(82,54,29,0.1)] active:scale-[0.99] sm:px-5"
+        class="flex min-h-[68px] items-center gap-4 rounded-2xl border border-sacred-border bg-sacred-bg-card px-4 py-4 shadow-sacred backdrop-blur-[20px] transition duration-200 hover:border-sacred-border-focus hover:shadow-[0_4px_20px_rgba(82,54,29,0.1)] active:scale-[0.99] sm:px-5"
       >
-        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#c4873b] to-[#8b5a1b] text-white shadow-[0_2px_8px_rgba(139,90,43,0.25)]">
+        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sacred-gold to-sacred-gold-dark text-white shadow-sacred-glow">
           <SacredIcons name="scroll" :size="20" />
         </div>
         <div class="min-w-0 flex-1 text-left">
-          <p class="font-serif text-[16px] font-bold text-[#2b1e10]">Write</p>
-          <p class="text-[13px] text-[#6b5740]">Journal your thoughts</p>
+          <p class="font-serif text-[16px] font-bold text-sacred-text">Write</p>
+          <p class="text-[13px] text-sacred-text-secondary">Journal your thoughts</p>
         </div>
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0 text-[#b5996f]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0 text-sacred-muted-light" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5l7 7-7 7" />
         </svg>
       </RouterLink>
 
       <!-- Speak (inline recorder) -->
-      <div class="rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] px-4 py-4 shadow-[0_4px_24px_rgba(82,54,29,0.06)] backdrop-blur-[20px] sm:px-5">
+      <div class="rounded-2xl border border-sacred-border bg-sacred-bg-card px-4 py-4 shadow-sacred backdrop-blur-[20px] sm:px-5">
         <div class="flex items-center gap-4">
-          <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#c4873b] to-[#8b5a1b] text-white shadow-[0_2px_8px_rgba(139,90,43,0.25)]">
+          <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sacred-gold to-sacred-gold-dark text-white shadow-sacred-glow">
             <SacredIcons name="shankha" :size="20" />
           </div>
           <div class="min-w-0 flex-1">
-            <p class="font-serif text-[16px] font-bold text-[#2b1e10]">Speak</p>
-            <p class="text-[13px] text-[#6b5740]">Record a voice note</p>
+            <p class="font-serif text-[16px] font-bold text-sacred-text">Speak</p>
+            <p class="text-[13px] text-sacred-text-secondary">Record a voice note</p>
           </div>
         </div>
 
         <!-- Mic denied -->
-        <div v-if="micDenied" class="mt-3 rounded-xl bg-[rgba(220,50,50,0.08)] px-4 py-2.5 text-[13px] text-red-700">
+        <div v-if="micDenied" class="mt-3 rounded-xl bg-sacred-error-strong px-4 py-2.5 text-[13px] text-red-700">
           Microphone access was denied. Please allow microphone access in your browser settings.
         </div>
 
@@ -285,7 +285,7 @@ onMounted(loadTimeline)
               <span
                 v-for="i in 12"
                 :key="i"
-                class="w-1.5 rounded-full bg-gradient-to-t from-[#8b5a1b] to-[#c4873b] animate-pulse"
+                class="w-1.5 rounded-full bg-gradient-to-t from-sacred-gold-dark to-sacred-gold animate-pulse"
                 :style="{
                   height: `${16 + Math.sin(i * 0.8) * 14 + Math.random() * 8}px`,
                   animationDelay: `${i * 80}ms`,
@@ -293,17 +293,17 @@ onMounted(loadTimeline)
               />
             </template>
             <template v-else-if="uploading">
-              <span class="text-[13px] text-[#6b5740]">Processing...</span>
+              <span class="text-[13px] text-sacred-text-secondary">Processing...</span>
             </template>
           </div>
 
-          <p v-if="recording" class="font-mono text-2xl font-bold text-[#c4873b]">{{ formatTime(recordingSeconds) }}</p>
+          <p v-if="recording" class="font-mono text-2xl font-bold text-sacred-gold">{{ formatTime(recordingSeconds) }}</p>
 
           <div class="flex gap-3">
             <button
               v-if="!recording && !uploading"
               @click="startRecording"
-              class="flex min-h-[44px] items-center gap-2 rounded-full bg-gradient-to-r from-[#c4873b] to-[#8b5a1b] px-5 py-2.5 text-[13px] font-semibold text-white shadow-[0_2px_8px_rgba(139,90,27,0.2)] transition duration-200 hover:-translate-y-0.5"
+              class="flex min-h-[44px] items-center gap-2 rounded-full bg-gradient-to-r from-sacred-gold to-sacred-gold-dark px-5 py-2.5 text-[13px] font-semibold text-white shadow-sacred-button transition duration-200 hover:-translate-y-0.5"
             >
               <span class="h-2.5 w-2.5 rounded-full bg-white" />
               Record
@@ -316,35 +316,35 @@ onMounted(loadTimeline)
               <span class="h-2.5 w-2.5 rounded bg-white" />
               Stop
             </button>
-            <div v-if="uploading" class="flex items-center gap-2 rounded-full bg-[rgba(139,90,43,0.08)] px-5 py-2.5 text-[13px] text-[#6b5740]">
-              <span class="h-4 w-4 animate-spin rounded-full border-2 border-[#c4873b] border-t-transparent" />
+            <div v-if="uploading" class="flex items-center gap-2 rounded-full bg-sacred-bg-hover-strong px-5 py-2.5 text-[13px] text-sacred-text-secondary">
+              <span class="h-4 w-4 animate-spin rounded-full border-2 border-sacred-gold border-t-transparent" />
               Uploading...
             </div>
           </div>
 
-          <p v-if="uploadError" class="rounded-xl bg-[rgba(220,50,50,0.08)] px-4 py-2 text-[13px] text-red-700">{{ uploadError }}</p>
-          <p v-if="uploadSuccess" class="rounded-xl bg-[rgba(90,160,90,0.12)] px-4 py-2 text-[13px] text-green-700">Voice note uploaded and queued for transcription!</p>
+          <p v-if="uploadError" class="rounded-xl bg-sacred-error-strong px-4 py-2 text-[13px] text-red-700">{{ uploadError }}</p>
+          <p v-if="uploadSuccess" class="rounded-xl bg-sacred-success-bg px-4 py-2 text-[13px] text-green-700">Voice note uploaded and queued for transcription!</p>
         </div>
       </div>
     </div>
 
     <!-- Recent reflections divider -->
     <div class="my-6 flex items-center gap-3">
-      <div class="h-px flex-1 border-t border-dashed border-[rgba(139,90,43,0.12)]" />
-      <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-[#a38d6d]">Recent reflections</p>
-      <div class="h-px flex-1 border-t border-dashed border-[rgba(139,90,43,0.12)]" />
+      <div class="h-px flex-1 border-t border-dashed border-sacred-border" />
+      <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-sacred-label">Recent reflections</p>
+      <div class="h-px flex-1 border-t border-dashed border-sacred-border" />
     </div>
 
     <!-- Loading skeletons -->
     <div v-if="loadingTimeline" class="space-y-3">
-      <div v-for="i in 4" :key="i" class="h-[64px] animate-pulse rounded-2xl bg-[rgba(139,90,43,0.06)]" />
+      <div v-for="i in 4" :key="i" class="h-[64px] animate-pulse rounded-2xl bg-sacred-bg-hover" />
     </div>
 
     <!-- Empty state -->
-    <div v-else-if="timeline.length === 0" class="rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] px-5 py-10 text-center backdrop-blur-[20px]">
-      <SacredIcons name="dharma" :size="32" class="mx-auto mb-3 text-[#b5996f]" />
-      <p class="font-serif text-lg font-bold text-[#2b1e10]">No reflections yet</p>
-      <p class="mt-2 text-[13px] text-[#6b5740]">Choose a way to reflect above and begin your practice.</p>
+    <div v-else-if="timeline.length === 0" class="rounded-2xl border border-sacred-border bg-sacred-bg-card px-5 py-10 text-center backdrop-blur-[20px]">
+      <SacredIcons name="dharma" :size="32" class="mx-auto mb-3 text-sacred-muted-light" />
+      <p class="font-serif text-lg font-bold text-sacred-text">No reflections yet</p>
+      <p class="mt-2 text-[13px] text-sacred-text-secondary">Choose a way to reflect above and begin your practice.</p>
     </div>
 
     <!-- Timeline list -->
@@ -352,25 +352,25 @@ onMounted(loadTimeline)
       <li v-for="item in timeline" :key="`${item.type}-${item.id}`">
         <RouterLink
           :to="item.route"
-          class="group flex min-h-[56px] items-center gap-3.5 rounded-2xl border border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.88)] px-4 py-3.5 shadow-[0_2px_12px_rgba(82,54,29,0.05)] backdrop-blur-[20px] transition duration-200 hover:border-[rgba(139,90,43,0.25)] hover:shadow-[0_4px_20px_rgba(82,54,29,0.1)] active:scale-[0.99] sm:px-5"
+          class="group flex min-h-[56px] items-center gap-3.5 rounded-2xl border border-sacred-border bg-sacred-bg-card px-4 py-3.5 shadow-[0_2px_12px_rgba(82,54,29,0.05)] backdrop-blur-[20px] transition duration-200 hover:border-sacred-border-focus hover:shadow-[0_4px_20px_rgba(82,54,29,0.1)] active:scale-[0.99] sm:px-5"
         >
-          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[rgba(196,135,59,0.1)] text-[#c4873b]">
+          <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sacred-border-subtle text-sacred-gold">
             <SacredIcons :name="typeIcon(item.type)" :size="16" />
           </div>
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">
-              <p class="truncate text-[14px] font-medium text-[#2b1e10]">{{ item.title }}</p>
-              <span class="shrink-0 text-[10px] uppercase tracking-[0.1em] text-[#b5996f]">{{ typeLabel(item.type) }}</span>
+              <p class="truncate text-[14px] font-medium text-sacred-text">{{ item.title }}</p>
+              <span class="shrink-0 text-[10px] uppercase tracking-[0.1em] text-sacred-muted-light">{{ typeLabel(item.type) }}</span>
             </div>
-            <p v-if="item.preview" class="mt-0.5 truncate text-[13px] text-[#6b5740]">{{ item.preview }}</p>
+            <p v-if="item.preview" class="mt-0.5 truncate text-[13px] text-sacred-text-secondary">{{ item.preview }}</p>
           </div>
-          <span class="shrink-0 text-[11px] text-[#9a8568]">{{ relativeTime(item.date) }}</span>
+          <span class="shrink-0 text-[11px] text-sacred-muted">{{ relativeTime(item.date) }}</span>
         </RouterLink>
       </li>
     </ul>
 
     <!-- Footer wisdom -->
-    <p v-if="!loadingTimeline && timeline.length > 0" class="mt-8 text-center text-xs italic leading-relaxed text-[#b5996f]">
+    <p v-if="!loadingTimeline && timeline.length > 0" class="mt-8 text-center text-xs italic leading-relaxed text-sacred-muted-light">
       "The mind is restless, turbulent, strong and unyielding -- but it is controlled by practice and detachment." -- Bhagavad Gita 6.35
     </p>
   </div>
