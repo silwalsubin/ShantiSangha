@@ -56,11 +56,20 @@ jobs:
             -archivePath $RUNNER_TEMP/ShantiSangha.xcarchive \
             -sdk iphoneos \
             -destination generic/platform=iOS \
+            -skipPackagePluginValidation \
             DEVELOPMENT_TEAM=${{ secrets.IOS_TEAM_ID }} \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="iPhone Distribution" \
             PROVISIONING_PROFILE=${{ env.PP_UUID }} \
-            archive
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            archive 2>&1 | tee build.log
+
+          # Check if archive was created
+          if [ ! -d "$RUNNER_TEMP/ShantiSangha.xcarchive" ]; then
+            echo "Archive failed. Last 50 lines:"
+            tail -50 build.log
+            exit 1
+          fi
 
       - name: Export IPA
         run: |
