@@ -222,6 +222,11 @@ try
         buildTime = serverBuildTime
     })).AllowAnonymous();
 
+    // Debug: show JWT claims (temporary — remove after debugging)
+    api.MapGet("/debug/claims", (HttpContext ctx) => Results.Ok(
+        ctx.User.Claims.Select(c => new { c.Type, c.Value })
+    )).RequireAuthorization();
+
     // Health check at root (no /api prefix)
     app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
         .AllowAnonymous();
