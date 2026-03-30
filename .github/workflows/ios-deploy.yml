@@ -55,6 +55,13 @@ jobs:
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/$PP_UUID.mobileprovision
 
+      - name: Set build number
+        working-directory: ios
+        run: |
+          # Use GitHub run number as build number (auto-increments)
+          agvtool new-version -all ${{ github.run_number }}
+          echo "Build number: ${{ github.run_number }}"
+
       - name: Build archive
         working-directory: ios
         run: |
