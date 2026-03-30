@@ -1,5 +1,24 @@
 import SwiftUI
 
+/// Sacred typography — reusable font styles for the sacred theme.
+extension Font {
+    /// 28pt serif bold — login hero, large titles
+    static let sacredHero = Font.system(size: 28, weight: .bold, design: .serif)
+    /// 22pt serif semibold — page titles ("Your sacred space")
+    static let sacredTitle = Font.system(size: 22, weight: .semibold, design: .serif)
+    /// 20pt serif bold — section hero (goal name)
+    static let sacredHeading = Font.system(size: 20, weight: .bold, design: .serif)
+    /// 18pt serif bold — card titles (app name)
+    static let sacredSubheading = Font.system(size: 18, weight: .bold, design: .serif)
+    /// 14pt serif regular — body serif (quotes, spiritual text)
+    static let sacredBody = Font.system(size: 14, design: .serif)
+    /// 12pt serif regular — small serif (feedback, captions)
+    static let sacredCaption = Font.system(size: 12, design: .serif)
+    /// 9pt bold — section labels ("ACCOUNT", "YOUR DHARMA")
+    /// Use with .tracking(3) and .foregroundColor(.sacredLabel)
+    static let sacredSectionLabel = Font.system(size: 9, weight: .bold)
+}
+
 /// Sacred design tokens — single source of truth for colors.
 /// Supports both light and dark mode.
 extension Color {
