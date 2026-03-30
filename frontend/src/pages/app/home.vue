@@ -224,6 +224,15 @@ async function onUndo(id: string) {
   }
 }
 
+async function onDelete(id: string) {
+  try {
+    await api.delete(`/goals/${id}`)
+    tasks.value = tasks.value.filter((t: Task) => t.id !== id)
+    delete feedbackMessages.value[id]
+    delete saving.value[id]
+  } catch {}
+}
+
 async function onProgress(id: string, value: number) {
   saving.value[id] = true
   try {
@@ -314,6 +323,7 @@ onMounted(() => { loadTasks() })
         @undo="onUndo"
         @navigate="onNavigate"
         @progress="onProgress"
+        @delete="onDelete"
       />
     </ul>
 
@@ -337,6 +347,7 @@ onMounted(() => { loadTasks() })
           @undo="onUndo"
           @navigate="onNavigate"
           @progress="onProgress"
+          @delete="onDelete"
         />
       </ul>
     </div>

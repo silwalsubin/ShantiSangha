@@ -22,12 +22,14 @@ const emit = defineEmits<{
   done: [id: string]
   skip: [id: string]
   undo: [id: string]
+  delete: [id: string]
   navigate: [id: string]
   progress: [id: string, value: number]
 }>()
 
 const showMenu = ref(false)
 const showProgress = ref(false)
+const confirmDelete = ref(false)
 const progressValue = ref(props.task.progress)
 
 const isOverdue = props.task.type === 'OneTime' && props.task.daysRemaining != null && props.task.daysRemaining <= 0
@@ -172,6 +174,36 @@ function saveProgress() {
         <SacredIcons name="recurring" :size="14" class="text-[#c4873b]" />
         Undo
       </button>
+
+      <!-- Divider -->
+      <div class="my-1 border-t border-[rgba(139,90,43,0.08)]" />
+
+      <!-- Delete -->
+      <button
+        v-if="!confirmDelete"
+        @click="confirmDelete = true"
+        class="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-[#b45a3c] transition duration-200 hover:bg-[rgba(180,90,60,0.06)]"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+        Delete
+      </button>
+      <div v-if="confirmDelete" class="px-4 py-2.5">
+        <p class="text-xs text-[#6b5740]">This will delete the task and all its history.</p>
+        <div class="mt-2 flex gap-2">
+          <button
+            @click="confirmDelete = false; showMenu = false; emit('delete', task.id)"
+            class="rounded-lg bg-[#b45a3c] px-3 py-1.5 text-xs font-semibold text-white transition duration-200 active:scale-[0.95]"
+          >
+            Delete
+          </button>
+          <button
+            @click="confirmDelete = false"
+            class="rounded-lg px-3 py-1.5 text-xs text-[#6b5740] transition duration-200 hover:bg-[rgba(139,90,43,0.06)]"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Click outside to close menu -->
