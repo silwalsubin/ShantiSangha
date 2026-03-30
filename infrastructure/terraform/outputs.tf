@@ -36,7 +36,7 @@ output "voice_bucket_name" {
 }
 
 output "cloudfront_domain" {
-  description = "CloudFront domain — point shantisangha.org CNAME here"
+  description = "CloudFront domain — point shantisangha.com CNAME here"
   value       = aws_cloudfront_distribution.frontend.domain_name
 }
 
