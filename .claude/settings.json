@@ -17,7 +17,8 @@
       "Read(//tmp/**)",
       "Bash(magick identify:*)",
       "Bash(magick ios/ShantiSangha/Assets.xcassets/AppIcon.appiconset/AppIcon.png -alpha off -background '#8b5a1b' -flatten -resize 1024x1024 ios/ShantiSangha/Assets.xcassets/AppIcon.appiconset/AppIcon.png)",
-      "Bash(magick ios/ShantiSangha/Assets.xcassets/AppIcon.appiconset/AppIcon.png -background '#8b5a1b' -flatten -alpha remove -alpha off PNG24:ios/ShantiSangha/Assets.xcassets/AppIcon.appiconset/AppIcon.png)"
+      "Bash(magick ios/ShantiSangha/Assets.xcassets/AppIcon.appiconset/AppIcon.png -background '#8b5a1b' -flatten -alpha remove -alpha off PNG24:ios/ShantiSangha/Assets.xcassets/AppIcon.appiconset/AppIcon.png)",
+      "Bash(/usr/libexec/PlistBuddy -c \"Print :REVERSED_CLIENT_ID\" /Users/subinsilwal/Desktop/code/maiself/ios/ShantiSangha/GoogleService-Info.plist)"
     ],
     "additionalDirectories": [
       "/Users/subinsilwal/Desktop/code/maiself/.claude",
