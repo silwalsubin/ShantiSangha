@@ -62,9 +62,20 @@ public class CurrentUserService : ICurrentUser
         }
         catch (DbUpdateException)
         {
-            // Duplicate email — detach and retry lookup (race condition or shared empty email)
+            // Duplicate email — user exists from a previous Clerk instance (e.g. domain change)
+            // or race condition. Look up by email and update ClerkId to the new one.
             _db.Entry(_cached).State = EntityState.Detached;
             _cached = await _db.Users.FirstOrDefaultAsync(u => u.ClerkId == clerkId);
+            if (_cached is null && email is not null)
+            {
+                _cached = await _db.Users.FirstOrDefaultAsync(u => u.Email == email);
+                if (_cached is not null)
+                {
+                    _cached.ClerkId = clerkId;
+                    _cached.UpdatedAt = DateTime.UtcNow;
+                    await _db.SaveChangesAsync();
+                }
+            }
         }
         return _cached;
     }
