@@ -4,22 +4,26 @@
     <!-- Central orb -->
     <circle cx="0" cy="0" r="2.2" fill="#fff" fill-opacity="0.2" stroke="#fff"/>
     <circle cx="0" cy="0" r="0.7" fill="#fff" stroke="none"/>
-    <!-- Up prongs -->
-    <path d="M0-2.2 L0-9.5"/>
-    <path d="M0-4 C-2.5-5.5-2-8.5 0-9.5"/>
-    <path d="M0-4 C2.5-5.5 2-8.5 0-9.5"/>
-    <!-- Down prongs -->
-    <path d="M0 2.2 L0 9.5"/>
-    <path d="M0 4 C-2.5 5.5-2 8.5 0 9.5"/>
-    <path d="M0 4 C2.5 5.5 2 8.5 0 9.5"/>
-    <!-- Left prongs -->
-    <path d="M-2.2 0 L-9.5 0"/>
-    <path d="M-4 0 C-5.5-2.5-8.5-2-9.5 0"/>
-    <path d="M-4 0 C-5.5 2.5-8.5 2-9.5 0"/>
-    <!-- Right prongs -->
-    <path d="M2.2 0 L9.5 0"/>
-    <path d="M4 0 C5.5-2.5 8.5-2 9.5 0"/>
-    <path d="M4 0 C5.5 2.5 8.5 2 9.5 0"/>
+    <!-- Up prongs + pointed tip -->
+    <path d="M0-2.2 L0-8.5"/>
+    <path d="M0-4 C-2.5-5.5-2-7.5 0-8.5"/>
+    <path d="M0-4 C2.5-5.5 2-7.5 0-8.5"/>
+    <path d="M0-8.5L-0.5-10.5"/><path d="M0-8.5L0.5-10.5"/>
+    <!-- Down prongs + pointed tip -->
+    <path d="M0 2.2 L0 8.5"/>
+    <path d="M0 4 C-2.5 5.5-2 7.5 0 8.5"/>
+    <path d="M0 4 C2.5 5.5 2 7.5 0 8.5"/>
+    <path d="M0 8.5L-0.5 10.5"/><path d="M0 8.5L0.5 10.5"/>
+    <!-- Left prongs + pointed tip -->
+    <path d="M-2.2 0 L-8.5 0"/>
+    <path d="M-4 0 C-5.5-2.5-7.5-2-8.5 0"/>
+    <path d="M-4 0 C-5.5 2.5-7.5 2-8.5 0"/>
+    <path d="M-8.5 0L-10.5-0.5"/><path d="M-8.5 0L-10.5 0.5"/>
+    <!-- Right prongs + pointed tip -->
+    <path d="M2.2 0 L8.5 0"/>
+    <path d="M4 0 C5.5-2.5 7.5-2 8.5 0"/>
+    <path d="M4 0 C5.5 2.5 7.5 2 8.5 0"/>
+    <path d="M8.5 0L10.5-0.5"/><path d="M8.5 0L10.5 0.5"/>
   </g>
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="32" y2="32">
