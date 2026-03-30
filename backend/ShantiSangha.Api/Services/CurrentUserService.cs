@@ -10,6 +10,11 @@ public interface ICurrentUser
     Task<User?> GetAsync();
 }
 
+/// <summary>
+/// Resolves the current user by email from the JWT session.
+/// ClerkId is stored for webhook integration but is not used
+/// for user identity — email is the single source of truth.
+/// </summary>
 public class CurrentUserService : ICurrentUser
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
@@ -28,35 +33,25 @@ public class CurrentUserService : ICurrentUser
         if (_resolved) return _cached;
         _resolved = true;
 
-        var clerkId = _httpContextAccessor.HttpContext?.User.FindFirstValue("sub");
         var email = _httpContextAccessor.HttpContext?.User.FindFirstValue("email");
+        if (email is null) return null;
 
-        if (clerkId is null || email is null) return null;
+        var clerkId = _httpContextAccessor.HttpContext?.User.FindFirstValue("sub") ?? "";
 
-        // Look up by ClerkId first
-        _cached = await _db.Users.FirstOrDefaultAsync(u => u.ClerkId == clerkId);
+        _cached = await _db.Users.FirstOrDefaultAsync(u => u.Email == email);
         if (_cached is not null)
         {
-            if (_cached.Email != email)
+            // Keep ClerkId in sync (may change on domain migration)
+            if (_cached.ClerkId != clerkId && clerkId != "")
             {
-                _cached.Email = email;
+                _cached.ClerkId = clerkId;
                 _cached.UpdatedAt = DateTime.UtcNow;
                 await _db.SaveChangesAsync();
             }
             return _cached;
         }
 
-        // ClerkId not found — check if email exists (user from a previous Clerk instance)
-        _cached = await _db.Users.FirstOrDefaultAsync(u => u.Email == email);
-        if (_cached is not null)
-        {
-            _cached.ClerkId = clerkId;
-            _cached.UpdatedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync();
-            return _cached;
-        }
-
-        // New user — create
+        // New user
         _cached = new User
         {
             Id = Guid.NewGuid(),
