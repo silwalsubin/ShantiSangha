@@ -102,6 +102,9 @@ namespace ShantiSangha.Infrastructure.Migrations
                     b.Property<int?>("FrequencyTarget")
                         .HasColumnType("integer");
 
+                    b.Property<int>("Progress")
+                        .HasColumnType("integer");
+
                     b.Property<DateOnly?>("TargetDate")
                         .HasColumnType("date");
 

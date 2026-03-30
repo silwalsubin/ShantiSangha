@@ -101,6 +101,7 @@ public static class GoalRoutes
                     g.Title,
                     g.Type,
                     g.TargetDate,
+                    g.Progress,
                     g.CompletedAt,
                     g.CreatedAt,
                     DaysRemaining = daysRemaining,
@@ -178,7 +179,7 @@ public static class GoalRoutes
             return Results.Ok(new
             {
                 goal.Id, goal.Title, goal.Type, goal.TargetDate, goal.DeeperWhy,
-                goal.CompletedAt, goal.CreatedAt,
+                goal.Progress, goal.CompletedAt, goal.CreatedAt,
                 DaysRemaining = daysRemaining, NoteCount = noteCount
             });
         }
@@ -224,6 +225,9 @@ public static class GoalRoutes
 
         if (body.DeeperWhy is not null)
             goal.DeeperWhy = body.DeeperWhy.Trim();
+
+        if (body.Progress is not null)
+            goal.Progress = Math.Clamp(body.Progress.Value, 0, 100);
 
         try
         {
@@ -399,5 +403,5 @@ public record CreateGoalRequest(
     int? FrequencyTarget = null,
     string? TargetDate = null,
     string? DeeperWhy = null);
-public record UpdateGoalRequest(string? Title, bool? Archived, bool? Completed, string? DeeperWhy = null);
+public record UpdateGoalRequest(string? Title, bool? Archived, bool? Completed, string? DeeperWhy = null, int? Progress = null);
 public record CheckInRequest(bool Completed, string? Note, string? Date = null);

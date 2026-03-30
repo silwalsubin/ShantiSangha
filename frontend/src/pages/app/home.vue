@@ -12,6 +12,7 @@ interface Task {
   checkedIn: boolean
   completedToday: boolean | null
   daysRemaining: number | null
+  progress: number
   feedbackMessage: string | null
   saving: boolean
 }
@@ -79,6 +80,7 @@ async function loadTasks() {
         checkedIn,
         completedToday,
         daysRemaining: null,
+        progress: 0,
         feedbackMessage: null,
         saving: false,
         _currentStreak: currentStreak,
@@ -111,6 +113,7 @@ async function loadTasks() {
         checkedIn: false,
         completedToday: null,
         daysRemaining: g.daysRemaining ?? g.days_remaining ?? null,
+        progress: g.progress ?? 0,
         feedbackMessage: null,
         saving: false,
       }))
@@ -221,6 +224,17 @@ async function onUndo(id: string) {
   }
 }
 
+async function onProgress(id: string, value: number) {
+  saving.value[id] = true
+  try {
+    await api.patch(`/goals/${id}`, { progress: value })
+    const task = tasks.value.find((t: Task) => t.id === id)
+    if (task) task.progress = value
+  } catch {} finally {
+    saving.value[id] = false
+  }
+}
+
 function onNavigate(id: string) {
   router.push(`/app/journey/goals/${id}`)
 }
@@ -299,6 +313,7 @@ onMounted(() => { loadTasks() })
         @skip="onSkip"
         @undo="onUndo"
         @navigate="onNavigate"
+        @progress="onProgress"
       />
     </ul>
 
@@ -321,6 +336,7 @@ onMounted(() => { loadTasks() })
           @skip="onSkip"
           @undo="onUndo"
           @navigate="onNavigate"
+          @progress="onProgress"
         />
       </ul>
     </div>
