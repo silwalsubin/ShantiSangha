@@ -1,18 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import SacredIcons from '@/components/icons/SacredIcons.vue'
-
-interface Task {
-  id: string
-  title: string
-  type: 'Recurring' | 'OneTime'
-  checkedIn: boolean
-  completedToday: boolean | null
-  daysRemaining: number | null
-  progress: number
-  feedbackMessage: string | null
-  saving: boolean
-}
+import type { Task } from '@/types'
 
 const props = defineProps<{
   task: Task
