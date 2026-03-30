@@ -1,6 +1,5 @@
 import SwiftUI
 import FirebaseCore
-import GoogleSignIn
 
 @main
 struct ShantiSanghaApp: App {
@@ -20,6 +19,5 @@ struct ShantiSanghaApp: App {
                     .environmentObject(auth)
             }
         }
-        .handlesExternalEvents(preferring: Set(), allowing: Set())
     }
 }

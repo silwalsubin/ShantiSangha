@@ -15,7 +15,7 @@ class AuthService: ObservableObject {
 
     init() {
         // Listen for auth state changes
-        Auth.auth().addStateDidChangeListener { [weak self] _, user in
+        _ = Auth.auth().addStateDidChangeListener { [weak self] _, user in
             Task { @MainActor in
                 self?.user = user
                 self?.isAuthenticated = user != nil
