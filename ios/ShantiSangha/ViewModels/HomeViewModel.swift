@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 /// ViewModel for the Home screen — "What needs your attention today?"
 /// Mirrors frontend/src/composables/useGoals.ts

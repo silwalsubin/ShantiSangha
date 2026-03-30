@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import AuthenticationServices
 
 /// Handles Clerk authentication via web-based OAuth.
