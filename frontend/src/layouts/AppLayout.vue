@@ -29,7 +29,7 @@ function isActive(href: string) {
       <div class="flex h-20 items-center border-b border-[rgba(139,90,43,0.12)] px-5">
         <RouterLink to="/app/home" class="flex items-center gap-3">
           <div class="logo-glow flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#c4873b] to-[#8b5a1b] text-white">
-            <SacredIcons name="vajra" :size="22" />
+            <SacredIcons name="vajra" :size="28" />
           </div>
           <span class="font-serif text-lg font-bold tracking-wide text-[#2b1e10]">ShantiSangha</span>
         </RouterLink>
@@ -74,7 +74,7 @@ function isActive(href: string) {
       <div class="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-[rgba(139,90,43,0.12)] bg-[rgba(250,245,237,0.95)] px-4 backdrop-blur-[20px] lg:hidden">
         <div class="flex items-center gap-2">
           <div class="logo-glow flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#c4873b] to-[#8b5a1b] text-white">
-            <SacredIcons name="vajra" :size="18" />
+            <SacredIcons name="vajra" :size="24" />
           </div>
           <span class="font-serif text-lg font-bold text-[#2b1e10]">ShantiSangha</span>
         </div>
