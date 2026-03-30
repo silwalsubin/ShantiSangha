@@ -13,9 +13,13 @@ class AuthService: ObservableObject {
     @Published var isLoading = false
     @Published var user: FirebaseAuth.User?
 
-    init() {
-        // Listen for auth state changes
-        _ = Auth.auth().addStateDidChangeListener { [weak self] _, user in
+    private var authHandle: AuthStateDidChangeListenerHandle?
+
+    init() {}
+
+    /// Call after FirebaseApp.configure()
+    func startListening() {
+        authHandle = Auth.auth().addStateDidChangeListener { [weak self] _, user in
             Task { @MainActor in
                 self?.user = user
                 self?.isAuthenticated = user != nil
@@ -36,15 +40,23 @@ class AuthService: ObservableObject {
         }
 
         do {
+            print("[Auth] Starting Google Sign-In...")
             let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: rootVC)
-            guard let idToken = result.user.idToken?.tokenString else { return }
+            print("[Auth] Google Sign-In succeeded for: \(result.user.profile?.email ?? "unknown")")
+            guard let idToken = result.user.idToken?.tokenString else {
+                print("[Auth] ERROR: No ID token from Google")
+                return
+            }
             let credential = GoogleAuthProvider.credential(
                 withIDToken: idToken,
                 accessToken: result.user.accessToken.tokenString
             )
-            try await Auth.auth().signIn(with: credential)
+            print("[Auth] Signing into Firebase...")
+            let authResult = try await Auth.auth().signIn(with: credential)
+            print("[Auth] Firebase sign-in succeeded: \(authResult.user.email ?? "no email")")
+            print("[Auth] isAuthenticated: \(isAuthenticated)")
         } catch {
-            print("Google Sign-In failed: \(error)")
+            print("[Auth] ERROR: \(error)")
         }
     }
 

@@ -7,8 +7,9 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         FirebaseApp.configure()
         GIDSignIn.sharedInstance.configuration = GIDConfiguration(
-            clientID: "476549159082-k7ql964hu0j0isjmu94gro7nqks3mp5p.apps.googleusercontent.com"
+            clientID: "361305168424-umc433jdki16tbit3ou2kkjv1p7k327g.apps.googleusercontent.com"
         )
+        AuthService.shared.startListening()
         return true
     }
 
@@ -26,16 +27,18 @@ struct ShantiSanghaApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if auth.isAuthenticated {
-                MainTabView()
-                    .environmentObject(auth)
-            } else {
-                LoginView()
-                    .environmentObject(auth)
+            Group {
+                if auth.isAuthenticated {
+                    MainTabView()
+                        .environmentObject(auth)
+                } else {
+                    LoginView()
+                        .environmentObject(auth)
+                }
             }
-        }
-        .onOpenURL { url in
-            GIDSignIn.sharedInstance.handle(url)
+            .onOpenURL { url in
+                GIDSignIn.sharedInstance.handle(url)
+            }
         }
     }
 }
