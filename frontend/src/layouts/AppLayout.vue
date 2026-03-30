@@ -12,7 +12,7 @@ const buildTime = rawBuildTime
   : 'dev'
 
 const navItems = [
-  { icon: 'lotus', label: 'Home', href: '/app/home' },
+  { icon: 'vajra', label: 'Home', href: '/app/home' },
   { icon: 'dialogue', label: 'Reflect', href: '/app/reflect' },
   { icon: 'diya', label: 'Journey', href: '/app/journey' },
 ]
