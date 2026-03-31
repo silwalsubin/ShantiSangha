@@ -70,7 +70,7 @@ struct ChatView: View {
                 .background(
                     RoundedRectangle(cornerRadius: 16)
                         .fill(msg.role == "user"
-                              ? LinearGradient(colors: [.sacredGold, .sacredGoldDark], startPoint: .topLeading, endPoint: .bottomTrailing)
+                              ? LinearGradient.sacredGoldShiny
                               : LinearGradient(colors: [Color.sacredBgCard, Color.sacredBgCard], startPoint: .top, endPoint: .bottom))
                 )
                 .overlay(

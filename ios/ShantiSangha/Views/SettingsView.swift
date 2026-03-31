@@ -33,8 +33,10 @@ struct SettingsView: View {
                     settingsCard(title: "ACCOUNT") {
                         HStack(spacing: 12) {
                             Circle()
-                                .fill(LinearGradient(colors: [.sacredGold, .sacredGoldDark], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                .fill(RadialGradient.sacredGoldShiny)
                                 .frame(width: 40, height: 40)
+                                .shimmer()
+                                .clipShape(Circle())
                                 .overlay(
                                     Text(String(email.prefix(1)).uppercased())
                                         .font(.sacredButtonLabel)

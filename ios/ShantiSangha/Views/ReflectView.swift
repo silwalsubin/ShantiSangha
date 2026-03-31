@@ -22,7 +22,9 @@ struct ReflectView: View {
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(LinearGradient(colors: [.sacredGold, .sacredGoldDark], startPoint: .leading, endPoint: .trailing))
+                    .background(LinearGradient.sacredGoldShiny)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shimmer()
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                 }
 

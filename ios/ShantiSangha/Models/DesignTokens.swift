@@ -54,6 +54,7 @@ extension Color {
     static let sacredGold = Color(hex: "#c4873b")
     static let sacredGoldDark = Color(hex: "#8b5a1b")
     static let sacredGoldLight = Color(hex: "#d4a054")
+    static let sacredGoldShine = Color(hex: "#e8c47a")
 
     static let sacredText = Color.adaptive(light: "#2b1e10", dark: "#f5ebe0")
     static let sacredTextSecondary = Color.adaptive(light: "#6b5740", dark: "#c4a882")
@@ -92,4 +93,90 @@ extension Color {
             )
         })
     }
+}
+
+/// Subtle shimmer animation — sweeps a light highlight across gold elements.
+struct ShimmerModifier: ViewModifier {
+    @State private var phase: CGFloat = -1
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(
+                GeometryReader { geo in
+                    LinearGradient(
+                        stops: [
+                            .init(color: .clear, location: 0),
+                            .init(color: .white.opacity(0.06), location: 0.4),
+                            .init(color: .white.opacity(0.12), location: 0.5),
+                            .init(color: .white.opacity(0.06), location: 0.6),
+                            .init(color: .clear, location: 1),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .frame(width: geo.size.width * 1.5)
+                    .offset(x: geo.size.width * phase)
+                    .onAppear {
+                        withAnimation(
+                            .easeInOut(duration: 3.5)
+                            .repeatForever(autoreverses: false)
+                            .delay(2)
+                        ) {
+                            phase = 1.5
+                        }
+                    }
+                }
+            )
+            .clipped()
+    }
+}
+
+extension View {
+    /// Adds a subtle, repeating shimmer sweep over gold elements.
+    func shimmer() -> some View {
+        modifier(ShimmerModifier())
+    }
+}
+
+/// Radial shiny gold — for circular elements (avatars, FAB).
+extension RadialGradient {
+    static let sacredGoldShiny = RadialGradient(
+        stops: [
+            .init(color: .sacredGoldShine, location: 0),
+            .init(color: .sacredGold, location: 0.45),
+            .init(color: .sacredGoldDark, location: 1),
+        ],
+        center: .init(x: 0.35, y: 0.35),
+        startRadius: 0,
+        endRadius: 40
+    )
+}
+
+/// Reusable shiny gold gradients — metallic highlight for sacred elements.
+extension LinearGradient {
+    /// Shiny gold — horizontal with center highlight band
+    static let sacredGoldShiny = LinearGradient(
+        stops: [
+            .init(color: .sacredGoldDark, location: 0),
+            .init(color: .sacredGold, location: 0.3),
+            .init(color: .sacredGoldShine, location: 0.5),
+            .init(color: .sacredGold, location: 0.7),
+            .init(color: .sacredGoldDark, location: 1),
+        ],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    /// Shiny gold — vertical variant for buttons
+    static let sacredGoldShinyVertical = LinearGradient(
+        stops: [
+            .init(color: .sacredGoldDark, location: 0),
+            .init(color: .sacredGold, location: 0.25),
+            .init(color: .sacredGoldShine, location: 0.45),
+            .init(color: .sacredGold, location: 0.7),
+            .init(color: .sacredGoldDark, location: 1),
+        ],
+        startPoint: .top,
+        endPoint: .bottom
+    )
 }

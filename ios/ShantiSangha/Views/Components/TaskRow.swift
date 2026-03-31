@@ -179,7 +179,7 @@ struct TaskRow: View {
                                 .fill(Color.sacredMuted.opacity(0.15))
                                 .frame(height: 6)
                             RoundedRectangle(cornerRadius: 3)
-                                .fill(LinearGradient(colors: [.sacredGold, .sacredGoldDark], startPoint: .leading, endPoint: .trailing))
+                                .fill(LinearGradient.sacredGoldShiny)
                                 .frame(width: geo.size.width * CGFloat(task.progress) / 100, height: 6)
                         }
                     }

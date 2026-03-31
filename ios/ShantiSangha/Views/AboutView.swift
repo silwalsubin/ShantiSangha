@@ -11,8 +11,10 @@ struct AboutView: View {
                 // Logo
                 HStack(spacing: 12) {
                     Circle()
-                        .fill(LinearGradient(colors: [.sacredGold, .sacredGoldDark], startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .fill(RadialGradient.sacredGoldShiny)
                         .frame(width: 40, height: 40)
+                        .shimmer()
+                        .clipShape(Circle())
                         .overlay(VajraIcon(size: 28, color: .white))
                     VStack(alignment: .leading) {
                         Text("ShantiSangha")

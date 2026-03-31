@@ -11,8 +11,10 @@ struct LoginView: View {
             // Logo
             VStack(spacing: 8) {
                 Circle()
-                    .fill(LinearGradient(colors: [.sacredGold, .sacredGoldDark], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .fill(RadialGradient.sacredGoldShiny)
                     .frame(width: 64, height: 64)
+                    .shimmer()
+                    .clipShape(Circle())
                     .overlay(
                         VajraIcon(size: 44, color: .white)
                     )
