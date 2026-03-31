@@ -109,7 +109,8 @@ struct HomeView: View {
                     .clipShape(Circle())
                     .shimmer()
                     .clipShape(Circle())
-                    .shadow(color: .sacredGold.opacity(0.3), radius: 8, y: 4)
+                    .shadow(color: .sacredGoldDark.opacity(0.4), radius: 2, y: 2)
+                    .shadow(color: .sacredGold.opacity(0.3), radius: 10, y: 6)
             }
             .padding(.trailing, 20)
             .padding(.bottom, 20)
