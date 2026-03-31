@@ -12,7 +12,7 @@ struct TaskRow: View {
     @State private var showMenu = false
     @State private var showProgress = false
     @State private var progressValue: Double = 0
-    @State private var showDeleteConfirm = false
+    @State private var navigateToDelete = false
 
     var isOverdue: Bool {
         task.type == .oneTime && (task.daysRemaining ?? 1) <= 0
@@ -100,15 +100,16 @@ struct TaskRow: View {
                 )
         }
         .background(
-            NavigationLink(destination: GoalDetailView(goalId: task.id), isActive: $navigateToDetail) {
-                EmptyView()
+            Group {
+                NavigationLink(destination: GoalDetailView(goalId: task.id), isActive: $navigateToDetail) {
+                    EmptyView()
+                }
+                NavigationLink(destination: DeleteTaskView(task: task, onDelete: onDelete), isActive: $navigateToDelete) {
+                    EmptyView()
+                }
             }
             .hidden()
         )
-        .confirmationDialog("Delete this task and all its history?", isPresented: $showDeleteConfirm) {
-            Button("Delete", role: .destructive) { onDelete() }
-            Button("Cancel", role: .cancel) {}
-        }
     }
 
     private var taskContent: some View {
@@ -156,9 +157,11 @@ struct TaskRow: View {
                             }
                         }
 
-                        Divider()
-
-                        Button(role: .destructive) { showDeleteConfirm = true } label: {
+                        Button {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                navigateToDelete = true
+                            }
+                        } label: {
                             Label("Delete", systemImage: "trash")
                         }
                     } label: {
