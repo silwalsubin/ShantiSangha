@@ -62,8 +62,11 @@ struct TaskRow: View {
             }
 
             // Card content
-            taskContent
-                .offset(x: offset)
+            NavigationLink(destination: GoalDetailView(goalId: task.id)) {
+                taskContent
+            }
+            .buttonStyle(.plain)
+            .offset(x: offset)
                 .gesture(
                     !task.checkedIn && !task.saving
                     ? DragGesture(minimumDistance: 20)
