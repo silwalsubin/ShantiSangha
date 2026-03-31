@@ -18,7 +18,92 @@ struct TaskRow: View {
         task.type == .oneTime && (task.daysRemaining ?? 1) <= 0
     }
 
+    @State private var offset: CGFloat = 0
+    @State private var activeSwipe: SwipeDirection? = nil
+    private let swipeThreshold: CGFloat = 80
+
+    private enum SwipeDirection {
+        case left, right
+    }
+
     var body: some View {
+        ZStack {
+            // Swipe background
+            HStack(spacing: 0) {
+                // Right swipe — complete (green)
+                HStack {
+                    Image(systemName: "checkmark")
+                        .font(.sacredTextSemibold)
+                        .foregroundColor(.white)
+                    Text("Done")
+                        .font(.sacredSmallSemibold)
+                        .foregroundColor(.white)
+                    Spacer()
+                }
+                .padding(.leading, 20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredGreen))
+                .opacity(offset > 0 ? 1 : 0)
+
+                // Left swipe — skip (muted)
+                HStack {
+                    Spacer()
+                    Text("Skip")
+                        .font(.sacredSmallSemibold)
+                        .foregroundColor(.white)
+                    Image(systemName: "forward.fill")
+                        .font(.sacredSmall)
+                        .foregroundColor(.white)
+                }
+                .padding(.trailing, 20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredMuted))
+                .opacity(offset < 0 ? 1 : 0)
+            }
+
+            // Card content
+            taskContent
+                .offset(x: offset)
+                .gesture(
+                    !task.checkedIn && !task.saving
+                    ? DragGesture(minimumDistance: 20)
+                        .onChanged { value in
+                            offset = value.translation.width
+                            if offset > swipeThreshold {
+                                activeSwipe = .right
+                            } else if offset < -swipeThreshold {
+                                activeSwipe = .left
+                            } else {
+                                activeSwipe = nil
+                            }
+                        }
+                        .onEnded { _ in
+                            if let swipe = activeSwipe {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    offset = swipe == .right ? 300 : -300
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                    if swipe == .right { onDone() } else { onSkip() }
+                                    offset = 0
+                                    activeSwipe = nil
+                                }
+                            } else {
+                                withAnimation(.spring(response: 0.3)) {
+                                    offset = 0
+                                }
+                            }
+                        }
+                    : nil
+                )
+        }
+        .confirmationDialog("Delete this task and all its history?", isPresented: $showDeleteConfirm) {
+            Button("Delete", role: .destructive) { onDelete() }
+            Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    private var taskContent: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
                 // Type icon
@@ -134,28 +219,6 @@ struct TaskRow: View {
                     .padding(.leading, 36)
             }
 
-            // Check-in buttons (not checked in)
-            if !task.checkedIn {
-                HStack(spacing: 12) {
-                    Button { onDone() } label: {
-                        Image(systemName: "checkmark")
-                            .font(.sacredTextSemibold)
-                            .foregroundColor(.white)
-                            .frame(width: 32, height: 32)
-                            .background(LinearGradient(colors: [.sacredGreen, .sacredGreenDark], startPoint: .topLeading, endPoint: .bottomTrailing))
-                            .clipShape(Circle())
-                    }
-
-                    Button { onSkip() } label: {
-                        Image(systemName: "forward.fill")
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredMutedLight)
-                            .frame(width: 32, height: 32)
-                            .overlay(Circle().stroke(Color.sacredMuted.opacity(0.2), lineWidth: 1))
-                    }
-                }
-                .padding(.leading, 36)
-            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -175,9 +238,5 @@ struct TaskRow: View {
                                 : Color.sacredMuted.opacity(0.12), lineWidth: 1)
                 )
         )
-        .confirmationDialog("Delete this task and all its history?", isPresented: $showDeleteConfirm) {
-            Button("Delete", role: .destructive) { onDelete() }
-            Button("Cancel", role: .cancel) {}
-        }
     }
 }
