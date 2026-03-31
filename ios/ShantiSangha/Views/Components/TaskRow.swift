@@ -20,6 +20,7 @@ struct TaskRow: View {
 
     @State private var offset: CGFloat = 0
     @State private var activeSwipe: SwipeDirection? = nil
+    @State private var navigateToDetail = false
     private let swipeThreshold: CGFloat = 80
 
     private enum SwipeDirection {
@@ -28,9 +29,8 @@ struct TaskRow: View {
 
     var body: some View {
         ZStack {
-            // Swipe background
-            HStack(spacing: 0) {
-                // Right swipe — complete (green)
+            // Swipe background — single layer behind the card
+            if offset > 0 {
                 HStack {
                     Image(systemName: "checkmark")
                         .font(.sacredTextSemibold)
@@ -43,9 +43,7 @@ struct TaskRow: View {
                 .padding(.leading, 20)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredGreen))
-                .opacity(offset > 0 ? 1 : 0)
-
-                // Left swipe — skip (muted)
+            } else if offset < 0 {
                 HStack {
                     Spacer()
                     Text("Skip")
@@ -58,15 +56,16 @@ struct TaskRow: View {
                 .padding(.trailing, 20)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredMuted))
-                .opacity(offset < 0 ? 1 : 0)
             }
 
             // Card content
-            NavigationLink(destination: GoalDetailView(goalId: task.id)) {
-                taskContent
-            }
-            .buttonStyle(.plain)
-            .offset(x: offset)
+            taskContent
+                .onTapGesture {
+                    if activeSwipe == nil {
+                        navigateToDetail = true
+                    }
+                }
+                .offset(x: offset)
                 .gesture(
                     !task.checkedIn && !task.saving
                     ? DragGesture(minimumDistance: 20)
@@ -100,6 +99,12 @@ struct TaskRow: View {
                     : nil
                 )
         }
+        .background(
+            NavigationLink(destination: GoalDetailView(goalId: task.id), isActive: $navigateToDetail) {
+                EmptyView()
+            }
+            .hidden()
+        )
         .confirmationDialog("Delete this task and all its history?", isPresented: $showDeleteConfirm) {
             Button("Delete", role: .destructive) { onDelete() }
             Button("Cancel", role: .cancel) {}
