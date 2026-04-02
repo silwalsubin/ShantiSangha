@@ -145,7 +145,7 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity)
             case .connected(let sv):
                 infoRow(icon: "server.rack", label: "Git hash", value: sv.gitHash)
-                infoRow(icon: "clock", label: "Built", value: sv.buildTime)
+                infoRow(icon: "clock", label: "Built", value: formatBuildTime(sv.buildTime))
             case .unreachable:
                 VStack(spacing: 8) {
                     Text("Unable to reach server")
@@ -199,6 +199,20 @@ struct SettingsView: View {
     }
 
     // MARK: - Helpers
+
+    private func formatBuildTime(_ raw: String) -> String {
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let isoBasic = ISO8601DateFormatter()
+        isoBasic.formatOptions = [.withInternetDateTime]
+
+        guard let date = iso.date(from: raw) ?? isoBasic.date(from: raw) else { return raw }
+
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .short
+        return f.string(from: date)
+    }
 
     private func fetchServerVersion() async {
         do {
