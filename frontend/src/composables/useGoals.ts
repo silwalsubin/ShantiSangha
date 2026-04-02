@@ -107,7 +107,7 @@ export function useGoals() {
       }
 
       // Load all goals for milestones
-      const allData = await api.get<any>('/goals')
+      const allData = await api.get<any>(`/goals?date=${today()}`)
       const allItems = Array.isArray(allData) ? allData : (allData?.goals || allData?.items || [])
 
       const milestones: TaskInternal[] = allItems

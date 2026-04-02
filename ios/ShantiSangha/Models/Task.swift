@@ -10,6 +10,7 @@ struct AppTask: Codable, Identifiable {
     var daysRemaining: Int?
     var progress: Int
     var checkIn: CheckInData?
+    var completedAt: String?
 
     // Internal — not from API, computed locally
     var feedbackMessage: String?
@@ -22,7 +23,7 @@ struct AppTask: Codable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case id, title, type, checkedIn, completedToday, daysRemaining, progress, checkIn
-        case currentStreak, longestStreak
+        case completedAt, currentStreak, longestStreak
     }
 
     /// Create from local cache
@@ -63,6 +64,7 @@ struct AppTask: Codable, Identifiable {
         checkIn = try c.decodeIfPresent(CheckInData.self, forKey: .checkIn)
         checkedIn = checkIn != nil
         completedToday = checkIn?.completed
+        completedAt = try c.decodeIfPresent(String.self, forKey: .completedAt)
         daysRemaining = try c.decodeIfPresent(Int.self, forKey: .daysRemaining)
         progress = try c.decodeIfPresent(Int.self, forKey: .progress) ?? 0
         currentStreak = try c.decodeIfPresent(Int.self, forKey: .currentStreak) ?? 0

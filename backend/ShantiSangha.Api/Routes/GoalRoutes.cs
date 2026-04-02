@@ -73,7 +73,7 @@ public static class GoalRoutes
     }
 
     private static async Task<IResult> ListGoals(
-        ICurrentUser currentUser, AppDbContext db)
+        ICurrentUser currentUser, AppDbContext db, string? date = null)
     {
         var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
@@ -84,7 +84,9 @@ public static class GoalRoutes
             .OrderBy(g => g.CreatedAt)
             .ToListAsync();
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = date is not null && DateOnly.TryParse(date, out var parsed)
+            ? parsed
+            : DateOnly.FromDateTime(DateTime.UtcNow);
 
         var result = goals.Select(g =>
         {
@@ -284,24 +286,31 @@ public static class GoalRoutes
         {
             existing.Completed = body.Completed;
             existing.Note = body.Note;
-            await db.SaveChangesAsync();
-            return Results.Ok(new { existing.Id, existing.Date, existing.Completed, existing.Note });
+        }
+        else
+        {
+            var checkIn = new GoalCheckIn
+            {
+                Id = Guid.NewGuid(),
+                GoalId = id,
+                Date = today,
+                Completed = body.Completed,
+                Note = body.Note,
+                CreatedAt = DateTime.UtcNow
+            };
+            db.GoalCheckIns.Add(checkIn);
+            existing = checkIn;
         }
 
-        var checkIn = new GoalCheckIn
-        {
-            Id = Guid.NewGuid(),
-            GoalId = id,
-            Date = today,
-            Completed = body.Completed,
-            Note = body.Note,
-            CreatedAt = DateTime.UtcNow
-        };
+        // Milestones: mark permanently completed when checked in as done
+        if (goal.Type == GoalType.OneTime && body.Completed)
+            goal.CompletedAt = DateTime.UtcNow;
+        else if (goal.Type == GoalType.OneTime && !body.Completed)
+            goal.CompletedAt = null;
 
-        db.GoalCheckIns.Add(checkIn);
         await db.SaveChangesAsync();
 
-        return Results.Created($"/goals/{id}/checkin", new { checkIn.Id, checkIn.Date, checkIn.Completed, checkIn.Note });
+        return Results.Ok(new { existing.Id, existing.Date, existing.Completed, existing.Note });
     }
 
     private static async Task<IResult> UndoCheckIn(
@@ -325,6 +334,11 @@ public static class GoalRoutes
         if (existing is null) return Results.NotFound();
 
         db.GoalCheckIns.Remove(existing);
+
+        // Milestones: clear permanent completion when undone
+        if (goal.Type == GoalType.OneTime)
+            goal.CompletedAt = null;
+
         await db.SaveChangesAsync();
 
         return Results.NoContent();

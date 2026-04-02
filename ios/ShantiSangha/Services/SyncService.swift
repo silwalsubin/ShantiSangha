@@ -25,7 +25,14 @@ actor SyncService {
     /// Queue a write operation for background sync
     func enqueue(method: String, path: String, body: Encodable? = nil, tempId: String? = nil) {
         guard let container = modelContainer else { return }
-        let bodyData = body != nil ? try? JSONEncoder().encode(body!) : nil
+        let bodyData: Data?
+        if let rawBody = body as? RawData {
+            bodyData = rawBody.data
+        } else if let body = body {
+            bodyData = try? JSONEncoder().encode(body)
+        } else {
+            bodyData = nil
+        }
 
         let context = ModelContext(container)
         let item = SyncQueueItem(method: method, path: path, body: bodyData, tempId: tempId)
@@ -92,34 +99,36 @@ actor SyncService {
                 // Handle temp ID replacement for create operations
                 if let tempId = item.tempId, let created = response {
                     await replaceTempId(tempId, with: created, in: context)
+                    await log(.info, "Created \(item.path) → \(created.id)")
                 } else {
-                    // Mark the resource as synced
                     await markResourceSynced(from: item.path)
+                    await log(.info, "Synced \(item.method) \(item.path)")
                 }
 
                 context.delete(item)
             } catch {
-                if case ApiError.httpError(let statusCode, _) = error {
+                if case ApiError.httpError(let statusCode, let responseData) = error {
                     switch statusCode {
                     case 404:
                         // Resource gone server-side — discard
-                        print("[Sync] 404 for \(item.method) \(item.path) — discarding")
+                        await log(.warn, "404 \(item.method) \(item.path) — discarding")
                         context.delete(item)
                     case 401:
                         // Token expired — don't count as retry, stop draining
-                        print("[Sync] 401 — token may be expired, will retry later")
+                        await log(.warn, "401 — token may be expired, will retry later")
                         item.lastAttemptedAt = Date()
                         try? context.save()
                         break
                     default:
                         item.retryCount += 1
                         item.lastAttemptedAt = Date()
-                        print("[Sync] Failed \(item.method) \(item.path): HTTP \(statusCode) (retry \(item.retryCount))")
+                        let body = String(data: responseData, encoding: .utf8) ?? ""
+                        await log(.error, "\(item.method) \(item.path): HTTP \(statusCode) \(body) (retry \(item.retryCount))")
                     }
                 } else {
                     item.retryCount += 1
                     item.lastAttemptedAt = Date()
-                    print("[Sync] Failed \(item.method) \(item.path): \(error) (retry \(item.retryCount))")
+                    await log(.error, "\(item.method) \(item.path): \(error) (retry \(item.retryCount))")
                 }
             }
         }
@@ -193,6 +202,17 @@ actor SyncService {
 
         await MainActor.run {
             TaskRepository.shared.markSynced(id: resourceId)
+        }
+    }
+
+    /// Log to AppLogger from actor context
+    private func log(_ level: AppLogger.LogEntry.Level, _ message: String) async {
+        await MainActor.run {
+            switch level {
+            case .info: AppLogger.shared.info("Sync", message)
+            case .warn: AppLogger.shared.warn("Sync", message)
+            case .error: AppLogger.shared.error("Sync", message)
+            }
         }
     }
 }

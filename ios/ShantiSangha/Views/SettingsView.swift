@@ -63,6 +63,33 @@ struct SettingsView: View {
                 // App Server
                 serverCard
 
+                // Logs
+                NavigationLink(destination: LogsView()) {
+                    HStack {
+                        Image(systemName: "doc.text")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
+                        Text("Logs")
+                            .font(.sacredText)
+                            .foregroundColor(.sacredText)
+                        Spacer()
+                        if SyncStatus.shared.pendingCount > 0 {
+                            Text("\(SyncStatus.shared.pendingCount)")
+                                .font(.sacredSmallSemibold)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Color.sacredRed))
+                        }
+                        Image(systemName: "chevron.right")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
+                    }
+                    .padding(16)
+                    .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
+                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.1)))
+                }
+
                 // Sign out
                 Button {
                     showSignOutConfirmation = true

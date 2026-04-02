@@ -39,10 +39,14 @@ class TaskRepository: ObservableObject {
             let todayItems: [AppTask] = try await api.get("/goals/today?date=\(dateStr)")
 
             // Fetch all (for milestones)
-            let allGoals: [AppTask] = try await api.get("/goals")
-            let milestones = allGoals.filter { $0.type == .oneTime }
+            let allGoals: [AppTask] = try await api.get("/goals?date=\(dateStr)")
+            let milestones = allGoals.filter { $0.type == .oneTime && $0.completedAt == nil }
 
             let allTasks = todayItems + milestones
+            AppLogger.shared.info("Repo", "Refresh: \(todayItems.count) recurring, \(milestones.count) milestones")
+            for t in todayItems {
+                AppLogger.shared.info("Repo", "  \(t.title): checkedIn=\(t.checkedIn) completedToday=\(String(describing: t.completedToday))")
+            }
 
             // Update local DB
             guard let ctx = modelContext else { return }
@@ -106,7 +110,7 @@ class TaskRepository: ObservableObject {
 
             tasks = result
         } catch {
-            print("[Repository] Failed to refresh: \(error)")
+            AppLogger.shared.error("Repo", "Refresh failed: \(error)")
             // Keep showing local data
         }
 
@@ -116,22 +120,31 @@ class TaskRepository: ObservableObject {
     // MARK: - Writes (local first + queue sync)
 
     func checkIn(id: String, completed: Bool) async {
-        // Update local
         if let idx = tasks.firstIndex(where: { $0.id == id }) {
-            tasks[idx].feedbackMessage = FeedbackService.generate(
-                currentStreak: tasks[idx].currentStreak,
-                longestStreak: tasks[idx].longestStreak,
-                completed: completed
-            )
-            tasks[idx].checkedIn = true
-            tasks[idx].completedToday = completed
-            if completed { tasks[idx].currentStreak += 1 }
-            else { tasks[idx].currentStreak = 0 }
-            updateLocal(tasks[idx], pending: true)
+            let isMilestone = tasks[idx].type == .oneTime
+
+            if isMilestone && completed {
+                // Milestone completed permanently — remove from list
+                let task = tasks[idx]
+                tasks.remove(at: idx)
+                deleteLocal(id: task.id)
+            } else {
+                // Recurring task or milestone skip — update check-in state
+                tasks[idx].feedbackMessage = FeedbackService.generate(
+                    currentStreak: tasks[idx].currentStreak,
+                    longestStreak: tasks[idx].longestStreak,
+                    completed: completed
+                )
+                tasks[idx].checkedIn = true
+                tasks[idx].completedToday = completed
+                if completed { tasks[idx].currentStreak += 1 }
+                else { tasks[idx].currentStreak = 0 }
+                updateLocal(tasks[idx], pending: true)
+            }
         }
 
         // Queue sync
-        let body = ["completed": completed, "date": localDateStr()] as [String: Any]
+        let body: [String: Any] = ["completed": completed, "note": NSNull(), "date": localDateStr()]
         if let data = try? JSONSerialization.data(withJSONObject: body) {
             await sync.enqueue(method: "POST", path: "/goals/\(id)/checkin", body: RawData(data: data))
         }
