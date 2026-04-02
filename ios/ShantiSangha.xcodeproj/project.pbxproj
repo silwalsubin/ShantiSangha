@@ -11,14 +11,41 @@
 		045258EF2F7B107400A03634 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 045258EE2F7B107400A03634 /* GoogleSignInSwift */; };
 		045258F22F7B118100A03634 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 045258F12F7B118100A03634 /* FirebaseAuth */; };
 		045258F42F7B118900A03634 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 045258F32F7B118900A03634 /* FirebaseCore */; };
+		0456C3CF9D12840A26ECAA6C /* FeedbackServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95AD8709C353998FDE5BE52E /* FeedbackServiceTests.swift */; };
+		1C6E8B19452EBF1F0FBF377F /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 608EE11F5A81C4476766F59E /* Foundation.framework */; };
+		244EBA0B449278CC7958DB5B /* TaskModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A09E248379299BAC76B4CF2 /* TaskModelTests.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		73DF12EFC99BBB3E3ADB394A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 04A24D8E2F7AFC1400775F13 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 04A24D952F7AFC1400775F13;
+			remoteInfo = ShantiSangha;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		04A24D962F7AFC1400775F13 /* ShantiSangha.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ShantiSangha.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		608EE11F5A81C4476766F59E /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		7A09E248379299BAC76B4CF2 /* TaskModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskModelTests.swift; sourceTree = "<group>"; };
+		95AD8709C353998FDE5BE52E /* FeedbackServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeedbackServiceTests.swift; sourceTree = "<group>"; };
+		EB354C813E86D53BA84588A6 /* ShantiSanghaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShantiSanghaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		04A24D982F7AFC1400775F13 /* ShantiSangha */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = ShantiSangha; sourceTree = "<group>"; };
+		04A24D982F7AFC1400775F13 /* ShantiSangha */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = ShantiSangha;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -33,12 +60,21 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		8C700ECEC94264F9D1B10C8B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1C6E8B19452EBF1F0FBF377F /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		045258F02F7B118100A03634 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				96E7420C74145C979CA12D67 /* iOS */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -49,6 +85,7 @@
 				04A24D982F7AFC1400775F13 /* ShantiSangha */,
 				045258F02F7B118100A03634 /* Frameworks */,
 				04A24D972F7AFC1400775F13 /* Products */,
+				AAD30E61CB8C3C0D28AE320A /* ShantiSanghaTests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -56,13 +93,50 @@
 			isa = PBXGroup;
 			children = (
 				04A24D962F7AFC1400775F13 /* ShantiSangha.app */,
+				EB354C813E86D53BA84588A6 /* ShantiSanghaTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		96E7420C74145C979CA12D67 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				608EE11F5A81C4476766F59E /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		AAD30E61CB8C3C0D28AE320A /* ShantiSanghaTests */ = {
+			isa = PBXGroup;
+			children = (
+				95AD8709C353998FDE5BE52E /* FeedbackServiceTests.swift */,
+				7A09E248379299BAC76B4CF2 /* TaskModelTests.swift */,
+			);
+			name = ShantiSanghaTests;
+			path = ShantiSanghaTests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		036D118A165478DCC2E12937 /* ShantiSanghaTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0036C9799539DE1DEA83FC67 /* Build configuration list for PBXNativeTarget "ShantiSanghaTests" */;
+			buildPhases = (
+				62F98B83E17CC4595D3E8902 /* Sources */,
+				8C700ECEC94264F9D1B10C8B /* Frameworks */,
+				5CAF04E643C747E4AA5E9AB6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5DD37EA92576EE2B44565BD1 /* PBXTargetDependency */,
+			);
+			name = ShantiSanghaTests;
+			productName = ShantiSanghaTests;
+			productReference = EB354C813E86D53BA84588A6 /* ShantiSanghaTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		04A24D952F7AFC1400775F13 /* ShantiSangha */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 04A24DA12F7AFC1600775F13 /* Build configuration list for PBXNativeTarget "ShantiSangha" */;
@@ -123,12 +197,20 @@
 			projectRoot = "";
 			targets = (
 				04A24D952F7AFC1400775F13 /* ShantiSangha */,
+				036D118A165478DCC2E12937 /* ShantiSanghaTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		04A24D942F7AFC1400775F13 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5CAF04E643C747E4AA5E9AB6 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -145,7 +227,25 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		62F98B83E17CC4595D3E8902 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0456C3CF9D12840A26ECAA6C /* FeedbackServiceTests.swift in Sources */,
+				244EBA0B449278CC7958DB5B /* TaskModelTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		5DD37EA92576EE2B44565BD1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = ShantiSangha;
+			target = 04A24D952F7AFC1400775F13 /* ShantiSangha */;
+			targetProxy = 73DF12EFC99BBB3E3ADB394A /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		04A24D9F2F7AFC1600775F13 /* Debug */ = {
@@ -331,9 +431,53 @@
 			};
 			name = Release;
 		};
+		8FEB45B6A229C4D7C6067556 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.shantisangha.tests;
+				PRODUCT_NAME = ShantiSanghaTests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ShantiSangha.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ShantiSangha";
+			};
+			name = Debug;
+		};
+		B43053D139D71A7CA13C9FC1 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.shantisangha.tests;
+				PRODUCT_NAME = ShantiSanghaTests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ShantiSangha.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/ShantiSangha";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		0036C9799539DE1DEA83FC67 /* Build configuration list for PBXNativeTarget "ShantiSanghaTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B43053D139D71A7CA13C9FC1 /* Release */,
+				8FEB45B6A229C4D7C6067556 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		04A24D912F7AFC1400775F13 /* Build configuration list for PBXProject "ShantiSangha" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
