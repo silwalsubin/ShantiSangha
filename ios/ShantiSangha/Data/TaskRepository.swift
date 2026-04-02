@@ -47,11 +47,15 @@ class TaskRepository: ObservableObject {
             // Update local DB
             guard let ctx = modelContext else { return }
             for task in allTasks {
+                let id = task.id
                 let descriptor = FetchDescriptor<CachedTask>(
-                    predicate: #Predicate { $0.id == task.id }
+                    predicate: #Predicate { $0.id == id }
                 )
                 if let existing = try? ctx.fetch(descriptor).first {
-                    existing.update(from: task)
+                    // Don't overwrite if local has pending unsynced changes
+                    if !existing.hasPendingChanges {
+                        existing.update(from: task)
+                    }
                 } else {
                     let cached = CachedTask(
                         id: task.id, title: task.title,
@@ -68,11 +72,14 @@ class TaskRepository: ObservableObject {
             }
 
             // Remove tasks that no longer exist on server
+            // but keep tasks with pending changes (they may have temp IDs)
             let serverIds = Set(allTasks.map(\.id))
             let allLocal = FetchDescriptor<CachedTask>()
             if let localTasks = try? ctx.fetch(allLocal) {
                 for local in localTasks where !serverIds.contains(local.id) {
-                    ctx.delete(local)
+                    if !local.hasPendingChanges {
+                        ctx.delete(local)
+                    }
                 }
             }
 
@@ -87,6 +94,14 @@ class TaskRepository: ObservableObject {
                     longestStreak: result[i].longestStreak,
                     completed: result[i].completedToday ?? false
                 )
+            }
+
+            // Merge with any local-only tasks (pending creates with temp IDs)
+            let serverResultIds = Set(result.map(\.id))
+            if let localTasks = try? ctx.fetch(FetchDescriptor<CachedTask>()) {
+                for local in localTasks where !serverResultIds.contains(local.id) && local.hasPendingChanges {
+                    result.append(local.toAppTask())
+                }
             }
 
             tasks = result
@@ -112,7 +127,7 @@ class TaskRepository: ObservableObject {
             tasks[idx].completedToday = completed
             if completed { tasks[idx].currentStreak += 1 }
             else { tasks[idx].currentStreak = 0 }
-            updateLocal(tasks[idx])
+            updateLocal(tasks[idx], pending: true)
         }
 
         // Queue sync
@@ -127,7 +142,7 @@ class TaskRepository: ObservableObject {
             tasks[idx].checkedIn = false
             tasks[idx].completedToday = nil
             tasks[idx].feedbackMessage = nil
-            updateLocal(tasks[idx])
+            updateLocal(tasks[idx], pending: true)
         }
 
         await sync.enqueue(method: "DELETE", path: "/goals/\(id)/checkin?date=\(localDateStr())")
@@ -142,7 +157,7 @@ class TaskRepository: ObservableObject {
     func updateProgress(id: String, value: Int) async {
         if let idx = tasks.firstIndex(where: { $0.id == id }) {
             tasks[idx].progress = value
-            updateLocal(tasks[idx])
+            updateLocal(tasks[idx], pending: true)
         }
 
         let body = ["progress": value]
@@ -159,44 +174,65 @@ class TaskRepository: ObservableObject {
             daysRemaining: nil, progress: 0
         )
         tasks.append(newTask)
-        insertLocal(newTask)
+        insertLocal(newTask, pending: true)
 
-        // Sync to server and get real ID
-        do {
-            var body: [String: String] = ["title": title, "type": type.rawValue]
-            if let date = targetDate { body["targetDate"] = date }
-            let created: AppTask = try await api.post("/goals", body: body)
+        // Queue sync — SyncService will replace temp ID with real ID on success
+        var body: [String: String] = ["title": title, "type": type.rawValue]
+        if let date = targetDate { body["targetDate"] = date }
+        if let data = try? JSONSerialization.data(withJSONObject: body) {
+            await sync.enqueue(method: "POST", path: "/goals", body: RawData(data: data), tempId: tempId)
+        }
+    }
 
-            // Replace temp with real
-            if let idx = tasks.firstIndex(where: { $0.id == tempId }) {
-                tasks[idx] = created
-            }
-            deleteLocal(id: tempId)
-            insertLocal(created)
-        } catch {
-            print("[Repository] Failed to create task: \(error)")
+    // MARK: - Sync callbacks
+
+    /// Called by SyncService after a create operation resolves the real server ID
+    func replaceTempWithReal(tempId: String, real: AppTask) {
+        // Update in-memory tasks
+        if let idx = tasks.firstIndex(where: { $0.id == tempId }) {
+            tasks[idx] = real
+        }
+        // Update local DB
+        deleteLocal(id: tempId)
+        insertLocal(real, pending: false)
+    }
+
+    /// Called by SyncService after a successful sync to clear pending flag
+    func markSynced(id: String) {
+        guard let ctx = modelContext else { return }
+        let descriptor = FetchDescriptor<CachedTask>(predicate: #Predicate { $0.id == id })
+        if let existing = try? ctx.fetch(descriptor).first {
+            existing.hasPendingChanges = false
+            existing.lastSyncedAt = Date()
+            try? ctx.save()
+        }
+        // Update in-memory
+        if let idx = tasks.firstIndex(where: { $0.id == id }) {
+            tasks[idx].hasPendingChanges = false
         }
     }
 
     // MARK: - Local DB helpers
 
-    private func updateLocal(_ task: AppTask) {
+    private func updateLocal(_ task: AppTask, pending: Bool) {
         guard let ctx = modelContext else { return }
         let id = task.id
         let descriptor = FetchDescriptor<CachedTask>(predicate: #Predicate { $0.id == id })
         if let existing = try? ctx.fetch(descriptor).first {
             existing.update(from: task)
+            if pending { existing.hasPendingChanges = true }
             try? ctx.save()
         }
     }
 
-    private func insertLocal(_ task: AppTask) {
+    private func insertLocal(_ task: AppTask, pending: Bool) {
         guard let ctx = modelContext else { return }
         let cached = CachedTask(
             id: task.id, title: task.title, type: task.type.rawValue,
             currentStreak: task.currentStreak, longestStreak: task.longestStreak,
             daysRemaining: task.daysRemaining, progress: task.progress,
-            checkedIn: task.checkedIn, completedToday: task.completedToday
+            checkedIn: task.checkedIn, completedToday: task.completedToday,
+            hasPendingChanges: pending
         )
         ctx.insert(cached)
         try? ctx.save()

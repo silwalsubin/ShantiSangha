@@ -132,13 +132,33 @@ class SyncService {
 **Retry strategy:**
 - Immediate retry on transient errors (timeout, no connection)
 - Max 5 retries per item
-- Exponential backoff: 1s, 2s, 4s, 8s, 16s
+- Exponential backoff: 1s, 2s, 4s, 8s, 16s (tracked via `lastAttemptedAt` on each queue item)
 - Items older than 24h are discarded
+- 401 errors don't count as retries (token refresh handled automatically)
+- Drain is guarded by `isDraining` flag to prevent concurrent processing
 
 **Conflict resolution:**
-- Server wins for reads (refreshFromServer overwrites local)
+- Server wins for reads — but only for tasks without `hasPendingChanges`
 - Client wins for pending writes (queued actions always sent)
-- If a write fails with 404 (resource deleted server-side), discard the queue item
+- If a write fails with 404 (resource deleted server-side), discard the queue item immediately
+- Tasks with `hasPendingChanges == true` are protected from server overwrites and deletion during refresh
+- After successful sync, `hasPendingChanges` is cleared and `lastSyncedAt` updated
+
+**Create task flow:**
+- Task created locally with temp UUID, `hasPendingChanges = true`
+- Queued as POST with `tempId` set on the `SyncQueueItem`
+- On sync success, `SyncService` decodes server response to get real ID
+- Temp ID replaced in local DB and remaining queue items that reference it
+- `TaskRepository.replaceTempWithReal()` handles the swap
+
+**Sync status (UI indicators):**
+- `SyncStatus.shared.syncing` — true while drain is in progress
+- `SyncStatus.shared.pendingCount` — number of unsynced queue items
+- `task.hasPendingChanges` — per-task flag for showing pending dot
+
+**DB migration safety:**
+- If SwiftData migration fails on app launch (schema change), the local store is deleted and recreated
+- Data is re-fetched from server on next refresh — no data loss since server is authoritative for reads
 
 ## Network Reachability
 

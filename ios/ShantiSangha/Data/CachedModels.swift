@@ -17,10 +17,12 @@ class CachedTask {
     var completedToday: Bool?
     var feedbackMessage: String?
     var lastSyncedAt: Date
+    var hasPendingChanges: Bool
 
     init(id: String, title: String, type: String, currentStreak: Int = 0,
          longestStreak: Int = 0, daysRemaining: Int? = nil, progress: Int = 0,
-         checkedIn: Bool = false, completedToday: Bool? = nil) {
+         checkedIn: Bool = false, completedToday: Bool? = nil,
+         hasPendingChanges: Bool = false) {
         self.id = id
         self.title = title
         self.type = type
@@ -31,6 +33,7 @@ class CachedTask {
         self.checkedIn = checkedIn
         self.completedToday = completedToday
         self.lastSyncedAt = Date()
+        self.hasPendingChanges = hasPendingChanges
     }
 
     /// Convert to the view-layer AppTask type
@@ -42,6 +45,7 @@ class CachedTask {
             checkedIn: checkedIn, completedToday: completedToday
         )
         task.feedbackMessage = feedbackMessage
+        task.hasPendingChanges = hasPendingChanges
         return task
     }
 
@@ -55,6 +59,7 @@ class CachedTask {
         checkedIn = task.checkedIn
         completedToday = task.completedToday
         lastSyncedAt = Date()
+        hasPendingChanges = false
     }
 }
 
@@ -81,13 +86,17 @@ class SyncQueueItem {
     var body: Data?
     var createdAt: Date
     var retryCount: Int
+    var tempId: String?
+    var lastAttemptedAt: Date?
 
-    init(method: String, path: String, body: Data? = nil) {
+    init(method: String, path: String, body: Data? = nil, tempId: String? = nil) {
         self.id = UUID().uuidString
         self.method = method
         self.path = path
         self.body = body
         self.createdAt = Date()
         self.retryCount = 0
+        self.tempId = tempId
+        self.lastAttemptedAt = nil
     }
 }

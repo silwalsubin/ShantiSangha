@@ -1,6 +1,14 @@
 import Foundation
 import SwiftData
 
+/// Observable sync status for UI indicators.
+@MainActor
+class SyncStatus: ObservableObject {
+    static let shared = SyncStatus()
+    @Published var syncing = false
+    @Published var pendingCount = 0
+}
+
 /// Manages queued writes for offline-first sync.
 /// When online: sends immediately. When offline: queues for later.
 actor SyncService {
@@ -8,66 +16,144 @@ actor SyncService {
 
     private let api = ApiService.shared
     private var modelContainer: ModelContainer?
+    private var isDraining = false
 
     func configure(container: ModelContainer) {
         self.modelContainer = container
     }
 
     /// Queue a write operation for background sync
-    func enqueue(method: String, path: String, body: Encodable? = nil) {
+    func enqueue(method: String, path: String, body: Encodable? = nil, tempId: String? = nil) {
         guard let container = modelContainer else { return }
         let bodyData = body != nil ? try? JSONEncoder().encode(body!) : nil
 
         let context = ModelContext(container)
-        let item = SyncQueueItem(method: method, path: path, body: bodyData)
+        let item = SyncQueueItem(method: method, path: path, body: bodyData, tempId: tempId)
         context.insert(item)
         try? context.save()
+
+        // Update pending count
+        let count = (try? context.fetch(FetchDescriptor<SyncQueueItem>()))?.count ?? 0
+        Task { @MainActor in SyncStatus.shared.pendingCount = count }
 
         // Try to send immediately
         Task { await drain() }
     }
 
-    /// Send all pending queue items
+    /// Send all pending queue items with exponential backoff, 404/401 handling
     func drain() async {
         guard let container = modelContainer else { return }
-        let context = ModelContext(container)
+        guard !isDraining else { return }
+        isDraining = true
+        defer { isDraining = false }
 
+        await MainActor.run { SyncStatus.shared.syncing = true }
+
+        let context = ModelContext(container)
         let descriptor = FetchDescriptor<SyncQueueItem>(
             sortBy: [SortDescriptor(\.createdAt)]
         )
 
-        guard let items = try? context.fetch(descriptor), !items.isEmpty else { return }
+        guard let items = try? context.fetch(descriptor), !items.isEmpty else {
+            await MainActor.run {
+                SyncStatus.shared.syncing = false
+                SyncStatus.shared.pendingCount = 0
+            }
+            return
+        }
+
+        var hasSkippedItems = false
 
         for item in items {
-            // Skip items older than 24h
+            // Discard items older than 24h
             if item.createdAt.timeIntervalSinceNow < -86400 {
                 context.delete(item)
                 continue
             }
 
-            // Skip items that have been retried too many times
+            // Discard items that exceeded max retries
             if item.retryCount >= 5 {
                 context.delete(item)
                 continue
             }
 
+            // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+            if item.retryCount > 0, let lastAttempt = item.lastAttemptedAt {
+                let backoff = pow(2.0, Double(item.retryCount - 1))
+                if Date().timeIntervalSince(lastAttempt) < backoff {
+                    hasSkippedItems = true
+                    continue
+                }
+            }
+
             do {
-                try await sendItem(item)
+                let response = try await sendItem(item)
+
+                // Handle temp ID replacement for create operations
+                if let tempId = item.tempId, let created = response {
+                    await replaceTempId(tempId, with: created, in: context)
+                } else {
+                    // Mark the resource as synced
+                    await markResourceSynced(from: item.path)
+                }
+
                 context.delete(item)
             } catch {
-                item.retryCount += 1
-                print("[Sync] Failed to sync \(item.method) \(item.path): \(error) (retry \(item.retryCount))")
+                if case ApiError.httpError(let statusCode, _) = error {
+                    switch statusCode {
+                    case 404:
+                        // Resource gone server-side — discard
+                        print("[Sync] 404 for \(item.method) \(item.path) — discarding")
+                        context.delete(item)
+                    case 401:
+                        // Token expired — don't count as retry, stop draining
+                        print("[Sync] 401 — token may be expired, will retry later")
+                        item.lastAttemptedAt = Date()
+                        try? context.save()
+                        break
+                    default:
+                        item.retryCount += 1
+                        item.lastAttemptedAt = Date()
+                        print("[Sync] Failed \(item.method) \(item.path): HTTP \(statusCode) (retry \(item.retryCount))")
+                    }
+                } else {
+                    item.retryCount += 1
+                    item.lastAttemptedAt = Date()
+                    print("[Sync] Failed \(item.method) \(item.path): \(error) (retry \(item.retryCount))")
+                }
             }
         }
 
         try? context.save()
+
+        // Update UI state
+        let remaining = (try? context.fetch(FetchDescriptor<SyncQueueItem>()))?.count ?? 0
+        await MainActor.run {
+            SyncStatus.shared.syncing = false
+            SyncStatus.shared.pendingCount = remaining
+        }
+
+        // Re-drain after delay if items were skipped due to backoff
+        if hasSkippedItems {
+            Task {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                await self.drain()
+            }
+        }
     }
 
-    private func sendItem(_ item: SyncQueueItem) async throws {
+    /// Send a single queue item. Returns decoded AppTask for POST creates.
+    private func sendItem(_ item: SyncQueueItem) async throws -> AppTask? {
         switch item.method {
         case "POST":
             if let body = item.body {
-                let _: EmptyResponse = try await api.postRaw(item.path, body: body)
+                if item.tempId != nil {
+                    // Create operation — decode the response to get real ID
+                    let created: AppTask = try await api.postRaw(item.path, body: body)
+                    return created
+                } else {
+                    let _: EmptyResponse = try await api.postRaw(item.path, body: body)
+                }
             }
         case "PATCH":
             if let body = item.body {
@@ -77,6 +163,36 @@ actor SyncService {
             try await api.delete(item.path)
         default:
             break
+        }
+        return nil
+    }
+
+    /// Replace temp ID with real server ID in local DB and remaining queue items
+    private func replaceTempId(_ tempId: String, with created: AppTask, in context: ModelContext) async {
+        // Update local CachedTask: delete temp, insert real
+        await MainActor.run {
+            let repo = TaskRepository.shared
+            repo.replaceTempWithReal(tempId: tempId, real: created)
+        }
+
+        // Rewrite paths in remaining queue items that reference the temp ID
+        let descriptor = FetchDescriptor<SyncQueueItem>()
+        if let remaining = try? context.fetch(descriptor) {
+            for item in remaining where item.path.contains(tempId) {
+                item.path = item.path.replacingOccurrences(of: tempId, with: created.id)
+            }
+        }
+    }
+
+    /// Mark the resource as synced in the local DB
+    private func markResourceSynced(from path: String) async {
+        // Extract resource ID from paths like /goals/{id}/checkin or /goals/{id}
+        let parts = path.split(separator: "/")
+        guard parts.count >= 2 else { return }
+        let resourceId = String(parts[1]) // /goals/{id}...
+
+        await MainActor.run {
+            TaskRepository.shared.markSynced(id: resourceId)
         }
     }
 }

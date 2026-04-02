@@ -34,7 +34,19 @@ struct ShantiSanghaApp: App {
         do {
             container = try ModelContainer(for: CachedTask.self, CachedConversation.self, SyncQueueItem.self)
         } catch {
-            fatalError("Failed to create ModelContainer: \(error)")
+            // Migration failed — delete old store and recreate
+            // Data will be re-fetched from server on next refresh
+            print("[App] ModelContainer migration failed, resetting local DB: \(error)")
+            let url = URL.applicationSupportDirectory.appending(path: "default.store")
+            try? FileManager.default.removeItem(at: url)
+            // Also remove WAL/SHM files
+            try? FileManager.default.removeItem(at: url.appendingPathExtension("wal"))
+            try? FileManager.default.removeItem(at: url.appendingPathExtension("shm"))
+            do {
+                container = try ModelContainer(for: CachedTask.self, CachedConversation.self, SyncQueueItem.self)
+            } catch {
+                fatalError("Failed to create ModelContainer after reset: \(error)")
+            }
         }
     }
 

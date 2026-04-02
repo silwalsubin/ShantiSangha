@@ -14,6 +14,7 @@ struct AppTask: Codable, Identifiable {
     // Internal — not from API, computed locally
     var feedbackMessage: String?
     var saving: Bool = false
+    var hasPendingChanges: Bool = false
 
     // Streak data from /goals/today
     var currentStreak: Int = 0
