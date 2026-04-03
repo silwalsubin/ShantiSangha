@@ -18,9 +18,21 @@ struct ChatView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 16) {
-                        ForEach(messages) { msg in
-                            messageBubble(msg)
-                                .id(msg.id)
+                        ForEach(Array(messages.enumerated()), id: \.element.id) { index, msg in
+                            // Date divider when date changes between messages
+                            if let label = dateDividerLabel(at: index) {
+                                Text(label)
+                                    .font(.sacredSmallSemibold)
+                                    .foregroundColor(.sacredMuted)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 4)
+                            }
+
+                            // Hide empty assistant placeholder — typing indicator replaces it
+                            if !(msg.role == "assistant" && msg.content.isEmpty && sending) {
+                                messageBubble(msg)
+                                    .id(msg.id)
+                            }
                         }
 
                         // Typing indicator
@@ -30,6 +42,7 @@ struct ChatView: View {
                         }
                     }
                     .padding(16)
+                    .padding(.bottom, 60)
                 }
                 .onChange(of: messages.count) {
                     scrollToBottom(proxy)
@@ -117,6 +130,47 @@ struct ChatView: View {
                 )
             Spacer()
         }
+    }
+
+    // MARK: - Date dividers
+
+    private func dateDividerLabel(at index: Int) -> String? {
+        let msg = messages[index]
+        guard let date = msg.timestamp else { return index == 0 ? "Today" : nil }
+
+        let calendar = Calendar.current
+
+        if index == 0 {
+            return dateLabelFor(date, calendar: calendar)
+        }
+
+        let prevDate = messages[index - 1].timestamp
+        guard let prev = prevDate else {
+            return dateLabelFor(date, calendar: calendar)
+        }
+
+        // Show divider if the day changed
+        if !calendar.isDate(date, inSameDayAs: prev) {
+            return dateLabelFor(date, calendar: calendar)
+        }
+
+        return nil
+    }
+
+    private func dateLabelFor(_ date: Date, calendar: Calendar) -> String {
+        if calendar.isDateInToday(date) { return "Today" }
+        if calendar.isDateInYesterday(date) { return "Yesterday" }
+
+        let days = calendar.dateComponents([.day], from: date, to: Date()).day ?? 0
+        if days < 7 {
+            let f = DateFormatter()
+            f.dateFormat = "EEEE"
+            return f.string(from: date)
+        }
+
+        let f = DateFormatter()
+        f.dateFormat = "MMM d, yyyy"
+        return f.string(from: date)
     }
 
     // MARK: - Helpers
