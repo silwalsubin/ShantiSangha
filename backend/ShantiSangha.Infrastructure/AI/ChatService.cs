@@ -55,7 +55,7 @@ public class ChatService(
             Id = Guid.NewGuid(),
             ConversationId = conversationId,
             Role = MessageRole.User,
-            Content = userMessage,
+            Content = userMessage.Trim(),
             CreatedAt = DateTime.UtcNow
         };
         db.Messages.Add(userMsg);
@@ -103,7 +103,7 @@ public class ChatService(
                 Id = Guid.NewGuid(),
                 ConversationId = conversationId,
                 Role = MessageRole.Assistant,
-                Content = fullResponse,
+                Content = fullResponse.Trim(),
                 CreatedAt = DateTime.UtcNow
             };
             db.Messages.Add(assistantMsg);

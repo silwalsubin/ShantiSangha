@@ -40,15 +40,21 @@ struct ChatView: View {
                             typingIndicator
                                 .id("typing")
                         }
+                        // Bottom anchor
+                        Color.clear
+                            .frame(height: 1)
+                            .id("bottom")
                     }
                     .padding(16)
                     .padding(.bottom, 60)
                 }
                 .onChange(of: messages.count) {
-                    scrollToBottom(proxy)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo("bottom") }
+                    }
                 }
                 .onChange(of: messages.last?.content) {
-                    scrollToBottom(proxy)
+                    proxy.scrollTo("bottom")
                 }
             }
 
@@ -176,9 +182,7 @@ struct ChatView: View {
     // MARK: - Helpers
 
     private func scrollToBottom(_ proxy: ScrollViewProxy) {
-        if let last = messages.last {
-            withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(last.id, anchor: .bottom) }
-        }
+        withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo("bottom") }
     }
 
     private func formatTimestamp(_ date: Date) -> String {
@@ -219,6 +223,7 @@ struct ChatView: View {
         messages.append(ChatMessage(id: assistantId, role: "assistant", content: "", timestamp: nil))
 
         // Stream response
+        let typingStart = Date()
         do {
             let token = try await Auth.auth().currentUser?.getIDToken()
             guard let url = URL(string: "https://shantisangha.com/api/conversations/\(conversationId)/messages") else { return }
@@ -233,6 +238,7 @@ struct ChatView: View {
 
             let (bytes, _) = try await URLSession.shared.bytes(for: request)
             var buffer = ""
+            var firstToken = true
 
             for try await byte in bytes {
                 buffer += String(UnicodeScalar(byte))
@@ -242,9 +248,18 @@ struct ChatView: View {
                     if line.hasPrefix("data: ") {
                         let payload = String(line.dropFirst(6))
                         if payload == "[DONE]" { continue }
+
+                        // Ensure typing indicator shows for at least 1 second
+                        if firstToken {
+                            let elapsed = Date().timeIntervalSince(typingStart)
+                            if elapsed < 1.0 {
+                                try? await Task.sleep(nanoseconds: UInt64((1.0 - elapsed) * 1_000_000_000))
+                            }
+                            firstToken = false
+                        }
+
                         if let idx = messages.firstIndex(where: { $0.id == assistantId }) {
                             messages[idx].content += payload
-                            // Set timestamp on first token
                             if messages[idx].timestamp == nil {
                                 messages[idx].timestamp = Date()
                             }

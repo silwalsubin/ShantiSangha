@@ -132,7 +132,7 @@ struct ReflectView: View {
                 .foregroundColor(.sacredText)
 
             if !conv.lastMessage.isEmpty {
-                Text(conv.lastMessage)
+                Text(conv.lastMessage.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.joined(separator: " "))
                     .font(.sacredSmall)
                     .foregroundColor(.sacredTextSecondary)
                     .lineLimit(2)
@@ -229,7 +229,9 @@ struct ConversationItem: Identifiable, Decodable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
         title = try c.decodeIfPresent(String.self, forKey: .title) ?? "Conversation"
-        lastMessage = (try c.decodeIfPresent(String.self, forKey: .lastMessage) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let rawMessage = try c.decodeIfPresent(String.self, forKey: .lastMessage) ?? ""
+        // Trim all whitespace including non-breaking spaces
+        lastMessage = rawMessage.replacingOccurrences(of: "^\\s+", with: "", options: .regularExpression)
 
         // Parse updatedAt or createdAt
         let iso = ISO8601DateFormatter()
