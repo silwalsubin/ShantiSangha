@@ -129,6 +129,18 @@ struct TaskRow: View {
 
                 Spacer()
 
+                // Streak for recurring tasks
+                if task.type == .recurring && task.currentStreak > 0 {
+                    HStack(spacing: 3) {
+                        Image(systemName: "flame.fill")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredGold)
+                        Text("\(task.currentStreak)")
+                            .font(.sacredBodyBold)
+                            .foregroundColor(.sacredGold)
+                    }
+                }
+
                 // Milestone days remaining
                 if task.type == .oneTime, let days = task.daysRemaining {
                     Text(days > 0 ? "\(days)d" : days == 0 ? "Today" : "\(abs(days))d over")

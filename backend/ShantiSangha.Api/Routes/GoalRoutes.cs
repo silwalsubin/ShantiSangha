@@ -144,19 +144,25 @@ public static class GoalRoutes
 
         var goals = await db.Goals
             .Where(g => g.UserId == user.Id && g.ArchivedAt == null && g.Type == GoalType.Recurring)
+            .Include(g => g.CheckIns)
             .OrderBy(g => g.CreatedAt)
-            .Select(g => new
+            .ToListAsync();
+
+        var result = goals.Select(g =>
+        {
+            var (current, longest) = ComputeStreaks(g.CheckIns, today);
+            var todayCheckIn = g.CheckIns.FirstOrDefault(c => c.Date == today);
+            return new
             {
                 g.Id,
                 g.Title,
-                CheckIn = g.CheckIns
-                    .Where(c => c.Date == today)
-                    .Select(c => new { c.Completed, c.Note })
-                    .FirstOrDefault()
-            })
-            .ToListAsync();
+                CurrentStreak = current,
+                LongestStreak = longest,
+                CheckIn = todayCheckIn != null ? new { todayCheckIn.Completed, todayCheckIn.Note } : null
+            };
+        });
 
-        return Results.Ok(goals);
+        return Results.Ok(result);
     }
 
     private static async Task<IResult> GetGoal(
