@@ -25,7 +25,7 @@ struct DeleteTaskView: View {
                         .foregroundColor(.sacredText)
                         .multilineTextAlignment(.center)
 
-                    Text(task.type == .recurring ? "Daily Practice" : "Milestone")
+                    Text(task.type == .recurring ? "Daily Practice" : "Commitment")
                         .font(.sacredSmall)
                         .foregroundColor(.sacredMuted)
                         .textCase(.uppercase)

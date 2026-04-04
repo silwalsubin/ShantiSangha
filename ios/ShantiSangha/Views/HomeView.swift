@@ -6,30 +6,21 @@ struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
     @State private var showNewTask = false
     @State private var showRecurringSummary = false
+    @State private var showMilestoneSummary = false
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    // Header with progress ring
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("YOUR DHARMA")
-                                .font(.sacredMicroBold)
-                                .tracking(3)
-                                .foregroundColor(.sacredLabel)
-                            Text("What needs your attention today?")
-                                .font(.sacredTitle)
-                                .foregroundColor(.sacredText)
-                        }
-
-                        Spacer()
-
-                        if !vm.loading && vm.hasTasks {
-                            Button { showRecurringSummary = true } label: {
-                                progressRing
-                            }
-                        }
+                    // Header
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("YOUR DHARMA")
+                            .font(.sacredMicroBold)
+                            .tracking(3)
+                            .foregroundColor(.sacredLabel)
+                        Text("What needs your attention today?")
+                            .font(.sacredTitle)
+                            .foregroundColor(.sacredText)
                     }
 
                     if vm.loading {
@@ -62,11 +53,24 @@ struct HomeView: View {
                     } else {
                         // Recurring tasks
                         if !vm.pendingRecurring.isEmpty {
+                            Button { showRecurringSummary = true } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "arrow.triangle.2.circlepath")
+                                        .font(.system(size: 18))
+                                        .foregroundColor(.sacredGold)
+                                    Rectangle()
+                                        .fill(Color.sacredMuted.opacity(0.15))
+                                        .frame(height: 1)
+                                    progressRing
+                                }
+                            }
+                            .padding(.top, 16)
+                            .padding(.bottom, 12)
+
                             taskList(vm.pendingRecurring)
-                                .padding(.top, 16)
                         }
 
-                        // Milestone timeline
+                        // Commitments
                         if !vm.urgentMilestones.isEmpty {
                             MilestoneTimelineView(
                                 milestones: vm.urgentMilestones,
@@ -74,7 +78,11 @@ struct HomeView: View {
                                 onSkip: { id in Task { await vm.checkIn(id: id, completed: false) } },
                                 onDelete: { id in Task { await vm.deleteTask(id: id) } },
                                 onProgressUpdate: { id, val in Task { await vm.updateProgress(id: id, value: val) } },
-                                onDueDateUpdate: { id, date in Task { await vm.updateDueDate(id: id, date: date) } }
+                                onDueDateUpdate: { id, date in Task { await vm.updateDueDate(id: id, date: date) } },
+                                onShowAll: { showMilestoneSummary = true },
+                                totalMilestones: vm.totalMilestones,
+                                doneMilestones: vm.doneMilestones,
+                                hasOverdue: vm.overdueMilestones > 0
                             )
                             .padding(.top, 20)
                         }
@@ -95,12 +103,12 @@ struct HomeView: View {
             } label: {
                 Image(systemName: "plus")
                     .font(.sacredHeading)
-                    .foregroundColor(.white)
+                    .foregroundColor(.sacredGold)
                     .frame(width: 56, height: 56)
-                    .background(RadialGradient.sacredGoldShiny)
+                    .background(.ultraThinMaterial)
                     .clipShape(Circle())
-                    .shimmer()
-                    .clipShape(Circle())
+                    .overlay(Circle().stroke(Color.sacredGold.opacity(0.25), lineWidth: 1))
+                    .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
             }
             .padding(.trailing, 20)
             .padding(.bottom, 20)
@@ -112,6 +120,9 @@ struct HomeView: View {
         }
         .navigationDestination(isPresented: $showRecurringSummary) {
             RecurringSummaryView(vm: vm)
+        }
+        .navigationDestination(isPresented: $showMilestoneSummary) {
+            MilestoneSummaryView(vm: vm)
         }
     }
 

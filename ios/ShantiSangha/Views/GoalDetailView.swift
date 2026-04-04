@@ -16,15 +16,10 @@ struct GoalDetailView: View {
             } else if let goal = goal {
                 VStack(alignment: .leading, spacing: 20) {
                     // Header
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 8) {
-                            Image(systemName: goal.type == .recurring ? "arrow.triangle.2.circlepath" : "target")
-                                .foregroundColor(.sacredGold)
-                            Text(goal.type == .recurring ? "DAILY PRACTICE" : "MILESTONE")
-                                .font(.sacredSectionLabel)
-                                .tracking(3)
-                                .foregroundColor(.sacredLabel)
-                        }
+                    HStack(spacing: 10) {
+                        Image(systemName: goal.type == .recurring ? "arrow.triangle.2.circlepath" : "calendar.badge.clock")
+                            .font(.sacredTitle)
+                            .foregroundColor(.sacredGold)
                         Text(goal.title)
                             .font(.sacredHeading)
                             .foregroundColor(.sacredText)

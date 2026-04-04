@@ -32,7 +32,7 @@ struct NewTaskView: View {
                         .foregroundColor(.sacredLabel)
                     HStack(spacing: 8) {
                         typePill("Daily practice", icon: "flame.fill", taskType: .recurring)
-                        typePill("Milestone", icon: "target", taskType: .oneTime)
+                        typePill("Commitment", icon: "calendar.badge.clock", taskType: .oneTime)
                     }
                 }
 

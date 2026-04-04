@@ -121,7 +121,7 @@ struct TaskRow: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
                 // Type icon
-                Image(systemName: task.type == .recurring ? "arrow.triangle.2.circlepath" : "target")
+                Image(systemName: task.type == .recurring ? "arrow.triangle.2.circlepath" : "calendar.badge.clock")
                     .font(.sacredText)
                     .foregroundColor(task.type == .recurring ? .sacredMutedLight : .sacredGold)
                     .frame(width: 24, height: 24)

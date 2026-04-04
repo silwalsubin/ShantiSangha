@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Timeline rail view for milestones — vertical line with dots marking due dates
+/// Commitment section on home — header with progress ring + task rows
 struct MilestoneTimelineView: View {
     let milestones: [AppTask]
     let onDone: (String) -> Void
@@ -9,121 +9,73 @@ struct MilestoneTimelineView: View {
     let onProgressUpdate: (String, Int) -> Void
     let onDueDateUpdate: (String, String) -> Void
 
+    var onShowAll: (() -> Void)?
+    var totalMilestones: Int = 0
+    var doneMilestones: Int = 0
+    var hasOverdue: Bool = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("UPCOMING")
-                .font(.sacredSectionLabel)
-                .tracking(3)
-                .foregroundColor(.sacredLabel)
-                .padding(.bottom, 12)
-
-            ForEach(Array(milestones.enumerated()), id: \.element.id) { index, milestone in
-                let isOverdue = (milestone.daysRemaining ?? 1) <= 0
-                let isLast = index == milestones.count - 1
-
-                HStack(alignment: .top, spacing: 12) {
-                    // Timeline rail
-                    VStack(spacing: 0) {
-                        // Dot
-                        Circle()
-                            .fill(isOverdue ? Color.sacredRed : Color.sacredGold)
-                            .frame(width: 10, height: 10)
-                            .overlay(
-                                Circle()
-                                    .stroke(isOverdue ? Color.sacredRed.opacity(0.3) : Color.sacredGold.opacity(0.3), lineWidth: 3)
-                            )
-
-                        // Line
-                        if !isLast {
-                            Rectangle()
-                                .fill(Color.sacredMuted.opacity(0.2))
-                                .frame(width: 1.5)
-                                .frame(maxHeight: .infinity)
-                        }
+            Button { onShowAll?() } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.system(size: 18))
+                        .foregroundColor(.sacredGold)
+                    Rectangle()
+                        .fill(Color.sacredMuted.opacity(0.15))
+                        .frame(height: 1)
+                    if totalMilestones > 0 {
+                        commitmentRing
                     }
-                    .frame(width: 16)
-
-                    // Card
-                    milestoneCard(milestone, isOverdue: isOverdue)
-                        .padding(.bottom, isLast ? 0 : 12)
                 }
             }
-        }
-    }
+            .padding(.bottom, 12)
 
-    private func milestoneCard(_ task: AppTask, isOverdue: Bool) -> some View {
-        NavigationLink(destination: GoalDetailView(goalId: task.id)) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(task.title)
-                        .font(.sacredTextMedium)
-                        .foregroundColor(.sacredText)
-                        .lineLimit(2)
-
-                    Spacer()
-
-                    // Due label
-                    if let days = task.daysRemaining {
-                        Text(dueLabel(days))
-                            .font(.sacredSmallSemibold)
-                            .foregroundColor(isOverdue ? .sacredRed : .sacredGold)
-                    }
-
-                    // Menu
-                    Menu {
-                        Button { onDone(task.id) } label: {
-                            Label("Mark complete", systemImage: "checkmark.circle")
-                        }
-                        Button { onSkip(task.id) } label: {
-                            Label("Skip for today", systemImage: "forward.fill")
-                        }
-                        Button { onDelete(task.id) } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.sacredText)
-                            .foregroundColor(.sacredMuted)
-                            .frame(width: 28, height: 28)
-                    }
-                }
-
-                // Progress bar (only if progress > 0)
-                if task.progress > 0 {
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(Color.sacredMuted.opacity(0.15))
-                                .frame(height: 5)
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(LinearGradient.sacredGoldShiny)
-                                .frame(width: geo.size.width * CGFloat(task.progress) / 100, height: 5)
-                        }
-                    }
-                    .frame(height: 5)
-
-                    Text("\(task.progress)%")
-                        .font(.sacredMicro)
-                        .foregroundColor(.sacredMuted)
-                }
-            }
-            .padding(12)
-            .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(isOverdue ? Color.sacredRed.opacity(0.06) : Color.sacredBgCard)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(isOverdue ? Color.sacredRed.opacity(0.25) : Color.sacredMuted.opacity(0.12), lineWidth: 1)
+            VStack(spacing: 8) {
+                ForEach(milestones) { task in
+                    TaskRow(
+                        task: task,
+                        onDone: { onDone(task.id) },
+                        onSkip: { onSkip(task.id) },
+                        onUndo: {},
+                        onDelete: { onDelete(task.id) },
+                        onProgressUpdate: { val in onProgressUpdate(task.id, val) },
+                        onDueDateUpdate: { date in onDueDateUpdate(task.id, date) }
                     )
-            )
+                }
+            }
         }
-        .buttonStyle(.plain)
     }
 
-    private func dueLabel(_ days: Int) -> String {
-        if days < 0 { return "\(abs(days))d over" }
-        if days == 0 { return "Today" }
-        if days == 1 { return "Tomorrow" }
-        return "\(days)d"
+    // MARK: - Commitment progress ring
+
+    private var commitmentRing: some View {
+        let progress = totalMilestones > 0 ? Double(doneMilestones) / Double(totalMilestones) : 0
+        let ringColor: Color = hasOverdue ? .sacredRed : .sacredGold
+        let gradient = LinearGradient(
+            colors: hasOverdue ? [.sacredRed, .sacredRed.opacity(0.7)] : [.sacredGoldShine, .sacredGold],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+
+        return ZStack {
+            Circle()
+                .stroke(Color.sacredMuted.opacity(0.15), lineWidth: 4)
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(gradient, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .animation(.easeOut(duration: 0.5), value: progress)
+
+            VStack(spacing: 0) {
+                Text("\(doneMilestones)")
+                    .font(.sacredTextSemibold)
+                    .foregroundColor(ringColor)
+                Text("of \(totalMilestones)")
+                    .font(.sacredMicro)
+                    .foregroundColor(.sacredMuted)
+            }
+        }
+        .frame(width: 48, height: 48)
     }
 }

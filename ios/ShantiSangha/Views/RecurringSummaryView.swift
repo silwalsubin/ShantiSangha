@@ -24,20 +24,21 @@ struct RecurringSummaryView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 // Progress header
-                HStack {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("TODAY'S PRACTICE")
-                            .font(.sacredSectionLabel)
-                            .tracking(3)
-                            .foregroundColor(.sacredLabel)
-                        Text("\(vm.doneRecurring) of \(vm.totalRecurring) complete")
-                            .font(.sacredTitle)
-                            .foregroundColor(.sacredText)
-                    }
-                    Spacer()
+                HStack(spacing: 12) {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 18))
+                        .foregroundColor(.sacredGold)
+                    Rectangle()
+                        .fill(Color.sacredMuted.opacity(0.15))
+                        .frame(height: 1)
                     progressRing
                 }
                 .padding(.top, 24)
+
+                Text("\(vm.doneRecurring) of \(vm.totalRecurring) complete")
+                    .font(.sacredTitle)
+                    .foregroundColor(.sacredText)
+                    .padding(.top, 8)
 
                 // Pending
                 if !pending.isEmpty {
@@ -61,7 +62,7 @@ struct RecurringSummaryView: View {
             .padding(.bottom, 40)
         }
         .background(Color.sacredBg.ignoresSafeArea())
-        .navigationTitle("Daily Practice")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
     }
 

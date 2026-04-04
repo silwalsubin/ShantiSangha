@@ -24,6 +24,23 @@ class HomeViewModel: ObservableObject {
         }.sorted { ($0.daysRemaining ?? 0) < ($1.daysRemaining ?? 0) }
     }
 
+    /// All milestones (for summary view)
+    var allMilestones: [AppTask] {
+        tasks.filter { $0.type == .oneTime }
+    }
+    var pendingMilestones: [AppTask] {
+        allMilestones.filter { !$0.checkedIn }
+            .sorted { ($0.daysRemaining ?? 999) < ($1.daysRemaining ?? 999) }
+    }
+    var completedMilestones: [AppTask] {
+        allMilestones.filter { $0.checkedIn && $0.completedToday == true }
+    }
+    var overdueMilestones: Int {
+        pendingMilestones.filter { ($0.daysRemaining ?? 1) <= 0 }.count
+    }
+    var totalMilestones: Int { allMilestones.count }
+    var doneMilestones: Int { completedMilestones.count }
+
     var pendingTasks: [AppTask] { pendingRecurring + urgentMilestones }
 
     var completedTasks: [AppTask] { tasks.filter { $0.checkedIn && $0.completedToday == true } }

@@ -100,12 +100,12 @@ struct ReflectView: View {
             } label: {
                 Image(systemName: "bubble.left.fill")
                     .font(.sacredHeading)
-                    .foregroundColor(.white)
+                    .foregroundColor(.sacredGold)
                     .frame(width: 56, height: 56)
-                    .background(RadialGradient.sacredGoldShiny)
+                    .background(.ultraThinMaterial)
                     .clipShape(Circle())
-                    .shimmer()
-                    .clipShape(Circle())
+                    .overlay(Circle().stroke(Color.sacredGold.opacity(0.25), lineWidth: 1))
+                    .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
             }
             .padding(.trailing, 20)
             .padding(.bottom, 20)

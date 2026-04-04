@@ -64,12 +64,12 @@ struct JourneyView: View {
                         }
                     }
 
-                    // Milestones
+                    // Commitments
                     sectionCard {
-                        sectionLabel(icon: "target", text: "MILESTONES")
+                        sectionLabel(icon: "calendar.badge.clock", text: "COMMITMENTS")
 
                         if milestoneGoals.isEmpty {
-                            Text("No milestones yet. Set one from Home.")
+                            Text("No commitments yet. Set one from Home.")
                                 .font(.sacredText)
                                 .foregroundColor(.sacredTextSecondary)
                                 .padding(.top, 8)
