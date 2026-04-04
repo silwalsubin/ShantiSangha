@@ -179,7 +179,8 @@ struct HomeView: View {
                     onSkip: { Task { await vm.checkIn(id: task.id, completed: false) } },
                     onUndo: { Task { await vm.undoCheckIn(id: task.id) } },
                     onDelete: { Task { await vm.deleteTask(id: task.id) } },
-                    onProgressUpdate: { val in Task { await vm.updateProgress(id: task.id, value: val) } }
+                    onProgressUpdate: { val in Task { await vm.updateProgress(id: task.id, value: val) } },
+                    onDueDateUpdate: { date in Task { await vm.updateDueDate(id: task.id, date: date) } }
                 )
             }
         }

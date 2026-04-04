@@ -12,7 +12,7 @@ struct MainTabView: View {
                 HomeView()
             }
             .tabItem {
-                Label("Dharma", image: "tab.vajra")
+                Image("tab.vajra")
             }
             .tag(0)
 
@@ -20,7 +20,7 @@ struct MainTabView: View {
                 ReflectView()
             }
             .tabItem {
-                Label("Reflect", image: "tab.dialogue")
+                Image("tab.dialogue")
             }
             .tag(1)
 
@@ -28,7 +28,7 @@ struct MainTabView: View {
                 JourneyView()
             }
             .tabItem {
-                Label("Journey", image: "tab.diya")
+                Image("tab.diya")
             }
             .tag(2)
 
@@ -36,7 +36,7 @@ struct MainTabView: View {
                 SettingsView()
             }
             .tabItem {
-                Label("Settings", image: "tab.chakra")
+                Image("tab.chakra")
             }
             .tag(3)
         }

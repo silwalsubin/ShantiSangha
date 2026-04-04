@@ -239,6 +239,14 @@ public static class GoalRoutes
         if (body.Progress is not null)
             goal.Progress = Math.Clamp(body.Progress.Value, 0, 100);
 
+        if (body.TargetDate is not null)
+        {
+            if (DateOnly.TryParse(body.TargetDate, out var parsedDate))
+                goal.TargetDate = parsedDate;
+            else
+                return Results.BadRequest(new { error = "Invalid date format. Use yyyy-MM-dd." });
+        }
+
         try
         {
             await db.SaveChangesAsync();
@@ -426,5 +434,5 @@ public record CreateGoalRequest(
     int? FrequencyTarget = null,
     string? TargetDate = null,
     string? DeeperWhy = null);
-public record UpdateGoalRequest(string? Title, bool? Archived, bool? Completed, string? DeeperWhy = null, int? Progress = null);
+public record UpdateGoalRequest(string? Title, bool? Archived, bool? Completed, string? DeeperWhy = null, int? Progress = null, string? TargetDate = null);
 public record CheckInRequest(bool Completed, string? Note, string? Date = null);

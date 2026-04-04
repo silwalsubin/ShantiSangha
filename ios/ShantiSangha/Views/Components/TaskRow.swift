@@ -8,10 +8,13 @@ struct TaskRow: View {
     let onUndo: () -> Void
     let onDelete: () -> Void
     let onProgressUpdate: (Int) -> Void
+    var onDueDateUpdate: ((String) -> Void)? = nil
 
     @State private var showMenu = false
     @State private var showProgress = false
+    @State private var showDueDatePicker = false
     @State private var progressValue: Double = 0
+    @State private var newDueDate = Date()
     @State private var navigateToDelete = false
 
     var isOverdue: Bool {
@@ -152,6 +155,9 @@ struct TaskRow: View {
                                 Button { showProgress = true; progressValue = Double(task.progress) } label: {
                                     Label("Update progress", systemImage: "chart.bar.fill")
                                 }
+                                Button { showDueDatePicker = true } label: {
+                                    Label("Change due date", systemImage: "calendar")
+                                }
                             }
                             Button { onSkip() } label: {
                                 Label("Skip for today", systemImage: "forward.fill")
@@ -226,6 +232,32 @@ struct TaskRow: View {
                 .padding(.leading, 36)
             }
 
+            // Due date picker
+            if showDueDatePicker {
+                VStack(spacing: 8) {
+                    DatePicker("New due date", selection: $newDueDate, displayedComponents: .date)
+                        .datePickerStyle(.compact)
+                        .tint(.sacredGold)
+                        .font(.sacredText)
+
+                    HStack {
+                        Spacer()
+                        Button("Cancel") { showDueDatePicker = false }
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
+                        Button("Save") {
+                            showDueDatePicker = false
+                            let f = DateFormatter()
+                            f.dateFormat = "yyyy-MM-dd"
+                            onDueDateUpdate?(f.string(from: newDueDate))
+                        }
+                        .font(.sacredSmallSemibold)
+                        .foregroundColor(.sacredGold)
+                    }
+                }
+                .padding(.leading, 36)
+            }
+
             // Spiritual feedback
             if task.checkedIn, let msg = task.feedbackMessage {
                 Text(msg)
@@ -243,17 +275,18 @@ struct TaskRow: View {
                 .fill(task.checkedIn
                       ? Color.sacredGreen.opacity(0.06)
                       : isOverdue
-                      ? Color.sacredRed.opacity(0.06)
+                      ? Color.sacredRed.opacity(0.08)
                       : Color.sacredBgCard)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
                         .stroke(task.checkedIn
                                 ? Color.sacredGreen.opacity(0.25)
                                 : isOverdue
-                                ? Color.sacredRed.opacity(0.25)
-                                : Color.sacredMuted.opacity(0.12), lineWidth: 1)
+                                ? Color.sacredRed.opacity(0.35)
+                                : Color.sacredMuted.opacity(0.12), lineWidth: isOverdue ? 1.5 : 1)
                 )
         )
+        .modifier(OverduePulseModifier(isOverdue: isOverdue))
     }
 }
 
@@ -278,5 +311,23 @@ private struct HeatDotsView: View {
     private func colorForDay(daysAgo: Int) -> Color {
         let intensity = 1.0 - (Double(daysAgo) * 0.1)
         return Color.sacredGold.opacity(max(0.4, intensity))
+    }
+}
+
+// MARK: - Overdue pulse — subtle breathing glow on overdue milestones
+
+private struct OverduePulseModifier: ViewModifier {
+    let isOverdue: Bool
+    @State private var pulsing = false
+
+    func body(content: Content) -> some View {
+        if isOverdue {
+            content
+                .shadow(color: .sacredRed.opacity(pulsing ? 0.2 : 0.05), radius: pulsing ? 8 : 2, y: 0)
+                .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: pulsing)
+                .onAppear { pulsing = true }
+        } else {
+            content
+        }
     }
 }

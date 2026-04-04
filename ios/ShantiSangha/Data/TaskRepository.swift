@@ -174,6 +174,23 @@ class TaskRepository: ObservableObject {
         }
     }
 
+    func updateDueDate(id: String, date: String) async {
+        if let idx = tasks.firstIndex(where: { $0.id == id }) {
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd"
+            if let parsed = f.date(from: date) {
+                let days = Calendar.current.dateComponents([.day], from: Date(), to: parsed).day
+                tasks[idx].daysRemaining = days
+            }
+            updateLocal(tasks[idx], pending: true)
+        }
+
+        let body: [String: String] = ["targetDate": date]
+        if let data = try? JSONSerialization.data(withJSONObject: body) {
+            await sync.enqueue(method: "PATCH", path: "/goals/\(id)", body: RawData(data: data))
+        }
+    }
+
     func createTask(title: String, type: TaskType, targetDate: String? = nil) async {
         // Create locally with temp ID
         let tempId = UUID().uuidString

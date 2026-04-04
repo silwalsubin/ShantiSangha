@@ -52,6 +52,10 @@ class HomeViewModel: ObservableObject {
         await repo.deleteTask(id: id)
     }
 
+    func updateDueDate(id: String, date: String) async {
+        await repo.updateDueDate(id: id, date: date)
+    }
+
     func createTask(title: String, type: TaskType, targetDate: String? = nil) async {
         await repo.createTask(title: title, type: type, targetDate: targetDate)
     }
