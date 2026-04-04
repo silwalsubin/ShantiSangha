@@ -6,6 +6,15 @@ struct MainTabView: View {
     @EnvironmentObject var auth: AuthService
     @State private var selectedTab = 0
 
+    init() {
+        let appearance = UITabBarAppearance()
+        appearance.configureWithDefaultBackground()
+        appearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
+        appearance.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.5)
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+    }
+
     var body: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
@@ -13,6 +22,7 @@ struct MainTabView: View {
             }
             .tabItem {
                 Image("tab.vajra")
+                Text("Home")
             }
             .tag(0)
 
@@ -21,6 +31,7 @@ struct MainTabView: View {
             }
             .tabItem {
                 Image("tab.dialogue")
+                Text("Reflect")
             }
             .tag(1)
 
@@ -29,6 +40,7 @@ struct MainTabView: View {
             }
             .tabItem {
                 Image("tab.diya")
+                Text("Journey")
             }
             .tag(2)
 
@@ -37,6 +49,7 @@ struct MainTabView: View {
             }
             .tabItem {
                 Image("tab.chakra")
+                Text("Settings")
             }
             .tag(3)
         }

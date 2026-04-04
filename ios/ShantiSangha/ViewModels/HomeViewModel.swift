@@ -34,11 +34,11 @@ class HomeViewModel: ObservableObject {
         tasks.filter { !$0.checkedIn && $0.type == .recurring }
     }
 
-    /// Filtered commitments, sorted by urgency (overdue first, then nearest due)
+    /// Filtered commitments (pending only), sorted by urgency
     var filteredCommitments: [AppTask] {
         let maxDays = commitmentFilter.maxDays
         return tasks.filter {
-            guard !$0.checkedIn && $0.type == .oneTime else { return false }
+            guard $0.type == .oneTime && $0.completedAt == nil else { return false }
             if let max = maxDays {
                 return ($0.daysRemaining ?? 999) <= max
             }
@@ -51,11 +51,11 @@ class HomeViewModel: ObservableObject {
         tasks.filter { $0.type == .oneTime }
     }
     var pendingMilestones: [AppTask] {
-        allMilestones.filter { !$0.checkedIn }
+        allMilestones.filter { $0.completedAt == nil }
             .sorted { ($0.daysRemaining ?? 999) < ($1.daysRemaining ?? 999) }
     }
     var completedMilestones: [AppTask] {
-        allMilestones.filter { $0.checkedIn && $0.completedToday == true }
+        allMilestones.filter { $0.completedAt != nil }
     }
     var overdueMilestones: Int {
         pendingMilestones.filter { ($0.daysRemaining ?? 1) <= 0 }.count
@@ -71,8 +71,8 @@ class HomeViewModel: ObservableObject {
         }
     }
     var filteredTotal: Int { milestonesInWindow(commitmentFilter).count }
-    var filteredDone: Int { milestonesInWindow(commitmentFilter).filter { $0.checkedIn && $0.completedToday == true }.count }
-    var filteredOverdue: Bool { milestonesInWindow(commitmentFilter).contains { !$0.checkedIn && ($0.daysRemaining ?? 1) <= 0 } }
+    var filteredDone: Int { milestonesInWindow(commitmentFilter).filter { $0.completedAt != nil }.count }
+    var filteredOverdue: Bool { milestonesInWindow(commitmentFilter).contains { $0.completedAt == nil && ($0.daysRemaining ?? 1) <= 0 } }
 
     var pendingTasks: [AppTask] { pendingRecurring + filteredCommitments }
 

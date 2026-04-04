@@ -13,12 +13,12 @@ struct MilestoneSummaryView: View {
     }
 
     private var filteredPending: [AppTask] {
-        filteredAll.filter { !$0.checkedIn }
+        filteredAll.filter { $0.completedAt == nil }
             .sorted { ($0.daysRemaining ?? 999) < ($1.daysRemaining ?? 999) }
     }
 
     private var filteredCompleted: [AppTask] {
-        filteredAll.filter { $0.checkedIn && $0.completedToday == true }
+        filteredAll.filter { $0.completedAt != nil }
     }
 
     private var filteredTotal: Int { filteredAll.count }

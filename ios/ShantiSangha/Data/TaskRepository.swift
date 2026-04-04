@@ -38,9 +38,9 @@ class TaskRepository: ObservableObject {
             // Fetch recurring
             let todayItems: [AppTask] = try await api.get("/goals/today?date=\(dateStr)")
 
-            // Fetch all (for milestones)
+            // Fetch all (for milestones — include completed so they show in summary)
             let allGoals: [AppTask] = try await api.get("/goals?date=\(dateStr)")
-            let milestones = allGoals.filter { $0.type == .oneTime && $0.completedAt == nil }
+            let milestones = allGoals.filter { $0.type == .oneTime }
 
             let allTasks = todayItems + milestones
             // Update local DB
@@ -118,24 +118,21 @@ class TaskRepository: ObservableObject {
         if let idx = tasks.firstIndex(where: { $0.id == id }) {
             let isMilestone = tasks[idx].type == .oneTime
 
+            tasks[idx].checkedIn = true
+            tasks[idx].completedToday = completed
             if isMilestone && completed {
-                // Milestone completed permanently — remove from list
-                let task = tasks[idx]
-                tasks.remove(at: idx)
-                deleteLocal(id: task.id)
-            } else {
-                // Recurring task or milestone skip — update check-in state
+                tasks[idx].completedAt = localDateStr()
+            }
+            if !isMilestone {
                 tasks[idx].feedbackMessage = FeedbackService.generate(
                     currentStreak: tasks[idx].currentStreak,
                     longestStreak: tasks[idx].longestStreak,
                     completed: completed
                 )
-                tasks[idx].checkedIn = true
-                tasks[idx].completedToday = completed
                 if completed { tasks[idx].currentStreak += 1 }
                 else { tasks[idx].currentStreak = 0 }
-                updateLocal(tasks[idx], pending: true)
             }
+            updateLocal(tasks[idx], pending: true)
         }
 
         // Queue sync
