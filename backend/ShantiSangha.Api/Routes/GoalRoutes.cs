@@ -31,12 +31,6 @@ public static class GoalRoutes
         if (string.IsNullOrWhiteSpace(body.Title))
             return Results.BadRequest(new { error = "Title is required." });
 
-        var activeCount = await db.Goals
-            .CountAsync(g => g.UserId == user.Id && g.ArchivedAt == null);
-
-        if (activeCount >= 10)
-            return Results.BadRequest(new { error = "Maximum of 10 active goals allowed." });
-
         DateOnly? targetDate = null;
         if (body.TargetDate is not null && DateOnly.TryParse(body.TargetDate, out var parsed))
             targetDate = parsed;
