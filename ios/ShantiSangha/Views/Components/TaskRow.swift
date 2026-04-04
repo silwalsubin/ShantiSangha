@@ -129,16 +129,9 @@ struct TaskRow: View {
 
                 Spacer()
 
-                // Streak for recurring tasks
-                if task.type == .recurring && task.currentStreak > 0 {
-                    HStack(spacing: 3) {
-                        Image(systemName: "flame.fill")
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredGold)
-                        Text("\(task.currentStreak)")
-                            .font(.sacredBodyBold)
-                            .foregroundColor(.sacredGold)
-                    }
+                // Streak heat dots for recurring tasks
+                if task.type == .recurring {
+                    HeatDotsView(streak: task.currentStreak)
                 }
 
                 // Milestone days remaining
@@ -185,8 +178,8 @@ struct TaskRow: View {
                 }
             }
 
-            // Progress bar for milestones
-            if task.type == .oneTime && !showProgress {
+            // Progress bar for milestones (only show when progress > 0)
+            if task.type == .oneTime && !showProgress && task.progress > 0 {
                 VStack(alignment: .leading, spacing: 4) {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
@@ -261,5 +254,29 @@ struct TaskRow: View {
                                 : Color.sacredMuted.opacity(0.12), lineWidth: 1)
                 )
         )
+    }
+}
+
+// MARK: - Heat dots — 7-day streak visualization
+
+private struct HeatDotsView: View {
+    let streak: Int
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(0..<7, id: \.self) { day in
+                let daysAgo = 6 - day // leftmost = 6 days ago, rightmost = today
+                let isLit = daysAgo < streak
+                Circle()
+                    .fill(isLit ? colorForDay(daysAgo: daysAgo) : Color.sacredMuted.opacity(0.15))
+                    .frame(width: 6, height: 6)
+            }
+        }
+    }
+
+    /// More recent days glow brighter
+    private func colorForDay(daysAgo: Int) -> Color {
+        let intensity = 1.0 - (Double(daysAgo) * 0.1)
+        return Color.sacredGold.opacity(max(0.4, intensity))
     }
 }

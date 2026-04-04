@@ -16,6 +16,10 @@ class HomeViewModel: ObservableObject {
     var skippedTasks: [AppTask] { tasks.filter { $0.checkedIn && $0.completedToday == false } }
     var hasTasks: Bool { !tasks.isEmpty }
 
+    // Daily progress — recurring tasks only
+    var totalRecurring: Int { tasks.filter { $0.type == .recurring }.count }
+    var doneRecurring: Int { tasks.filter { $0.type == .recurring && $0.checkedIn }.count }
+
     init() {
         // Forward repo changes to trigger view updates
         repo.$tasks

@@ -385,9 +385,10 @@ public static class GoalRoutes
             .Select(c => c.Date)
             .ToHashSet();
 
-        // Current streak: count consecutive days backwards from today
+        // Current streak: count consecutive days backwards
+        // If today has no check-in yet, start from yesterday (streak still alive)
         var currentStreak = 0;
-        var date = today;
+        var date = completedDates.Contains(today) ? today : today.AddDays(-1);
         while (completedDates.Contains(date))
         {
             currentStreak++;

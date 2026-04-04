@@ -12,19 +12,26 @@ struct HomeView: View {
         ZStack(alignment: .bottomTrailing) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    // Header
-                    Text("YOUR DHARMA")
-                        .font(.sacredMicroBold)
-                        .tracking(3)
-                        .foregroundColor(.sacredLabel)
+                    // Header with progress ring
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("YOUR DHARMA")
+                                .font(.sacredMicroBold)
+                                .tracking(3)
+                                .foregroundColor(.sacredLabel)
+                            Text("What needs your attention today?")
+                                .font(.sacredTitle)
+                                .foregroundColor(.sacredText)
+                        }
 
-                    Text("What needs your attention today?")
-                        .font(.sacredTitle)
-                        .foregroundColor(.sacredText)
-                        .padding(.top, 12)
+                        Spacer()
+
+                        if !vm.loading && vm.hasTasks {
+                            progressRing
+                        }
+                    }
 
                     if vm.loading {
-                        // Skeleton
                         VStack(spacing: 12) {
                             ForEach(0..<2, id: \.self) { _ in
                                 RoundedRectangle(cornerRadius: 16)
@@ -34,7 +41,6 @@ struct HomeView: View {
                         }
                         .padding(.top, 24)
                     } else if !vm.hasTasks {
-                        // Empty state
                         VStack(spacing: 16) {
                             Text("You haven't set any tasks yet.")
                                 .font(.sacredText)
@@ -55,13 +61,13 @@ struct HomeView: View {
                     } else {
                         // Recurring tasks
                         if !vm.recurringTasks.isEmpty {
-                            sectionHeader(icon: "arrow.triangle.2.circlepath", label: "RECURRING TASKS")
+                            sectionLabel("RECURRING")
                             taskList(vm.recurringTasks)
                         }
 
                         // Milestones
                         if !vm.milestoneTasks.isEmpty {
-                            sectionHeader(icon: "target", label: "MILESTONES")
+                            sectionLabel("MILESTONES")
                             taskList(vm.milestoneTasks)
                         }
 
@@ -120,26 +126,52 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Section header
+    // MARK: - Progress ring
 
-    private func sectionHeader(icon: String, label: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.sacredSmall)
-                .foregroundColor(.sacredLabel)
-            Text(label)
-                .font(.sacredSectionLabel)
-                .tracking(3)
-                .foregroundColor(.sacredLabel)
+    private var progressRing: some View {
+        let total = vm.totalRecurring
+        let done = vm.doneRecurring
+        let progress = total > 0 ? Double(done) / Double(total) : 0
+
+        return ZStack {
+            Circle()
+                .stroke(Color.sacredMuted.opacity(0.15), lineWidth: 4)
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(
+                    LinearGradient.sacredGoldShiny,
+                    style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+                .animation(.easeOut(duration: 0.5), value: progress)
+
+            VStack(spacing: 0) {
+                Text("\(done)")
+                    .font(.sacredTextSemibold)
+                    .foregroundColor(.sacredGold)
+                Text("of \(total)")
+                    .font(.sacredMicro)
+                    .foregroundColor(.sacredMuted)
+            }
         }
-        .padding(.top, 24)
-        .padding(.bottom, 12)
+        .frame(width: 48, height: 48)
+    }
+
+    // MARK: - Compact section label
+
+    private func sectionLabel(_ label: String) -> some View {
+        Text(label)
+            .font(.sacredSectionLabel)
+            .tracking(3)
+            .foregroundColor(.sacredLabel)
+            .padding(.top, 20)
+            .padding(.bottom, 8)
     }
 
     // MARK: - Task list
 
     private func taskList(_ tasks: [AppTask]) -> some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             ForEach(tasks) { task in
                 TaskRow(
                     task: task,
@@ -168,7 +200,7 @@ struct HomeView: View {
                 }
                 .foregroundColor(color)
             }
-            .padding(.top, 16)
+            .padding(.top, 12)
 
             if isExpanded.wrappedValue {
                 taskList(tasks)

@@ -43,11 +43,6 @@ class TaskRepository: ObservableObject {
             let milestones = allGoals.filter { $0.type == .oneTime && $0.completedAt == nil }
 
             let allTasks = todayItems + milestones
-            AppLogger.shared.info("Repo", "Refresh: \(todayItems.count) recurring, \(milestones.count) milestones")
-            for t in todayItems {
-                AppLogger.shared.info("Repo", "  \(t.title): checkedIn=\(t.checkedIn) completedToday=\(String(describing: t.completedToday))")
-            }
-
             // Update local DB
             guard let ctx = modelContext else { return }
             for task in allTasks {
