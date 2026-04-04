@@ -52,7 +52,7 @@ struct HomeView: View {
                         .padding(.top, 24)
                     } else {
                         // Recurring tasks
-                        if !vm.pendingRecurring.isEmpty {
+                        if vm.totalRecurring > 0 {
                             Button { showRecurringSummary = true } label: {
                                 HStack(spacing: 12) {
                                     Image(systemName: "arrow.triangle.2.circlepath")
@@ -67,22 +67,25 @@ struct HomeView: View {
                             .padding(.top, 16)
                             .padding(.bottom, 12)
 
-                            taskList(vm.pendingRecurring)
+                            if !vm.pendingRecurring.isEmpty {
+                                taskList(vm.pendingRecurring)
+                            }
                         }
 
                         // Commitments
-                        if !vm.urgentMilestones.isEmpty {
+                        if vm.totalMilestones > 0 {
                             MilestoneTimelineView(
-                                milestones: vm.urgentMilestones,
+                                milestones: vm.filteredCommitments,
                                 onDone: { id in Task { await vm.checkIn(id: id, completed: true) } },
                                 onSkip: { id in Task { await vm.checkIn(id: id, completed: false) } },
                                 onDelete: { id in Task { await vm.deleteTask(id: id) } },
                                 onProgressUpdate: { id, val in Task { await vm.updateProgress(id: id, value: val) } },
                                 onDueDateUpdate: { id, date in Task { await vm.updateDueDate(id: id, date: date) } },
                                 onShowAll: { showMilestoneSummary = true },
-                                totalMilestones: vm.totalMilestones,
-                                doneMilestones: vm.doneMilestones,
-                                hasOverdue: vm.overdueMilestones > 0
+                                filter: $vm.commitmentFilter,
+                                totalMilestones: vm.filteredTotal,
+                                doneMilestones: vm.filteredDone,
+                                hasOverdue: vm.filteredOverdue
                             )
                             .padding(.top, 20)
                         }

@@ -9,6 +9,7 @@ struct TaskRow: View {
     let onDelete: () -> Void
     let onProgressUpdate: (Int) -> Void
     var onDueDateUpdate: ((String) -> Void)? = nil
+    var neutralStyle: Bool = false
 
     @State private var showMenu = false
     @State private var showProgress = false
@@ -129,8 +130,8 @@ struct TaskRow: View {
                 // Title
                 Text(task.title)
                     .font(.sacredTextMedium)
-                    .foregroundColor(task.checkedIn && task.completedToday == true ? .sacredGreen : .sacredText)
-                    .strikethrough(task.checkedIn && task.completedToday == true, color: .sacredGreen.opacity(0.4))
+                    .foregroundColor(!neutralStyle && task.checkedIn && task.completedToday == true ? .sacredGreen : .sacredText)
+                    .strikethrough(!neutralStyle && task.checkedIn && task.completedToday == true, color: .sacredGreen.opacity(0.4))
 
                 Spacer()
 
@@ -252,21 +253,25 @@ struct TaskRow: View {
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(task.checkedIn
+                .fill(neutralStyle
+                      ? Color.sacredBgCard
+                      : task.checkedIn
                       ? Color.sacredGreen.opacity(0.06)
                       : isOverdue
                       ? Color.sacredRed.opacity(0.08)
                       : Color.sacredBgCard)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
-                        .stroke(task.checkedIn
+                        .stroke(neutralStyle
+                                ? Color.sacredMuted.opacity(0.12)
+                                : task.checkedIn
                                 ? Color.sacredGreen.opacity(0.25)
                                 : isOverdue
                                 ? Color.sacredRed.opacity(0.35)
-                                : Color.sacredMuted.opacity(0.12), lineWidth: isOverdue ? 1.5 : 1)
+                                : Color.sacredMuted.opacity(0.12), lineWidth: neutralStyle ? 1 : isOverdue ? 1.5 : 1)
                 )
         )
-        .modifier(OverduePulseModifier(isOverdue: isOverdue))
+        .modifier(OverduePulseModifier(isOverdue: neutralStyle ? false : isOverdue))
     }
 }
 

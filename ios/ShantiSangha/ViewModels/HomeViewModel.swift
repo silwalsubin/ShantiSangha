@@ -3,9 +3,26 @@ import Combine
 
 /// ViewModel for the Home screen — "What needs your attention today?"
 /// Delegates to TaskRepository for offline-first data management.
+enum CommitmentFilter: String, CaseIterable {
+    case week = "1W"
+    case twoWeeks = "2W"
+    case month = "1M"
+    case all = "All"
+
+    var maxDays: Int? {
+        switch self {
+        case .week: return 7
+        case .twoWeeks: return 14
+        case .month: return 30
+        case .all: return nil
+        }
+    }
+}
+
 @MainActor
 class HomeViewModel: ObservableObject {
     @Published var loading = true
+    @Published var commitmentFilter: CommitmentFilter = .week
     private let repo = TaskRepository.shared
     private var cancellables = Set<AnyCancellable>()
 
@@ -17,10 +34,15 @@ class HomeViewModel: ObservableObject {
         tasks.filter { !$0.checkedIn && $0.type == .recurring }
     }
 
-    /// Milestones due within 7 days, sorted by urgency (overdue first, then nearest due)
-    var urgentMilestones: [AppTask] {
-        tasks.filter {
-            !$0.checkedIn && $0.type == .oneTime && ($0.daysRemaining ?? 999) <= 7
+    /// Filtered commitments, sorted by urgency (overdue first, then nearest due)
+    var filteredCommitments: [AppTask] {
+        let maxDays = commitmentFilter.maxDays
+        return tasks.filter {
+            guard !$0.checkedIn && $0.type == .oneTime else { return false }
+            if let max = maxDays {
+                return ($0.daysRemaining ?? 999) <= max
+            }
+            return true
         }.sorted { ($0.daysRemaining ?? 0) < ($1.daysRemaining ?? 0) }
     }
 
@@ -41,7 +63,18 @@ class HomeViewModel: ObservableObject {
     var totalMilestones: Int { allMilestones.count }
     var doneMilestones: Int { completedMilestones.count }
 
-    var pendingTasks: [AppTask] { pendingRecurring + urgentMilestones }
+    // Filter-aware counts for progress ring
+    private func milestonesInWindow(_ filter: CommitmentFilter) -> [AppTask] {
+        allMilestones.filter { task in
+            guard let max = filter.maxDays else { return true }
+            return (task.daysRemaining ?? 999) <= max
+        }
+    }
+    var filteredTotal: Int { milestonesInWindow(commitmentFilter).count }
+    var filteredDone: Int { milestonesInWindow(commitmentFilter).filter { $0.checkedIn && $0.completedToday == true }.count }
+    var filteredOverdue: Bool { milestonesInWindow(commitmentFilter).contains { !$0.checkedIn && ($0.daysRemaining ?? 1) <= 0 } }
+
+    var pendingTasks: [AppTask] { pendingRecurring + filteredCommitments }
 
     var completedTasks: [AppTask] { tasks.filter { $0.checkedIn && $0.completedToday == true } }
     var skippedTasks: [AppTask] { tasks.filter { $0.checkedIn && $0.completedToday == false } }

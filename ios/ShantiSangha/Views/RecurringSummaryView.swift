@@ -112,7 +112,8 @@ struct RecurringSummaryView: View {
                     onSkip: { Task { await vm.checkIn(id: task.id, completed: false) } },
                     onUndo: { Task { await vm.undoCheckIn(id: task.id) } },
                     onDelete: { Task { await vm.deleteTask(id: task.id) } },
-                    onProgressUpdate: { _ in }
+                    onProgressUpdate: { _ in },
+                    neutralStyle: true
                 )
             }
         }
