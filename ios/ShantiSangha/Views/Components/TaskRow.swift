@@ -12,9 +12,8 @@ struct TaskRow: View {
 
     @State private var showMenu = false
     @State private var showProgress = false
-    @State private var showDueDatePicker = false
+    @State private var navigateToDueDate = false
     @State private var progressValue: Double = 0
-    @State private var newDueDate = Date()
     @State private var navigateToDelete = false
 
     var isOverdue: Bool {
@@ -110,6 +109,9 @@ struct TaskRow: View {
                 NavigationLink(destination: DeleteTaskView(task: task, onDelete: onDelete), isActive: $navigateToDelete) {
                     EmptyView()
                 }
+                NavigationLink(destination: ChangeDueDateView(task: task, onSave: { date in onDueDateUpdate?(date) }), isActive: $navigateToDueDate) {
+                    EmptyView()
+                }
             }
             .hidden()
         )
@@ -155,7 +157,11 @@ struct TaskRow: View {
                                 Button { showProgress = true; progressValue = Double(task.progress) } label: {
                                     Label("Update progress", systemImage: "chart.bar.fill")
                                 }
-                                Button { showDueDatePicker = true } label: {
+                                Button {
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                        navigateToDueDate = true
+                                    }
+                                } label: {
                                     Label("Change due date", systemImage: "calendar")
                                 }
                             }
@@ -224,32 +230,6 @@ struct TaskRow: View {
                         Button("Save") {
                             showProgress = false
                             onProgressUpdate(Int(progressValue))
-                        }
-                        .font(.sacredSmallSemibold)
-                        .foregroundColor(.sacredGold)
-                    }
-                }
-                .padding(.leading, 36)
-            }
-
-            // Due date picker
-            if showDueDatePicker {
-                VStack(spacing: 8) {
-                    DatePicker("New due date", selection: $newDueDate, displayedComponents: .date)
-                        .datePickerStyle(.compact)
-                        .tint(.sacredGold)
-                        .font(.sacredText)
-
-                    HStack {
-                        Spacer()
-                        Button("Cancel") { showDueDatePicker = false }
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredMuted)
-                        Button("Save") {
-                            showDueDatePicker = false
-                            let f = DateFormatter()
-                            f.dateFormat = "yyyy-MM-dd"
-                            onDueDateUpdate?(f.string(from: newDueDate))
                         }
                         .font(.sacredSmallSemibold)
                         .foregroundColor(.sacredGold)
