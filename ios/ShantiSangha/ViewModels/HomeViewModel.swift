@@ -10,11 +10,24 @@ class HomeViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     var tasks: [AppTask] { repo.tasks }
-    var recurringTasks: [AppTask] { tasks.filter { !$0.checkedIn && $0.type == .recurring } }
-    var milestoneTasks: [AppTask] { tasks.filter { !$0.checkedIn && $0.type == .oneTime } }
+    var hasTasks: Bool { !tasks.isEmpty }
+
+    /// Pending recurring tasks
+    var pendingRecurring: [AppTask] {
+        tasks.filter { !$0.checkedIn && $0.type == .recurring }
+    }
+
+    /// Milestones due within 7 days, sorted by urgency (overdue first, then nearest due)
+    var urgentMilestones: [AppTask] {
+        tasks.filter {
+            !$0.checkedIn && $0.type == .oneTime && ($0.daysRemaining ?? 999) <= 7
+        }.sorted { ($0.daysRemaining ?? 0) < ($1.daysRemaining ?? 0) }
+    }
+
+    var pendingTasks: [AppTask] { pendingRecurring + urgentMilestones }
+
     var completedTasks: [AppTask] { tasks.filter { $0.checkedIn && $0.completedToday == true } }
     var skippedTasks: [AppTask] { tasks.filter { $0.checkedIn && $0.completedToday == false } }
-    var hasTasks: Bool { !tasks.isEmpty }
 
     // Daily progress — recurring tasks only
     var totalRecurring: Int { tasks.filter { $0.type == .recurring }.count }

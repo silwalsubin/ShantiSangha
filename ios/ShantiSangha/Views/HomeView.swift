@@ -4,9 +4,8 @@ import SwiftUI
 /// Mirrors frontend/src/pages/app/home.vue
 struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
-    @State private var showCompleted = false
-    @State private var showSkipped = false
     @State private var showNewTask = false
+    @State private var showRecurringSummary = false
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -27,7 +26,9 @@ struct HomeView: View {
                         Spacer()
 
                         if !vm.loading && vm.hasTasks {
-                            progressRing
+                            Button { showRecurringSummary = true } label: {
+                                progressRing
+                            }
                         }
                     }
 
@@ -60,37 +61,22 @@ struct HomeView: View {
                         .padding(.top, 24)
                     } else {
                         // Recurring tasks
-                        if !vm.recurringTasks.isEmpty {
-                            sectionLabel("RECURRING")
-                            taskList(vm.recurringTasks)
+                        if !vm.pendingRecurring.isEmpty {
+                            taskList(vm.pendingRecurring)
+                                .padding(.top, 16)
                         }
 
-                        // Milestones
-                        if !vm.milestoneTasks.isEmpty {
-                            sectionLabel("MILESTONES")
-                            taskList(vm.milestoneTasks)
-                        }
-
-                        // Completed
-                        if !vm.completedTasks.isEmpty {
-                            collapsibleSection(
-                                icon: "checkmark",
-                                label: "\(vm.completedTasks.count) completed",
-                                color: .sacredGreen,
-                                isExpanded: $showCompleted,
-                                tasks: vm.completedTasks
+                        // Milestone timeline
+                        if !vm.urgentMilestones.isEmpty {
+                            MilestoneTimelineView(
+                                milestones: vm.urgentMilestones,
+                                onDone: { id in Task { await vm.checkIn(id: id, completed: true) } },
+                                onSkip: { id in Task { await vm.checkIn(id: id, completed: false) } },
+                                onDelete: { id in Task { await vm.deleteTask(id: id) } },
+                                onProgressUpdate: { id, val in Task { await vm.updateProgress(id: id, value: val) } },
+                                onDueDateUpdate: { id, date in Task { await vm.updateDueDate(id: id, date: date) } }
                             )
-                        }
-
-                        // Skipped
-                        if !vm.skippedTasks.isEmpty {
-                            collapsibleSection(
-                                icon: "forward.fill",
-                                label: "\(vm.skippedTasks.count) skipped",
-                                color: .sacredMuted,
-                                isExpanded: $showSkipped,
-                                tasks: vm.skippedTasks
-                            )
+                            .padding(.top, 20)
                         }
                     }
                 }
@@ -123,6 +109,9 @@ struct HomeView: View {
             NewTaskView { title, type, targetDate in
                 await vm.createTask(title: title, type: type, targetDate: targetDate)
             }
+        }
+        .navigationDestination(isPresented: $showRecurringSummary) {
+            RecurringSummaryView(vm: vm)
         }
     }
 
@@ -157,17 +146,6 @@ struct HomeView: View {
         .frame(width: 48, height: 48)
     }
 
-    // MARK: - Compact section label
-
-    private func sectionLabel(_ label: String) -> some View {
-        Text(label)
-            .font(.sacredSectionLabel)
-            .tracking(3)
-            .foregroundColor(.sacredLabel)
-            .padding(.top, 20)
-            .padding(.bottom, 8)
-    }
-
     // MARK: - Task list
 
     private func taskList(_ tasks: [AppTask]) -> some View {
@@ -186,26 +164,4 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Collapsible section
-
-    private func collapsibleSection(icon: String, label: String, color: Color, isExpanded: Binding<Bool>, tasks: [AppTask]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Button { isExpanded.wrappedValue.toggle() } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: icon)
-                        .font(.sacredSmall)
-                    Text(label)
-                        .font(.sacredSmallMedium)
-                    Image(systemName: isExpanded.wrappedValue ? "chevron.up" : "chevron.down")
-                        .font(.sacredMicro)
-                }
-                .foregroundColor(color)
-            }
-            .padding(.top, 12)
-
-            if isExpanded.wrappedValue {
-                taskList(tasks)
-            }
-        }
-    }
 }

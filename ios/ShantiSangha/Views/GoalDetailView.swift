@@ -39,7 +39,10 @@ struct GoalDetailView: View {
                     } else {
                         HStack(spacing: 12) {
                             if let days = goal.daysRemaining {
-                                statCard(value: goal.completedAt != nil ? "Done" : "\(days)", label: goal.completedAt != nil ? "Completed" : "Days Left")
+                                statCard(
+                                    value: goal.completedAt != nil ? "Done" : days < 0 ? "Overdue" : "\(days)",
+                                    label: goal.completedAt != nil ? "Completed" : days < 0 ? "\(abs(days))d over" : "Days Left"
+                                )
                             }
                             statCard(value: "\(goal.progress ?? 0)%", label: "Progress")
                         }

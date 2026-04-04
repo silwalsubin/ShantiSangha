@@ -25,13 +25,24 @@
       "Bash(dig shantisangha.com A +short)",
       "Bash(dig @8.8.8.8 shantisangha.com A +short)",
       "Bash(chmod +x /Users/subinsilwal/Desktop/code/maiself/ios/upload-testflight.sh)",
-      "Bash(find ShantiSangha/Views -name \"*.swift\" -exec sed -i '' -e 's/Color\\\\.sacredBg\\\\.opacity\\(0\\\\.88\\)/Color.sacredBgCard/g' -e 's/Color\\\\.sacredBg\\\\.opacity\\(0\\\\.95\\)/Color.sacredBgCard/g' -e 's/Color\\\\.sacredBg\\\\.opacity\\(0\\\\.7\\)/Color.sacredBgCard/g' -e 's/Color\\\\.sacredBg\\\\.opacity\\(0\\\\.6\\)/Color.sacredBgCard/g' -e 's/Color\\\\.sacredBg\\\\.opacity\\(0\\\\.5\\)/Color.sacredBgCard/g' {} +)"
+      "Bash(find ShantiSangha/Views -name \"*.swift\" -exec sed -i '' -e 's/Color\\\\.sacredBg\\\\.opacity\\(0\\\\.88\\)/Color.sacredBgCard/g' -e 's/Color\\\\.sacredBg\\\\.opacity\\(0\\\\.95\\)/Color.sacredBgCard/g' -e 's/Color\\\\.sacredBg\\\\.opacity\\(0\\\\.7\\)/Color.sacredBgCard/g' -e 's/Color\\\\.sacredBg\\\\.opacity\\(0\\\\.6\\)/Color.sacredBgCard/g' -e 's/Color\\\\.sacredBg\\\\.opacity\\(0\\\\.5\\)/Color.sacredBgCard/g' {} +)",
+      "Bash(ls -la /Users/subinsilwal/Desktop/code/maiself/infrastructure/terraform/.git*)",
+      "Bash(grep -r shantisangha. /Users/subinsilwal/Desktop/code/maiself/web --include=*.ts --include=*.js --include=*.vue)",
+      "Bash(terraform --version)",
+      "Bash(gh auth:*)",
+      "Bash(aws sts:*)",
+      "Bash(ruby -e ':*)",
+      "Bash(xcodebuild test:*)",
+      "Bash(find /Users/subinsilwal/Desktop/code/maiself -type f -name *Test*.swift -o -name *test*.swift)",
+      "Bash(xcodebuild build:*)",
+      "Bash(xcrun simctl:*)"
     ],
     "additionalDirectories": [
       "/Users/subinsilwal/Desktop/code/maiself/.claude",
       "/Users/subinsilwal/Desktop/code/maiself/ios/ShantiSangha/ShantiSangha/.git",
       "/private/tmp",
-      "/Users/subinsilwal/Downloads"
+      "/Users/subinsilwal/Downloads",
+      "/Users/subinsilwal/Desktop/code/maiself/ios"
     ]
   }
 }

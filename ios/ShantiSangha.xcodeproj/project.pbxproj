@@ -35,17 +35,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		04A24D982F7AFC1400775F13 /* ShantiSangha */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
-			explicitFileTypes = {
-			};
-			explicitFolders = (
-			);
-			path = ShantiSangha;
-			sourceTree = "<group>";
-		};
+		04A24D982F7AFC1400775F13 /* ShantiSangha */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = ShantiSangha; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -112,7 +102,6 @@
 				95AD8709C353998FDE5BE52E /* FeedbackServiceTests.swift */,
 				7A09E248379299BAC76B4CF2 /* TaskModelTests.swift */,
 			);
-			name = ShantiSanghaTests;
 			path = ShantiSanghaTests;
 			sourceTree = "<group>";
 		};
