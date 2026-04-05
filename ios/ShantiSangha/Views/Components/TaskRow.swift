@@ -289,27 +289,68 @@ struct TaskRow: View {
     }
 }
 
-// MARK: - Heat dots — 7-day streak visualization
+// MARK: - Heartbeat — 7-day streak as ECG-style pulse line
 
 private struct HeatDotsView: View {
     let streak: Int
 
+    private let width: CGFloat = 56
+    private let height: CGFloat = 20
+    private let days = 7
+
+    @State private var trimEnd: CGFloat = 0
+
     var body: some View {
-        HStack(spacing: 3) {
-            ForEach(0..<7, id: \.self) { day in
-                let daysAgo = 6 - day // leftmost = 6 days ago, rightmost = today
-                let isLit = daysAgo < streak
-                Circle()
-                    .fill(isLit ? colorForDay(daysAgo: daysAgo) : Color.sacredMuted.opacity(0.15))
-                    .frame(width: 6, height: 6)
+        HeartbeatShape(streak: streak, days: days)
+            .trim(from: 0, to: trimEnd)
+            .stroke(
+                LinearGradient(
+                    colors: [Color.sacredGold.opacity(0.3), Color.sacredGold],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                ),
+                lineWidth: 1.5
+            )
+            .frame(width: width, height: height)
+            .onAppear {
+                withAnimation(.easeOut(duration: 0.8).delay(0.2)) {
+                    trimEnd = 1
+                }
+            }
+    }
+}
+
+private struct HeartbeatShape: Shape {
+    let streak: Int
+    let days: Int
+
+    func path(in rect: CGRect) -> Path {
+        let stepX = rect.width / CGFloat(days - 1)
+        let baseline = rect.height * 0.7
+        let peakHeight = rect.height * 0.55
+
+        var path = Path()
+        path.move(to: CGPoint(x: 0, y: baseline))
+
+        for day in 0..<days {
+            let daysAgo = (days - 1) - day
+            let isLit = daysAgo < streak
+            let x = CGFloat(day) * stepX
+
+            if isLit {
+                let riseStart = x - stepX * 0.25
+                let fallEnd = x + stepX * 0.25
+                path.addLine(to: CGPoint(x: max(riseStart, 0), y: baseline))
+                path.addQuadCurve(
+                    to: CGPoint(x: min(fallEnd, rect.width), y: baseline),
+                    control: CGPoint(x: x, y: baseline - peakHeight)
+                )
+            } else {
+                path.addLine(to: CGPoint(x: x, y: baseline))
             }
         }
-    }
 
-    /// More recent days glow brighter
-    private func colorForDay(daysAgo: Int) -> Color {
-        let intensity = 1.0 - (Double(daysAgo) * 0.1)
-        return Color.sacredGold.opacity(max(0.4, intensity))
+        return path
     }
 }
 
