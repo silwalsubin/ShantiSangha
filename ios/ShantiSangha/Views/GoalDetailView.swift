@@ -176,7 +176,7 @@ struct GoalDetailView: View {
     private func actionIcon(_ action: String) -> String {
         switch action {
         case "Completed": return "checkmark"
-        case "Skipped": return "forward.fill"
+        case "Skipped": return "moon.fill"
         case "ProgressUpdated": return "chart.bar.fill"
         case "DueDateChanged": return "calendar"
         case "Created": return "plus"

@@ -23,6 +23,7 @@ struct TaskRow: View {
 
     @State private var offset: CGFloat = 0
     @State private var activeSwipe: SwipeDirection? = nil
+    @State private var swipeActive = false
     @State private var navigateToDetail = false
     private let swipeThreshold: CGFloat = 80
 
@@ -52,7 +53,7 @@ struct TaskRow: View {
                     Text("Skip")
                         .font(.sacredSmallSemibold)
                         .foregroundColor(.white)
-                    Image(systemName: "forward.fill")
+                    Image(systemName: "moon.fill")
                         .font(.sacredSmall)
                         .foregroundColor(.white)
                 }
@@ -71,34 +72,47 @@ struct TaskRow: View {
                 .offset(x: offset)
                 .gesture(
                     !task.checkedIn && !task.saving
-                    ? DragGesture(minimumDistance: 20)
-                        .onChanged { value in
-                            offset = value.translation.width
-                            if offset > swipeThreshold {
-                                activeSwipe = .right
-                            } else if offset < -swipeThreshold {
-                                activeSwipe = .left
-                            } else {
-                                activeSwipe = nil
+                    ? LongPressGesture(minimumDuration: 0.3)
+                        .onChanged { _ in
+                            if !swipeActive {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             }
                         }
                         .onEnded { _ in
-                            if let swipe = activeSwipe {
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                withAnimation(.easeOut(duration: 0.2)) {
-                                    offset = swipe == .right ? 300 : -300
-                                }
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                    if swipe == .right { onDone() } else { onSkip() }
-                                    offset = 0
-                                    activeSwipe = nil
-                                }
-                            } else {
-                                withAnimation(.spring(response: 0.3)) {
-                                    offset = 0
-                                }
-                            }
+                            swipeActive = true
                         }
+                        .sequenced(before:
+                            DragGesture(minimumDistance: 10)
+                                .onChanged { value in
+                                    guard swipeActive else { return }
+                                    offset = value.translation.width
+                                    if offset > swipeThreshold {
+                                        activeSwipe = .right
+                                    } else if offset < -swipeThreshold {
+                                        activeSwipe = .left
+                                    } else {
+                                        activeSwipe = nil
+                                    }
+                                }
+                                .onEnded { _ in
+                                    if let swipe = activeSwipe {
+                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                        withAnimation(.easeOut(duration: 0.2)) {
+                                            offset = swipe == .right ? 300 : -300
+                                        }
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                            if swipe == .right { onDone() } else { onSkip() }
+                                            offset = 0
+                                            activeSwipe = nil
+                                        }
+                                    } else {
+                                        withAnimation(.spring(response: 0.3)) {
+                                            offset = 0
+                                        }
+                                    }
+                                    swipeActive = false
+                                }
+                        )
                     : nil
                 )
         }
@@ -167,7 +181,7 @@ struct TaskRow: View {
                                 }
                             }
                             Button { onSkip() } label: {
-                                Label("Skip for today", systemImage: "forward.fill")
+                                Label("Skip for today", systemImage: "moon.fill")
                             }
                         } else {
                             Button { onUndo() } label: {
