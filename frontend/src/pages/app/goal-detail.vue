@@ -48,6 +48,39 @@ const loading = ref(true)
 const editingWhy = ref(false)
 const whyInput = ref('')
 const savingWhy = ref(false)
+const togglingDate = ref<string | null>(null)
+
+async function toggleDay(day: DayEntry) {
+  if (!goal.value || day.isFuture) return
+  togglingDate.value = day.date
+  try {
+    if (day.checkin) {
+      // Remove existing check-in
+      await api.delete(`/goals/${goal.value.id}/checkin?date=${day.date}`)
+      checkIns.value = checkIns.value.filter(c => c.date !== day.date)
+    } else {
+      // Add as completed
+      const result = await api.post<any>(`/goals/${goal.value.id}/checkin`, {
+        completed: true,
+        date: day.date,
+      })
+      checkIns.value.push({
+        id: result.id,
+        date: result.date,
+        completed: result.completed,
+        note: result.note ?? null,
+      })
+    }
+    // Refresh goal to update streaks
+    const data = await api.get<any>(`/goals/${goal.value.id}`)
+    if (goal.value.type === 'Recurring') {
+      goal.value.currentStreak = data.currentStreak ?? data.current_streak ?? 0
+      goal.value.longestStreak = data.longestStreak ?? data.longest_streak ?? 0
+    }
+  } finally {
+    togglingDate.value = null
+  }
+}
 
 function buildDayEntries(): DayEntry[] {
   if (!goal.value) return []
@@ -296,12 +329,16 @@ onMounted(() => {
           <li
             v-for="day in dayEntries"
             :key="day.date"
-            class="flex items-center gap-3 rounded-xl px-3 py-2.5"
-            :class="day.isToday ? 'bg-sacred-bg-hover' : ''"
+            class="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 transition duration-150 active:scale-[0.98]"
+            :class="[
+              day.isToday ? 'bg-sacred-bg-hover' : 'hover:bg-sacred-bg-hover/50',
+              togglingDate === day.date ? 'opacity-50 pointer-events-none' : '',
+            ]"
+            @click="toggleDay(day)"
           >
             <!-- Status indicator -->
             <div
-              class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+              class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition duration-150"
               :class="day.checkin?.completed
                 ? 'bg-gradient-to-br from-sacred-gold to-sacred-gold-dark'
                 : day.checkin && !day.checkin.completed
