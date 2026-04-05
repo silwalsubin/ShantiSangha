@@ -154,11 +154,11 @@ struct TaskRow: View {
                     HeatDotsView(streak: task.currentStreak)
                 }
 
-                // Milestone days remaining
+                // Milestone due date
                 if task.type == .oneTime, let days = task.daysRemaining {
-                    Text(days > 0 ? "\(days)d" : days == 0 ? "Today" : "\(abs(days))d over")
+                    Text(dueDateLabel(daysRemaining: days))
                         .font(days <= 0 ? .sacredSmallSemibold : .sacredSmall)
-                        .foregroundColor(days <= 0 ? .sacredRed : .sacredGold)
+                        .foregroundColor(days < 0 ? .sacredRed : days == 0 ? .sacredGold : .sacredMuted)
                 }
 
                 // Three-dot menu
@@ -346,6 +346,25 @@ private struct HeartbeatShape: Shape {
 }
 
 // MARK: - Overdue pulse — subtle breathing glow on overdue milestones
+
+// MARK: - Due date label — shows "Apr 5" style date from daysRemaining
+
+private func dueDateLabel(daysRemaining days: Int) -> String {
+    if days == 0 { return "Today" }
+    if days == 1 { return "Tomorrow" }
+    if days < 0 {
+        let overdue = abs(days)
+        if overdue >= 30 {
+            let months = overdue / 30
+            return "\(months) month\(months == 1 ? "" : "s") overdue"
+        }
+        return "\(overdue) day\(overdue == 1 ? "" : "s") overdue"
+    }
+    let date = Calendar.current.date(byAdding: .day, value: days, to: Date())!
+    let f = DateFormatter()
+    f.dateFormat = "MMM d"
+    return f.string(from: date)
+}
 
 private struct OverduePulseModifier: ViewModifier {
     let isOverdue: Bool

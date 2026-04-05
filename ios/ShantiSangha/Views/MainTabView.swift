@@ -40,6 +40,8 @@ struct MainTabView: View {
             }
             .tabItem {
                 Image(systemName: "leaf")
+                    .environment(\.symbolVariants, .none)
+                    .fontWeight(.ultraLight)
                 Text("Journey")
             }
             .tag(2)

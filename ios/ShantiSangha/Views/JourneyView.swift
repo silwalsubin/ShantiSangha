@@ -35,39 +35,51 @@ struct JourneyView: View {
                         }
                     }
                 }
-                .padding(.bottom, 24)
+                .padding(.bottom, 32)
 
                 if loading {
                     ProgressView()
                         .frame(maxWidth: .infinity, minHeight: 200)
                 } else if let journey = journey {
-                    // Celebration header
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("\(journey.summary.practicesCompleted)")
-                            .font(.system(size: 52, weight: .bold, design: .serif))
-                            .foregroundColor(.sacredGold)
-                        + Text(" practices")
-                            .font(.sacredTitle)
-                            .foregroundColor(.sacredText)
+                    // Hero ring — overall consistency
+                    VStack(spacing: 12) {
+                        ZStack {
+                            Circle()
+                                .stroke(Color.sacredMuted.opacity(0.1), lineWidth: 8)
+                            Circle()
+                                .trim(from: 0, to: Double(journey.summary.completionRate) / 100)
+                                .stroke(
+                                    LinearGradient(colors: [.sacredGoldShine, .sacredGold], startPoint: .topLeading, endPoint: .bottomTrailing),
+                                    style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                                )
+                                .rotationEffect(.degrees(-90))
+                                .animation(.easeOut(duration: 0.8), value: journey.summary.completionRate)
+
+                            VStack(spacing: 2) {
+                                Text("\(journey.summary.practicesCompleted)")
+                                    .font(.system(size: 36, weight: .bold, design: .serif))
+                                    .foregroundColor(.sacredGold)
+                                Text("practices")
+                                    .font(.sacredSmall)
+                                    .foregroundColor(.sacredMuted)
+                            }
+                        }
+                        .frame(width: 120, height: 120)
 
                         if journey.summary.completionRate > 0 {
                             Text("\(journey.summary.completionRate)% consistency")
-                                .font(.sacredSmall)
-                                .foregroundColor(.sacredMuted)
+                                .font(.sacredSmallMedium)
+                                .foregroundColor(.sacredText)
                         }
 
                         if journey.summary.commitmentsFinished > 0 {
-                            HStack(spacing: 6) {
-                                Image(systemName: "checkmark.seal.fill")
-                                    .foregroundColor(.sacredGreen)
-                                Text("\(journey.summary.commitmentsFinished) commitment\(journey.summary.commitmentsFinished == 1 ? "" : "s") fulfilled")
-                                    .font(.sacredSmallMedium)
-                                    .foregroundColor(.sacredGreen)
-                            }
-                            .padding(.top, 2)
+                            Text("\(journey.summary.commitmentsFinished) commitment\(journey.summary.commitmentsFinished == 1 ? "" : "s") fulfilled")
+                                .font(.sacredSmall)
+                                .foregroundColor(.sacredGreen)
                         }
                     }
-                    .padding(.bottom, 20)
+                    .frame(maxWidth: .infinity)
+                    .padding(.bottom, 28)
 
                     // AI Reflection
                     if reflectionLoading {
@@ -85,37 +97,39 @@ struct JourneyView: View {
                             .font(.sacredBody)
                             .italic()
                             .foregroundColor(.sacredText)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(16)
-                            .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredGold.opacity(0.06)))
-                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.1)))
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity)
                             .padding(.bottom, 28)
                     }
 
-                    // Practices with progress rings
+                    // Practice breakdown
                     if !journey.practices.isEmpty {
-                        VStack(spacing: 12) {
-                            ForEach(journey.practices) { practice in
+                        VStack(spacing: 0) {
+                            ForEach(Array(journey.practices.enumerated()), id: \.element.id) { index, practice in
                                 HStack(spacing: 14) {
+                                    // Mini ring
                                     PracticeRing(
                                         done: practice.daysCompleted,
                                         total: practice.totalDays
                                     )
+                                    .frame(width: 40, height: 40)
 
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(practice.title)
-                                            .font(.sacredTextMedium)
-                                            .foregroundColor(.sacredText)
-                                        Text("\(practice.daysCompleted) of \(practice.totalDays) days")
-                                            .font(.sacredMicro)
-                                            .foregroundColor(.sacredMuted)
-                                    }
+                                    Text(practice.title)
+                                        .font(.sacredTextMedium)
+                                        .foregroundColor(.sacredText)
 
                                     Spacer()
+
+                                    Text("\(practice.daysCompleted)/\(practice.totalDays)")
+                                        .font(.sacredSmall)
+                                        .foregroundColor(.sacredMuted)
                                 }
-                                .padding(12)
-                                .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBgCard))
-                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.1)))
+                                .padding(.vertical, 12)
+
+                                if index < journey.practices.count - 1 {
+                                    Divider()
+                                        .padding(.leading, 54)
+                                }
                             }
                         }
                         .padding(.bottom, 28)
@@ -128,26 +142,28 @@ struct JourneyView: View {
                             .frame(height: 1)
                             .padding(.bottom, 20)
 
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 0) {
                             Text("FULFILLED")
                                 .font(.sacredSectionLabel)
                                 .tracking(3)
                                 .foregroundColor(.sacredLabel)
-                                .padding(.bottom, 4)
+                                .padding(.bottom, 12)
 
-                            ForEach(journey.completedCommitments) { c in
+                            ForEach(Array(journey.completedCommitments.enumerated()), id: \.element.id) { index, c in
                                 HStack(spacing: 12) {
-                                    Image(systemName: "checkmark.seal.fill")
-                                        .font(.sacredText)
+                                    Image(systemName: "leaf.fill")
+                                        .font(.sacredSmall)
                                         .foregroundColor(.sacredGreen)
                                     Text(c.title)
                                         .font(.sacredTextMedium)
                                         .foregroundColor(.sacredText)
                                 }
-                                .padding(12)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(RoundedRectangle(cornerRadius: 14).fill(Color.sacredGreen.opacity(0.05)))
-                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.sacredGreen.opacity(0.12)))
+                                .padding(.vertical, 10)
+
+                                if index < journey.completedCommitments.count - 1 {
+                                    Divider()
+                                        .padding(.leading, 36)
+                                }
                             }
                         }
                     }
@@ -204,39 +220,33 @@ private struct PracticeRing: View {
 
         ZStack {
             Circle()
-                .stroke(Color.sacredMuted.opacity(0.15), lineWidth: 4)
+                .stroke(Color.sacredMuted.opacity(0.12), lineWidth: 3)
             Circle()
                 .trim(from: 0, to: progress)
                 .stroke(
                     LinearGradient(colors: [.sacredGoldShine, .sacredGold], startPoint: .topLeading, endPoint: .bottomTrailing),
-                    style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                    style: StrokeStyle(lineWidth: 3, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
 
-            VStack(spacing: 0) {
-                Text("\(done)")
-                    .font(.sacredTextSemibold)
-                    .foregroundColor(.sacredGold)
-                Text("of \(total)")
-                    .font(.sacredMicro)
-                    .foregroundColor(.sacredMuted)
-            }
+            Text("\(done)")
+                .font(.sacredSmallSemibold)
+                .foregroundColor(.sacredGold)
         }
-        .frame(width: 48, height: 48)
     }
 }
 
 // MARK: - Period
 
 enum JourneyPeriod: CaseIterable {
-    case week, twoWeeks, month, threeMonths
+    case today, week, month, all
 
     var label: String {
         switch self {
-        case .week: return "7D"
-        case .twoWeeks: return "14D"
-        case .month: return "30D"
-        case .threeMonths: return "90D"
+        case .today: return "Today"
+        case .week: return "This week"
+        case .month: return "This month"
+        case .all: return "All time"
         }
     }
 
@@ -246,10 +256,10 @@ enum JourneyPeriod: CaseIterable {
         let today = Date()
         let daysBack: Int
         switch self {
+        case .today: daysBack = 0
         case .week: daysBack = 6
-        case .twoWeeks: daysBack = 13
         case .month: daysBack = 29
-        case .threeMonths: daysBack = 89
+        case .all: daysBack = 365
         }
         let from = Calendar.current.date(byAdding: .day, value: -daysBack, to: today)!
         return (f.string(from: from), f.string(from: today))

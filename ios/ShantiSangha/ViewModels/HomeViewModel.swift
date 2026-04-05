@@ -4,17 +4,15 @@ import Combine
 /// ViewModel for the Home screen — "What needs your attention today?"
 /// Delegates to TaskRepository for offline-first data management.
 enum CommitmentFilter: String, CaseIterable {
-    case day = "1D"
-    case week = "1W"
-    case twoWeeks = "2W"
-    case month = "1M"
+    case today = "Due today"
+    case week = "Due this week"
+    case month = "Due this month"
     case all = "All"
 
     var maxDays: Int? {
         switch self {
-        case .day: return 1
+        case .today: return 0
         case .week: return 7
-        case .twoWeeks: return 14
         case .month: return 30
         case .all: return nil
         }
@@ -24,7 +22,7 @@ enum CommitmentFilter: String, CaseIterable {
 @MainActor
 class HomeViewModel: ObservableObject {
     @Published var loading = true
-    @Published var commitmentFilter: CommitmentFilter = .day
+    @Published var commitmentFilter: CommitmentFilter = .today
     @Published var activeSwipeId: String?
     private let repo = TaskRepository.shared
     private var cancellables = Set<AnyCancellable>()
