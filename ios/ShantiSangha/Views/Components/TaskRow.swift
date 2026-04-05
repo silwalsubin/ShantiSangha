@@ -82,7 +82,7 @@ struct TaskRow: View {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         }
                         .sequenced(before:
-                            DragGesture(minimumDistance: 10)
+                            DragGesture(minimumDistance: 0)
                                 .onChanged { value in
                                     guard swipeActive else { return }
                                     offset = value.translation.width
@@ -253,14 +253,6 @@ struct TaskRow: View {
                 .padding(.leading, 36)
             }
 
-            // Spiritual feedback
-            if task.checkedIn, let msg = task.feedbackMessage {
-                Text(msg)
-                    .font(.sacredCaption)
-                    .italic()
-                    .foregroundColor(.sacredMuted)
-                    .padding(.leading, 36)
-            }
 
         }
         .padding(.horizontal, 16)

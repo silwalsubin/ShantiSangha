@@ -15,7 +15,6 @@ class CachedTask {
     var progress: Int
     var checkedIn: Bool
     var completedToday: Bool?
-    var feedbackMessage: String?
     var lastSyncedAt: Date
     var hasPendingChanges: Bool
 
@@ -44,7 +43,6 @@ class CachedTask {
             daysRemaining: daysRemaining, progress: progress,
             checkedIn: checkedIn, completedToday: completedToday
         )
-        task.feedbackMessage = feedbackMessage
         task.hasPendingChanges = hasPendingChanges
         return task
     }

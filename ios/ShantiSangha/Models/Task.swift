@@ -13,7 +13,6 @@ struct AppTask: Codable, Identifiable, Equatable {
     var completedAt: String?
 
     // Internal — not from API, computed locally
-    var feedbackMessage: String?
     var saving: Bool = false
     var hasPendingChanges: Bool = false
 

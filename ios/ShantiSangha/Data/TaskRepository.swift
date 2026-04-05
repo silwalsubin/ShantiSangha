@@ -84,16 +84,7 @@ class TaskRepository: ObservableObject {
 
             try? ctx.save()
 
-            // Generate feedback for checked-in tasks
             var result = allTasks
-            for i in result.indices where result[i].checkedIn {
-                let streak = result[i].completedToday == true ? result[i].currentStreak - 1 : 0
-                result[i].feedbackMessage = FeedbackService.generate(
-                    currentStreak: streak,
-                    longestStreak: result[i].longestStreak,
-                    completed: result[i].completedToday ?? false
-                )
-            }
 
             // Merge with any local-only tasks (pending creates with temp IDs)
             let serverResultIds = Set(result.map(\.id))
@@ -124,11 +115,6 @@ class TaskRepository: ObservableObject {
                 tasks[idx].completedAt = localDateStr()
             }
             if !isMilestone {
-                tasks[idx].feedbackMessage = FeedbackService.generate(
-                    currentStreak: tasks[idx].currentStreak,
-                    longestStreak: tasks[idx].longestStreak,
-                    completed: completed
-                )
                 if completed { tasks[idx].currentStreak += 1 }
                 else { tasks[idx].currentStreak = 0 }
             }
@@ -146,7 +132,6 @@ class TaskRepository: ObservableObject {
         if let idx = tasks.firstIndex(where: { $0.id == id }) {
             tasks[idx].checkedIn = false
             tasks[idx].completedToday = nil
-            tasks[idx].feedbackMessage = nil
             updateLocal(tasks[idx], pending: true)
         }
 
