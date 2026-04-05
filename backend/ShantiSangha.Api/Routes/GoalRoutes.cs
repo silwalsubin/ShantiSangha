@@ -22,6 +22,19 @@ public static class GoalRoutes
         group.MapGet("/{id:guid}/history", GetHistory);
     }
 
+    // Helper to log activity
+    private static void LogActivity(AppDbContext db, Guid goalId, string action, string? detail = null)
+    {
+        db.GoalActivities.Add(new GoalActivity
+        {
+            Id = Guid.NewGuid(),
+            GoalId = goalId,
+            Action = action,
+            Detail = detail,
+            CreatedAt = DateTime.UtcNow
+        });
+    }
+
     private static async Task<IResult> CreateGoal(
         ICurrentUser currentUser, AppDbContext db, CreateGoalRequest body)
     {
@@ -49,6 +62,7 @@ public static class GoalRoutes
         };
 
         db.Goals.Add(goal);
+        LogActivity(db, goal.Id, "Created");
 
         try
         {
@@ -223,7 +237,10 @@ public static class GoalRoutes
             goal.ArchivedAt = null;
 
         if (body.Completed is true)
+        {
             goal.CompletedAt = DateTime.UtcNow;
+            LogActivity(db, id, "Completed");
+        }
         else if (body.Completed is false)
             goal.CompletedAt = null;
 
@@ -231,12 +248,24 @@ public static class GoalRoutes
             goal.DeeperWhy = body.DeeperWhy.Trim();
 
         if (body.Progress is not null)
-            goal.Progress = Math.Clamp(body.Progress.Value, 0, 100);
+        {
+            var oldProgress = goal.Progress;
+            var newProgress = Math.Clamp(body.Progress.Value, 0, 100);
+            if (oldProgress != newProgress)
+            {
+                goal.Progress = newProgress;
+                LogActivity(db, id, "ProgressUpdated", $"{oldProgress}% → {newProgress}%");
+            }
+        }
 
         if (body.TargetDate is not null)
         {
             if (DateOnly.TryParse(body.TargetDate, out var parsedDate))
+            {
+                var oldDate = goal.TargetDate?.ToString("MMM d, yyyy");
                 goal.TargetDate = parsedDate;
+                LogActivity(db, id, "DueDateChanged", $"{oldDate ?? "none"} → {parsedDate:MMM d, yyyy}");
+            }
             else
                 return Results.BadRequest(new { error = "Invalid date format. Use yyyy-MM-dd." });
         }
@@ -261,10 +290,12 @@ public static class GoalRoutes
 
         var goal = await db.Goals
             .Include(g => g.CheckIns)
+            .Include(g => g.Activities)
             .FirstOrDefaultAsync(g => g.Id == id && g.UserId == user.Id);
 
         if (goal is null) return Results.NotFound();
 
+        db.GoalActivities.RemoveRange(goal.Activities);
         db.GoalCheckIns.RemoveRange(goal.CheckIns);
         db.Goals.Remove(goal);
         await db.SaveChangesAsync();
@@ -312,9 +343,19 @@ public static class GoalRoutes
 
         // Milestones: mark permanently completed when checked in as done
         if (goal.Type == GoalType.OneTime && body.Completed)
+        {
             goal.CompletedAt = DateTime.UtcNow;
+            LogActivity(db, id, "Completed");
+        }
         else if (goal.Type == GoalType.OneTime && !body.Completed)
+        {
             goal.CompletedAt = null;
+            LogActivity(db, id, "Skipped");
+        }
+        else
+        {
+            LogActivity(db, id, body.Completed ? "Completed" : "Skipped", today.ToString("MMM d, yyyy"));
+        }
 
         await db.SaveChangesAsync();
 
@@ -347,6 +388,8 @@ public static class GoalRoutes
         if (goal.Type == GoalType.OneTime)
             goal.CompletedAt = null;
 
+        LogActivity(db, id, "Undone", today.ToString("MMM d, yyyy"));
+
         await db.SaveChangesAsync();
 
         return Results.NoContent();
@@ -354,7 +397,7 @@ public static class GoalRoutes
 
     private static async Task<IResult> GetHistory(
         Guid id, ICurrentUser currentUser, AppDbContext db,
-        int page = 1, int pageSize = 30)
+        int page = 1, int pageSize = 50)
     {
         var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
@@ -366,15 +409,15 @@ public static class GoalRoutes
 
         pageSize = Math.Clamp(pageSize, 1, 100);
 
-        var history = await db.GoalCheckIns
-            .Where(c => c.GoalId == id)
-            .OrderByDescending(c => c.Date)
+        var activities = await db.GoalActivities
+            .Where(a => a.GoalId == id)
+            .OrderByDescending(a => a.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(c => new { c.Id, c.Date, c.Completed, c.Note, c.CreatedAt })
+            .Select(a => new { a.Id, a.Action, a.Detail, a.CreatedAt })
             .ToListAsync();
 
-        return Results.Ok(history);
+        return Results.Ok(activities);
     }
 
     private static (int CurrentStreak, int LongestStreak) ComputeStreaks(

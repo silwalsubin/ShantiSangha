@@ -18,6 +18,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<SafetyEvent> SafetyEvents => Set<SafetyEvent>();
     public DbSet<Goal> Goals => Set<Goal>();
     public DbSet<GoalCheckIn> GoalCheckIns => Set<GoalCheckIn>();
+    public DbSet<GoalActivity> GoalActivities => Set<GoalActivity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -74,6 +75,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         {
             e.HasIndex(c => c.GoalId);
             e.HasIndex(c => new { c.GoalId, c.Date }).IsUnique();
+        });
+
+        modelBuilder.Entity<GoalActivity>(e =>
+        {
+            e.HasIndex(a => new { a.GoalId, a.CreatedAt });
         });
     }
 }

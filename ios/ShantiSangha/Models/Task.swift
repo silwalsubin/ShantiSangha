@@ -106,3 +106,10 @@ struct CheckIn: Codable, Identifiable {
     let note: String?
     let createdAt: String
 }
+
+struct GoalActivityItem: Codable, Identifiable {
+    let id: String
+    let action: String   // Created, Completed, Skipped, ProgressUpdated, DueDateChanged, Undone
+    let detail: String?
+    let createdAt: String
+}

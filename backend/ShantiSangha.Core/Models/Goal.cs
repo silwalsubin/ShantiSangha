@@ -20,4 +20,5 @@ public class Goal
 
     public User User { get; set; } = null!;
     public ICollection<GoalCheckIn> CheckIns { get; set; } = [];
+    public ICollection<GoalActivity> Activities { get; set; } = [];
 }

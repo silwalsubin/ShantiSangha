@@ -160,6 +160,32 @@ namespace ShantiSangha.Infrastructure.Migrations
                     b.ToTable("GoalCheckIns");
                 });
 
+            modelBuilder.Entity("ShantiSangha.Core.Models.GoalActivity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Detail")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("GoalId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GoalId", "CreatedAt");
+
+                    b.ToTable("GoalActivities");
+                });
+
             modelBuilder.Entity("ShantiSangha.Core.Models.Journal", b =>
                 {
                     b.Property<Guid>("Id")
@@ -602,8 +628,21 @@ namespace ShantiSangha.Infrastructure.Migrations
                     b.Navigation("Goal");
                 });
 
+            modelBuilder.Entity("ShantiSangha.Core.Models.GoalActivity", b =>
+                {
+                    b.HasOne("ShantiSangha.Core.Models.Goal", "Goal")
+                        .WithMany("Activities")
+                        .HasForeignKey("GoalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Goal");
+                });
+
             modelBuilder.Entity("ShantiSangha.Core.Models.Goal", b =>
                 {
+                    b.Navigation("Activities");
+
                     b.Navigation("CheckIns");
                 });
 #pragma warning restore 612, 618

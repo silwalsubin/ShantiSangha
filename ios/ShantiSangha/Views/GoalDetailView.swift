@@ -4,7 +4,7 @@ import SwiftUI
 struct GoalDetailView: View {
     let goalId: String
     @State private var goal: Goal?
-    @State private var history: [CheckIn] = []
+    @State private var activities: [GoalActivityItem] = []
     @State private var loading = true
     private let api = ApiService.shared
 
@@ -69,48 +69,67 @@ struct GoalDetailView: View {
                     .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
                     .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.12)))
 
-                    // History
-                    VStack(alignment: .leading, spacing: 12) {
+                    // Activity timeline
+                    VStack(alignment: .leading, spacing: 0) {
                         Text("HISTORY")
                             .font(.sacredSectionLabel)
                             .tracking(3)
                             .foregroundColor(.sacredLabel)
+                            .padding(.bottom, 16)
 
-                        if history.isEmpty {
-                            Text("No check-ins yet.")
+                        if activities.isEmpty {
+                            Text("No activity yet.")
                                 .font(.sacredText)
                                 .foregroundColor(.sacredTextSecondary)
                         } else {
-                            ForEach(history) { checkin in
-                                HStack(spacing: 12) {
-                                    Circle()
-                                        .fill(checkin.completed ? Color.sacredGreen : Color.sacredMuted.opacity(0.2))
-                                        .frame(width: 28, height: 28)
-                                        .overlay(
-                                            Image(systemName: checkin.completed ? "checkmark" : "forward.fill")
-                                                .font(.sacredSmall)
-                                                .foregroundColor(checkin.completed ? .white : .sacredMutedLight)
-                                        )
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(formatDate(checkin.date))
-                                            .font(.sacredSmallMedium)
-                                            .foregroundColor(.sacredText)
-                                        if let note = checkin.note, !note.isEmpty {
-                                            Text(note)
+                            ForEach(Array(activities.enumerated()), id: \.element.id) { index, activity in
+                                let isLast = index == activities.count - 1
+
+                                HStack(alignment: .top, spacing: 14) {
+                                    // Timeline rail
+                                    VStack(spacing: 0) {
+                                        Circle()
+                                            .fill(dotColor(for: activity.action))
+                                            .frame(width: 12, height: 12)
+                                            .overlay(
+                                                Circle()
+                                                    .stroke(dotColor(for: activity.action).opacity(0.3), lineWidth: 3)
+                                            )
+
+                                        if !isLast {
+                                            Rectangle()
+                                                .fill(Color.sacredMuted.opacity(0.15))
+                                                .frame(width: 1.5)
+                                                .frame(maxHeight: .infinity)
+                                        }
+                                    }
+                                    .frame(width: 18)
+
+                                    // Content
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        HStack {
+                                            Text(actionLabel(activity.action))
+                                                .font(.sacredSmallMedium)
+                                                .foregroundColor(.sacredText)
+                                            Spacer()
+                                            Image(systemName: actionIcon(activity.action))
+                                                .font(.sacredMicro)
+                                                .foregroundColor(dotColor(for: activity.action))
+                                        }
+                                        if let detail = activity.detail {
+                                            Text(detail)
                                                 .font(.sacredSmall)
                                                 .foregroundColor(.sacredTextSecondary)
                                         }
+                                        Text(formatDateTime(activity.createdAt))
+                                            .font(.sacredMicro)
+                                            .foregroundColor(.sacredMuted)
                                     }
+                                    .padding(.bottom, isLast ? 0 : 20)
                                 }
-                                .padding(12)
-                                .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBgCard))
-                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.08)))
                             }
                         }
                     }
-                    .padding(16)
-                    .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
-                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.12)))
 
                     Text("Started \(formatDate(goal.createdAt))")
                         .font(.sacredMicro)
@@ -133,11 +152,49 @@ struct GoalDetailView: View {
     private func load() async {
         do {
             goal = try await api.get("/goals/\(goalId)")
-            history = try await api.get("/goals/\(goalId)/history")
+            activities = try await api.get("/goals/\(goalId)/history")
         } catch {
             print("Failed to load goal: \(error)")
         }
         loading = false
+    }
+
+    // MARK: - Activity helpers
+
+    private func dotColor(for action: String) -> Color {
+        switch action {
+        case "Completed": return .sacredGreen
+        case "Skipped": return .sacredMuted.opacity(0.4)
+        case "ProgressUpdated": return .sacredGold
+        case "DueDateChanged": return .sacredGold
+        case "Created": return .sacredGold
+        case "Undone": return .sacredMuted.opacity(0.4)
+        default: return .sacredMuted
+        }
+    }
+
+    private func actionIcon(_ action: String) -> String {
+        switch action {
+        case "Completed": return "checkmark"
+        case "Skipped": return "forward.fill"
+        case "ProgressUpdated": return "chart.bar.fill"
+        case "DueDateChanged": return "calendar"
+        case "Created": return "plus"
+        case "Undone": return "arrow.uturn.backward"
+        default: return "circle"
+        }
+    }
+
+    private func actionLabel(_ action: String) -> String {
+        switch action {
+        case "Completed": return "Completed"
+        case "Skipped": return "Skipped"
+        case "ProgressUpdated": return "Progress updated"
+        case "DueDateChanged": return "Due date changed"
+        case "Created": return "Created"
+        case "Undone": return "Undone"
+        default: return action
+        }
     }
 
     private func statCard(value: String, label: String) -> some View {
@@ -162,6 +219,20 @@ struct GoalDetailView: View {
         f.dateFormat = "yyyy-MM-dd"
         if let date = f.date(from: dateStr.prefix(10).description) {
             f.dateFormat = "MMM d, yyyy"
+            return f.string(from: date)
+        }
+        return dateStr
+    }
+
+    private func formatDateTime(_ dateStr: String) -> String {
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let isoBasic = ISO8601DateFormatter()
+        isoBasic.formatOptions = [.withInternetDateTime]
+
+        if let date = iso.date(from: dateStr) ?? isoBasic.date(from: dateStr) {
+            let f = DateFormatter()
+            f.dateFormat = "MMM d, yyyy 'at' h:mm a"
             return f.string(from: date)
         }
         return dateStr
