@@ -1,138 +1,268 @@
 import SwiftUI
 
-/// Journey — progress tracking. Mirrors frontend/src/pages/app/journey.vue
+/// Journey — "How am I actually doing?"
 struct JourneyView: View {
-    @State private var goals: [AppTask] = []
+    @State private var journey: JourneyData?
+    @State private var reflection: String?
     @State private var loading = true
+    @State private var reflectionLoading = false
+    @State private var selectedPeriod: JourneyPeriod = .week
     private let api = ApiService.shared
-
-    var recurringGoals: [AppTask] { goals.filter { $0.type == .recurring } }
-    var milestoneGoals: [AppTask] { goals.filter { $0.type == .oneTime } }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("See how you're growing over time.")
-                    .font(.sacredText)
-                    .foregroundColor(.sacredTextSecondary)
+                // Period selector
+                HStack(spacing: 6) {
+                    ForEach(JourneyPeriod.allCases, id: \.self) { period in
+                        Button {
+                            withAnimation(.easeOut(duration: 0.2)) { selectedPeriod = period }
+                            Task { await loadAll() }
+                        } label: {
+                            Text(period.label)
+                                .font(.sacredMicro)
+                                .foregroundColor(selectedPeriod == period ? .sacredGold : .sacredMuted)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(
+                                    Capsule()
+                                        .fill(selectedPeriod == period ? Color.sacredGold.opacity(0.12) : Color.clear)
+                                )
+                                .overlay(
+                                    Capsule()
+                                        .stroke(selectedPeriod == period ? Color.sacredGold.opacity(0.3) : Color.sacredMuted.opacity(0.15), lineWidth: 1)
+                                )
+                        }
+                    }
+                }
 
                 if loading {
                     ProgressView()
                         .frame(maxWidth: .infinity, minHeight: 200)
-                } else {
-                    // Your Dharma
-                    sectionCard {
-                        sectionLabel(icon: "flame.fill", text: "YOUR DHARMA")
+                } else if let journey = journey {
+                    // Celebration header
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("\(journey.summary.practicesCompleted)")
+                            .font(.system(size: 48, weight: .bold, design: .serif))
+                            .foregroundColor(.sacredGold)
+                        + Text(" practices")
+                            .font(.sacredTitle)
+                            .foregroundColor(.sacredText)
 
-                        if recurringGoals.isEmpty {
-                            Text("No tasks yet. Set one from Home.")
-                                .font(.sacredText)
-                                .foregroundColor(.sacredTextSecondary)
-                                .padding(.top, 8)
-                        } else {
-                            ForEach(recurringGoals) { goal in
-                                NavigationLink(destination: GoalDetailView(goalId: goal.id)) {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text(goal.title)
-                                                .font(.sacredTextMedium)
-                                                .foregroundColor(.sacredText)
-                                            Text("Longest: \(goal.longestStreak) days")
-                                                .font(.sacredMicro)
-                                                .foregroundColor(.sacredLabel)
-                                                .textCase(.uppercase)
-                                                .tracking(1)
-                                        }
-                                        Spacer()
-                                        HStack(spacing: 4) {
-                                            Image(systemName: "flame.fill")
-                                                .font(.sacredSmall)
-                                                .foregroundColor(.sacredGold)
-                                            Text("\(goal.currentStreak)")
-                                                .font(.sacredBodyBold)
-                                                .foregroundColor(.sacredGold)
-                                            Text("days")
-                                                .font(.sacredMicro)
-                                                .foregroundColor(.sacredMuted)
-                                        }
-                                    }
-                                    .padding(12)
-                                    .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBgCard))
-                                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.1)))
-                                }
+                        if journey.summary.completionRate > 0 {
+                            Text("\(journey.summary.completionRate)% consistency")
+                                .font(.sacredSmall)
+                                .foregroundColor(.sacredMuted)
+                        }
+
+                        if journey.summary.commitmentsFinished > 0 {
+                            HStack(spacing: 6) {
+                                Image(systemName: "checkmark.seal.fill")
+                                    .foregroundColor(.sacredGreen)
+                                Text("\(journey.summary.commitmentsFinished) commitment\(journey.summary.commitmentsFinished == 1 ? "" : "s") fulfilled")
+                                    .font(.sacredSmallMedium)
+                                    .foregroundColor(.sacredGreen)
                             }
+                            .padding(.top, 4)
                         }
                     }
 
-                    // Commitments
-                    sectionCard {
-                        sectionLabel(icon: "calendar.badge.clock", text: "COMMITMENTS")
+                    // AI Reflection
+                    if reflectionLoading {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Reflecting...")
+                                .font(.sacredSmall)
+                                .foregroundColor(.sacredMuted)
+                        }
+                        .padding(16)
+                    } else if let reflection = reflection {
+                        Text(reflection)
+                            .font(.sacredBody)
+                            .italic()
+                            .foregroundColor(.sacredText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(16)
+                            .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredGold.opacity(0.06)))
+                            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredGold.opacity(0.12)))
+                    }
 
-                        if milestoneGoals.isEmpty {
-                            Text("No commitments yet. Set one from Home.")
-                                .font(.sacredText)
-                                .foregroundColor(.sacredTextSecondary)
-                                .padding(.top, 8)
-                        } else {
-                            ForEach(milestoneGoals) { goal in
-                                NavigationLink(destination: GoalDetailView(goalId: goal.id)) {
+                    // Rhythm grid
+                    if !journey.practices.isEmpty {
+                        VStack(alignment: .leading, spacing: 16) {
+                            ForEach(journey.practices) { practice in
+                                VStack(alignment: .leading, spacing: 8) {
                                     HStack {
-                                        Text(goal.title)
-                                            .font(.sacredTextMedium)
+                                        Text(practice.title)
+                                            .font(.sacredSmallMedium)
                                             .foregroundColor(.sacredText)
                                         Spacer()
-                                        if let days = goal.daysRemaining {
-                                            Text(days > 0 ? "\(days)d left" : days == 0 ? "Today" : "\(abs(days))d over")
-                                                .font(days <= 0 ? .sacredSmallSemibold : .sacredSmall)
-                                                .foregroundColor(days <= 0 ? .sacredRed : .sacredGold)
-                                        }
+                                        Text("\(practice.daysCompleted)/\(practice.totalDays)")
+                                            .font(.sacredMicro)
+                                            .foregroundColor(.sacredMuted)
                                     }
-                                    .padding(12)
-                                    .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBgCard))
-                                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.1)))
+
+                                    // Day blocks
+                                    RhythmRow(days: practice.days)
                                 }
                             }
                         }
                     }
+
+                    // Completed commitments
+                    if !journey.completedCommitments.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "calendar.badge.clock")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.sacredGold)
+                                Text("FULFILLED")
+                                    .font(.sacredSectionLabel)
+                                    .tracking(3)
+                                    .foregroundColor(.sacredLabel)
+                            }
+
+                            ForEach(journey.completedCommitments) { c in
+                                HStack(spacing: 10) {
+                                    Image(systemName: "checkmark.seal.fill")
+                                        .font(.sacredSmall)
+                                        .foregroundColor(.sacredGreen)
+                                    Text(c.title)
+                                        .font(.sacredTextMedium)
+                                        .foregroundColor(.sacredText)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Text("Start your practices to see your journey unfold.")
+                        .font(.sacredText)
+                        .foregroundColor(.sacredTextSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 40)
                 }
             }
             .padding(16)
+            .padding(.bottom, 40)
         }
         .background(Color.sacredBg.ignoresSafeArea())
-        .refreshable { await loadGoals() }
+        .refreshable { await loadAll() }
         .navigationTitle("Journey")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await loadGoals() }
+        .task { await loadAll() }
     }
 
-    private func loadGoals() async {
+    private func loadAll() async {
+        loading = journey == nil
+        let (from, to) = selectedPeriod.dateRange
+
         do {
-            goals = try await api.get("/goals")
+            journey = try await api.get("/goals/journey?from=\(from)&to=\(to)")
         } catch {
-            print("Failed to load goals: \(error)")
+            print("Failed to load journey: \(error)")
         }
         loading = false
+
+        // Load reflection in background
+        reflectionLoading = true
+        do {
+            let result: ReflectionResponse = try await api.get("/goals/journey/reflection?from=\(from)&to=\(to)")
+            withAnimation(.easeIn(duration: 0.3)) { reflection = result.reflection }
+        } catch {
+            print("Failed to load reflection: \(error)")
+        }
+        reflectionLoading = false
+    }
+}
+
+// MARK: - Rhythm row visualization
+
+private struct RhythmRow: View {
+    let days: [JourneyDay]
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(Array(days.enumerated()), id: \.offset) { _, day in
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(day.completed ? Color.sacredGold : Color.sacredMuted.opacity(0.1))
+                    .frame(height: day.completed ? 20 : 8)
+                    .frame(maxWidth: .infinity)
+            }
+        }
+        .frame(height: 20, alignment: .bottom)
+    }
+}
+
+// MARK: - Period
+
+enum JourneyPeriod: CaseIterable {
+    case week, twoWeeks, month, threeMonths
+
+    var label: String {
+        switch self {
+        case .week: return "7D"
+        case .twoWeeks: return "14D"
+        case .month: return "30D"
+        case .threeMonths: return "90D"
+        }
     }
 
-    private func sectionCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            content()
+    var dateRange: (String, String) {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        let today = Date()
+        let daysBack: Int
+        switch self {
+        case .week: daysBack = 6
+        case .twoWeeks: daysBack = 13
+        case .month: daysBack = 29
+        case .threeMonths: daysBack = 89
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.12)))
+        let from = Calendar.current.date(byAdding: .day, value: -daysBack, to: today)!
+        return (f.string(from: from), f.string(from: today))
     }
+}
 
-    private func sectionLabel(icon: String, text: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.sacredSmall)
-                .foregroundColor(.sacredGold)
-            Text(text)
-                .font(.sacredSectionLabel)
-                .tracking(3)
-                .foregroundColor(.sacredLabel)
-        }
-    }
+// MARK: - Models
+
+struct JourneyData: Codable {
+    let from: String
+    let to: String
+    let totalDays: Int
+    let practices: [JourneyPractice]
+    let completedCommitments: [JourneyCommitment]
+    let summary: JourneySummary
+}
+
+struct JourneyPractice: Codable, Identifiable {
+    let id: String
+    let title: String
+    let daysCompleted: Int
+    let totalDays: Int
+    let currentStreak: Int
+    let longestStreak: Int
+    let days: [JourneyDay]
+}
+
+struct JourneyDay: Codable {
+    let date: String
+    let completed: Bool
+}
+
+struct JourneySummary: Codable {
+    let practicesCompleted: Int
+    let practicesPossible: Int
+    let completionRate: Int
+    let commitmentsFinished: Int
+}
+
+struct JourneyCommitment: Codable, Identifiable {
+    let id: String
+    let title: String
+    let completedAt: String?
+}
+
+struct ReflectionResponse: Codable {
+    let reflection: String?
 }

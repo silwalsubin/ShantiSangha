@@ -23,6 +23,8 @@ public static class GoalRoutes
         group.MapDelete("/{id:guid}/checkin", UndoCheckIn);
         group.MapGet("/{id:guid}/history", GetHistory);
         group.MapGet("/{id:guid}/nudge", GetNudge);
+        group.MapGet("/journey", GetJourney);
+        group.MapGet("/journey/reflection", GetJourneyReflection);
     }
 
     // Helper to log activity
@@ -519,6 +521,151 @@ public static class GoalRoutes
         {
             // Return stale cache or null if AI fails
             return Results.Ok(new { nudge = goal.AiNudge });
+        }
+    }
+
+    private static async Task<IResult> GetJourney(
+        ICurrentUser currentUser, AppDbContext db, string? from = null, string? to = null)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Results.Unauthorized();
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var endDate = to is not null && DateOnly.TryParse(to, out var toParsed) ? toParsed : today;
+        var startDate = from is not null && DateOnly.TryParse(from, out var fromParsed) ? fromParsed : endDate.AddDays(-6);
+
+        var goals = await db.Goals
+            .Where(g => g.UserId == user.Id && g.ArchivedAt == null && g.Type == GoalType.Recurring)
+            .Include(g => g.CheckIns)
+            .OrderBy(g => g.CreatedAt)
+            .ToListAsync();
+
+        // Build day-by-day rhythm for each goal
+        var totalDays = endDate.DayNumber - startDate.DayNumber + 1;
+        var completedCheckIns = await db.GoalCheckIns
+            .Where(c => goals.Select(g => g.Id).Contains(c.GoalId)
+                && c.Date >= startDate && c.Date <= endDate && c.Completed)
+            .Select(c => new { c.GoalId, c.Date })
+            .ToListAsync();
+
+        var completedSet = completedCheckIns
+            .GroupBy(c => c.GoalId)
+            .ToDictionary(g => g.Key, g => g.Select(c => c.Date).ToHashSet());
+
+        var practices = goals.Select(g =>
+        {
+            var dates = completedSet.GetValueOrDefault(g.Id) ?? new HashSet<DateOnly>();
+            var daysCompleted = dates.Count;
+            var (current, longest) = ComputeStreaks(g.CheckIns, today);
+
+            return new
+            {
+                g.Id,
+                g.Title,
+                DaysCompleted = daysCompleted,
+                TotalDays = totalDays,
+                CurrentStreak = current,
+                LongestStreak = longest,
+                Days = Enumerable.Range(0, totalDays)
+                    .Select(i => startDate.AddDays(i))
+                    .Select(d => new { Date = d.ToString("yyyy-MM-dd"), Completed = dates.Contains(d) })
+                    .ToList()
+            };
+        }).ToList();
+
+        // Completed commitments in this period
+        var completedCommitments = await db.Goals
+            .Where(g => g.UserId == user.Id && g.Type == GoalType.OneTime
+                && g.CompletedAt != null
+                && DateOnly.FromDateTime(g.CompletedAt!.Value) >= startDate
+                && DateOnly.FromDateTime(g.CompletedAt!.Value) <= endDate)
+            .Select(g => new { g.Id, g.Title, g.CompletedAt })
+            .ToListAsync();
+
+        var totalCompleted = practices.Sum(p => p.DaysCompleted);
+        var totalPossible = practices.Sum(p => p.TotalDays);
+
+        return Results.Ok(new
+        {
+            From = startDate.ToString("yyyy-MM-dd"),
+            To = endDate.ToString("yyyy-MM-dd"),
+            TotalDays = totalDays,
+            Practices = practices,
+            CompletedCommitments = completedCommitments,
+            Summary = new
+            {
+                PracticesCompleted = totalCompleted,
+                PracticesPossible = totalPossible,
+                CompletionRate = totalPossible > 0 ? Math.Round(100.0 * totalCompleted / totalPossible) : 0,
+                CommitmentsFinished = completedCommitments.Count
+            }
+        });
+    }
+
+    private static async Task<IResult> GetJourneyReflection(
+        ICurrentUser currentUser, AppDbContext db, Kernel kernel, string? from = null, string? to = null)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Results.Unauthorized();
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var endDate = to is not null && DateOnly.TryParse(to, out var toParsed) ? toParsed : today;
+        var startDate = from is not null && DateOnly.TryParse(from, out var fromParsed) ? fromParsed : endDate.AddDays(-6);
+        var totalDays = endDate.DayNumber - startDate.DayNumber + 1;
+
+        var goals = await db.Goals
+            .Where(g => g.UserId == user.Id && g.ArchivedAt == null && g.Type == GoalType.Recurring)
+            .Include(g => g.CheckIns.Where(c => c.Date >= startDate && c.Date <= endDate))
+            .OrderBy(g => g.CreatedAt)
+            .ToListAsync();
+
+        // Build context for AI
+        var lines = new List<string>();
+        lines.Add($"Period: {startDate:MMM d} to {endDate:MMM d, yyyy} ({totalDays} days)");
+
+        var totalDone = 0;
+        var totalPossible = 0;
+        foreach (var g in goals)
+        {
+            var done = g.CheckIns.Count(c => c.Completed);
+            totalDone += done;
+            totalPossible += totalDays;
+            lines.Add($"- {g.Title}: {done}/{totalDays} days completed");
+        }
+
+        if (totalPossible > 0)
+            lines.Add($"\nOverall: {totalDone} of {totalPossible} practices completed ({Math.Round(100.0 * totalDone / totalPossible)}%)");
+
+        var completedCommitments = await db.Goals
+            .Where(g => g.UserId == user.Id && g.Type == GoalType.OneTime
+                && g.CompletedAt != null
+                && DateOnly.FromDateTime(g.CompletedAt!.Value) >= startDate
+                && DateOnly.FromDateTime(g.CompletedAt!.Value) <= endDate)
+            .Select(g => g.Title)
+            .ToListAsync();
+
+        if (completedCommitments.Count > 0)
+            lines.Add($"\nCommitments finished: {string.Join(", ", completedCommitments)}");
+
+        var context = string.Join("\n", lines);
+
+        try
+        {
+            var chat = kernel.GetRequiredService<IChatCompletionService>();
+            var history = new ChatHistory("""
+                You are a warm spiritual companion reflecting on someone's practice.
+                Given their activity data for a time period, write a short reflection (2-3 sentences).
+                Focus on what they DID accomplish — celebrate consistency, notice patterns of strength.
+                If something was missed, frame it gently as an opportunity, never as failure.
+                Be specific to their actual data. No emojis, no exclamation marks. Speak like a wise, loving friend.
+                """);
+            history.AddUserMessage(context);
+            var result = await chat.GetChatMessageContentAsync(history);
+            return Results.Ok(new { reflection = result.Content?.Trim() });
+        }
+        catch
+        {
+            return Results.Ok(new { reflection = (string?)null });
         }
     }
 
