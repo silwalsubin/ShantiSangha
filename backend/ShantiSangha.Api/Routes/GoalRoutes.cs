@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.SemanticKernel;
+using Microsoft.SemanticKernel.ChatCompletion;
 using ShantiSangha.Api.Services;
 using ShantiSangha.Core.Models;
 using ShantiSangha.Infrastructure.Data;
@@ -20,6 +22,7 @@ public static class GoalRoutes
         group.MapPost("/{id:guid}/checkin", CheckIn);
         group.MapDelete("/{id:guid}/checkin", UndoCheckIn);
         group.MapGet("/{id:guid}/history", GetHistory);
+        group.MapGet("/{id:guid}/nudge", GetNudge);
     }
 
     // Helper to log activity
@@ -198,7 +201,8 @@ public static class GoalRoutes
             {
                 goal.Id, goal.Title, goal.Type, goal.TargetDate, goal.DeeperWhy,
                 goal.Progress, goal.CompletedAt, goal.CreatedAt,
-                DaysRemaining = daysRemaining, NoteCount = noteCount
+                DaysRemaining = daysRemaining, NoteCount = noteCount,
+                goal.AiNudge
             });
         }
         else
@@ -208,7 +212,8 @@ public static class GoalRoutes
             {
                 goal.Id, goal.Title, goal.Type, goal.Frequency,
                 goal.FrequencyTarget, goal.DeeperWhy, goal.CreatedAt,
-                CurrentStreak = current, LongestStreak = longest
+                CurrentStreak = current, LongestStreak = longest,
+                goal.AiNudge
             });
         }
     }
@@ -429,6 +434,92 @@ public static class GoalRoutes
         }
 
         return Results.Ok(activities);
+    }
+
+    private static async Task<IResult> GetNudge(
+        Guid id, ICurrentUser currentUser, AppDbContext db, Kernel kernel)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Results.Unauthorized();
+
+        var goal = await db.Goals
+            .Include(g => g.CheckIns)
+            .Include(g => g.Activities.OrderByDescending(a => a.CreatedAt).Take(10))
+            .FirstOrDefaultAsync(g => g.Id == id && g.UserId == user.Id);
+
+        if (goal is null) return Results.NotFound();
+
+        // Return cached nudge if less than 12 hours old
+        if (goal.AiNudge is not null && goal.AiNudgeAt.HasValue
+            && DateTime.UtcNow - goal.AiNudgeAt.Value < TimeSpan.FromHours(12))
+        {
+            return Results.Ok(new { nudge = goal.AiNudge });
+        }
+
+        // Build context
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var daysSinceCreation = today.DayNumber - DateOnly.FromDateTime(goal.CreatedAt).DayNumber;
+        var recentActivity = goal.Activities
+            .OrderByDescending(a => a.CreatedAt)
+            .Take(10)
+            .Select(a => $"- {a.Action}{(a.Detail != null ? $": {a.Detail}" : "")} ({a.CreatedAt:MMM d})")
+            .ToList();
+
+        var context = $"""
+            Task: "{goal.Title}"
+            Type: {(goal.Type == GoalType.Recurring ? "Daily practice" : "Commitment with due date")}
+            Created: {daysSinceCreation} days ago
+            """;
+
+        if (goal.Type == GoalType.Recurring)
+        {
+            var (current, longest) = ComputeStreaks(goal.CheckIns, today);
+            context += $"\nCurrent streak: {current} days\nLongest streak: {longest} days";
+        }
+        else
+        {
+            if (goal.TargetDate.HasValue)
+            {
+                var daysLeft = goal.TargetDate.Value.DayNumber - today.DayNumber;
+                context += $"\nDue: {(daysLeft < 0 ? $"{Math.Abs(daysLeft)} days overdue" : daysLeft == 0 ? "Today" : $"in {daysLeft} days")}";
+            }
+            context += $"\nProgress: {goal.Progress}%";
+            if (goal.CompletedAt.HasValue) context += "\nStatus: Completed";
+        }
+
+        if (goal.DeeperWhy is not null)
+            context += $"\nDeeper why: \"{goal.DeeperWhy}\"";
+
+        if (recentActivity.Count > 0)
+            context += $"\n\nRecent activity:\n{string.Join("\n", recentActivity)}";
+
+        try
+        {
+            var chat = kernel.GetRequiredService<IChatCompletionService>();
+            var history = new ChatHistory("""
+                You are a gentle spiritual companion. Given a user's task and its history,
+                write ONE short encouraging sentence (under 20 words). Be warm, specific to
+                their situation, and never generic. Reference their actual progress or patterns.
+                No quotes, no emojis, no exclamation marks. Speak as a wise friend.
+                """);
+            history.AddUserMessage(context);
+            var result = await chat.GetChatMessageContentAsync(history);
+            var nudge = result.Content?.Trim();
+
+            if (!string.IsNullOrEmpty(nudge))
+            {
+                goal.AiNudge = nudge;
+                goal.AiNudgeAt = DateTime.UtcNow;
+                await db.SaveChangesAsync();
+            }
+
+            return Results.Ok(new { nudge });
+        }
+        catch
+        {
+            // Return stale cache or null if AI fails
+            return Results.Ok(new { nudge = goal.AiNudge });
+        }
     }
 
     private static (int CurrentStreak, int LongestStreak) ComputeStreaks(

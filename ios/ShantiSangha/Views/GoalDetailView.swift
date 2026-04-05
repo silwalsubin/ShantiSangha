@@ -6,6 +6,11 @@ struct GoalDetailView: View {
     @State private var goal: Goal?
     @State private var activities: [GoalActivityItem] = []
     @State private var loading = true
+    @State private var historyExpanded = false
+    @State private var historyLoading = false
+    @State private var showWhyEditor = false
+    @State private var whyText = ""
+    @State private var nudge: String?
     private let api = ApiService.shared
 
     var body: some View {
@@ -43,90 +48,137 @@ struct GoalDetailView: View {
                         }
                     }
 
-                    // Deeper Why
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "leaf")
-                                .font(.sacredSmall)
-                                .foregroundColor(.sacredGold)
-                            Text("THE DEEPER WHY")
-                                .font(.sacredSectionLabel)
-                                .tracking(3)
-                                .foregroundColor(.sacredLabel)
-                        }
-                        if let why = goal.deeperWhy, !why.isEmpty {
-                            Text("\"\(why)\"")
-                                .font(.sacredBody)
-                                .italic()
-                                .foregroundColor(.sacredText)
-                        } else {
-                            Text("What draws you to this task? Understanding the deeper intention behind your commitments can transform discipline into devotion.")
-                                .font(.sacredText)
-                                .foregroundColor(.sacredMuted)
-                        }
+                    // AI nudge
+                    if let nudge = nudge {
+                        Text(nudge)
+                            .font(.sacredBody)
+                            .italic()
+                            .foregroundColor(.sacredText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(16)
+                            .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredGold.opacity(0.06)))
+                            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredGold.opacity(0.12)))
                     }
-                    .padding(16)
-                    .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
-                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.12)))
 
-                    // Activity timeline
+                    // Deeper Why
+                    Button {
+                        whyText = goal.deeperWhy ?? ""
+                        showWhyEditor = true
+                    } label: {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "leaf")
+                                    .font(.sacredSmall)
+                                    .foregroundColor(.sacredGold)
+                                Text("THE DEEPER WHY")
+                                    .font(.sacredSectionLabel)
+                                    .tracking(3)
+                                    .foregroundColor(.sacredLabel)
+                                Spacer()
+                                Image(systemName: "pencil")
+                                    .font(.sacredMicro)
+                                    .foregroundColor(.sacredMuted)
+                            }
+                            if let why = goal.deeperWhy, !why.isEmpty {
+                                Text("\"\(why)\"")
+                                    .font(.sacredBody)
+                                    .italic()
+                                    .foregroundColor(.sacredText)
+                                    .multilineTextAlignment(.leading)
+                            } else {
+                                Text("Tap to add your deeper intention...")
+                                    .font(.sacredText)
+                                    .foregroundColor(.sacredMuted)
+                            }
+                        }
+                        .padding(16)
+                        .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
+                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.12)))
+                    }
+                    .buttonStyle(.plain)
+
+                    // Activity timeline (collapsed by default)
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("HISTORY")
-                            .font(.sacredSectionLabel)
-                            .tracking(3)
-                            .foregroundColor(.sacredLabel)
-                            .padding(.bottom, 16)
+                        Button {
+                            withAnimation(.easeOut(duration: 0.25)) {
+                                historyExpanded.toggle()
+                            }
+                            if historyExpanded && activities.isEmpty {
+                                Task { await loadHistory() }
+                            }
+                        } label: {
+                            HStack {
+                                Text("HISTORY")
+                                    .font(.sacredSectionLabel)
+                                    .tracking(3)
+                                    .foregroundColor(.sacredLabel)
+                                Image(systemName: historyExpanded ? "chevron.up" : "chevron.down")
+                                    .font(.sacredMicro)
+                                    .foregroundColor(.sacredMuted)
+                                Spacer()
+                            }
+                        }
 
-                        if activities.isEmpty {
-                            Text("No activity yet.")
-                                .font(.sacredText)
-                                .foregroundColor(.sacredTextSecondary)
-                        } else {
-                            ForEach(Array(activities.enumerated()), id: \.element.id) { index, activity in
-                                let isLast = index == activities.count - 1
+                        if historyExpanded {
+                            if historyLoading {
+                                ProgressView()
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.top, 16)
+                            } else if activities.isEmpty {
+                                Text("No activity yet.")
+                                    .font(.sacredText)
+                                    .foregroundColor(.sacredTextSecondary)
+                                    .padding(.top, 16)
+                            } else {
+                                VStack(alignment: .leading, spacing: 0) {
+                                    ForEach(Array(activities.enumerated()), id: \.element.id) { index, activity in
+                                        let isLast = index == activities.count - 1
 
-                                HStack(alignment: .top, spacing: 14) {
-                                    // Timeline rail
-                                    VStack(spacing: 0) {
-                                        Circle()
-                                            .fill(dotColor(for: activity.action))
-                                            .frame(width: 12, height: 12)
-                                            .overlay(
+                                        HStack(alignment: .top, spacing: 14) {
+                                            // Timeline rail
+                                            VStack(spacing: 0) {
                                                 Circle()
-                                                    .stroke(dotColor(for: activity.action).opacity(0.3), lineWidth: 3)
-                                            )
+                                                    .fill(dotColor(for: activity.action))
+                                                    .frame(width: 12, height: 12)
+                                                    .overlay(
+                                                        Circle()
+                                                            .stroke(dotColor(for: activity.action).opacity(0.3), lineWidth: 3)
+                                                    )
 
-                                        if !isLast {
-                                            Rectangle()
-                                                .fill(Color.sacredMuted.opacity(0.15))
-                                                .frame(width: 1.5)
-                                                .frame(maxHeight: .infinity)
+                                                if !isLast {
+                                                    Rectangle()
+                                                        .fill(Color.sacredMuted.opacity(0.15))
+                                                        .frame(width: 1.5)
+                                                        .frame(maxHeight: .infinity)
+                                                }
+                                            }
+                                            .frame(width: 18)
+
+                                            // Content
+                                            VStack(alignment: .leading, spacing: 3) {
+                                                HStack {
+                                                    Text(actionLabel(activity.action))
+                                                        .font(.sacredSmallMedium)
+                                                        .foregroundColor(.sacredText)
+                                                    Spacer()
+                                                    Image(systemName: actionIcon(activity.action))
+                                                        .font(.sacredMicro)
+                                                        .foregroundColor(dotColor(for: activity.action))
+                                                }
+                                                if let detail = activity.detail {
+                                                    Text(detail)
+                                                        .font(.sacredSmall)
+                                                        .foregroundColor(.sacredTextSecondary)
+                                                }
+                                                Text(formatDateTime(activity.createdAt))
+                                                    .font(.sacredMicro)
+                                                    .foregroundColor(.sacredMuted)
+                                            }
+                                            .padding(.bottom, isLast ? 0 : 20)
                                         }
                                     }
-                                    .frame(width: 18)
-
-                                    // Content
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        HStack {
-                                            Text(actionLabel(activity.action))
-                                                .font(.sacredSmallMedium)
-                                                .foregroundColor(.sacredText)
-                                            Spacer()
-                                            Image(systemName: actionIcon(activity.action))
-                                                .font(.sacredMicro)
-                                                .foregroundColor(dotColor(for: activity.action))
-                                        }
-                                        if let detail = activity.detail {
-                                            Text(detail)
-                                                .font(.sacredSmall)
-                                                .foregroundColor(.sacredTextSecondary)
-                                        }
-                                        Text(formatDateTime(activity.createdAt))
-                                            .font(.sacredMicro)
-                                            .foregroundColor(.sacredMuted)
-                                    }
-                                    .padding(.bottom, isLast ? 0 : 20)
                                 }
+                                .padding(.top, 16)
                             }
                         }
                     }
@@ -142,16 +194,87 @@ struct GoalDetailView: View {
         .background(Color.sacredBg.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
+        .sheet(isPresented: $showWhyEditor) {
+            NavigationStack {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("What draws you to this task? Understanding the deeper intention behind your commitments can transform discipline into devotion.")
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredMuted)
+
+                    TextEditor(text: $whyText)
+                        .font(.sacredBody)
+                        .foregroundColor(.sacredText)
+                        .scrollContentBackground(.hidden)
+                        .frame(minHeight: 120)
+                        .padding(12)
+                        .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBgCard))
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.12)))
+
+                    Spacer()
+                }
+                .padding(16)
+                .background(Color.sacredBg.ignoresSafeArea())
+                .navigationTitle("The Deeper Why")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { showWhyEditor = false }
+                            .foregroundColor(.sacredMuted)
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") {
+                            showWhyEditor = false
+                            Task { await saveDeeperWhy() }
+                        }
+                        .foregroundColor(.sacredGold)
+                    }
+                }
+            }
+        }
     }
 
     private func load() async {
         do {
-            goal = try await api.get("/goals/\(goalId)")
-            activities = try await api.get("/goals/\(goalId)/history")
+            let g: Goal = try await api.get("/goals/\(goalId)")
+            goal = g
+            nudge = g.aiNudge
         } catch {
             print("Failed to load goal: \(error)")
         }
         loading = false
+
+        // Fetch fresh nudge in background
+        Task {
+            do {
+                let result: NudgeResponse = try await api.get("/goals/\(goalId)/nudge")
+                if let fresh = result.nudge {
+                    withAnimation(.easeIn(duration: 0.3)) { nudge = fresh }
+                }
+            } catch {
+                print("Failed to load nudge: \(error)")
+            }
+        }
+    }
+
+    private func saveDeeperWhy() async {
+        let trimmed = whyText.trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            let body: [String: String] = ["deeperWhy": trimmed]
+            let _: EmptyResponse = try await api.patch("/goals/\(goalId)", body: body)
+            goal = try await api.get("/goals/\(goalId)")
+        } catch {
+            print("Failed to save deeper why: \(error)")
+        }
+    }
+
+    private func loadHistory() async {
+        historyLoading = true
+        do {
+            activities = try await api.get("/goals/\(goalId)/history")
+        } catch {
+            print("Failed to load history: \(error)")
+        }
+        historyLoading = false
     }
 
     // MARK: - Activity helpers

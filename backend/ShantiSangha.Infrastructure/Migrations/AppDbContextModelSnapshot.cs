@@ -84,6 +84,12 @@ namespace ShantiSangha.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AiNudge")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("AiNudgeAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("ArchivedAt")
                         .HasColumnType("timestamp with time zone");
 

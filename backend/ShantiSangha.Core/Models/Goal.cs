@@ -17,6 +17,8 @@ public class Goal
     public DateTime? CompletedAt { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? ArchivedAt { get; set; }
+    public string? AiNudge { get; set; }
+    public DateTime? AiNudgeAt { get; set; }
 
     public User User { get; set; } = null!;
     public ICollection<GoalCheckIn> CheckIns { get; set; } = [];
