@@ -192,6 +192,11 @@ public static class GoalRoutes
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
+        var checkIns = goal.CheckIns
+            .OrderByDescending(c => c.Date)
+            .Select(c => new { c.Id, Date = c.Date.ToString("yyyy-MM-dd"), c.Completed, c.Note })
+            .ToList();
+
         if (goal.Type == GoalType.OneTime)
         {
             var noteCount = goal.CheckIns.Count(c => c.Note is not null);
@@ -204,7 +209,7 @@ public static class GoalRoutes
                 goal.Id, goal.Title, goal.Type, goal.TargetDate, goal.DeeperWhy,
                 goal.Progress, goal.CompletedAt, goal.CreatedAt,
                 DaysRemaining = daysRemaining, NoteCount = noteCount,
-                goal.AiNudge
+                goal.AiNudge, CheckIns = checkIns
             });
         }
         else
@@ -215,7 +220,7 @@ public static class GoalRoutes
                 goal.Id, goal.Title, goal.Type, goal.Frequency,
                 goal.FrequencyTarget, goal.DeeperWhy, goal.CreatedAt,
                 CurrentStreak = current, LongestStreak = longest,
-                goal.AiNudge
+                goal.AiNudge, CheckIns = checkIns
             });
         }
     }

@@ -31,17 +31,60 @@ interface CheckIn {
   date: string
   completed: boolean
   note: string | null
-  createdAt: string
+}
+
+interface DayEntry {
+  date: string
+  label: string
+  checkin: CheckIn | null
+  isToday: boolean
+  isFuture: boolean
 }
 
 const goal = ref<Goal | null>(null)
-const history = ref<CheckIn[]>([])
+const checkIns = ref<CheckIn[]>([])
 const loading = ref(true)
-const historyLoading = ref(true)
 
 const editingWhy = ref(false)
 const whyInput = ref('')
 const savingWhy = ref(false)
+
+function buildDayEntries(): DayEntry[] {
+  if (!goal.value) return []
+
+  const createdDate = goal.value.createdAt.includes('T')
+    ? goal.value.createdAt.split('T')[0]
+    : goal.value.createdAt.slice(0, 10)
+
+  const now = new Date()
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+
+  const checkinMap = new Map<string, CheckIn>()
+  for (const ci of checkIns.value) {
+    checkinMap.set(ci.date, ci)
+  }
+
+  const entries: DayEntry[] = []
+  const start = new Date(createdDate + 'T12:00:00')
+  const end = new Date(todayStr + 'T12:00:00')
+
+  const cursor = new Date(end)
+  while (cursor >= start) {
+    const dateStr = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`
+    entries.push({
+      date: dateStr,
+      label: formatDate(dateStr),
+      checkin: checkinMap.get(dateStr) ?? null,
+      isToday: dateStr === todayStr,
+      isFuture: cursor > end,
+    })
+    cursor.setDate(cursor.getDate() - 1)
+  }
+
+  return entries
+}
+
+const dayEntries = computed(() => buildDayEntries())
 
 async function loadGoal() {
   loading.value = true
@@ -63,29 +106,18 @@ async function loadGoal() {
       createdAt: data.createdAt ?? data.created_at ?? '',
     }
     whyInput.value = goal.value.deeperWhy ?? ''
-  } catch {
-    goal.value = null
-  } finally {
-    loading.value = false
-  }
-}
 
-async function loadHistory() {
-  historyLoading.value = true
-  try {
-    const data = await api.get<any>(`/goals/${goalId.value}/history`)
-    const items = Array.isArray(data) ? data : (data?.items || data?.checkins || data?.checkIns || [])
-    history.value = items.map((c: any) => ({
+    const items = data.checkIns ?? data.checkins ?? []
+    checkIns.value = items.map((c: any) => ({
       id: c.id,
       date: c.date,
       completed: c.completed ?? false,
       note: c.note ?? null,
-      createdAt: c.createdAt ?? c.created_at ?? '',
     }))
   } catch {
-    history.value = []
+    goal.value = null
   } finally {
-    historyLoading.value = false
+    loading.value = false
   }
 }
 
@@ -123,7 +155,6 @@ function daysSinceCreated(): number {
 
 onMounted(() => {
   loadGoal()
-  loadHistory()
 })
 </script>
 
@@ -253,38 +284,42 @@ onMounted(() => {
         </p>
       </div>
 
-      <!-- Check-in History -->
-      <div class="rounded-2xl border border-sacred-border bg-sacred-bg-card p-4 shadow-sacred backdrop-blur-[20px] sm:p-6">
-        <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-sacred-label">History</p>
+      <!-- Day-by-day Check-ins -->
+      <div v-if="goal.type === 'Recurring'" class="rounded-2xl border border-sacred-border bg-sacred-bg-card p-4 shadow-sacred backdrop-blur-[20px] sm:p-6">
+        <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-sacred-label">Daily Record</p>
 
-        <div v-if="historyLoading" class="mt-4 space-y-2">
-          <div v-for="i in 3" :key="i" class="h-12 animate-pulse rounded-2xl bg-sacred-bg-hover" />
+        <div v-if="dayEntries.length === 0" class="mt-4 text-sm text-sacred-text-secondary">
+          No days recorded yet.
         </div>
 
-        <div v-else-if="history.length === 0" class="mt-4 text-sm text-sacred-text-secondary">
-          No check-ins yet.
-        </div>
-
-        <ul v-else class="mt-4 space-y-2">
+        <ul v-else class="mt-4 space-y-1.5">
           <li
-            v-for="checkin in history"
-            :key="checkin.id"
-            class="rounded-2xl border border-sacred-border-light bg-sacred-bg-card-deep px-4 py-3"
+            v-for="day in dayEntries"
+            :key="day.date"
+            class="flex items-center gap-3 rounded-xl px-3 py-2.5"
+            :class="day.isToday ? 'bg-sacred-bg-hover' : ''"
           >
-            <div class="flex items-center gap-3">
-              <div
-                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
-                :class="checkin.completed
-                  ? 'bg-gradient-to-br from-sacred-gold to-sacred-gold-dark'
-                  : 'border border-sacred-border-focus bg-sacred-bg-card-deep'"
-              >
-                <SacredIcons v-if="checkin.completed" name="check" :size="12" class="text-white" />
-                <SacredIcons v-else name="skip" :size="12" class="text-sacred-muted-light" />
+            <!-- Status indicator -->
+            <div
+              class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
+              :class="day.checkin?.completed
+                ? 'bg-gradient-to-br from-sacred-gold to-sacred-gold-dark'
+                : day.checkin && !day.checkin.completed
+                  ? 'border border-sacred-border-focus bg-sacred-bg-card-deep'
+                  : 'border border-dashed border-sacred-border-light bg-transparent'"
+            >
+              <SacredIcons v-if="day.checkin?.completed" name="check" :size="12" class="text-white" />
+              <SacredIcons v-else-if="day.checkin && !day.checkin.completed" name="skip" :size="12" class="text-sacred-muted-light" />
+              <span v-else class="text-[10px] text-sacred-muted-light">--</span>
+            </div>
+
+            <!-- Date and note -->
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <p class="text-xs font-medium text-sacred-text">{{ day.label }}</p>
+                <span v-if="day.isToday" class="text-[9px] uppercase tracking-[0.15em] text-sacred-gold">Today</span>
               </div>
-              <div class="flex-1">
-                <p class="text-xs font-medium text-sacred-text">{{ formatDate(checkin.date) }}</p>
-                <p v-if="checkin.note" class="mt-0.5 text-xs leading-relaxed text-sacred-text-secondary">{{ checkin.note }}</p>
-              </div>
+              <p v-if="day.checkin?.note" class="mt-0.5 truncate text-xs leading-relaxed text-sacred-text-secondary">{{ day.checkin.note }}</p>
             </div>
           </li>
         </ul>
