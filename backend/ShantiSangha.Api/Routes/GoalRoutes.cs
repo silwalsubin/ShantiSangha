@@ -558,12 +558,17 @@ public static class GoalRoutes
             var daysCompleted = dates.Count;
             var (current, longest) = ComputeStreaks(g.CheckIns, today);
 
+            // Only count days from when the goal was created (not before)
+            var goalCreatedDate = DateOnly.FromDateTime(g.CreatedAt);
+            var effectiveStart = goalCreatedDate > startDate ? goalCreatedDate : startDate;
+            var goalTotalDays = Math.Max(0, endDate.DayNumber - effectiveStart.DayNumber + 1);
+
             return new
             {
                 g.Id,
                 g.Title,
                 DaysCompleted = daysCompleted,
-                TotalDays = totalDays,
+                TotalDays = goalTotalDays,
                 CurrentStreak = current,
                 LongestStreak = longest,
                 Days = Enumerable.Range(0, totalDays)
@@ -627,10 +632,14 @@ public static class GoalRoutes
         var totalPossible = 0;
         foreach (var g in goals)
         {
+            var goalCreatedDate = DateOnly.FromDateTime(g.CreatedAt);
+            var effectiveStart = goalCreatedDate > startDate ? goalCreatedDate : startDate;
+            var goalTotalDays = Math.Max(0, endDate.DayNumber - effectiveStart.DayNumber + 1);
+
             var done = g.CheckIns.Count(c => c.Completed);
             totalDone += done;
-            totalPossible += totalDays;
-            lines.Add($"- {g.Title}: {done}/{totalDays} days completed");
+            totalPossible += goalTotalDays;
+            lines.Add($"- {g.Title}: {done}/{goalTotalDays} days completed");
         }
 
         if (totalPossible > 0)

@@ -6,7 +6,7 @@ struct JourneyView: View {
     @State private var reflection: String?
     @State private var loading = true
     @State private var reflectionLoading = false
-    @State private var selectedPeriod: JourneyPeriod = .week
+    @State private var selectedPeriod: JourneyPeriod = .lastWeek
     private let api = ApiService.shared
 
     var body: some View {
@@ -239,14 +239,15 @@ private struct PracticeRing: View {
 // MARK: - Period
 
 enum JourneyPeriod: CaseIterable {
-    case today, week, month, all
+    case yesterday, lastWeek, lastMonth, lastYear, all
 
     var label: String {
         switch self {
-        case .today: return "Today"
-        case .week: return "This week"
-        case .month: return "This month"
-        case .all: return "All time"
+        case .yesterday: return "Yesterday"
+        case .lastWeek: return "Last week"
+        case .lastMonth: return "Last month"
+        case .lastYear: return "Last year"
+        case .all: return "All"
         }
     }
 
@@ -254,15 +255,25 @@ enum JourneyPeriod: CaseIterable {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
         let today = Date()
-        let daysBack: Int
+        let cal = Calendar.current
+
         switch self {
-        case .today: daysBack = 0
-        case .week: daysBack = 6
-        case .month: daysBack = 29
-        case .all: daysBack = 365
+        case .yesterday:
+            let yesterday = cal.date(byAdding: .day, value: -1, to: today)!
+            return (f.string(from: yesterday), f.string(from: yesterday))
+        case .lastWeek:
+            let from = cal.date(byAdding: .day, value: -7, to: today)!
+            return (f.string(from: from), f.string(from: today))
+        case .lastMonth:
+            let from = cal.date(byAdding: .day, value: -30, to: today)!
+            return (f.string(from: from), f.string(from: today))
+        case .lastYear:
+            let from = cal.date(byAdding: .day, value: -365, to: today)!
+            return (f.string(from: from), f.string(from: today))
+        case .all:
+            let from = cal.date(byAdding: .year, value: -5, to: today)!
+            return (f.string(from: from), f.string(from: today))
         }
-        let from = Calendar.current.date(byAdding: .day, value: -daysBack, to: today)!
-        return (f.string(from: from), f.string(from: today))
     }
 }
 
