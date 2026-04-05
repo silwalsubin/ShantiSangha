@@ -404,10 +404,10 @@ public static class GoalRoutes
         var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
 
-        var goalExists = await db.Goals
-            .AnyAsync(g => g.Id == id && g.UserId == user.Id);
+        var goal = await db.Goals
+            .FirstOrDefaultAsync(g => g.Id == id && g.UserId == user.Id);
 
-        if (!goalExists) return Results.NotFound();
+        if (goal is null) return Results.NotFound();
 
         pageSize = Math.Clamp(pageSize, 1, 100);
 
@@ -418,6 +418,15 @@ public static class GoalRoutes
             .Take(pageSize)
             .Select(a => new { a.Id, a.Action, a.Detail, a.CreatedAt })
             .ToListAsync();
+
+        // Ensure "Created" always appears for older goals without activity logs
+        var hasCreated = await db.GoalActivities
+            .AnyAsync(a => a.GoalId == id && a.Action == "Created");
+
+        if (!hasCreated)
+        {
+            activities.Add(new { Id = goal.Id, Action = "Created", Detail = (string?)null, goal.CreatedAt });
+        }
 
         return Results.Ok(activities);
     }

@@ -131,11 +131,6 @@ struct GoalDetailView: View {
                         }
                     }
 
-                    Text("Started \(formatDate(goal.createdAt))")
-                        .font(.sacredMicro)
-                        .foregroundColor(.sacredLabel)
-                        .textCase(.uppercase)
-                        .tracking(1)
                 }
                 .padding(16)
             } else {
