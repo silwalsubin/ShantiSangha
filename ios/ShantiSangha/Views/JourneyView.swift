@@ -11,7 +11,7 @@ struct JourneyView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 0) {
                 // Period selector
                 HStack(spacing: 6) {
                     ForEach(JourneyPeriod.allCases, id: \.self) { period in
@@ -35,15 +35,16 @@ struct JourneyView: View {
                         }
                     }
                 }
+                .padding(.bottom, 24)
 
                 if loading {
                     ProgressView()
                         .frame(maxWidth: .infinity, minHeight: 200)
                 } else if let journey = journey {
                     // Celebration header
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text("\(journey.summary.practicesCompleted)")
-                            .font(.system(size: 48, weight: .bold, design: .serif))
+                            .font(.system(size: 52, weight: .bold, design: .serif))
                             .foregroundColor(.sacredGold)
                         + Text(" practices")
                             .font(.sacredTitle)
@@ -63,9 +64,10 @@ struct JourneyView: View {
                                     .font(.sacredSmallMedium)
                                     .foregroundColor(.sacredGreen)
                             }
-                            .padding(.top, 4)
+                            .padding(.top, 2)
                         }
                     }
+                    .padding(.bottom, 20)
 
                     // AI Reflection
                     if reflectionLoading {
@@ -76,7 +78,8 @@ struct JourneyView: View {
                                 .font(.sacredSmall)
                                 .foregroundColor(.sacredMuted)
                         }
-                        .padding(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.bottom, 24)
                     } else if let reflection = reflection {
                         Text(reflection)
                             .font(.sacredBody)
@@ -84,15 +87,16 @@ struct JourneyView: View {
                             .foregroundColor(.sacredText)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(16)
-                            .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredGold.opacity(0.06)))
-                            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredGold.opacity(0.12)))
+                            .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredGold.opacity(0.06)))
+                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.1)))
+                            .padding(.bottom, 28)
                     }
 
                     // Rhythm grid
                     if !journey.practices.isEmpty {
-                        VStack(alignment: .leading, spacing: 16) {
+                        VStack(alignment: .leading, spacing: 20) {
                             ForEach(journey.practices) { practice in
-                                VStack(alignment: .leading, spacing: 8) {
+                                VStack(alignment: .leading, spacing: 6) {
                                     HStack {
                                         Text(practice.title)
                                             .font(.sacredSmallMedium)
@@ -103,35 +107,40 @@ struct JourneyView: View {
                                             .foregroundColor(.sacredMuted)
                                     }
 
-                                    // Day blocks
                                     RhythmRow(days: practice.days)
                                 }
                             }
                         }
+                        .padding(.bottom, 28)
                     }
 
-                    // Completed commitments
+                    // Fulfilled commitments
                     if !journey.completedCommitments.isEmpty {
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "calendar.badge.clock")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.sacredGold)
-                                Text("FULFILLED")
-                                    .font(.sacredSectionLabel)
-                                    .tracking(3)
-                                    .foregroundColor(.sacredLabel)
-                            }
+                        Rectangle()
+                            .fill(Color.sacredMuted.opacity(0.12))
+                            .frame(height: 1)
+                            .padding(.bottom, 20)
+
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("FULFILLED")
+                                .font(.sacredSectionLabel)
+                                .tracking(3)
+                                .foregroundColor(.sacredLabel)
+                                .padding(.bottom, 4)
 
                             ForEach(journey.completedCommitments) { c in
-                                HStack(spacing: 10) {
+                                HStack(spacing: 12) {
                                     Image(systemName: "checkmark.seal.fill")
-                                        .font(.sacredSmall)
+                                        .font(.sacredText)
                                         .foregroundColor(.sacredGreen)
                                     Text(c.title)
                                         .font(.sacredTextMedium)
                                         .foregroundColor(.sacredText)
                                 }
+                                .padding(12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(RoundedRectangle(cornerRadius: 14).fill(Color.sacredGreen.opacity(0.05)))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.sacredGreen.opacity(0.12)))
                             }
                         }
                     }
@@ -155,6 +164,7 @@ struct JourneyView: View {
 
     private func loadAll() async {
         loading = journey == nil
+        reflection = nil
         let (from, to) = selectedPeriod.dateRange
 
         do {
@@ -176,21 +186,21 @@ struct JourneyView: View {
     }
 }
 
-// MARK: - Rhythm row visualization
+// MARK: - Rhythm row — rounded squares, height varies by completion
 
 private struct RhythmRow: View {
     let days: [JourneyDay]
 
     var body: some View {
-        HStack(spacing: 3) {
+        HStack(spacing: 2) {
             ForEach(Array(days.enumerated()), id: \.offset) { _, day in
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(day.completed ? Color.sacredGold : Color.sacredMuted.opacity(0.1))
-                    .frame(height: day.completed ? 20 : 8)
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(day.completed ? Color.sacredGold : Color.sacredMuted.opacity(0.08))
                     .frame(maxWidth: .infinity)
+                    .frame(height: day.completed ? 24 : 6)
             }
         }
-        .frame(height: 20, alignment: .bottom)
+        .frame(height: 24, alignment: .bottom)
     }
 }
 

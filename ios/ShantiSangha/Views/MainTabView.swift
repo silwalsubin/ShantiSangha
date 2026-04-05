@@ -39,7 +39,7 @@ struct MainTabView: View {
                 JourneyView()
             }
             .tabItem {
-                Image("tab.diya")
+                Image(systemName: "leaf")
                 Text("Journey")
             }
             .tag(2)
