@@ -27,6 +27,7 @@ struct ShantiSanghaApp: App {
     @StateObject private var auth = AuthService.shared
     @StateObject private var network = NetworkMonitor.shared
     @StateObject private var repo = TaskRepository.shared
+    @StateObject private var notifications = NotificationService.shared
 
     let container: ModelContainer
 
@@ -71,6 +72,15 @@ struct ShantiSanghaApp: App {
                 let context = container.mainContext
                 repo.configure(context: context)
                 await SyncService.shared.configure(container: container)
+
+                // Request notification permission on first launch
+                if !UserDefaults.standard.bool(forKey: "notificationPermissionAsked") {
+                    UserDefaults.standard.set(true, forKey: "notificationPermissionAsked")
+                    await notifications.requestPermission()
+                }
+            }
+            .onChange(of: repo.tasks) {
+                notifications.reschedule(tasks: repo.tasks)
             }
         }
         .modelContainer(container)

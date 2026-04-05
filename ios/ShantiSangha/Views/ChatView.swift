@@ -80,9 +80,10 @@ struct ChatView: View {
             .padding(.vertical, 12)
             .background(Color.sacredBg)
         }
-        .background(Color.sacredBgCard.ignoresSafeArea())
-        .navigationTitle(title)
+        .background(Color.sacredBg.ignoresSafeArea())
+        .navigationTitle("Conversation")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .tabBar)
         .task { await loadMessages() }
     }
 
@@ -95,17 +96,14 @@ struct ChatView: View {
                 Text(msg.content)
                     .font(.sacredText)
                     .foregroundColor(msg.role == "user" ? .white : .sacredText)
-                    .padding(12)
+                    .padding(msg.role == "user" ? 12 : 0)
                     .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(msg.role == "user"
-                                  ? LinearGradient.sacredGoldShiny
-                                  : LinearGradient(colors: [Color.sacredBgCard, Color.sacredBgCard], startPoint: .top, endPoint: .bottom))
-                    )
-                    .overlay(
-                        msg.role == "assistant"
-                        ? RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.12))
-                        : nil
+                        Group {
+                            if msg.role == "user" {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .fill(LinearGradient.sacredGoldShiny)
+                            }
+                        }
                     )
                 if msg.role == "assistant" { Spacer() }
             }
@@ -125,15 +123,8 @@ struct ChatView: View {
     private var typingIndicator: some View {
         HStack {
             TypingDotsView()
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color.sacredBgCard)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.12))
-                )
+                .padding(.horizontal, 4)
+                .padding(.vertical, 8)
             Spacer()
         }
     }

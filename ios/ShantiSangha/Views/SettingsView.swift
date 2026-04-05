@@ -2,8 +2,10 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var auth: AuthService
+    @StateObject private var notifications = NotificationService.shared
     @State private var showSignOutConfirmation = false
     @State private var showErrorDetail = false
+    @State private var showTimePicker = false
     @State private var serverStatus: ServerStatus = .loading
     private let api = ApiService.shared
 
@@ -51,6 +53,53 @@ struct SettingsView: View {
                                     .foregroundColor(.sacredText)
                             }
                         }
+                    }
+                }
+
+                // Reminders
+                settingsCard(title: "REMINDERS") {
+                    Toggle(isOn: $notifications.isEnabled) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "bell")
+                                .font(.sacredSmall)
+                                .foregroundColor(.sacredMuted)
+                            Text("Daily reminders")
+                                .font(.sacredText)
+                                .foregroundColor(.sacredText)
+                        }
+                    }
+                    .tint(.sacredGold)
+                    .onChange(of: notifications.isEnabled) {
+                        if notifications.isEnabled {
+                            Task {
+                                let granted = await notifications.checkPermission()
+                                if !granted {
+                                    let result = await notifications.requestPermission()
+                                    if !result { notifications.isEnabled = false }
+                                }
+                                notifications.reschedule(tasks: TaskRepository.shared.tasks)
+                            }
+                        } else {
+                            notifications.reschedule(tasks: [])
+                        }
+                    }
+
+                    if notifications.isEnabled {
+                        Button { showTimePicker = true } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "clock")
+                                    .font(.sacredSmall)
+                                    .foregroundColor(.sacredMuted)
+                                Text("Remind me at")
+                                    .font(.sacredText)
+                                    .foregroundColor(.sacredTextSecondary)
+                                Spacer()
+                                Text(formattedReminderTime)
+                                    .font(.sacredTextMedium)
+                                    .foregroundColor(.sacredGold)
+                            }
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
 
@@ -124,6 +173,40 @@ struct SettingsView: View {
                 auth.signOut()
             }
             Button("Cancel", role: .cancel) {}
+        }
+        .sheet(isPresented: $showTimePicker) {
+            NavigationStack {
+                DatePicker(
+                    "Reminder time",
+                    selection: Binding(
+                        get: {
+                            Calendar.current.date(bySettingHour: notifications.reminderHour, minute: notifications.reminderMinute, second: 0, of: Date()) ?? Date()
+                        },
+                        set: { newDate in
+                            let components = Calendar.current.dateComponents([.hour, .minute], from: newDate)
+                            notifications.reminderHour = components.hour ?? 20
+                            notifications.reminderMinute = components.minute ?? 0
+                        }
+                    ),
+                    displayedComponents: .hourAndMinute
+                )
+                .datePickerStyle(.wheel)
+                .labelsHidden()
+                .padding()
+                .background(Color.sacredBg.ignoresSafeArea())
+                .navigationTitle("Remind me at")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") {
+                            showTimePicker = false
+                            notifications.reschedule(tasks: TaskRepository.shared.tasks)
+                        }
+                        .foregroundColor(.sacredGold)
+                    }
+                }
+            }
+            .presentationDetents([.height(300)])
         }
     }
 
@@ -199,6 +282,13 @@ struct SettingsView: View {
     }
 
     // MARK: - Helpers
+
+    private var formattedReminderTime: String {
+        let date = Calendar.current.date(bySettingHour: notifications.reminderHour, minute: notifications.reminderMinute, second: 0, of: Date()) ?? Date()
+        let f = DateFormatter()
+        f.dateFormat = "h:mm a"
+        return f.string(from: date)
+    }
 
     private func formatBuildTime(_ raw: String) -> String {
         let iso = ISO8601DateFormatter()

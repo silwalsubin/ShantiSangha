@@ -1,7 +1,7 @@
 import Foundation
 
 /// Mirrors frontend/src/types/index.ts — Task interface
-struct AppTask: Codable, Identifiable {
+struct AppTask: Codable, Identifiable, Equatable {
     var id: String
     var title: String
     var type: TaskType
@@ -77,7 +77,7 @@ enum TaskType: String, Codable {
     case oneTime = "OneTime"
 }
 
-struct CheckInData: Codable {
+struct CheckInData: Codable, Equatable {
     let completed: Bool
     let note: String?
 }
