@@ -11,6 +11,8 @@ struct GoalDetailView: View {
     @State private var historyLoading = false
     @State private var showWhyEditor = false
     @State private var whyText = ""
+    @State private var showTitleEditor = false
+    @State private var titleText = ""
     @State private var nudge: String?
     @State private var showProgress = false
     @State private var progressValue: Double = 0
@@ -25,16 +27,22 @@ struct GoalDetailView: View {
             } else if let goal = goal {
                 VStack(alignment: .leading, spacing: 20) {
                     // Header
-                    VStack(spacing: 12) {
-                        Image(systemName: goal.type == .recurring ? "arrow.triangle.2.circlepath" : "calendar.badge.clock")
-                            .font(.system(size: 28))
-                            .foregroundColor(.sacredGold)
-                        Text(goal.title)
-                            .font(.sacredHeading)
-                            .foregroundColor(.sacredText)
-                            .multilineTextAlignment(.center)
+                    Button {
+                        titleText = goal.title
+                        showTitleEditor = true
+                    } label: {
+                        VStack(spacing: 12) {
+                            Image(systemName: goal.type == .recurring ? "arrow.triangle.2.circlepath" : "calendar.badge.clock")
+                                .font(.system(size: 28))
+                                .foregroundColor(.sacredGold)
+                            Text(goal.title)
+                                .font(.sacredHeading)
+                                .foregroundColor(.sacredText)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
                     }
-                    .frame(maxWidth: .infinity)
+                    .buttonStyle(.plain)
 
                     // Stats
                     if goal.type == .recurring {
@@ -315,6 +323,36 @@ struct GoalDetailView: View {
             }
         }
         .task { await load() }
+        .sheet(isPresented: $showTitleEditor) {
+            NavigationStack {
+                VStack(spacing: 16) {
+                    TextField("Task name", text: $titleText)
+                        .font(.sacredHeading)
+                        .foregroundColor(.sacredText)
+                        .multilineTextAlignment(.center)
+                        .padding(16)
+
+                    Spacer()
+                }
+                .background(Color.sacredBg.ignoresSafeArea())
+                .navigationTitle("Rename")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { showTitleEditor = false }
+                            .foregroundColor(.sacredMuted)
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") {
+                            showTitleEditor = false
+                            Task { await saveTitle() }
+                        }
+                        .foregroundColor(.sacredGold)
+                        .disabled(titleText.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                }
+            }
+        }
         .sheet(isPresented: $showWhyEditor) {
             NavigationStack {
                 VStack(alignment: .leading, spacing: 16) {
@@ -430,6 +468,18 @@ struct GoalDetailView: View {
             dismiss()
         } catch {
             print("Failed to delete goal: \(error)")
+        }
+    }
+
+    private func saveTitle() async {
+        let trimmed = titleText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        do {
+            let body: [String: String] = ["title": trimmed]
+            let _: EmptyResponse = try await api.patch("/goals/\(goalId)", body: body)
+            goal = try await api.get("/goals/\(goalId)")
+        } catch {
+            print("Failed to save title: \(error)")
         }
     }
 
