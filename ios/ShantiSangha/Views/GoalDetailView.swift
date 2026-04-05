@@ -6,9 +6,14 @@ struct GoalDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var goal: Goal?
     @State private var activities: [GoalActivityItem] = []
+    @State private var checkIns: [GoalCheckIn] = []
     @State private var loading = true
     @State private var historyExpanded = false
     @State private var historyLoading = false
+    @State private var togglingDate: String?
+    @State private var selectMode = false
+    @State private var selectedDates: Set<String> = []
+    @State private var bulkDeleting = false
     @State private var showWhyEditor = false
     @State private var whyText = ""
     @State private var showTitleEditor = false
@@ -133,90 +138,11 @@ struct GoalDetailView: View {
                     }
                     .buttonStyle(.plain)
 
-                    // Activity timeline (collapsed by default)
-                    VStack(alignment: .leading, spacing: 0) {
-                        Button {
-                            withAnimation(.easeOut(duration: 0.25)) {
-                                historyExpanded.toggle()
-                            }
-                            if historyExpanded && activities.isEmpty {
-                                Task { await loadHistory() }
-                            }
-                        } label: {
-                            HStack {
-                                Text("HISTORY")
-                                    .font(.sacredSectionLabel)
-                                    .tracking(3)
-                                    .foregroundColor(.sacredLabel)
-                                Image(systemName: historyExpanded ? "chevron.up" : "chevron.down")
-                                    .font(.sacredMicro)
-                                    .foregroundColor(.sacredMuted)
-                                Spacer()
-                            }
-                        }
-
-                        if historyExpanded {
-                            if historyLoading {
-                                ProgressView()
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.top, 16)
-                            } else if activities.isEmpty {
-                                Text("No activity yet.")
-                                    .font(.sacredText)
-                                    .foregroundColor(.sacredTextSecondary)
-                                    .padding(.top, 16)
-                            } else {
-                                VStack(alignment: .leading, spacing: 0) {
-                                    ForEach(Array(activities.enumerated()), id: \.element.id) { index, activity in
-                                        let isLast = index == activities.count - 1
-
-                                        HStack(alignment: .top, spacing: 14) {
-                                            // Timeline rail
-                                            VStack(spacing: 0) {
-                                                Circle()
-                                                    .fill(dotColor(for: activity.action))
-                                                    .frame(width: 12, height: 12)
-                                                    .overlay(
-                                                        Circle()
-                                                            .stroke(dotColor(for: activity.action).opacity(0.3), lineWidth: 3)
-                                                    )
-
-                                                if !isLast {
-                                                    Rectangle()
-                                                        .fill(Color.sacredMuted.opacity(0.15))
-                                                        .frame(width: 1.5)
-                                                        .frame(maxHeight: .infinity)
-                                                }
-                                            }
-                                            .frame(width: 18)
-
-                                            // Content
-                                            VStack(alignment: .leading, spacing: 3) {
-                                                HStack {
-                                                    Text(actionLabel(activity.action))
-                                                        .font(.sacredSmallMedium)
-                                                        .foregroundColor(.sacredText)
-                                                    Spacer()
-                                                    Image(systemName: actionIcon(activity.action))
-                                                        .font(.sacredMicro)
-                                                        .foregroundColor(dotColor(for: activity.action))
-                                                }
-                                                if let detail = activity.detail {
-                                                    Text(detail)
-                                                        .font(.sacredSmall)
-                                                        .foregroundColor(.sacredTextSecondary)
-                                                }
-                                                Text(formatDateTime(activity.createdAt))
-                                                    .font(.sacredMicro)
-                                                    .foregroundColor(.sacredMuted)
-                                            }
-                                            .padding(.bottom, isLast ? 0 : 20)
-                                        }
-                                    }
-                                }
-                                .padding(.top, 16)
-                            }
-                        }
+                    // Daily Record (recurring) or Activity timeline (one-time)
+                    if goal.type == .recurring {
+                        dailyRecordSection(goal: goal)
+                    } else {
+                        activityTimelineSection()
                     }
 
                     // Progress slider (shown inline when triggered from menu)
@@ -397,6 +323,7 @@ struct GoalDetailView: View {
             let g: Goal = try await api.get("/goals/\(goalId)")
             goal = g
             nudge = g.aiNudge
+            checkIns = g.checkIns ?? []
         } catch {
             print("Failed to load goal: \(error)")
         }
@@ -502,6 +429,366 @@ struct GoalDetailView: View {
             print("Failed to load history: \(error)")
         }
         historyLoading = false
+    }
+
+    // MARK: - Daily Record
+
+    private struct DayEntry: Identifiable {
+        let id: String  // date string
+        let date: String
+        let label: String
+        let checkin: GoalCheckIn?
+        let isToday: Bool
+    }
+
+    private func buildDayEntries() -> [DayEntry] {
+        guard let goal = goal else { return [] }
+
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        let displayFmt = DateFormatter()
+        displayFmt.dateFormat = "MMM d, yyyy"
+
+        let createdDateStr = String(goal.createdAt.prefix(10))
+        guard let startDate = df.date(from: createdDateStr) else { return [] }
+        let today = Date()
+        let todayStr = df.string(from: today)
+
+        let checkinMap = Dictionary(
+            uniqueKeysWithValues: checkIns.map { ($0.date, $0) }
+        )
+
+        var entries: [DayEntry] = []
+        var cursor = Calendar.current.startOfDay(for: today)
+        let start = Calendar.current.startOfDay(for: startDate)
+
+        while cursor >= start {
+            let dateStr = df.string(from: cursor)
+            entries.append(DayEntry(
+                id: dateStr,
+                date: dateStr,
+                label: displayFmt.string(from: cursor),
+                checkin: checkinMap[dateStr],
+                isToday: dateStr == todayStr
+            ))
+            cursor = Calendar.current.date(byAdding: .day, value: -1, to: cursor)!
+        }
+
+        return entries
+    }
+
+    @ViewBuilder
+    private func dailyRecordSection(goal: Goal) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("DAILY RECORD")
+                    .font(.sacredSectionLabel)
+                    .tracking(3)
+                    .foregroundColor(.sacredLabel)
+                Spacer()
+                if selectMode {
+                    Button {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            selectMode = false
+                            selectedDates.removeAll()
+                        }
+                    } label: {
+                        Text("Cancel")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
+                    }
+                } else if checkIns.contains(where: { _ in true }) {
+                    Button {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            selectMode = true
+                            selectedDates.removeAll()
+                        }
+                    } label: {
+                        Text("Select")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredGold)
+                    }
+                }
+            }
+
+            let entries = buildDayEntries()
+            if entries.isEmpty {
+                Text("No days recorded yet.")
+                    .font(.sacredText)
+                    .foregroundColor(.sacredTextSecondary)
+            } else {
+                VStack(spacing: 4) {
+                    ForEach(entries) { day in
+                        Button {
+                            if selectMode {
+                                // Only allow selecting days that have check-ins
+                                guard day.checkin != nil else { return }
+                                if selectedDates.contains(day.date) {
+                                    selectedDates.remove(day.date)
+                                } else {
+                                    selectedDates.insert(day.date)
+                                }
+                            } else {
+                                Task { await toggleDay(day) }
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                if selectMode {
+                                    // Selection checkbox (only for days with check-ins)
+                                    if day.checkin != nil {
+                                        ZStack {
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .strokeBorder(
+                                                    selectedDates.contains(day.date)
+                                                        ? Color.sacredGold
+                                                        : Color.sacredMuted.opacity(0.3),
+                                                    lineWidth: 1.5
+                                                )
+                                            if selectedDates.contains(day.date) {
+                                                RoundedRectangle(cornerRadius: 6)
+                                                    .fill(Color.sacredGold)
+                                                Image(systemName: "checkmark")
+                                                    .font(.system(size: 9, weight: .bold))
+                                                    .foregroundColor(.white)
+                                            }
+                                        }
+                                        .frame(width: 22, height: 22)
+                                    } else {
+                                        Color.clear.frame(width: 22, height: 22)
+                                    }
+                                }
+
+                                // Status circle
+                                ZStack {
+                                    if day.checkin?.completed == true {
+                                        Circle()
+                                            .fill(LinearGradient(
+                                                colors: [.sacredGold, .sacredGoldDark],
+                                                startPoint: .topLeading, endPoint: .bottomTrailing
+                                            ))
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(.white)
+                                    } else if day.checkin != nil {
+                                        Circle()
+                                            .strokeBorder(Color.sacredMuted.opacity(0.3), lineWidth: 1)
+                                        Image(systemName: "moon.fill")
+                                            .font(.system(size: 9))
+                                            .foregroundColor(.sacredMuted.opacity(0.5))
+                                    } else {
+                                        Circle()
+                                            .strokeBorder(Color.sacredMuted.opacity(0.2), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                                        Text("--")
+                                            .font(.system(size: 8))
+                                            .foregroundColor(.sacredMuted.opacity(0.4))
+                                    }
+                                }
+                                .frame(width: 28, height: 28)
+
+                                // Date label
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack(spacing: 6) {
+                                        Text(day.label)
+                                            .font(.sacredSmallMedium)
+                                            .foregroundColor(.sacredText)
+                                        if day.isToday {
+                                            Text("TODAY")
+                                                .font(.sacredSectionLabel)
+                                                .tracking(2)
+                                                .foregroundColor(.sacredGold)
+                                        }
+                                    }
+                                    if let note = day.checkin?.note {
+                                        Text(note)
+                                            .font(.sacredSmall)
+                                            .foregroundColor(.sacredTextSecondary)
+                                            .lineLimit(1)
+                                    }
+                                }
+
+                                Spacer()
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(
+                                        selectMode && selectedDates.contains(day.date)
+                                            ? Color.sacredGold.opacity(0.06)
+                                            : day.isToday ? Color.sacredMuted.opacity(0.06) : Color.clear
+                                    )
+                            )
+                            .opacity(togglingDate == day.date ? 0.4 : 1)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!selectMode && togglingDate != nil)
+                        .disabled(selectMode && day.checkin == nil)
+                    }
+                }
+
+                // Bulk delete bar
+                if selectMode && !selectedDates.isEmpty {
+                    Button {
+                        Task { await bulkDeleteSelected() }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "trash")
+                                .font(.sacredSmall)
+                            Text("Remove \(selectedDates.count) \(selectedDates.count == 1 ? "entry" : "entries")")
+                                .font(.sacredSmallMedium)
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(Color.red.opacity(0.85))
+                        )
+                    }
+                    .disabled(bulkDeleting)
+                    .opacity(bulkDeleting ? 0.5 : 1)
+                    .padding(.top, 8)
+                }
+            }
+        }
+    }
+
+    private func toggleDay(_ day: DayEntry) async {
+        togglingDate = day.date
+        defer { togglingDate = nil }
+
+        do {
+            if day.checkin != nil {
+                // Remove existing check-in
+                try await api.delete("/goals/\(goalId)/checkin?date=\(day.date)")
+                checkIns.removeAll { $0.date == day.date }
+            } else {
+                // Add as completed
+                let body: [String: Any] = ["completed": true, "date": day.date]
+                if let data = try? JSONSerialization.data(withJSONObject: body) {
+                    let result: GoalCheckIn = try await api.postRaw("/goals/\(goalId)/checkin", body: data)
+                    checkIns.append(result)
+                }
+            }
+            // Refresh goal to update streaks
+            let refreshed: Goal = try await api.get("/goals/\(goalId)")
+            goal = refreshed
+            checkIns = refreshed.checkIns ?? []
+        } catch {
+            print("Failed to toggle check-in: \(error)")
+        }
+    }
+
+    private func bulkDeleteSelected() async {
+        bulkDeleting = true
+        defer {
+            bulkDeleting = false
+            selectMode = false
+            selectedDates.removeAll()
+        }
+
+        for date in selectedDates {
+            do {
+                try await api.delete("/goals/\(goalId)/checkin?date=\(date)")
+                checkIns.removeAll { $0.date == date }
+            } catch {
+                print("Failed to delete check-in for \(date): \(error)")
+            }
+        }
+
+        // Refresh goal for updated streaks
+        do {
+            let refreshed: Goal = try await api.get("/goals/\(goalId)")
+            goal = refreshed
+            checkIns = refreshed.checkIns ?? []
+        } catch {
+            print("Failed to refresh goal: \(error)")
+        }
+    }
+
+    @ViewBuilder
+    private func activityTimelineSection() -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeOut(duration: 0.25)) {
+                    historyExpanded.toggle()
+                }
+                if historyExpanded && activities.isEmpty {
+                    Task { await loadHistory() }
+                }
+            } label: {
+                HStack {
+                    Text("HISTORY")
+                        .font(.sacredSectionLabel)
+                        .tracking(3)
+                        .foregroundColor(.sacredLabel)
+                    Image(systemName: historyExpanded ? "chevron.up" : "chevron.down")
+                        .font(.sacredMicro)
+                        .foregroundColor(.sacredMuted)
+                    Spacer()
+                }
+            }
+
+            if historyExpanded {
+                if historyLoading {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 16)
+                } else if activities.isEmpty {
+                    Text("No activity yet.")
+                        .font(.sacredText)
+                        .foregroundColor(.sacredTextSecondary)
+                        .padding(.top, 16)
+                } else {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(Array(activities.enumerated()), id: \.element.id) { index, activity in
+                            let isLast = index == activities.count - 1
+
+                            HStack(alignment: .top, spacing: 14) {
+                                VStack(spacing: 0) {
+                                    Circle()
+                                        .fill(dotColor(for: activity.action))
+                                        .frame(width: 12, height: 12)
+                                        .overlay(
+                                            Circle()
+                                                .stroke(dotColor(for: activity.action).opacity(0.3), lineWidth: 3)
+                                        )
+                                    if !isLast {
+                                        Rectangle()
+                                            .fill(Color.sacredMuted.opacity(0.15))
+                                            .frame(width: 1.5)
+                                            .frame(maxHeight: .infinity)
+                                    }
+                                }
+                                .frame(width: 18)
+
+                                VStack(alignment: .leading, spacing: 3) {
+                                    HStack {
+                                        Text(actionLabel(activity.action))
+                                            .font(.sacredSmallMedium)
+                                            .foregroundColor(.sacredText)
+                                        Spacer()
+                                        Image(systemName: actionIcon(activity.action))
+                                            .font(.sacredMicro)
+                                            .foregroundColor(dotColor(for: activity.action))
+                                    }
+                                    if let detail = activity.detail {
+                                        Text(detail)
+                                            .font(.sacredSmall)
+                                            .foregroundColor(.sacredTextSecondary)
+                                    }
+                                    Text(formatDateTime(activity.createdAt))
+                                        .font(.sacredMicro)
+                                        .foregroundColor(.sacredMuted)
+                                }
+                                .padding(.bottom, isLast ? 0 : 20)
+                            }
+                        }
+                    }
+                    .padding(.top, 16)
+                }
+            }
+        }
     }
 
     // MARK: - Activity helpers

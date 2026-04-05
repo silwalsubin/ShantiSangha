@@ -97,6 +97,14 @@ struct Goal: Codable, Identifiable {
     let noteCount: Int?
     let createdAt: String
     let aiNudge: String?
+    let checkIns: [GoalCheckIn]?
+}
+
+struct GoalCheckIn: Codable, Identifiable {
+    let id: String
+    let date: String
+    let completed: Bool
+    let note: String?
 }
 
 struct CheckIn: Codable, Identifiable {

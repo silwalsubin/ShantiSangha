@@ -49,17 +49,33 @@ const editingWhy = ref(false)
 const whyInput = ref('')
 const savingWhy = ref(false)
 const togglingDate = ref<string | null>(null)
+const selectMode = ref(false)
+const selectedDates = ref<Set<string>>(new Set())
+const bulkDeleting = ref(false)
+
+const hasCheckIns = computed(() => checkIns.value.length > 0)
+
+function toggleSelect(date: string) {
+  const s = new Set(selectedDates.value)
+  if (s.has(date)) s.delete(date)
+  else s.add(date)
+  selectedDates.value = s
+}
 
 async function toggleDay(day: DayEntry) {
   if (!goal.value || day.isFuture) return
+
+  if (selectMode.value) {
+    if (day.checkin) toggleSelect(day.date)
+    return
+  }
+
   togglingDate.value = day.date
   try {
     if (day.checkin) {
-      // Remove existing check-in
       await api.delete(`/goals/${goal.value.id}/checkin?date=${day.date}`)
       checkIns.value = checkIns.value.filter(c => c.date !== day.date)
     } else {
-      // Add as completed
       const result = await api.post<any>(`/goals/${goal.value.id}/checkin`, {
         completed: true,
         date: day.date,
@@ -71,7 +87,6 @@ async function toggleDay(day: DayEntry) {
         note: result.note ?? null,
       })
     }
-    // Refresh goal to update streaks
     const data = await api.get<any>(`/goals/${goal.value.id}`)
     if (goal.value.type === 'Recurring') {
       goal.value.currentStreak = data.currentStreak ?? data.current_streak ?? 0
@@ -79,6 +94,26 @@ async function toggleDay(day: DayEntry) {
     }
   } finally {
     togglingDate.value = null
+  }
+}
+
+async function bulkDeleteSelected() {
+  if (!goal.value || selectedDates.value.size === 0) return
+  bulkDeleting.value = true
+  try {
+    for (const date of selectedDates.value) {
+      await api.delete(`/goals/${goal.value.id}/checkin?date=${date}`)
+      checkIns.value = checkIns.value.filter(c => c.date !== date)
+    }
+    const data = await api.get<any>(`/goals/${goal.value.id}`)
+    if (goal.value.type === 'Recurring') {
+      goal.value.currentStreak = data.currentStreak ?? data.current_streak ?? 0
+      goal.value.longestStreak = data.longestStreak ?? data.longest_streak ?? 0
+    }
+  } finally {
+    bulkDeleting.value = false
+    selectMode.value = false
+    selectedDates.value = new Set()
   }
 }
 
@@ -319,7 +354,23 @@ onMounted(() => {
 
       <!-- Day-by-day Check-ins -->
       <div v-if="goal.type === 'Recurring'" class="rounded-2xl border border-sacred-border bg-sacred-bg-card p-4 shadow-sacred backdrop-blur-[20px] sm:p-6">
-        <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-sacred-label">Daily Record</p>
+        <div class="flex items-center justify-between">
+          <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-sacred-label">Daily Record</p>
+          <button
+            v-if="selectMode"
+            class="min-h-[44px] text-xs font-medium text-sacred-text-secondary transition duration-200 hover:text-sacred-text"
+            @click="selectMode = false; selectedDates = new Set()"
+          >
+            Cancel
+          </button>
+          <button
+            v-else-if="hasCheckIns"
+            class="min-h-[44px] text-xs font-medium text-sacred-gold transition duration-200 hover:text-sacred-gold-dark"
+            @click="selectMode = true; selectedDates = new Set()"
+          >
+            Select
+          </button>
+        </div>
 
         <div v-if="dayEntries.length === 0" class="mt-4 text-sm text-sacred-text-secondary">
           No days recorded yet.
@@ -331,11 +382,19 @@ onMounted(() => {
             :key="day.date"
             class="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 transition duration-150 active:scale-[0.98]"
             :class="[
-              day.isToday ? 'bg-sacred-bg-hover' : 'hover:bg-sacred-bg-hover/50',
+              selectMode && selectedDates.has(day.date) ? 'bg-sacred-gold/5' : day.isToday ? 'bg-sacred-bg-hover' : 'hover:bg-sacred-bg-hover/50',
               togglingDate === day.date ? 'opacity-50 pointer-events-none' : '',
+              selectMode && !day.checkin ? 'opacity-30 pointer-events-none' : '',
             ]"
             @click="toggleDay(day)"
           >
+            <!-- Selection checkbox -->
+            <div v-if="selectMode && day.checkin" class="flex h-5 w-5 shrink-0 items-center justify-center rounded border transition duration-150"
+              :class="selectedDates.has(day.date) ? 'border-sacred-gold bg-sacred-gold' : 'border-sacred-border-focus bg-transparent'"
+            >
+              <SacredIcons v-if="selectedDates.has(day.date)" name="check" :size="10" class="text-white" />
+            </div>
+
             <!-- Status indicator -->
             <div
               class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition duration-150"
@@ -360,6 +419,17 @@ onMounted(() => {
             </div>
           </li>
         </ul>
+
+        <!-- Bulk delete bar -->
+        <button
+          v-if="selectMode && selectedDates.size > 0"
+          class="mt-4 flex w-full min-h-[44px] items-center justify-center gap-2 rounded-xl bg-red-500/90 px-4 text-sm font-medium text-white transition duration-200 active:scale-[0.98] disabled:opacity-50"
+          :disabled="bulkDeleting"
+          @click="bulkDeleteSelected"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+          Remove {{ selectedDates.size }} {{ selectedDates.size === 1 ? 'entry' : 'entries' }}
+        </button>
       </div>
     </template>
   </div>
