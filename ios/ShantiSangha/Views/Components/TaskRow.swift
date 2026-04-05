@@ -10,6 +10,7 @@ struct TaskRow: View {
     let onProgressUpdate: (Int) -> Void
     var onDueDateUpdate: ((String) -> Void)? = nil
     var neutralStyle: Bool = false
+    var activeSwipeId: Binding<String?>?
 
     @State private var showMenu = false
     @State private var showProgress = false
@@ -23,8 +24,11 @@ struct TaskRow: View {
 
     @State private var offset: CGFloat = 0
     @State private var activeSwipe: SwipeDirection? = nil
-    @State private var swipeActive = false
     @State private var navigateToDetail = false
+
+    private var swipeActive: Bool {
+        activeSwipeId?.wrappedValue == task.id
+    }
     private let swipeThreshold: CGFloat = 80
 
     private enum SwipeDirection {
@@ -73,13 +77,9 @@ struct TaskRow: View {
                 .gesture(
                     !task.checkedIn && !task.saving
                     ? LongPressGesture(minimumDuration: 0.3)
-                        .onChanged { _ in
-                            if !swipeActive {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            }
-                        }
                         .onEnded { _ in
-                            swipeActive = true
+                            activeSwipeId?.wrappedValue = task.id
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         }
                         .sequenced(before:
                             DragGesture(minimumDistance: 10)
@@ -110,7 +110,7 @@ struct TaskRow: View {
                                             offset = 0
                                         }
                                     }
-                                    swipeActive = false
+                                    activeSwipeId?.wrappedValue = nil
                                 }
                         )
                     : nil
@@ -266,26 +266,17 @@ struct TaskRow: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(neutralStyle
-                      ? Color.sacredBgCard
-                      : task.checkedIn
-                      ? Color.sacredGreen.opacity(0.06)
-                      : isOverdue
-                      ? Color.sacredRed.opacity(0.08)
-                      : Color.sacredBgCard)
-                .overlay(
+            Group {
+                if swipeActive || neutralStyle {
                     RoundedRectangle(cornerRadius: 16)
-                        .stroke(neutralStyle
-                                ? Color.sacredMuted.opacity(0.12)
-                                : task.checkedIn
-                                ? Color.sacredGreen.opacity(0.25)
-                                : isOverdue
-                                ? Color.sacredRed.opacity(0.35)
-                                : Color.sacredMuted.opacity(0.12), lineWidth: neutralStyle ? 1 : isOverdue ? 1.5 : 1)
-                )
+                        .fill(neutralStyle ? Color.sacredBgCard : Color.sacredBgCard)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.sacredMuted.opacity(0.12), lineWidth: 1)
+                        )
+                }
+            }
         )
-        .modifier(OverduePulseModifier(isOverdue: neutralStyle ? false : isOverdue))
     }
 }
 

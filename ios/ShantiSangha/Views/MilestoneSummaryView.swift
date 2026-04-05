@@ -3,11 +3,21 @@ import SwiftUI
 /// Shows all commitment tasks — pending (sorted by urgency) and completed
 struct MilestoneSummaryView: View {
     @ObservedObject var vm: HomeViewModel
+    var initialFilter: CommitmentFilter = .all
     @State private var filter: CommitmentFilter = .all
+
+    init(vm: HomeViewModel, initialFilter: CommitmentFilter = .all) {
+        self.vm = vm
+        self.initialFilter = initialFilter
+        _filter = State(initialValue: initialFilter)
+    }
 
     private var filteredAll: [AppTask] {
         vm.allMilestones.filter { task in
             guard let max = filter.maxDays else { return true }
+            if task.completedAt != nil {
+                return completedWithinDays(task.completedAt, max)
+            }
             return (task.daysRemaining ?? 999) <= max
         }
     }
@@ -19,6 +29,17 @@ struct MilestoneSummaryView: View {
 
     private var filteredCompleted: [AppTask] {
         filteredAll.filter { $0.completedAt != nil }
+    }
+
+    private func completedWithinDays(_ dateStr: String?, _ days: Int) -> Bool {
+        guard let dateStr = dateStr else { return false }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let isoBasic = ISO8601DateFormatter()
+        isoBasic.formatOptions = [.withInternetDateTime]
+        guard let date = iso.date(from: dateStr) ?? isoBasic.date(from: dateStr) else { return false }
+        let daysAgo = Calendar.current.dateComponents([.day], from: date, to: Date()).day ?? 999
+        return daysAgo <= days
     }
 
     private var filteredTotal: Int { filteredAll.count }

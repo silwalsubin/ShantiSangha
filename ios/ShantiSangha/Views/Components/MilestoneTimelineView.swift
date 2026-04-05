@@ -11,6 +11,7 @@ struct MilestoneTimelineView: View {
 
     var onShowAll: (() -> Void)?
     @Binding var filter: CommitmentFilter
+    var activeSwipeId: Binding<String?>?
     var totalMilestones: Int = 0
     var doneMilestones: Int = 0
     var hasOverdue: Bool = false
@@ -64,8 +65,8 @@ struct MilestoneTimelineView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
             } else {
-                VStack(spacing: 8) {
-                    ForEach(milestones) { task in
+                VStack(spacing: 0) {
+                    ForEach(Array(milestones.enumerated()), id: \.element.id) { index, task in
                         TaskRow(
                             task: task,
                             onDone: { onDone(task.id) },
@@ -73,8 +74,15 @@ struct MilestoneTimelineView: View {
                             onUndo: {},
                             onDelete: { onDelete(task.id) },
                             onProgressUpdate: { val in onProgressUpdate(task.id, val) },
-                            onDueDateUpdate: { date in onDueDateUpdate(task.id, date) }
+                            onDueDateUpdate: { date in onDueDateUpdate(task.id, date) },
+                            activeSwipeId: activeSwipeId
                         )
+
+                        if index < milestones.count - 1 {
+                            Divider()
+                                .padding(.leading, 52)
+                                .padding(.trailing, 16)
+                        }
                     }
                 }
             }

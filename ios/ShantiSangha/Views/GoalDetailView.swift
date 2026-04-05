@@ -3,6 +3,7 @@ import SwiftUI
 /// Goal detail — mirrors frontend/src/pages/app/goal-detail.vue
 struct GoalDetailView: View {
     let goalId: String
+    @Environment(\.dismiss) private var dismiss
     @State private var goal: Goal?
     @State private var activities: [GoalActivityItem] = []
     @State private var loading = true
@@ -11,6 +12,9 @@ struct GoalDetailView: View {
     @State private var showWhyEditor = false
     @State private var whyText = ""
     @State private var nudge: String?
+    @State private var showProgress = false
+    @State private var progressValue: Double = 0
+    @State private var navigateToDueDate = false
     private let api = ApiService.shared
 
     var body: some View {
@@ -21,14 +25,16 @@ struct GoalDetailView: View {
             } else if let goal = goal {
                 VStack(alignment: .leading, spacing: 20) {
                     // Header
-                    HStack(spacing: 10) {
+                    VStack(spacing: 12) {
                         Image(systemName: goal.type == .recurring ? "arrow.triangle.2.circlepath" : "calendar.badge.clock")
-                            .font(.sacredTitle)
+                            .font(.system(size: 28))
                             .foregroundColor(.sacredGold)
                         Text(goal.title)
                             .font(.sacredHeading)
                             .foregroundColor(.sacredText)
+                            .multilineTextAlignment(.center)
                     }
+                    .frame(maxWidth: .infinity)
 
                     // Stats
                     if goal.type == .recurring {
@@ -45,6 +51,28 @@ struct GoalDetailView: View {
                                 )
                             }
                             statCard(value: "\(goal.progress ?? 0)%", label: "Progress")
+                        }
+
+                        // Due date row — tappable
+                        if let targetDate = goal.targetDate {
+                            Button { navigateToDueDate = true } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "calendar")
+                                        .font(.sacredSmall)
+                                        .foregroundColor(.sacredGold)
+                                    Text("Due \(formatDate(targetDate))")
+                                        .font(.sacredTextMedium)
+                                        .foregroundColor(.sacredText)
+                                    Spacer()
+                                    Image(systemName: "pencil")
+                                        .font(.sacredMicro)
+                                        .foregroundColor(.sacredMuted)
+                                }
+                                .padding(14)
+                                .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBgCard))
+                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.08)))
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
 
@@ -183,6 +211,34 @@ struct GoalDetailView: View {
                         }
                     }
 
+                    // Progress slider (shown inline when triggered from menu)
+                    if showProgress {
+                        VStack(spacing: 8) {
+                            Slider(value: $progressValue, in: 0...100, step: 5)
+                                .tint(.sacredGold)
+                            HStack {
+                                Text("\(Int(progressValue))%")
+                                    .font(.sacredSmallMedium)
+                                    .foregroundColor(.sacredGold)
+                                Spacer()
+                                Button("Cancel") {
+                                    showProgress = false
+                                }
+                                .font(.sacredSmall)
+                                .foregroundColor(.sacredMuted)
+                                Button("Save") {
+                                    showProgress = false
+                                    Task { await updateProgress(Int(progressValue)) }
+                                }
+                                .font(.sacredSmallSemibold)
+                                .foregroundColor(.sacredGold)
+                            }
+                        }
+                        .padding(16)
+                        .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBgCard))
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.12)))
+                    }
+
                 }
                 .padding(16)
             } else {
@@ -191,8 +247,73 @@ struct GoalDetailView: View {
                     .frame(maxWidth: .infinity, minHeight: 200)
             }
         }
+        .background(
+            Group {
+                if let goal = goal, goal.type == .oneTime {
+                    NavigationLink(
+                        destination: ChangeDueDateView(
+                            task: AppTask(id: goal.id, title: goal.title, type: .oneTime, daysRemaining: goal.daysRemaining, progress: goal.progress ?? 0),
+                            onSave: { date in Task { await updateDueDate(date) } }
+                        ),
+                        isActive: $navigateToDueDate
+                    ) { EmptyView() }
+                    .hidden()
+                }
+            }
+        )
         .background(Color.sacredBg.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if let goal = goal {
+                    Menu {
+                        if goal.completedAt == nil {
+                            Button {
+                                Task { await markComplete() }
+                            } label: {
+                                Label(
+                                    goal.type == .recurring ? "Complete for today" : "Complete",
+                                    systemImage: "checkmark.circle"
+                                )
+                            }
+
+                            Button {
+                                Task { await skipForToday() }
+                            } label: {
+                                Label("Skip for today", systemImage: "moon.fill")
+                            }
+
+                            if goal.type == .oneTime {
+                                Button {
+                                    progressValue = Double(goal.progress ?? 0)
+                                    showProgress = true
+                                } label: {
+                                    Label("Update progress", systemImage: "chart.bar.fill")
+                                }
+
+                                Button {
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                        navigateToDueDate = true
+                                    }
+                                } label: {
+                                    Label("Change due date", systemImage: "calendar")
+                                }
+                            }
+                        }
+
+                        Button(role: .destructive) {
+                            Task { await deleteGoal() }
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.sacredText)
+                            .foregroundColor(.sacredMuted)
+                    }
+                }
+            }
+        }
         .task { await load() }
         .sheet(isPresented: $showWhyEditor) {
             NavigationStack {
@@ -253,6 +374,62 @@ struct GoalDetailView: View {
             } catch {
                 print("Failed to load nudge: \(error)")
             }
+        }
+    }
+
+    private func markComplete() async {
+        let dateStr = {
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd"
+            return f.string(from: Date())
+        }()
+        let body: [String: Any] = ["completed": true, "date": dateStr]
+        if let data = try? JSONSerialization.data(withJSONObject: body) {
+            let _: EmptyResponse? = try? await api.postRaw("/goals/\(goalId)/checkin", body: data)
+        }
+        // Reload to reflect new state
+        goal = try? await api.get("/goals/\(goalId)")
+    }
+
+    private func skipForToday() async {
+        let dateStr = {
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd"
+            return f.string(from: Date())
+        }()
+        let body: [String: Any] = ["completed": false, "date": dateStr]
+        if let data = try? JSONSerialization.data(withJSONObject: body) {
+            let _: EmptyResponse? = try? await api.postRaw("/goals/\(goalId)/checkin", body: data)
+        }
+        goal = try? await api.get("/goals/\(goalId)")
+    }
+
+    private func updateProgress(_ value: Int) async {
+        let body: [String: Int] = ["progress": value]
+        do {
+            let _: EmptyResponse = try await api.patch("/goals/\(goalId)", body: body)
+            goal = try await api.get("/goals/\(goalId)")
+        } catch {
+            print("Failed to update progress: \(error)")
+        }
+    }
+
+    private func updateDueDate(_ date: String) async {
+        let body: [String: String] = ["targetDate": date]
+        do {
+            let _: EmptyResponse = try await api.patch("/goals/\(goalId)", body: body)
+            goal = try await api.get("/goals/\(goalId)")
+        } catch {
+            print("Failed to update due date: \(error)")
+        }
+    }
+
+    private func deleteGoal() async {
+        do {
+            try await api.delete("/goals/\(goalId)")
+            dismiss()
+        } catch {
+            print("Failed to delete goal: \(error)")
         }
     }
 

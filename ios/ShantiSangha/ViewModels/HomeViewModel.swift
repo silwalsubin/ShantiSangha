@@ -4,6 +4,7 @@ import Combine
 /// ViewModel for the Home screen — "What needs your attention today?"
 /// Delegates to TaskRepository for offline-first data management.
 enum CommitmentFilter: String, CaseIterable {
+    case day = "1D"
     case week = "1W"
     case twoWeeks = "2W"
     case month = "1M"
@@ -11,6 +12,7 @@ enum CommitmentFilter: String, CaseIterable {
 
     var maxDays: Int? {
         switch self {
+        case .day: return 1
         case .week: return 7
         case .twoWeeks: return 14
         case .month: return 30
@@ -22,7 +24,8 @@ enum CommitmentFilter: String, CaseIterable {
 @MainActor
 class HomeViewModel: ObservableObject {
     @Published var loading = true
-    @Published var commitmentFilter: CommitmentFilter = .week
+    @Published var commitmentFilter: CommitmentFilter = .day
+    @Published var activeSwipeId: String?
     private let repo = TaskRepository.shared
     private var cancellables = Set<AnyCancellable>()
 
@@ -67,9 +70,26 @@ class HomeViewModel: ObservableObject {
     private func milestonesInWindow(_ filter: CommitmentFilter) -> [AppTask] {
         allMilestones.filter { task in
             guard let max = filter.maxDays else { return true }
+            if task.completedAt != nil {
+                // Completed: include if completed within the last N days
+                return completedWithinDays(task.completedAt, max)
+            }
+            // Pending: include if due within N days (or overdue)
             return (task.daysRemaining ?? 999) <= max
         }
     }
+
+    private func completedWithinDays(_ dateStr: String?, _ days: Int) -> Bool {
+        guard let dateStr = dateStr else { return false }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let isoBasic = ISO8601DateFormatter()
+        isoBasic.formatOptions = [.withInternetDateTime]
+        guard let date = iso.date(from: dateStr) ?? isoBasic.date(from: dateStr) else { return false }
+        let daysAgo = Calendar.current.dateComponents([.day], from: date, to: Date()).day ?? 999
+        return daysAgo <= days
+    }
+
     var filteredTotal: Int { milestonesInWindow(commitmentFilter).count }
     var filteredDone: Int { milestonesInWindow(commitmentFilter).filter { $0.completedAt != nil }.count }
     var filteredOverdue: Bool { milestonesInWindow(commitmentFilter).contains { $0.completedAt == nil && ($0.daysRemaining ?? 1) <= 0 } }

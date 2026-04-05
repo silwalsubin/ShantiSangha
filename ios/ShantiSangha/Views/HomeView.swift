@@ -18,7 +18,7 @@ struct HomeView: View {
                             .font(.sacredMicroBold)
                             .tracking(3)
                             .foregroundColor(.sacredLabel)
-                        Text("What needs your attention today?")
+                        Text("What needs your attention?")
                             .font(.sacredTitle)
                             .foregroundColor(.sacredText)
                     }
@@ -83,6 +83,7 @@ struct HomeView: View {
                                 onDueDateUpdate: { id, date in Task { await vm.updateDueDate(id: id, date: date) } },
                                 onShowAll: { showMilestoneSummary = true },
                                 filter: $vm.commitmentFilter,
+                                activeSwipeId: $vm.activeSwipeId,
                                 totalMilestones: vm.filteredTotal,
                                 doneMilestones: vm.filteredDone,
                                 hasOverdue: vm.filteredOverdue
@@ -125,7 +126,7 @@ struct HomeView: View {
             RecurringSummaryView(vm: vm)
         }
         .navigationDestination(isPresented: $showMilestoneSummary) {
-            MilestoneSummaryView(vm: vm)
+            MilestoneSummaryView(vm: vm, initialFilter: vm.commitmentFilter)
         }
     }
 
@@ -163,8 +164,8 @@ struct HomeView: View {
     // MARK: - Task list
 
     private func taskList(_ tasks: [AppTask]) -> some View {
-        VStack(spacing: 8) {
-            ForEach(tasks) { task in
+        VStack(spacing: 0) {
+            ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
                 TaskRow(
                     task: task,
                     onDone: { Task { await vm.checkIn(id: task.id, completed: true) } },
@@ -172,8 +173,15 @@ struct HomeView: View {
                     onUndo: { Task { await vm.undoCheckIn(id: task.id) } },
                     onDelete: { Task { await vm.deleteTask(id: task.id) } },
                     onProgressUpdate: { val in Task { await vm.updateProgress(id: task.id, value: val) } },
-                    onDueDateUpdate: { date in Task { await vm.updateDueDate(id: task.id, date: date) } }
+                    onDueDateUpdate: { date in Task { await vm.updateDueDate(id: task.id, date: date) } },
+                    activeSwipeId: $vm.activeSwipeId
                 )
+
+                if index < tasks.count - 1 {
+                    Divider()
+                        .padding(.leading, 52)
+                        .padding(.trailing, 16)
+                }
             }
         }
     }
