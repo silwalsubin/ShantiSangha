@@ -321,6 +321,9 @@ public static class GoalRoutes
         var existing = await db.GoalCheckIns
             .FirstOrDefaultAsync(c => c.GoalId == id && c.Date == today);
 
+        var isNew = existing is null;
+        var statusChanged = existing is not null && existing.Completed != body.Completed;
+
         if (existing is not null)
         {
             existing.Completed = body.Completed;
@@ -343,18 +346,17 @@ public static class GoalRoutes
 
         // Milestones: mark permanently completed when checked in as done
         if (goal.Type == GoalType.OneTime && body.Completed)
-        {
             goal.CompletedAt = DateTime.UtcNow;
-            LogActivity(db, id, "Completed");
-        }
         else if (goal.Type == GoalType.OneTime && !body.Completed)
-        {
             goal.CompletedAt = null;
-            LogActivity(db, id, "Skipped");
-        }
-        else
+
+        // Only log activity on first check-in or status change
+        if (isNew || statusChanged)
         {
-            LogActivity(db, id, body.Completed ? "Completed" : "Skipped", today.ToString("MMM d, yyyy"));
+            if (goal.Type == GoalType.OneTime)
+                LogActivity(db, id, body.Completed ? "Completed" : "Skipped");
+            else
+                LogActivity(db, id, body.Completed ? "Completed" : "Skipped", today.ToString("MMM d, yyyy"));
         }
 
         await db.SaveChangesAsync();
