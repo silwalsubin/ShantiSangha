@@ -2,9 +2,9 @@
 
 ## Product Vision
 
-ShantiSangha is a spiritual wellness companion rooted in Hindu and Buddhist wisdom. It helps people build a daily spiritual practice through guided reflection, meditation, journaling, and AI-powered conversations grounded in sacred teachings.
+ShantiSangha is a spiritual wellness companion rooted in Hindu and Buddhist wisdom. It helps people build a daily spiritual practice through guided reflection, journaling, goal-setting, and AI-powered conversations grounded in sacred teachings.
 
-**Core belief:** Spiritual growth happens in small daily moments — a morning reflection, a mindful pause during stress, an evening journal entry. ShantiSangha makes these moments accessible, personal, and habitual.
+**Core belief:** Spiritual growth happens in small daily moments — a morning intention, a mindful pause during stress, an evening journal entry. ShantiSangha makes these moments accessible, personal, and habitual.
 
 **Long-term goal:** A trusted daily companion that feels like having a wise, calm guide in your pocket — one who knows your journey, remembers your struggles, and meets you where you are.
 
@@ -12,178 +12,181 @@ ShantiSangha is a spiritual wellness companion rooted in Hindu and Buddhist wisd
 
 ---
 
-## Current State (End of Q1)
+## Current State (April 5, 2026)
 
-### What's Live
-- **AI Spiritual Companion** — GPT-4o conversations with streaming responses
+### What's Live — Web + Native iOS
+
+The app has evolved significantly from its Q1 state. We now have a full native iOS app with near feature-parity to the web, an offline-first architecture, and a mature goals/tasks system that has become the core daily engagement loop.
+
+**Core Loop: Reflect → Track → Grow**
+
+- **AI Spiritual Companion** — GPT-4o streaming conversations with safety pipeline (crisis detection, moderation, escalation)
 - **Journaling** — entries with AI-generated summaries and insights
-- **Mood Check-ins** — daily 1-10 scoring with notes, trend tracking
-- **Coping Exercises** — 8 guided exercises (box breathing, grounding, body scan, etc.)
-- **Voice Notes** — audio upload with async transcription
-- **Semantic Search** — vector search across journals and insights (pgvector)
-- **Saved Insights** — AI-extracted takeaways from conversations and journals
-- **Auth** — Clerk production with Google SSO
-- **Sacred Theme UI** — Hindu scripture-inspired design with custom sacred icons
+- **Voice Notes** — audio upload with async transcription (no playback UI yet)
+- **Goals & Commitments** — recurring daily tasks with streaks + one-time milestones with due dates, progress tracking, deeper-why intentions, AI nudges, full activity history timeline
+- **Journey Dashboard** — premium-style view with progress rings, completion rates, period filters (week/month/3 months), AI reflections
+- **Coping Exercises** — 8 guided text-based exercises (box breathing, grounding, body scan, etc.)
+- **Insights** — AI-extracted takeaways from conversations and journals, semantic search (pgvector)
+- **Auth** — Clerk with Google SSO
 
-### Infrastructure
+**iOS Native App (SwiftUI)**
+- Full 4-tab navigation: Home, Reflect, Journey, Settings
+- Offline-first with SwiftData + SyncService
+- Network monitoring, push notification infrastructure (not fully wired)
+- Swipe gestures for task completion, haptic feedback
+- Near feature-parity with web
+
+**Infrastructure**
 - AWS ECS Fargate, RDS PostgreSQL 16 (pgvector), ElastiCache Redis 7
-- CloudFront CDN, S3 frontend, ACM SSL for shantisangha.org
-- Terraform IaC, GitHub Actions CI/CD
+- CloudFront CDN, S3 frontend, ACM SSL
+- Terraform IaC, GitHub Actions CI/CD (frontend, backend, iOS tests)
 - Hangfire background jobs
 
-### Known Gaps
-- No onboarding flow
-- No daily practice / routine system
-- Chat has no memory across conversations
-- No guided audio content (meditations, chants)
-- No push notifications or reminders
-- No data export or account deletion
-- Voice entries have no playback UI
-- No analytics or usage tracking
-- Pages need responsive design polish
+### What Changed Since Original Plan
+
+The app's direction shifted meaningfully from the original Q2 plan:
+
+1. **Goals/Tasks became the core loop** — instead of a generic "daily practice" system, we built a full commitment tracker with streaks, milestones, progress rings, AI nudges, and activity timelines. This is the feature that drives daily opens.
+2. **iOS native app exists** — the original plan assumed web-only with PWA aspirations. We now have a full SwiftUI app, making PWA less relevant.
+3. **Journey replaced simple tracking** — instead of basic mood charts, Journey became a premium dashboard with AI reflections, completion rates, and celebration of consistency.
+4. **Spiritual feedback removed** — we tried inline motivational messages on tasks and removed them. The app's tone comes through the AI companion and design, not through scattered quotes.
+5. **Mood check-ins deprioritized** — the daily mood scoring system didn't fit the flow. Emotional awareness comes through journaling and AI conversations instead.
 
 ---
 
-## Q2 Objectives (April - June 2026)
+## Q2 Revised Objectives (April - June 2026)
 
-### Theme: "Build the daily practice"
+### Theme: "Deepen the companion, earn the habit"
 
-Q2 transforms ShantiSangha from a collection of features into a *daily spiritual habit*. Every change should answer: "Does this make someone open the app tomorrow?"
+The foundation is solid — people can set goals, journal, and talk to an AI companion. Now we need to make the AI *actually know you*, give people reasons to come back every morning, and build the trust layer for real users.
 
 ---
 
-### Objective 1: Personalized Spiritual Dashboard
+### Objective 1: AI That Knows You
 
-**Why:** The dashboard should feel alive — not a static page but a daily spiritual companion that greets you with purpose.
+**Why:** The AI companion is the core differentiator, but right now every conversation starts cold. A spiritual guide who forgets everything isn't a guide — it's a search engine.
 
 | Initiative | Description | Priority |
 |---|---|---|
-| Daily teaching | Dynamic quote/verse from Gita, Dhammapada, Upanishads — rotates daily | P0 |
-| Today's practice | Suggested daily practice based on mood/history (meditate, journal, breathe) | P0 |
-| Practice streak | Visual streak counter for consecutive days of any practice | P1 |
-| Progress summary | Meditation minutes, journal entries, mood trend — at a glance | P1 |
-| Quick actions | One-tap: "How am I feeling?", "Start a reflection", "Breathe" | P0 |
-| Time-aware greeting | Morning/afternoon/evening with contextual spiritual encouragement | P1 |
+| Conversation memory | Include past insights, mood patterns, recent journals, and goals in the system prompt | P0 |
+| Spiritual grounding | System prompt grounded in Gita, Dhammapada, Buddhist teachings — not generic wellness advice | P0 |
+| Contextual responses | "I feel anxious" → guided response with breathing exercise link + relevant teaching | P1 |
+| Suggested prompts | 3 contextual conversation starters based on recent activity/time of day | P1 |
+| Chat auto-titles | Generate meaningful titles from conversation content | P2 |
+
+*Crisis detection and moderation are already live.*
 
 ---
 
-### Objective 2: AI Spiritual Companion (Deepened)
+### Objective 2: The Morning Open
 
-**Why:** This is the core differentiator. The AI should feel like a wise teacher who knows your journey, not a generic chatbot.
+**Why:** The dashboard needs to give people a reason to open the app every morning. Right now it shows tasks — useful but not inspiring. It should feel like a daily spiritual greeting.
 
 | Initiative | Description | Priority |
 |---|---|---|
-| Conversation memory | Include past insights, mood trends, recent journals in system prompt | P0 |
-| Spiritual grounding | System prompt trained on Gita, Buddhist teachings, mindfulness wisdom | P0 |
-| Contextual responses | "I feel anxious" → guided response with breathing exercise + teaching | P0 |
-| Suggested prompts | 3 contextual starters based on mood/time/recent activity | P1 |
-| Chat auto-titles | Generate meaningful titles from conversation content | P1 |
-| Crisis detection | Detect distress, show helpline resources, gentle disclaimers | P0 |
-| Reflection prompts | End-of-conversation: "What did you learn about yourself?" | P2 |
+| Daily verse | Rotating quote/verse from Gita, Dhammapada, Upanishads — changes daily | P0 |
+| Time-aware greeting | Morning/afternoon/evening with contextual encouragement | P1 |
+| Today's reflection prompt | One thought-provoking question to carry through the day | P1 |
+| Quick actions polish | One-tap access to journal, chat, breathe from the dashboard | P1 |
+
+*Practice streaks, progress rings, and task management are already live on the dashboard.*
 
 ---
 
-### Objective 3: Guided Content Library
+### Objective 3: Notifications & Reminders
 
-**Why:** Content is what brings users to the app. Guided meditations and teachings give people a reason to return daily.
+**Why:** The iOS notification infrastructure exists but isn't wired. Without reminders, the app relies entirely on the user remembering to open it. That's not how habits form.
 
 | Initiative | Description | Priority |
 |---|---|---|
-| Audio meditations | 5-10 guided meditations (breathing, body scan, loving-kindness) | P1 |
-| Sacred chants | Om, Gayatri Mantra, peace mantras — with loop/timer | P1 |
-| Teaching snippets | Short audio/text teachings from Gita, Dhammapada | P2 |
-| Resume playback | Continue where you left off | P2 |
-| Practice timer | Simple meditation timer with bell sounds | P1 |
+| Daily reminder | Configurable morning notification — "Your practice awaits" | P0 |
+| Smart nudges | Missed 2+ days? Gentle re-engagement nudge | P1 |
+| Evening reflection | Optional end-of-day prompt — "How did today go?" | P2 |
+
+*iOS NotificationService and Settings toggle already exist — this is about wiring them up properly.*
 
 ---
 
-### Objective 4: Onboarding & First Experience
+### Objective 4: Trust & Privacy
 
-**Why:** First 2 minutes determine if someone stays. Make them meaningful, not bureaucratic.
+**Why:** People are writing about their deepest fears, spiritual doubts, and emotional struggles. They need to *know* their data is safe before they'll truly open up. This is table stakes for real users.
 
 | Initiative | Description | Priority |
 |---|---|---|
-| Welcome flow | "What brings you here?" → intention setting → first practice | P0 |
-| Guided first chat | Pre-seeded spiritual conversation, not empty screen | P1 |
+| Account deletion | Self-serve delete with full data wipe | P0 |
+| Privacy page | In-app, warm explanation of data handling — not legalese | P0 |
+| Terms of service | Required for App Store submission | P0 |
+| Data export | Download journals, insights, conversation history | P1 |
+| Error tracking | Sentry integration for frontend + backend + iOS | P1 |
+
+---
+
+### Objective 5: Onboarding
+
+**Why:** First 2 minutes determine if someone stays. Right now a new user sees empty lists. That's a dead end.
+
+| Initiative | Description | Priority |
+|---|---|---|
+| Welcome flow | "What brings you here?" → set first intention → guided first action | P0 |
+| Guided first chat | Pre-seeded conversation that feels like meeting your guide | P1 |
 | Empty states | Replace "No X yet" with invitations to practice | P1 |
-| Onboarding checklist | Gentle nudges: set mood, try a meditation, write first journal | P2 |
 
 ---
 
-### Objective 5: Growth & Reflection Tracking
+### Objective 6: iOS App Store Readiness
 
-**Why:** Make inner growth visible. People stick with what they can see progress in.
-
-| Initiative | Description | Priority |
-|---|---|---|
-| Weekly reflection | Auto-generated weekly summary: mood arc, insights, practices done | P1 |
-| Emotional trends | Visualize mood patterns over weeks/months | P1 |
-| Journal insights | AI-tagged themes and emotional patterns across entries | P2 |
-| Practice log | Track meditation minutes, journaling frequency, coping sessions | P1 |
-| Monthly review | "Your month in reflection" — shareable summary | P2 |
-
----
-
-### Objective 6: Mobile & UX Polish
-
-**Why:** Spiritual moments happen on phones — commuting, before sleep, during breaks. It must feel native.
+**Why:** The iOS app is functionally complete but not shippable. Getting it into TestFlight and then the App Store unlocks real distribution.
 
 | Initiative | Description | Priority |
 |---|---|---|
-| Responsive redesign | Every page polished for mobile with sacred theme | P0 |
-| PWA support | Manifest + service worker for "Add to Home Screen" | P1 |
-| Voice playback | Audio player with waveform for voice entries | P1 |
-| Loading states | Smooth transitions, not jarring skeleton screens | P2 |
-| Dark mode | Evening/night theme — warm, not cold dark | P2 |
-
----
-
-### Objective 7: Trust, Privacy & Operations
-
-**Why:** Spiritual and emotional data is sacred. And we need visibility into what's working.
-
-| Initiative | Description | Priority |
-|---|---|---|
-| Privacy page | Clear, warm explanation of data handling | P0 |
-| Account deletion | Self-serve delete with data wipe | P0 |
-| Data export | Download journals, insights, mood history | P1 |
-| Terms of service | Legal copy for production | P0 |
-| Error tracking | Sentry for frontend + backend | P0 |
-| Usage analytics | Simple event tracking (practices started, retention) | P1 |
-| Cost monitoring | AWS budget alerts | P1 |
+| App Store metadata | Screenshots, description, privacy labels | P0 |
+| TestFlight beta | Internal testing with real devices | P0 |
+| Notification wiring | Connect iOS notification infrastructure to backend scheduling | P1 |
+| Voice playback | Audio player for voice entries in iOS | P2 |
 
 ---
 
 ## Monthly Breakdown
 
-### April — Foundation & Daily Practice
-- **Dashboard redesign** with daily teaching, today's practice, quick actions
-- **Onboarding flow** — intention setting + first practice
-- **AI spiritual grounding** — system prompt with teachings, conversation memory
-- **Crisis detection** + safety disclaimers
-- **Privacy page + terms of service + account deletion**
-- **Error tracking (Sentry)**
-- **Responsive redesign** of all pages
+### April — AI Memory & Morning Experience
+- **Conversation memory** — include user context in AI system prompt
+- **Spiritual grounding** — sacred text-informed system prompt
+- **Daily verse** on dashboard
+- **Time-aware greeting**
+- **Privacy page + terms of service** (needed for App Store)
 
-### May — Content & Depth
-- **Guided audio meditations** (5-10 tracks)
-- **Sacred chants** with loop/timer
-- **Practice timer** for silent meditation
+### May — Onboarding, Notifications & Trust
+- **Welcome flow** for new users
+- **Guided first chat** experience
+- **Daily reminder notifications** (iOS + web)
+- **Account deletion** endpoint + UI
+- **Data export**
+- **Sentry integration**
+- **TestFlight beta** release
+
+### June — Polish, Submit & Grow
 - **Suggested prompts** in chat
-- **Weekly reflection** summaries
-- **Voice playback UI**
-- **PWA support**
-- **Usage analytics**
-
-### June — Habit & Growth
-- **Practice streaks** visualization
-- **Emotional trend** charts
-- **Practice log** (minutes, frequency)
-- **Daily reminders** (email/browser notification)
 - **Chat auto-titles**
-- **Dark mode**
-- **Monthly review** feature
-- **Performance optimization**
+- **Smart nudges** for re-engagement
+- **Empty state improvements**
+- **App Store submission**
+- **Performance optimization** and bug sweep
+
+---
+
+## What We're NOT Doing in Q2
+
+These were in the original plan but are cut or deferred:
+
+| Cut | Why |
+|---|---|
+| Guided audio meditations & chants | Large content investment with uncertain engagement. Revisit after validating daily usage with current features. |
+| Practice timer | Coping exercises serve this need adequately for now. |
+| PWA support | We have a native iOS app. PWA adds complexity without clear value. |
+| Dark mode | Nice-to-have but won't drive retention. The sacred warm aesthetic is core to the identity. |
+| Weekly/monthly email summaries | Build in-app first. Journey dashboard partially serves this need. |
+| Emotional trend charts | Journey dashboard with AI reflections replaced the need for raw mood charts. |
+| Usage analytics | Defer until we have real users to measure. |
 
 ---
 
@@ -191,48 +194,46 @@ Q2 transforms ShantiSangha from a collection of features into a *daily spiritual
 
 | Metric | Current | Q2 Target |
 |---|---|---|
-| Registered users | 1 | 100 |
-| Weekly active users | 0 | 25 |
-| Daily practice completion rate | 0 | 40% |
-| Avg practices per active user/week | 0 | 4 |
-| Avg conversations per active user/week | 0 | 2 |
-| 7-day retention (new users) | unknown | 35% |
-| 30-day retention | unknown | 20% |
+| TestFlight testers | 0 | 10-20 |
+| App Store submission | No | Yes |
+| Weekly active users (web + iOS) | 1 | 20 |
+| Daily task completion rate | N/A | 40% |
+| Avg conversations per active user/week | N/A | 2 |
+| 7-day retention (new users) | unknown | 30% |
 | Error rate (5xx) | unknown | < 1% |
 | P95 API latency | unknown | < 500ms |
+| Account deletion available | No | Yes |
 
 ---
 
 ## Future Roadmap (Post-Q2)
 
-These are valuable but too large or premature for Q2:
+### Q3 — Content & Depth
+- **Guided audio meditations** — 5-10 tracks (breathing, body scan, loving-kindness)
+- **Sacred chants** with loop/timer (Om, Gayatri Mantra)
+- **Dark mode** — warm evening theme
+- **Weekly reflection summaries** — AI-generated weekly review
+- **Voice playback UI** with waveform
 
-### Q3 — Community & Connection
-- **Sangha Circles** — small group meditation/study groups
-- **Shared practices** — meditate together in real-time
-- **Discussion threads** — reflect on teachings together
-- **Teacher/guide profiles**
-
-### Q4 — Expansion
-- **Events & retreats** — satsangs, workshops, calendar sync
-- **Seva marketplace** — volunteer opportunities, service matching
-- **Multi-language** — Hindi, Sanskrit, Nepali
-- **Native mobile apps** (React Native)
+### Q4 — Community & Connection
+- **Sangha Circles** — small group meditation or study groups
+- **Shared practices** — meditate together
+- **Multi-language** — Hindi, Nepali
+- **Android app** consideration
 
 ### Beyond
-- **Therapist integration** — bridge spiritual + clinical support
 - **AI fine-tuning** on sacred texts
+- **Therapist integration** — bridge spiritual + clinical support
 - **Monetization** — premium content, group subscriptions
-- **HIPAA compliance** for clinical partnerships
+- **Events & retreats** — satsangs, workshops
 
 ---
 
 ## Open Questions
 
-1. Should we offer a guest mode (no sign-up) for the first guided meditation?
-2. What sacred texts should the AI be grounded in? (Gita, Dhammapada, Yoga Sutras, Upanishads — all?)
-3. Should audio content be user-generated eventually or always curated?
-4. Weekly reflections: email, in-app, or both?
-5. Dark mode: user toggle or system preference?
-6. Should the practice streak reset on miss or allow "rest days"?
-7. How do we handle users in genuine crisis? Hotline integration?
+1. Should the AI companion have distinct "personalities" or teaching lineages the user can choose?
+2. How deeply should conversation memory go? Last 5 conversations? All-time summary?
+3. What sacred texts should the AI draw from? (Gita, Dhammapada, Yoga Sutras, Upanishads — all?)
+4. For App Store review: how do we position the AI spiritual advice vs. "not a substitute for professional help"?
+5. Should we gate features behind onboarding completion or let people explore freely?
+6. Android: React Native, Kotlin native, or defer entirely?
