@@ -92,23 +92,30 @@ struct JourneyView: View {
                             .padding(.bottom, 28)
                     }
 
-                    // Rhythm grid
+                    // Practices with progress rings
                     if !journey.practices.isEmpty {
-                        VStack(alignment: .leading, spacing: 20) {
+                        VStack(spacing: 12) {
                             ForEach(journey.practices) { practice in
-                                VStack(alignment: .leading, spacing: 6) {
-                                    HStack {
+                                HStack(spacing: 14) {
+                                    PracticeRing(
+                                        done: practice.daysCompleted,
+                                        total: practice.totalDays
+                                    )
+
+                                    VStack(alignment: .leading, spacing: 3) {
                                         Text(practice.title)
-                                            .font(.sacredSmallMedium)
+                                            .font(.sacredTextMedium)
                                             .foregroundColor(.sacredText)
-                                        Spacer()
-                                        Text("\(practice.daysCompleted)/\(practice.totalDays)")
+                                        Text("\(practice.daysCompleted) of \(practice.totalDays) days")
                                             .font(.sacredMicro)
                                             .foregroundColor(.sacredMuted)
                                     }
 
-                                    RhythmRow(days: practice.days)
+                                    Spacer()
                                 }
+                                .padding(12)
+                                .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBgCard))
+                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.1)))
                             }
                         }
                         .padding(.bottom, 28)
@@ -186,21 +193,36 @@ struct JourneyView: View {
     }
 }
 
-// MARK: - Rhythm row — rounded squares, height varies by completion
+// MARK: - Practice progress ring
 
-private struct RhythmRow: View {
-    let days: [JourneyDay]
+private struct PracticeRing: View {
+    let done: Int
+    let total: Int
 
     var body: some View {
-        HStack(spacing: 2) {
-            ForEach(Array(days.enumerated()), id: \.offset) { _, day in
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(day.completed ? Color.sacredGold : Color.sacredMuted.opacity(0.08))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: day.completed ? 24 : 6)
+        let progress = total > 0 ? Double(done) / Double(total) : 0
+
+        ZStack {
+            Circle()
+                .stroke(Color.sacredMuted.opacity(0.15), lineWidth: 4)
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(
+                    LinearGradient(colors: [.sacredGoldShine, .sacredGold], startPoint: .topLeading, endPoint: .bottomTrailing),
+                    style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+
+            VStack(spacing: 0) {
+                Text("\(done)")
+                    .font(.sacredTextSemibold)
+                    .foregroundColor(.sacredGold)
+                Text("of \(total)")
+                    .font(.sacredMicro)
+                    .foregroundColor(.sacredMuted)
             }
         }
-        .frame(height: 24, alignment: .bottom)
+        .frame(width: 48, height: 48)
     }
 }
 
