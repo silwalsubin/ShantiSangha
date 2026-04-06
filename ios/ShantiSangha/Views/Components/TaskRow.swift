@@ -138,7 +138,7 @@ struct TaskRow: View {
                 // Type icon
                 Image(systemName: task.type == .recurring ? "arrow.triangle.2.circlepath" : "calendar.badge.clock")
                     .font(.sacredText)
-                    .foregroundColor(task.type == .recurring ? .sacredMutedLight : .sacredGold)
+                    .foregroundColor(.sacredGold)
                     .frame(width: 24, height: 24)
 
                 // Title
