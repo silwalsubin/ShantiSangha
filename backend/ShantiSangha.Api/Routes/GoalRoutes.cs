@@ -22,6 +22,7 @@ public static class GoalRoutes
         group.MapPost("/{id:guid}/checkin", CheckIn);
         group.MapDelete("/{id:guid}/checkin", UndoCheckIn);
         group.MapGet("/{id:guid}/checkins", GetCheckIns);
+        group.MapPost("/{id:guid}/reset", ResetGoal);
         group.MapGet("/{id:guid}/history", GetHistory);
         group.MapGet("/{id:guid}/nudge", GetNudge);
         group.MapGet("/journey", GetJourney);
@@ -400,6 +401,34 @@ public static class GoalRoutes
 
         LogActivity(db, id, "Undone", today.ToString("MMM d, yyyy"));
 
+        await db.SaveChangesAsync();
+
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> ResetGoal(
+        Guid id, ICurrentUser currentUser, AppDbContext db)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Results.Unauthorized();
+
+        var goal = await db.Goals
+            .Include(g => g.CheckIns)
+            .Include(g => g.Activities)
+            .FirstOrDefaultAsync(g => g.Id == id && g.UserId == user.Id);
+
+        if (goal is null) return Results.NotFound();
+        if (goal.Type != GoalType.Recurring)
+            return Results.BadRequest(new { error = "Only recurring goals can be reset." });
+
+        db.GoalCheckIns.RemoveRange(goal.CheckIns);
+        db.GoalActivities.RemoveRange(goal.Activities);
+
+        goal.CreatedAt = DateTime.UtcNow;
+        goal.AiNudge = null;
+        goal.AiNudgeAt = null;
+
+        LogActivity(db, id, "Created", "History reset");
         await db.SaveChangesAsync();
 
         return Results.NoContent();

@@ -22,6 +22,7 @@ struct GoalDetailView: View {
     @State private var showProgress = false
     @State private var progressValue: Double = 0
     @State private var navigateToDueDate = false
+    @State private var showResetConfirm = false
     private let api = ApiService.shared
 
     var body: some View {
@@ -235,6 +236,14 @@ struct GoalDetailView: View {
                             }
                         }
 
+                        if goal.type == .recurring {
+                            Button(role: .destructive) {
+                                showResetConfirm = true
+                            } label: {
+                                Label("Reset history", systemImage: "arrow.counterclockwise")
+                            }
+                        }
+
                         Button(role: .destructive) {
                             Task { await deleteGoal() }
                         } label: {
@@ -247,6 +256,14 @@ struct GoalDetailView: View {
                     }
                 }
             }
+        }
+        .alert("Reset History", isPresented: $showResetConfirm) {
+            Button("Cancel", role: .cancel) { }
+            Button("Reset", role: .destructive) {
+                Task { await resetGoalHistory() }
+            }
+        } message: {
+            Text("This will delete all check-in records and reset the start date to today. This cannot be undone.")
         }
         .task { await load() }
         .sheet(isPresented: $showTitleEditor) {
@@ -396,6 +413,26 @@ struct GoalDetailView: View {
         } catch {
             print("Failed to delete goal: \(error)")
         }
+    }
+
+    private func resetGoalHistory() async {
+        let body: [String: String] = [:]
+        if let data = try? JSONSerialization.data(withJSONObject: body) {
+            let _: EmptyResponse? = try? await api.postRaw("/goals/\(goalId)/reset", body: data)
+        }
+        // Reload everything
+        let now = Date()
+        calYear = Calendar.current.component(.year, from: now)
+        calMonth = Calendar.current.component(.month, from: now)
+        checkIns = []
+        do {
+            let g: Goal = try await api.get("/goals/\(goalId)")
+            goal = g
+            nudge = g.aiNudge
+        } catch {
+            print("Failed to reload after reset: \(error)")
+        }
+        await loadCheckIns()
     }
 
     private func saveTitle() async {

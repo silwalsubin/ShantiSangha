@@ -39,6 +39,8 @@ const loading = ref(true)
 const calendarLoading = ref(false)
 const togglingDate = ref<string | null>(null)
 const bulkActioning = ref(false)
+const showResetConfirm = ref(false)
+const resetting = ref(false)
 
 const editingWhy = ref(false)
 const whyInput = ref('')
@@ -239,6 +241,23 @@ async function refreshStreaks() {
     goal.value.currentStreak = data.currentStreak ?? data.current_streak ?? 0
     goal.value.longestStreak = data.longestStreak ?? data.longest_streak ?? 0
   } catch { /* ignore */ }
+}
+
+async function resetHistory() {
+  if (!goal.value) return
+  resetting.value = true
+  try {
+    await api.post(`/goals/${goal.value.id}/reset`)
+    // Reload everything — createdAt, streaks, and check-ins all change
+    await loadGoal()
+    // Reset calendar to current month
+    const now = new Date()
+    calYear.value = now.getFullYear()
+    calMonth.value = now.getMonth()
+  } finally {
+    resetting.value = false
+    showResetConfirm.value = false
+  }
 }
 
 async function loadGoal() {
@@ -512,6 +531,37 @@ onMounted(() => {
             >
               Uncheck all
             </button>
+          </div>
+        </div>
+
+        <!-- Reset history -->
+        <div class="mt-4 flex justify-center">
+          <button
+            v-if="!showResetConfirm"
+            class="min-h-[36px] text-[11px] font-medium text-sacred-text-secondary/60 transition duration-150 hover:text-sacred-text-secondary"
+            @click="showResetConfirm = true"
+          >
+            Reset history
+          </button>
+          <div v-else class="flex flex-col items-center gap-3 rounded-xl border border-red-200/50 bg-red-50/30 px-5 py-4">
+            <p class="text-center text-xs text-sacred-text-secondary">
+              This will delete all check-in records and reset the start date to today. This cannot be undone.
+            </p>
+            <div class="flex gap-2">
+              <button
+                class="min-h-[36px] rounded-lg px-4 text-xs font-medium text-sacred-text-secondary transition duration-150 hover:bg-sacred-bg-hover"
+                @click="showResetConfirm = false"
+              >
+                Cancel
+              </button>
+              <button
+                class="min-h-[36px] rounded-lg bg-red-500/90 px-4 text-xs font-medium text-white transition duration-150 active:scale-[0.97] disabled:opacity-50"
+                :disabled="resetting"
+                @click="resetHistory"
+              >
+                {{ resetting ? 'Resetting...' : 'Reset' }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
