@@ -50,13 +50,13 @@ struct RecurringSummaryView: View {
                 // Completed
                 if !completed.isEmpty {
                     sectionLabel("COMPLETED")
-                    taskList(completed)
+                    taskList(completed, neutralStyle: true)
                 }
 
                 // Skipped
                 if !skipped.isEmpty {
                     sectionLabel("SKIPPED")
-                    taskList(skipped)
+                    taskList(skipped, neutralStyle: true)
                 }
             }
             .padding(.horizontal, 16)
@@ -104,7 +104,7 @@ struct RecurringSummaryView: View {
             .padding(.bottom, 8)
     }
 
-    private func taskList(_ tasks: [AppTask]) -> some View {
+    private func taskList(_ tasks: [AppTask], neutralStyle: Bool = false) -> some View {
         VStack(spacing: 8) {
             ForEach(tasks) { task in
                 TaskRow(
@@ -114,6 +114,7 @@ struct RecurringSummaryView: View {
                     onUndo: { Task { await vm.undoCheckIn(id: task.id) } },
                     onDelete: { Task { await vm.deleteTask(id: task.id) } },
                     onProgressUpdate: { _ in },
+                    neutralStyle: neutralStyle,
                     activeSwipeId: $activeSwipeId
                 )
             }
