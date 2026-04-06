@@ -426,9 +426,9 @@ struct GoalCalendarView: View {
     }
 
     private func resetHistory() async {
-        let body: [String: String] = [:]
+        let body: [String: String] = ["date": todayStr]
         if let data = try? JSONSerialization.data(withJSONObject: body) {
-            let _: EmptyResponse? = try? await api.postRaw("/goals/\(goalId)/reset", body: data)
+            let _: EmptyResponse? = try? await api.postRaw("/goals/\(goalId)/reset?date=\(todayStr)", body: data)
         }
         let now = Date()
         calYear = Calendar.current.component(.year, from: now)

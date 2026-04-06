@@ -409,7 +409,7 @@ public static class GoalRoutes
     }
 
     private static async Task<IResult> ResetGoal(
-        Guid id, ICurrentUser currentUser, AppDbContext db)
+        Guid id, ICurrentUser currentUser, AppDbContext db, string? date = null)
     {
         var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
@@ -426,7 +426,10 @@ public static class GoalRoutes
         db.GoalCheckIns.RemoveRange(goal.CheckIns);
         db.GoalActivities.RemoveRange(goal.Activities);
 
-        goal.CreatedAt = DateTime.UtcNow;
+        var today = date is not null && DateOnly.TryParse(date, out var parsed)
+            ? parsed
+            : DateOnly.FromDateTime(DateTime.UtcNow);
+        goal.CreatedAt = today.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
         goal.AiNudge = null;
         goal.AiNudgeAt = null;
 

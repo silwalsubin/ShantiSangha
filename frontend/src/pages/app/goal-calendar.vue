@@ -207,7 +207,7 @@ async function resetHistory() {
   if (!goalInfo.value) return
   resetting.value = true
   try {
-    await api.post(`/goals/${goalInfo.value.id}/reset`)
+    await api.post(`/goals/${goalInfo.value.id}/reset?date=${todayStr.value}`)
     const data = await api.get<any>(`/goals/${goalInfo.value.id}?date=${todayStr.value}`)
     goalInfo.value = {
       id: data.id,
