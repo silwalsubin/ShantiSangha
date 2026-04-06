@@ -6,14 +6,9 @@ struct GoalDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var goal: Goal?
     @State private var activities: [GoalActivityItem] = []
-    @State private var checkIns: [GoalCheckIn] = []
     @State private var loading = true
     @State private var historyExpanded = false
     @State private var historyLoading = false
-    @State private var togglingDate: String?
-    @State private var bulkActioning = false
-    @State private var calYear: Int = Calendar.current.component(.year, from: Date())
-    @State private var calMonth: Int = Calendar.current.component(.month, from: Date())
     @State private var showWhyEditor = false
     @State private var whyText = ""
     @State private var showTitleEditor = false
@@ -22,7 +17,6 @@ struct GoalDetailView: View {
     @State private var showProgress = false
     @State private var progressValue: Double = 0
     @State private var navigateToDueDate = false
-    @State private var showResetConfirm = false
     private let api = ApiService.shared
 
     var body: some View {
@@ -139,9 +133,35 @@ struct GoalDetailView: View {
                     }
                     .buttonStyle(.plain)
 
-                    // Calendar (recurring) or Activity timeline (one-time)
+                    // Calendar link (recurring) or Activity timeline (one-time)
                     if goal.type == .recurring {
-                        calendarSection(goal: goal)
+                        NavigationLink(destination: GoalCalendarView(
+                            goalId: goal.id,
+                            goalTitle: goal.title,
+                            goalCreatedAt: goal.createdAt
+                        )) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "calendar")
+                                    .font(.sacredSmall)
+                                    .foregroundColor(.sacredGold)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Check-in Calendar")
+                                        .font(.sacredSmallMedium)
+                                        .foregroundColor(.sacredText)
+                                    Text("View, edit, or correct past entries")
+                                        .font(.sacredMicro)
+                                        .foregroundColor(.sacredMuted)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.sacredMicro)
+                                    .foregroundColor(.sacredMuted)
+                            }
+                            .padding(16)
+                            .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
+                            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.08)))
+                        }
+                        .buttonStyle(.plain)
                     } else {
                         activityTimelineSection()
                     }
@@ -236,14 +256,6 @@ struct GoalDetailView: View {
                             }
                         }
 
-                        if goal.type == .recurring {
-                            Button(role: .destructive) {
-                                showResetConfirm = true
-                            } label: {
-                                Label("Reset history", systemImage: "arrow.counterclockwise")
-                            }
-                        }
-
                         Button(role: .destructive) {
                             Task { await deleteGoal() }
                         } label: {
@@ -256,14 +268,6 @@ struct GoalDetailView: View {
                     }
                 }
             }
-        }
-        .alert("Reset History", isPresented: $showResetConfirm) {
-            Button("Cancel", role: .cancel) { }
-            Button("Reset", role: .destructive) {
-                Task { await resetGoalHistory() }
-            }
-        } message: {
-            Text("This will delete all check-in records and reset the start date to today. This cannot be undone.")
         }
         .task { await load() }
         .sheet(isPresented: $showTitleEditor) {
@@ -344,7 +348,6 @@ struct GoalDetailView: View {
             print("Failed to load goal: \(error)")
         }
         loading = false
-        await loadCheckIns()
 
         // Fetch fresh nudge in background
         Task {
@@ -415,26 +418,6 @@ struct GoalDetailView: View {
         }
     }
 
-    private func resetGoalHistory() async {
-        let body: [String: String] = [:]
-        if let data = try? JSONSerialization.data(withJSONObject: body) {
-            let _: EmptyResponse? = try? await api.postRaw("/goals/\(goalId)/reset", body: data)
-        }
-        // Reload everything
-        let now = Date()
-        calYear = Calendar.current.component(.year, from: now)
-        calMonth = Calendar.current.component(.month, from: now)
-        checkIns = []
-        do {
-            let g: Goal = try await api.get("/goals/\(goalId)")
-            goal = g
-            nudge = g.aiNudge
-        } catch {
-            print("Failed to reload after reset: \(error)")
-        }
-        await loadCheckIns()
-    }
-
     private func saveTitle() async {
         let trimmed = titleText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -466,312 +449,6 @@ struct GoalDetailView: View {
             print("Failed to load history: \(error)")
         }
         historyLoading = false
-    }
-
-    // MARK: - Calendar
-
-    private static let dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-
-    private struct CalDay: Identifiable {
-        let id: String
-        let date: String
-        let day: Int
-        let checkin: GoalCheckIn?
-        let isToday: Bool
-        let isFuture: Bool
-        let isBeforeCreation: Bool
-        let isCurrentMonth: Bool
-    }
-
-    private var todayStr: String {
-        let df = DateFormatter()
-        df.dateFormat = "yyyy-MM-dd"
-        return df.string(from: Date())
-    }
-
-    private var goalCreatedDateStr: String {
-        String((goal?.createdAt ?? "").prefix(10))
-    }
-
-    private var monthLabel: String {
-        let df = DateFormatter()
-        df.dateFormat = "LLLL yyyy"
-        let date = Calendar.current.date(from: DateComponents(year: calYear, month: calMonth, day: 1))!
-        return df.string(from: date)
-    }
-
-    private var canGoPrev: Bool {
-        guard let goal = goal else { return false }
-        let df = DateFormatter()
-        df.dateFormat = "yyyy-MM-dd"
-        guard let created = df.date(from: goalCreatedDateStr) else { return false }
-        let createdY = Calendar.current.component(.year, from: created)
-        let createdM = Calendar.current.component(.month, from: created)
-        return calYear > createdY || (calYear == createdY && calMonth > createdM)
-    }
-
-    private var canGoNext: Bool {
-        let now = Date()
-        let y = Calendar.current.component(.year, from: now)
-        let m = Calendar.current.component(.month, from: now)
-        return calYear < y || (calYear == y && calMonth < m)
-    }
-
-    private var checkinMap: [String: GoalCheckIn] {
-        Dictionary(uniqueKeysWithValues: checkIns.map { ($0.date, $0) })
-    }
-
-    private var calendarDays: [CalDay] {
-        let cal = Calendar.current
-        let firstOfMonth = cal.date(from: DateComponents(year: calYear, month: calMonth, day: 1))!
-        let startDow = cal.component(.weekday, from: firstOfMonth) - 1 // 0=Sun
-        let daysInMonth = cal.range(of: .day, in: .month, for: firstOfMonth)!.count
-        let today = todayStr
-        let created = goalCreatedDateStr
-        let map = checkinMap
-
-        var days: [CalDay] = []
-
-        // Leading blanks
-        for i in 0..<startDow {
-            days.append(CalDay(id: "blank-\(i)", date: "", day: 0, checkin: nil,
-                               isToday: false, isFuture: true, isBeforeCreation: true, isCurrentMonth: false))
-        }
-
-        for d in 1...daysInMonth {
-            let dateStr = String(format: "%04d-%02d-%02d", calYear, calMonth, d)
-            days.append(CalDay(
-                id: dateStr, date: dateStr, day: d,
-                checkin: map[dateStr],
-                isToday: dateStr == today,
-                isFuture: dateStr > today,
-                isBeforeCreation: dateStr < created,
-                isCurrentMonth: true
-            ))
-        }
-
-        return days
-    }
-
-    private var checkedInCount: Int {
-        calendarDays.filter { $0.isCurrentMonth && $0.checkin != nil }.count
-    }
-
-    private var actionableDays: [CalDay] {
-        calendarDays.filter { $0.isCurrentMonth && !$0.isFuture && !$0.isBeforeCreation }
-    }
-
-    private func loadCheckIns() async {
-        guard goal != nil else { return }
-        let cal = Calendar.current
-        let firstOfMonth = cal.date(from: DateComponents(year: calYear, month: calMonth, day: 1))!
-        let daysInMonth = cal.range(of: .day, in: .month, for: firstOfMonth)!.count
-        let from = String(format: "%04d-%02d-01", calYear, calMonth)
-        let to = String(format: "%04d-%02d-%02d", calYear, calMonth, daysInMonth)
-
-        do {
-            checkIns = try await api.get("/goals/\(goalId)/checkins?from=\(from)&to=\(to)")
-        } catch {
-            print("Failed to load check-ins: \(error)")
-            checkIns = []
-        }
-    }
-
-    private func goPrev() {
-        if calMonth == 1 { calYear -= 1; calMonth = 12 }
-        else { calMonth -= 1 }
-        Task { await loadCheckIns() }
-    }
-
-    private func goNext() {
-        if calMonth == 12 { calYear += 1; calMonth = 1 }
-        else { calMonth += 1 }
-        Task { await loadCheckIns() }
-    }
-
-    @ViewBuilder
-    private func calendarSection(goal: Goal) -> some View {
-        VStack(spacing: 16) {
-            // Month navigation
-            HStack {
-                Button { goPrev() } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.sacredSmallMedium)
-                        .foregroundColor(canGoPrev ? .sacredGold : .sacredMuted.opacity(0.3))
-                        .frame(width: 44, height: 44)
-                }
-                .disabled(!canGoPrev)
-
-                Spacer()
-
-                Text(monthLabel)
-                    .font(.sacredTextMedium)
-                    .foregroundColor(.sacredText)
-
-                Spacer()
-
-                Button { goNext() } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.sacredSmallMedium)
-                        .foregroundColor(canGoNext ? .sacredGold : .sacredMuted.opacity(0.3))
-                        .frame(width: 44, height: 44)
-                }
-                .disabled(!canGoNext)
-            }
-
-            // Day-of-week labels
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 7), spacing: 2) {
-                ForEach(Self.dayLabels, id: \.self) { label in
-                    Text(label)
-                        .font(.sacredSectionLabel)
-                        .tracking(1)
-                        .foregroundColor(.sacredMuted)
-                        .frame(height: 24)
-                }
-            }
-
-            // Calendar grid
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 7), spacing: 4) {
-                ForEach(calendarDays) { day in
-                    if day.isCurrentMonth {
-                        Button {
-                            guard !day.isFuture, !day.isBeforeCreation else { return }
-                            Task { await toggleDate(day.date, hasCheckin: day.checkin != nil) }
-                        } label: {
-                            ZStack {
-                                if day.checkin?.completed == true {
-                                    Circle()
-                                        .fill(LinearGradient(
-                                            colors: [.sacredGold, .sacredGoldDark],
-                                            startPoint: .topLeading, endPoint: .bottomTrailing
-                                        ))
-                                } else if day.checkin != nil {
-                                    Circle()
-                                        .fill(Color.sacredMuted.opacity(0.12))
-                                } else if day.isToday {
-                                    Circle()
-                                        .strokeBorder(Color.sacredGold.opacity(0.4), lineWidth: 1)
-                                }
-
-                                Text("\(day.day)")
-                                    .font(.system(size: 13, weight: day.checkin?.completed == true ? .semibold : .regular, design: .serif))
-                                    .foregroundColor(
-                                        day.isFuture || day.isBeforeCreation
-                                            ? .sacredMuted.opacity(0.25)
-                                            : day.checkin?.completed == true
-                                                ? .white
-                                                : .sacredText
-                                    )
-
-                                if day.isToday {
-                                    Circle()
-                                        .fill(Color.sacredGold)
-                                        .frame(width: 4, height: 4)
-                                        .offset(y: 14)
-                                }
-                            }
-                            .frame(width: 40, height: 40)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(day.isFuture || day.isBeforeCreation)
-                        .opacity(togglingDate == day.date ? 0.4 : 1)
-                    } else {
-                        Color.clear.frame(width: 40, height: 40)
-                    }
-                }
-            }
-            .opacity(bulkActioning ? 0.4 : 1)
-            .allowsHitTesting(!bulkActioning)
-
-            // Bulk actions
-            HStack {
-                Text("\(checkedInCount) / \(actionableDays.count) days")
-                    .font(.sacredMicro)
-                    .foregroundColor(.sacredMuted)
-
-                Spacer()
-
-                if checkedInCount < actionableDays.count {
-                    Button { Task { await checkAllMonth() } } label: {
-                        Text("Check all")
-                            .font(.sacredSmallMedium)
-                            .foregroundColor(.sacredGold)
-                    }
-                    .disabled(bulkActioning)
-                }
-
-                if checkedInCount > 0 {
-                    Button { Task { await uncheckAllMonth() } } label: {
-                        Text("Uncheck all")
-                            .font(.sacredSmallMedium)
-                            .foregroundColor(.sacredTextSecondary)
-                    }
-                    .disabled(bulkActioning)
-                }
-            }
-            .padding(.top, 4)
-        }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.08)))
-    }
-
-    private func toggleDate(_ date: String, hasCheckin: Bool) async {
-        togglingDate = date
-        defer { togglingDate = nil }
-
-        do {
-            if hasCheckin {
-                try await api.delete("/goals/\(goalId)/checkin?date=\(date)")
-                checkIns.removeAll { $0.date == date }
-            } else {
-                let body: [String: Any] = ["completed": true, "date": date]
-                if let data = try? JSONSerialization.data(withJSONObject: body) {
-                    let result: GoalCheckIn = try await api.postRaw("/goals/\(goalId)/checkin", body: data)
-                    checkIns.append(result)
-                }
-            }
-            await refreshStreaks()
-        } catch {
-            print("Failed to toggle check-in: \(error)")
-        }
-    }
-
-    private func checkAllMonth() async {
-        bulkActioning = true
-        defer { bulkActioning = false }
-
-        let unchecked = actionableDays.filter { $0.checkin == nil }
-        for day in unchecked {
-            let body: [String: Any] = ["completed": true, "date": day.date]
-            if let data = try? JSONSerialization.data(withJSONObject: body) {
-                if let result: GoalCheckIn = try? await api.postRaw("/goals/\(goalId)/checkin", body: data) {
-                    checkIns.append(result)
-                }
-            }
-        }
-        await refreshStreaks()
-    }
-
-    private func uncheckAllMonth() async {
-        bulkActioning = true
-        defer { bulkActioning = false }
-
-        let checked = actionableDays.filter { $0.checkin != nil }
-        for day in checked {
-            try? await api.delete("/goals/\(goalId)/checkin?date=\(day.date)")
-            checkIns.removeAll { $0.date == day.date }
-        }
-        await refreshStreaks()
-    }
-
-    private func refreshStreaks() async {
-        do {
-            let refreshed: Goal = try await api.get("/goals/\(goalId)")
-            goal = refreshed
-        } catch {
-            print("Failed to refresh streaks: \(error)")
-        }
     }
 
     @ViewBuilder
