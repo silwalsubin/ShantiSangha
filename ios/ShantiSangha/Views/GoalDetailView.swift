@@ -138,33 +138,34 @@ struct GoalDetailView: View {
                     }
                     .buttonStyle(.plain)
 
-                    // Calendar link (recurring) or Activity timeline (one-time)
+                    // Check-in Calendar (recurring) or Activity timeline (one-time)
                     if goal.type == .recurring {
                         NavigationLink(destination: GoalCalendarView(
                             goalId: goal.id,
                             goalTitle: goal.title,
                             goalCreatedAt: goal.createdAt
                         )) {
-                            HStack(spacing: 12) {
-                                Image(systemName: "calendar")
-                                    .font(.sacredSmall)
-                                    .foregroundColor(.sacredGold)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Check-in Calendar")
-                                        .font(.sacredSmallMedium)
-                                        .foregroundColor(.sacredText)
-                                    Text("View, edit, or correct past entries")
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "calendar")
+                                        .font(.sacredSmall)
+                                        .foregroundColor(.sacredGold)
+                                    Text("CHECK-IN CALENDAR")
+                                        .font(.sacredSectionLabel)
+                                        .tracking(3)
+                                        .foregroundColor(.sacredLabel)
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
                                         .font(.sacredMicro)
                                         .foregroundColor(.sacredMuted)
                                 }
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.sacredMicro)
+                                Text("View, edit, or correct past entries.")
+                                    .font(.sacredText)
                                     .foregroundColor(.sacredMuted)
                             }
                             .padding(16)
                             .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
-                            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.08)))
+                            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.12)))
                         }
                         .buttonStyle(.plain)
                     } else {

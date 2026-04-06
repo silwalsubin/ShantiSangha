@@ -225,21 +225,23 @@ onMounted(() => {
         </p>
       </div>
 
-      <!-- Calendar link (recurring only) -->
-      <button
+      <!-- Check-in Calendar (recurring only) -->
+      <div
         v-if="goal.type === 'Recurring'"
-        class="flex min-h-[56px] w-full items-center justify-between rounded-2xl border border-sacred-border bg-sacred-bg-card px-5 py-4 shadow-sacred backdrop-blur-[20px] transition duration-150 hover:bg-sacred-bg-hover active:scale-[0.99]"
+        class="cursor-pointer rounded-2xl border border-sacred-border bg-sacred-bg-card p-4 shadow-sacred backdrop-blur-[20px] transition duration-150 hover:bg-sacred-bg-hover active:scale-[0.99] sm:p-6"
         @click="router.push(`/app/journey/goals/${goal.id}/calendar`)"
       >
-        <div class="flex items-center gap-3">
-          <SacredIcons name="chakra" :size="16" class="text-sacred-gold" />
-          <div class="text-left">
-            <p class="text-sm font-medium text-sacred-text">Check-in Calendar</p>
-            <p class="mt-0.5 text-[10px] text-sacred-muted">View, edit, or correct past entries</p>
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-1.5">
+            <SacredIcons name="chakra" :size="14" class="text-sacred-gold" />
+            <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-sacred-label">Check-in Calendar</p>
           </div>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-sacred-muted"><path d="M9 18l6-6-6-6"/></svg>
         </div>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-sacred-muted"><path d="M9 18l6-6-6-6"/></svg>
-      </button>
+        <p class="mt-3 text-sm text-sacred-muted">
+          View, edit, or correct past entries.
+        </p>
+      </div>
     </template>
   </div>
 </template>
