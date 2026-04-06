@@ -218,7 +218,7 @@ struct GoalCalendarView: View {
 
     private func load() async {
         do {
-            let g: Goal = try await api.get("/goals/\(goalId)")
+            let g: Goal = try await api.get(goalPath)
             currentStreak = g.currentStreak ?? 0
             longestStreak = g.longestStreak ?? 0
         } catch {
@@ -258,6 +258,10 @@ struct GoalCalendarView: View {
     private var todayStr: String {
         let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
         return df.string(from: Date())
+    }
+
+    private var goalPath: String {
+        "/goals/\(goalId)?date=\(todayStr)"
     }
 
     private var createdDateStr: String {
@@ -407,7 +411,7 @@ struct GoalCalendarView: View {
 
     private func refreshStreaks() async {
         do {
-            let g: Goal = try await api.get("/goals/\(goalId)")
+            let g: Goal = try await api.get(goalPath)
             currentStreak = g.currentStreak ?? 0
             longestStreak = g.longestStreak ?? 0
         } catch {

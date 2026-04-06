@@ -19,6 +19,11 @@ struct GoalDetailView: View {
     @State private var navigateToDueDate = false
     private let api = ApiService.shared
 
+    private var goalPathWithDate: String {
+        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+        return "/goals/\(goalId)?date=\(df.string(from: Date()))"
+    }
+
     var body: some View {
         ScrollView {
             if loading {
@@ -341,7 +346,7 @@ struct GoalDetailView: View {
 
     private func load() async {
         do {
-            let g: Goal = try await api.get("/goals/\(goalId)")
+            let g: Goal = try await api.get(goalPathWithDate)
             goal = g
             nudge = g.aiNudge
         } catch {
@@ -373,7 +378,7 @@ struct GoalDetailView: View {
             let _: EmptyResponse? = try? await api.postRaw("/goals/\(goalId)/checkin", body: data)
         }
         // Reload to reflect new state
-        goal = try? await api.get("/goals/\(goalId)")
+        goal = try? await api.get(goalPathWithDate)
     }
 
     private func skipForToday() async {
@@ -386,14 +391,14 @@ struct GoalDetailView: View {
         if let data = try? JSONSerialization.data(withJSONObject: body) {
             let _: EmptyResponse? = try? await api.postRaw("/goals/\(goalId)/checkin", body: data)
         }
-        goal = try? await api.get("/goals/\(goalId)")
+        goal = try? await api.get(goalPathWithDate)
     }
 
     private func updateProgress(_ value: Int) async {
         let body: [String: Int] = ["progress": value]
         do {
             let _: EmptyResponse = try await api.patch("/goals/\(goalId)", body: body)
-            goal = try await api.get("/goals/\(goalId)")
+            goal = try await api.get(goalPathWithDate)
         } catch {
             print("Failed to update progress: \(error)")
         }
@@ -403,7 +408,7 @@ struct GoalDetailView: View {
         let body: [String: String] = ["targetDate": date]
         do {
             let _: EmptyResponse = try await api.patch("/goals/\(goalId)", body: body)
-            goal = try await api.get("/goals/\(goalId)")
+            goal = try await api.get(goalPathWithDate)
         } catch {
             print("Failed to update due date: \(error)")
         }
@@ -424,7 +429,7 @@ struct GoalDetailView: View {
         do {
             let body: [String: String] = ["title": trimmed]
             let _: EmptyResponse = try await api.patch("/goals/\(goalId)", body: body)
-            goal = try await api.get("/goals/\(goalId)")
+            goal = try await api.get(goalPathWithDate)
         } catch {
             print("Failed to save title: \(error)")
         }
@@ -435,7 +440,7 @@ struct GoalDetailView: View {
         do {
             let body: [String: String] = ["deeperWhy": trimmed]
             let _: EmptyResponse = try await api.patch("/goals/\(goalId)", body: body)
-            goal = try await api.get("/goals/\(goalId)")
+            goal = try await api.get(goalPathWithDate)
         } catch {
             print("Failed to save deeper why: \(error)")
         }

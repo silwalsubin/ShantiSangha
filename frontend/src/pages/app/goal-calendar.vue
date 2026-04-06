@@ -197,7 +197,7 @@ async function uncheckAllMonth() {
 async function refreshStreaks() {
   if (!goalInfo.value) return
   try {
-    const data = await api.get<any>(`/goals/${goalInfo.value.id}`)
+    const data = await api.get<any>(`/goals/${goalInfo.value.id}?date=${todayStr.value}`)
     goalInfo.value.currentStreak = data.currentStreak ?? data.current_streak ?? 0
     goalInfo.value.longestStreak = data.longestStreak ?? data.longest_streak ?? 0
   } catch { /* ignore */ }
@@ -208,7 +208,7 @@ async function resetHistory() {
   resetting.value = true
   try {
     await api.post(`/goals/${goalInfo.value.id}/reset`)
-    const data = await api.get<any>(`/goals/${goalInfo.value.id}`)
+    const data = await api.get<any>(`/goals/${goalInfo.value.id}?date=${todayStr.value}`)
     goalInfo.value = {
       id: data.id,
       title: data.title,
@@ -229,7 +229,7 @@ async function resetHistory() {
 async function load() {
   loading.value = true
   try {
-    const data = await api.get<any>(`/goals/${goalId.value}`)
+    const data = await api.get<any>(`/goals/${goalId.value}?date=${todayStr.value}`)
     goalInfo.value = {
       id: data.id,
       title: data.title,

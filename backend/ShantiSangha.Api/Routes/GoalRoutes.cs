@@ -181,7 +181,7 @@ public static class GoalRoutes
     }
 
     private static async Task<IResult> GetGoal(
-        Guid id, ICurrentUser currentUser, AppDbContext db)
+        Guid id, ICurrentUser currentUser, AppDbContext db, string? date = null)
     {
         var user = await currentUser.GetAsync();
         if (user is null) return Results.Unauthorized();
@@ -192,7 +192,9 @@ public static class GoalRoutes
 
         if (goal is null) return Results.NotFound();
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = date is not null && DateOnly.TryParse(date, out var parsed)
+            ? parsed
+            : DateOnly.FromDateTime(DateTime.UtcNow);
 
         if (goal.Type == GoalType.OneTime)
         {

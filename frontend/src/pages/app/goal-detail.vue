@@ -36,7 +36,9 @@ const savingWhy = ref(false)
 async function loadGoal() {
   loading.value = true
   try {
-    const data = await api.get<any>(`/goals/${goalId.value}`)
+    const n = new Date()
+    const today = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`
+    const data = await api.get<any>(`/goals/${goalId.value}?date=${today}`)
     goal.value = {
       id: data.id,
       title: data.title,
