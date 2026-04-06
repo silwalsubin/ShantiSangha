@@ -3,6 +3,7 @@ import SwiftUI
 /// Shows all recurring tasks for today — pending, completed, and skipped
 struct RecurringSummaryView: View {
     @ObservedObject var vm: HomeViewModel
+    @State private var activeSwipeId: String?
 
     private var allRecurring: [AppTask] {
         vm.tasks.filter { $0.type == .recurring }
@@ -113,7 +114,7 @@ struct RecurringSummaryView: View {
                     onUndo: { Task { await vm.undoCheckIn(id: task.id) } },
                     onDelete: { Task { await vm.deleteTask(id: task.id) } },
                     onProgressUpdate: { _ in },
-                    neutralStyle: true
+                    activeSwipeId: $activeSwipeId
                 )
             }
         }
