@@ -48,6 +48,17 @@ struct GoalCalendarView: View {
                 }
                 .padding(.top, 8)
 
+                // Reset history
+                Button { showResetConfirm = true } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.counterclockwise")
+                            .font(.system(size: 11))
+                        Text("Reset history")
+                            .font(.sacredSmall)
+                    }
+                    .foregroundColor(.sacredMuted.opacity(0.6))
+                }
+
                 // Calendar card
                 VStack(spacing: 16) {
                     // Month navigation
@@ -170,15 +181,6 @@ struct GoalCalendarView: View {
                         enabled: checkedInCount > 0 && !bulkActioning
                     ) {
                         showUncheckAllConfirm = true
-                    }
-
-                    actionButton(
-                        icon: "arrow.counterclockwise",
-                        label: "Reset",
-                        color: .sacredMuted,
-                        enabled: !bulkActioning
-                    ) {
-                        showResetConfirm = true
                     }
                 }
             }

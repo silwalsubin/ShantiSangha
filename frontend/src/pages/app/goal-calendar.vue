@@ -281,6 +281,17 @@ onMounted(() => { load() })
         </div>
       </div>
 
+      <!-- Reset history (global action) -->
+      <div class="flex justify-center">
+        <button
+          class="flex items-center gap-1.5 text-[11px] font-medium text-sacred-text-secondary/50 transition duration-150 hover:text-sacred-text-secondary"
+          @click="showResetConfirm = true"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+          Reset history
+        </button>
+      </div>
+
       <!-- Calendar -->
       <div class="rounded-2xl border border-sacred-border bg-sacred-bg-card p-4 shadow-sacred backdrop-blur-[20px] sm:p-6">
         <!-- Month header -->
@@ -346,7 +357,7 @@ onMounted(() => { load() })
       </div>
 
       <!-- Actions row -->
-      <div class="grid grid-cols-3 gap-2">
+      <div class="grid grid-cols-2 gap-2">
         <button
           class="flex min-h-[56px] flex-col items-center justify-center gap-1.5 rounded-2xl border border-sacred-border bg-sacred-bg-card transition duration-150 active:scale-[0.97] disabled:opacity-30"
           :disabled="checkedInCount >= actionableDays.length || bulkActioning"
@@ -362,14 +373,6 @@ onMounted(() => { load() })
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-sacred-text-secondary"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
           <span class="text-[9px] font-bold uppercase tracking-[0.15em] text-sacred-text-secondary">Uncheck all</span>
-        </button>
-        <button
-          class="flex min-h-[56px] flex-col items-center justify-center gap-1.5 rounded-2xl border border-sacred-border bg-sacred-bg-card transition duration-150 active:scale-[0.97] disabled:opacity-30"
-          :disabled="bulkActioning"
-          @click="showResetConfirm = true"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-sacred-muted"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-          <span class="text-[9px] font-bold uppercase tracking-[0.15em] text-sacred-muted">Reset</span>
         </button>
       </div>
 
