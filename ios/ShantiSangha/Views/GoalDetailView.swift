@@ -11,9 +11,9 @@ struct GoalDetailView: View {
     @State private var historyExpanded = false
     @State private var historyLoading = false
     @State private var togglingDate: String?
-    @State private var selectMode = false
-    @State private var selectedDates: Set<String> = []
-    @State private var bulkDeleting = false
+    @State private var bulkActioning = false
+    @State private var calYear: Int = Calendar.current.component(.year, from: Date())
+    @State private var calMonth: Int = Calendar.current.component(.month, from: Date())
     @State private var showWhyEditor = false
     @State private var whyText = ""
     @State private var showTitleEditor = false
@@ -138,9 +138,9 @@ struct GoalDetailView: View {
                     }
                     .buttonStyle(.plain)
 
-                    // Daily Record (recurring) or Activity timeline (one-time)
+                    // Calendar (recurring) or Activity timeline (one-time)
                     if goal.type == .recurring {
-                        dailyRecordSection(goal: goal)
+                        calendarSection(goal: goal)
                     } else {
                         activityTimelineSection()
                     }
@@ -323,11 +323,11 @@ struct GoalDetailView: View {
             let g: Goal = try await api.get("/goals/\(goalId)")
             goal = g
             nudge = g.aiNudge
-            checkIns = g.checkIns ?? []
         } catch {
             print("Failed to load goal: \(error)")
         }
         loading = false
+        await loadCheckIns()
 
         // Fetch fresh nudge in background
         Task {
@@ -431,278 +431,309 @@ struct GoalDetailView: View {
         historyLoading = false
     }
 
-    // MARK: - Daily Record
+    // MARK: - Calendar
 
-    private struct DayEntry: Identifiable {
-        let id: String  // date string
+    private static let dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+
+    private struct CalDay: Identifiable {
+        let id: String
         let date: String
-        let label: String
+        let day: Int
         let checkin: GoalCheckIn?
         let isToday: Bool
+        let isFuture: Bool
+        let isBeforeCreation: Bool
+        let isCurrentMonth: Bool
     }
 
-    private func buildDayEntries() -> [DayEntry] {
-        guard let goal = goal else { return [] }
-
+    private var todayStr: String {
         let df = DateFormatter()
         df.dateFormat = "yyyy-MM-dd"
-        let displayFmt = DateFormatter()
-        displayFmt.dateFormat = "MMM d, yyyy"
+        return df.string(from: Date())
+    }
 
-        let createdDateStr = String(goal.createdAt.prefix(10))
-        guard let startDate = df.date(from: createdDateStr) else { return [] }
-        let today = Date()
-        let todayStr = df.string(from: today)
+    private var goalCreatedDateStr: String {
+        String((goal?.createdAt ?? "").prefix(10))
+    }
 
-        let checkinMap = Dictionary(
-            uniqueKeysWithValues: checkIns.map { ($0.date, $0) }
-        )
+    private var monthLabel: String {
+        let df = DateFormatter()
+        df.dateFormat = "LLLL yyyy"
+        let date = Calendar.current.date(from: DateComponents(year: calYear, month: calMonth, day: 1))!
+        return df.string(from: date)
+    }
 
-        var entries: [DayEntry] = []
-        var cursor = Calendar.current.startOfDay(for: today)
-        let start = Calendar.current.startOfDay(for: startDate)
+    private var canGoPrev: Bool {
+        guard let goal = goal else { return false }
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        guard let created = df.date(from: goalCreatedDateStr) else { return false }
+        let createdY = Calendar.current.component(.year, from: created)
+        let createdM = Calendar.current.component(.month, from: created)
+        return calYear > createdY || (calYear == createdY && calMonth > createdM)
+    }
 
-        while cursor >= start {
-            let dateStr = df.string(from: cursor)
-            entries.append(DayEntry(
-                id: dateStr,
-                date: dateStr,
-                label: displayFmt.string(from: cursor),
-                checkin: checkinMap[dateStr],
-                isToday: dateStr == todayStr
-            ))
-            cursor = Calendar.current.date(byAdding: .day, value: -1, to: cursor)!
+    private var canGoNext: Bool {
+        let now = Date()
+        let y = Calendar.current.component(.year, from: now)
+        let m = Calendar.current.component(.month, from: now)
+        return calYear < y || (calYear == y && calMonth < m)
+    }
+
+    private var checkinMap: [String: GoalCheckIn] {
+        Dictionary(uniqueKeysWithValues: checkIns.map { ($0.date, $0) })
+    }
+
+    private var calendarDays: [CalDay] {
+        let cal = Calendar.current
+        let firstOfMonth = cal.date(from: DateComponents(year: calYear, month: calMonth, day: 1))!
+        let startDow = cal.component(.weekday, from: firstOfMonth) - 1 // 0=Sun
+        let daysInMonth = cal.range(of: .day, in: .month, for: firstOfMonth)!.count
+        let today = todayStr
+        let created = goalCreatedDateStr
+        let map = checkinMap
+
+        var days: [CalDay] = []
+
+        // Leading blanks
+        for i in 0..<startDow {
+            days.append(CalDay(id: "blank-\(i)", date: "", day: 0, checkin: nil,
+                               isToday: false, isFuture: true, isBeforeCreation: true, isCurrentMonth: false))
         }
 
-        return entries
+        for d in 1...daysInMonth {
+            let dateStr = String(format: "%04d-%02d-%02d", calYear, calMonth, d)
+            days.append(CalDay(
+                id: dateStr, date: dateStr, day: d,
+                checkin: map[dateStr],
+                isToday: dateStr == today,
+                isFuture: dateStr > today,
+                isBeforeCreation: dateStr < created,
+                isCurrentMonth: true
+            ))
+        }
+
+        return days
+    }
+
+    private var checkedInCount: Int {
+        calendarDays.filter { $0.isCurrentMonth && $0.checkin != nil }.count
+    }
+
+    private var actionableDays: [CalDay] {
+        calendarDays.filter { $0.isCurrentMonth && !$0.isFuture && !$0.isBeforeCreation }
+    }
+
+    private func loadCheckIns() async {
+        guard goal != nil else { return }
+        let cal = Calendar.current
+        let firstOfMonth = cal.date(from: DateComponents(year: calYear, month: calMonth, day: 1))!
+        let daysInMonth = cal.range(of: .day, in: .month, for: firstOfMonth)!.count
+        let from = String(format: "%04d-%02d-01", calYear, calMonth)
+        let to = String(format: "%04d-%02d-%02d", calYear, calMonth, daysInMonth)
+
+        do {
+            checkIns = try await api.get("/goals/\(goalId)/checkins?from=\(from)&to=\(to)")
+        } catch {
+            print("Failed to load check-ins: \(error)")
+            checkIns = []
+        }
+    }
+
+    private func goPrev() {
+        if calMonth == 1 { calYear -= 1; calMonth = 12 }
+        else { calMonth -= 1 }
+        Task { await loadCheckIns() }
+    }
+
+    private func goNext() {
+        if calMonth == 12 { calYear += 1; calMonth = 1 }
+        else { calMonth += 1 }
+        Task { await loadCheckIns() }
     }
 
     @ViewBuilder
-    private func dailyRecordSection(goal: Goal) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+    private func calendarSection(goal: Goal) -> some View {
+        VStack(spacing: 16) {
+            // Month navigation
             HStack {
-                Text("DAILY RECORD")
-                    .font(.sacredSectionLabel)
-                    .tracking(3)
-                    .foregroundColor(.sacredLabel)
+                Button { goPrev() } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.sacredSmallMedium)
+                        .foregroundColor(canGoPrev ? .sacredGold : .sacredMuted.opacity(0.3))
+                        .frame(width: 44, height: 44)
+                }
+                .disabled(!canGoPrev)
+
                 Spacer()
-                if selectMode {
-                    Button {
-                        withAnimation(.easeOut(duration: 0.2)) {
-                            selectMode = false
-                            selectedDates.removeAll()
-                        }
-                    } label: {
-                        Text("Cancel")
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredMuted)
-                    }
-                } else if checkIns.contains(where: { _ in true }) {
-                    Button {
-                        withAnimation(.easeOut(duration: 0.2)) {
-                            selectMode = true
-                            selectedDates.removeAll()
-                        }
-                    } label: {
-                        Text("Select")
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredGold)
-                    }
+
+                Text(monthLabel)
+                    .font(.sacredTextMedium)
+                    .foregroundColor(.sacredText)
+
+                Spacer()
+
+                Button { goNext() } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.sacredSmallMedium)
+                        .foregroundColor(canGoNext ? .sacredGold : .sacredMuted.opacity(0.3))
+                        .frame(width: 44, height: 44)
+                }
+                .disabled(!canGoNext)
+            }
+
+            // Day-of-week labels
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 7), spacing: 2) {
+                ForEach(Self.dayLabels, id: \.self) { label in
+                    Text(label)
+                        .font(.sacredSectionLabel)
+                        .tracking(1)
+                        .foregroundColor(.sacredMuted)
+                        .frame(height: 24)
                 }
             }
 
-            let entries = buildDayEntries()
-            if entries.isEmpty {
-                Text("No days recorded yet.")
-                    .font(.sacredText)
-                    .foregroundColor(.sacredTextSecondary)
-            } else {
-                VStack(spacing: 4) {
-                    ForEach(entries) { day in
+            // Calendar grid
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 7), spacing: 4) {
+                ForEach(calendarDays) { day in
+                    if day.isCurrentMonth {
                         Button {
-                            if selectMode {
-                                // Only allow selecting days that have check-ins
-                                guard day.checkin != nil else { return }
-                                if selectedDates.contains(day.date) {
-                                    selectedDates.remove(day.date)
-                                } else {
-                                    selectedDates.insert(day.date)
-                                }
-                            } else {
-                                Task { await toggleDay(day) }
-                            }
+                            guard !day.isFuture, !day.isBeforeCreation else { return }
+                            Task { await toggleDate(day.date, hasCheckin: day.checkin != nil) }
                         } label: {
-                            HStack(spacing: 12) {
-                                if selectMode {
-                                    // Selection checkbox (only for days with check-ins)
-                                    if day.checkin != nil {
-                                        ZStack {
-                                            RoundedRectangle(cornerRadius: 6)
-                                                .strokeBorder(
-                                                    selectedDates.contains(day.date)
-                                                        ? Color.sacredGold
-                                                        : Color.sacredMuted.opacity(0.3),
-                                                    lineWidth: 1.5
-                                                )
-                                            if selectedDates.contains(day.date) {
-                                                RoundedRectangle(cornerRadius: 6)
-                                                    .fill(Color.sacredGold)
-                                                Image(systemName: "checkmark")
-                                                    .font(.system(size: 9, weight: .bold))
-                                                    .foregroundColor(.white)
-                                            }
-                                        }
-                                        .frame(width: 22, height: 22)
-                                    } else {
-                                        Color.clear.frame(width: 22, height: 22)
-                                    }
+                            ZStack {
+                                if day.checkin?.completed == true {
+                                    Circle()
+                                        .fill(LinearGradient(
+                                            colors: [.sacredGold, .sacredGoldDark],
+                                            startPoint: .topLeading, endPoint: .bottomTrailing
+                                        ))
+                                } else if day.checkin != nil {
+                                    Circle()
+                                        .fill(Color.sacredMuted.opacity(0.12))
+                                } else if day.isToday {
+                                    Circle()
+                                        .strokeBorder(Color.sacredGold.opacity(0.4), lineWidth: 1)
                                 }
 
-                                // Status circle
-                                ZStack {
-                                    if day.checkin?.completed == true {
-                                        Circle()
-                                            .fill(LinearGradient(
-                                                colors: [.sacredGold, .sacredGoldDark],
-                                                startPoint: .topLeading, endPoint: .bottomTrailing
-                                            ))
-                                        Image(systemName: "checkmark")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundColor(.white)
-                                    } else if day.checkin != nil {
-                                        Circle()
-                                            .strokeBorder(Color.sacredMuted.opacity(0.3), lineWidth: 1)
-                                        Image(systemName: "moon.fill")
-                                            .font(.system(size: 9))
-                                            .foregroundColor(.sacredMuted.opacity(0.5))
-                                    } else {
-                                        Circle()
-                                            .strokeBorder(Color.sacredMuted.opacity(0.2), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                                        Text("--")
-                                            .font(.system(size: 8))
-                                            .foregroundColor(.sacredMuted.opacity(0.4))
-                                    }
-                                }
-                                .frame(width: 28, height: 28)
-
-                                // Date label
-                                VStack(alignment: .leading, spacing: 2) {
-                                    HStack(spacing: 6) {
-                                        Text(day.label)
-                                            .font(.sacredSmallMedium)
-                                            .foregroundColor(.sacredText)
-                                        if day.isToday {
-                                            Text("TODAY")
-                                                .font(.sacredSectionLabel)
-                                                .tracking(2)
-                                                .foregroundColor(.sacredGold)
-                                        }
-                                    }
-                                    if let note = day.checkin?.note {
-                                        Text(note)
-                                            .font(.sacredSmall)
-                                            .foregroundColor(.sacredTextSecondary)
-                                            .lineLimit(1)
-                                    }
-                                }
-
-                                Spacer()
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(
-                                        selectMode && selectedDates.contains(day.date)
-                                            ? Color.sacredGold.opacity(0.06)
-                                            : day.isToday ? Color.sacredMuted.opacity(0.06) : Color.clear
+                                Text("\(day.day)")
+                                    .font(.system(size: 13, weight: day.checkin?.completed == true ? .semibold : .regular, design: .serif))
+                                    .foregroundColor(
+                                        day.isFuture || day.isBeforeCreation
+                                            ? .sacredMuted.opacity(0.25)
+                                            : day.checkin?.completed == true
+                                                ? .white
+                                                : .sacredText
                                     )
-                            )
-                            .opacity(togglingDate == day.date ? 0.4 : 1)
+
+                                if day.isToday {
+                                    Circle()
+                                        .fill(Color.sacredGold)
+                                        .frame(width: 4, height: 4)
+                                        .offset(y: 14)
+                                }
+                            }
+                            .frame(width: 40, height: 40)
                         }
                         .buttonStyle(.plain)
-                        .disabled(!selectMode && togglingDate != nil)
-                        .disabled(selectMode && day.checkin == nil)
+                        .disabled(day.isFuture || day.isBeforeCreation)
+                        .opacity(togglingDate == day.date ? 0.4 : 1)
+                    } else {
+                        Color.clear.frame(width: 40, height: 40)
                     }
-                }
-
-                // Bulk delete bar
-                if selectMode && !selectedDates.isEmpty {
-                    Button {
-                        Task { await bulkDeleteSelected() }
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "trash")
-                                .font(.sacredSmall)
-                            Text("Remove \(selectedDates.count) \(selectedDates.count == 1 ? "entry" : "entries")")
-                                .font(.sacredSmallMedium)
-                        }
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14)
-                                .fill(Color.red.opacity(0.85))
-                        )
-                    }
-                    .disabled(bulkDeleting)
-                    .opacity(bulkDeleting ? 0.5 : 1)
-                    .padding(.top, 8)
                 }
             }
+            .opacity(bulkActioning ? 0.4 : 1)
+            .allowsHitTesting(!bulkActioning)
+
+            // Bulk actions
+            HStack {
+                Text("\(checkedInCount) / \(actionableDays.count) days")
+                    .font(.sacredMicro)
+                    .foregroundColor(.sacredMuted)
+
+                Spacer()
+
+                if checkedInCount < actionableDays.count {
+                    Button { Task { await checkAllMonth() } } label: {
+                        Text("Check all")
+                            .font(.sacredSmallMedium)
+                            .foregroundColor(.sacredGold)
+                    }
+                    .disabled(bulkActioning)
+                }
+
+                if checkedInCount > 0 {
+                    Button { Task { await uncheckAllMonth() } } label: {
+                        Text("Uncheck all")
+                            .font(.sacredSmallMedium)
+                            .foregroundColor(.sacredTextSecondary)
+                    }
+                    .disabled(bulkActioning)
+                }
+            }
+            .padding(.top, 4)
         }
+        .padding(16)
+        .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.08)))
     }
 
-    private func toggleDay(_ day: DayEntry) async {
-        togglingDate = day.date
+    private func toggleDate(_ date: String, hasCheckin: Bool) async {
+        togglingDate = date
         defer { togglingDate = nil }
 
         do {
-            if day.checkin != nil {
-                // Remove existing check-in
-                try await api.delete("/goals/\(goalId)/checkin?date=\(day.date)")
-                checkIns.removeAll { $0.date == day.date }
+            if hasCheckin {
+                try await api.delete("/goals/\(goalId)/checkin?date=\(date)")
+                checkIns.removeAll { $0.date == date }
             } else {
-                // Add as completed
-                let body: [String: Any] = ["completed": true, "date": day.date]
+                let body: [String: Any] = ["completed": true, "date": date]
                 if let data = try? JSONSerialization.data(withJSONObject: body) {
                     let result: GoalCheckIn = try await api.postRaw("/goals/\(goalId)/checkin", body: data)
                     checkIns.append(result)
                 }
             }
-            // Refresh goal to update streaks
-            let refreshed: Goal = try await api.get("/goals/\(goalId)")
-            goal = refreshed
-            checkIns = refreshed.checkIns ?? []
+            await refreshStreaks()
         } catch {
             print("Failed to toggle check-in: \(error)")
         }
     }
 
-    private func bulkDeleteSelected() async {
-        bulkDeleting = true
-        defer {
-            bulkDeleting = false
-            selectMode = false
-            selectedDates.removeAll()
-        }
+    private func checkAllMonth() async {
+        bulkActioning = true
+        defer { bulkActioning = false }
 
-        for date in selectedDates {
-            do {
-                try await api.delete("/goals/\(goalId)/checkin?date=\(date)")
-                checkIns.removeAll { $0.date == date }
-            } catch {
-                print("Failed to delete check-in for \(date): \(error)")
+        let unchecked = actionableDays.filter { $0.checkin == nil }
+        for day in unchecked {
+            let body: [String: Any] = ["completed": true, "date": day.date]
+            if let data = try? JSONSerialization.data(withJSONObject: body) {
+                if let result: GoalCheckIn = try? await api.postRaw("/goals/\(goalId)/checkin", body: data) {
+                    checkIns.append(result)
+                }
             }
         }
+        await refreshStreaks()
+    }
 
-        // Refresh goal for updated streaks
+    private func uncheckAllMonth() async {
+        bulkActioning = true
+        defer { bulkActioning = false }
+
+        let checked = actionableDays.filter { $0.checkin != nil }
+        for day in checked {
+            try? await api.delete("/goals/\(goalId)/checkin?date=\(day.date)")
+            checkIns.removeAll { $0.date == day.date }
+        }
+        await refreshStreaks()
+    }
+
+    private func refreshStreaks() async {
         do {
             let refreshed: Goal = try await api.get("/goals/\(goalId)")
             goal = refreshed
-            checkIns = refreshed.checkIns ?? []
         } catch {
-            print("Failed to refresh goal: \(error)")
+            print("Failed to refresh streaks: \(error)")
         }
     }
 

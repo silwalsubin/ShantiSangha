@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useApi } from '@/composables/useApi'
 import SacredIcons from '@/components/icons/SacredIcons.vue'
@@ -33,43 +33,144 @@ interface CheckIn {
   note: string | null
 }
 
-interface DayEntry {
-  date: string
-  label: string
-  checkin: CheckIn | null
-  isToday: boolean
-  isFuture: boolean
-}
-
 const goal = ref<Goal | null>(null)
 const checkIns = ref<CheckIn[]>([])
 const loading = ref(true)
+const calendarLoading = ref(false)
+const togglingDate = ref<string | null>(null)
+const bulkActioning = ref(false)
 
 const editingWhy = ref(false)
 const whyInput = ref('')
 const savingWhy = ref(false)
-const togglingDate = ref<string | null>(null)
-const selectMode = ref(false)
-const selectedDates = ref<Set<string>>(new Set())
-const bulkDeleting = ref(false)
 
-const hasCheckIns = computed(() => checkIns.value.length > 0)
+// Calendar state — year/month of the currently displayed month
+const now = new Date()
+const calYear = ref(now.getFullYear())
+const calMonth = ref(now.getMonth()) // 0-indexed
 
-function toggleSelect(date: string) {
-  const s = new Set(selectedDates.value)
-  if (s.has(date)) s.delete(date)
-  else s.add(date)
-  selectedDates.value = s
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+const todayStr = computed(() => {
+  const n = new Date()
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`
+})
+
+const monthLabel = computed(() => {
+  const d = new Date(calYear.value, calMonth.value, 1)
+  return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+})
+
+const goalCreatedDate = computed(() => {
+  if (!goal.value) return ''
+  return goal.value.createdAt.includes('T')
+    ? goal.value.createdAt.split('T')[0]
+    : goal.value.createdAt.slice(0, 10)
+})
+
+// Can navigate to previous month? Only if goal was created before this month
+const canGoPrev = computed(() => {
+  if (!goal.value) return false
+  const [y, m] = goalCreatedDate.value.split('-').map(Number)
+  return calYear.value > y || (calYear.value === y && calMonth.value > m - 1)
+})
+
+// Can navigate to next month? Only up to current month
+const canGoNext = computed(() => {
+  const n = new Date()
+  return calYear.value < n.getFullYear() || (calYear.value === n.getFullYear() && calMonth.value < n.getMonth())
+})
+
+function prevMonth() {
+  if (!canGoPrev.value) return
+  if (calMonth.value === 0) { calYear.value--; calMonth.value = 11 }
+  else calMonth.value--
 }
 
-async function toggleDay(day: DayEntry) {
-  if (!goal.value || day.isFuture) return
+function nextMonth() {
+  if (!canGoNext.value) return
+  if (calMonth.value === 11) { calYear.value++; calMonth.value = 0 }
+  else calMonth.value++
+}
 
-  if (selectMode.value) {
-    if (day.checkin) toggleSelect(day.date)
-    return
+// Build the calendar grid for the current month
+interface CalDay {
+  date: string       // yyyy-MM-dd
+  day: number        // day of month
+  checkin: CheckIn | null
+  isToday: boolean
+  isFuture: boolean
+  isBeforeCreation: boolean
+  isCurrentMonth: boolean
+}
+
+const checkinMap = computed(() => {
+  const m = new Map<string, CheckIn>()
+  for (const ci of checkIns.value) m.set(ci.date, ci)
+  return m
+})
+
+const calendarDays = computed((): CalDay[] => {
+  const firstDay = new Date(calYear.value, calMonth.value, 1)
+  const startDow = firstDay.getDay() // 0=Sun
+  const daysInMonth = new Date(calYear.value, calMonth.value + 1, 0).getDate()
+  const today = todayStr.value
+  const created = goalCreatedDate.value
+
+  const days: CalDay[] = []
+
+  // Leading blanks
+  for (let i = 0; i < startDow; i++) {
+    days.push({ date: '', day: 0, checkin: null, isToday: false, isFuture: true, isBeforeCreation: true, isCurrentMonth: false })
   }
 
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${calYear.value}-${String(calMonth.value + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+    days.push({
+      date: dateStr,
+      day: d,
+      checkin: checkinMap.value.get(dateStr) ?? null,
+      isToday: dateStr === today,
+      isFuture: dateStr > today,
+      isBeforeCreation: dateStr < created,
+      isCurrentMonth: true,
+    })
+  }
+
+  return days
+})
+
+// Count of checked-in days and actionable days in visible month
+const checkedInCount = computed(() => calendarDays.value.filter(d => d.isCurrentMonth && d.checkin).length)
+const actionableDays = computed(() => calendarDays.value.filter(d => d.isCurrentMonth && !d.isFuture && !d.isBeforeCreation))
+
+// Fetch check-ins for the displayed month
+async function loadCheckIns() {
+  if (!goal.value) return
+  calendarLoading.value = true
+  try {
+    const from = `${calYear.value}-${String(calMonth.value + 1).padStart(2, '0')}-01`
+    const lastDay = new Date(calYear.value, calMonth.value + 1, 0).getDate()
+    const to = `${calYear.value}-${String(calMonth.value + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    const items = await api.get<any[]>(`/goals/${goal.value.id}/checkins?from=${from}&to=${to}`)
+    checkIns.value = (items ?? []).map((c: any) => ({
+      id: c.id,
+      date: c.date,
+      completed: c.completed ?? false,
+      note: c.note ?? null,
+    }))
+  } catch {
+    checkIns.value = []
+  } finally {
+    calendarLoading.value = false
+  }
+}
+
+// Reload check-ins when month changes
+watch([calYear, calMonth], () => { loadCheckIns() })
+
+async function toggleDay(day: CalDay) {
+  if (!goal.value || day.isFuture || day.isBeforeCreation || !day.isCurrentMonth) return
   togglingDate.value = day.date
   try {
     if (day.checkin) {
@@ -87,72 +188,58 @@ async function toggleDay(day: DayEntry) {
         note: result.note ?? null,
       })
     }
-    const data = await api.get<any>(`/goals/${goal.value.id}`)
-    if (goal.value.type === 'Recurring') {
-      goal.value.currentStreak = data.currentStreak ?? data.current_streak ?? 0
-      goal.value.longestStreak = data.longestStreak ?? data.longest_streak ?? 0
-    }
+    await refreshStreaks()
   } finally {
     togglingDate.value = null
   }
 }
 
-async function bulkDeleteSelected() {
-  if (!goal.value || selectedDates.value.size === 0) return
-  bulkDeleting.value = true
+async function checkAllMonth() {
+  if (!goal.value) return
+  bulkActioning.value = true
   try {
-    for (const date of selectedDates.value) {
-      await api.delete(`/goals/${goal.value.id}/checkin?date=${date}`)
-      checkIns.value = checkIns.value.filter(c => c.date !== date)
+    const unchecked = actionableDays.value.filter(d => !d.checkin)
+    for (const day of unchecked) {
+      const result = await api.post<any>(`/goals/${goal.value.id}/checkin`, {
+        completed: true,
+        date: day.date,
+      })
+      checkIns.value.push({
+        id: result.id,
+        date: result.date,
+        completed: result.completed,
+        note: result.note ?? null,
+      })
     }
-    const data = await api.get<any>(`/goals/${goal.value.id}`)
-    if (goal.value.type === 'Recurring') {
-      goal.value.currentStreak = data.currentStreak ?? data.current_streak ?? 0
-      goal.value.longestStreak = data.longestStreak ?? data.longest_streak ?? 0
-    }
+    await refreshStreaks()
   } finally {
-    bulkDeleting.value = false
-    selectMode.value = false
-    selectedDates.value = new Set()
+    bulkActioning.value = false
   }
 }
 
-function buildDayEntries(): DayEntry[] {
-  if (!goal.value) return []
-
-  const createdDate = goal.value.createdAt.includes('T')
-    ? goal.value.createdAt.split('T')[0]
-    : goal.value.createdAt.slice(0, 10)
-
-  const now = new Date()
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-
-  const checkinMap = new Map<string, CheckIn>()
-  for (const ci of checkIns.value) {
-    checkinMap.set(ci.date, ci)
+async function uncheckAllMonth() {
+  if (!goal.value) return
+  bulkActioning.value = true
+  try {
+    const checked = actionableDays.value.filter(d => d.checkin)
+    for (const day of checked) {
+      await api.delete(`/goals/${goal.value.id}/checkin?date=${day.date}`)
+      checkIns.value = checkIns.value.filter(c => c.date !== day.date)
+    }
+    await refreshStreaks()
+  } finally {
+    bulkActioning.value = false
   }
-
-  const entries: DayEntry[] = []
-  const start = new Date(createdDate + 'T12:00:00')
-  const end = new Date(todayStr + 'T12:00:00')
-
-  const cursor = new Date(end)
-  while (cursor >= start) {
-    const dateStr = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`
-    entries.push({
-      date: dateStr,
-      label: formatDate(dateStr),
-      checkin: checkinMap.get(dateStr) ?? null,
-      isToday: dateStr === todayStr,
-      isFuture: cursor > end,
-    })
-    cursor.setDate(cursor.getDate() - 1)
-  }
-
-  return entries
 }
 
-const dayEntries = computed(() => buildDayEntries())
+async function refreshStreaks() {
+  if (!goal.value || goal.value.type !== 'Recurring') return
+  try {
+    const data = await api.get<any>(`/goals/${goal.value.id}`)
+    goal.value.currentStreak = data.currentStreak ?? data.current_streak ?? 0
+    goal.value.longestStreak = data.longestStreak ?? data.longest_streak ?? 0
+  } catch { /* ignore */ }
+}
 
 async function loadGoal() {
   loading.value = true
@@ -174,14 +261,7 @@ async function loadGoal() {
       createdAt: data.createdAt ?? data.created_at ?? '',
     }
     whyInput.value = goal.value.deeperWhy ?? ''
-
-    const items = data.checkIns ?? data.checkins ?? []
-    checkIns.value = items.map((c: any) => ({
-      id: c.id,
-      date: c.date,
-      completed: c.completed ?? false,
-      note: c.note ?? null,
-    }))
+    await loadCheckIns()
   } catch {
     goal.value = null
   } finally {
@@ -352,84 +432,88 @@ onMounted(() => {
         </p>
       </div>
 
-      <!-- Day-by-day Check-ins -->
+      <!-- Calendar Check-ins -->
       <div v-if="goal.type === 'Recurring'" class="rounded-2xl border border-sacred-border bg-sacred-bg-card p-4 shadow-sacred backdrop-blur-[20px] sm:p-6">
+        <!-- Month header -->
         <div class="flex items-center justify-between">
-          <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-sacred-label">Daily Record</p>
           <button
-            v-if="selectMode"
-            class="min-h-[44px] text-xs font-medium text-sacred-text-secondary transition duration-200 hover:text-sacred-text"
-            @click="selectMode = false; selectedDates = new Set()"
+            class="flex h-10 w-10 items-center justify-center rounded-full transition duration-150"
+            :class="canGoPrev ? 'text-sacred-gold hover:bg-sacred-bg-hover active:scale-95' : 'text-sacred-muted-light pointer-events-none'"
+            @click="prevMonth"
           >
-            Cancel
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
+          <p class="font-serif text-sm font-semibold text-sacred-text">{{ monthLabel }}</p>
           <button
-            v-else-if="hasCheckIns"
-            class="min-h-[44px] text-xs font-medium text-sacred-gold transition duration-200 hover:text-sacred-gold-dark"
-            @click="selectMode = true; selectedDates = new Set()"
+            class="flex h-10 w-10 items-center justify-center rounded-full transition duration-150"
+            :class="canGoNext ? 'text-sacred-gold hover:bg-sacred-bg-hover active:scale-95' : 'text-sacred-muted-light pointer-events-none'"
+            @click="nextMonth"
           >
-            Select
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
           </button>
         </div>
 
-        <div v-if="dayEntries.length === 0" class="mt-4 text-sm text-sacred-text-secondary">
-          No days recorded yet.
+        <!-- Day-of-week labels -->
+        <div class="mt-3 grid grid-cols-7 gap-1">
+          <div v-for="label in DAY_LABELS" :key="label" class="py-1 text-center text-[9px] font-bold uppercase tracking-[0.15em] text-sacred-muted">
+            {{ label }}
+          </div>
         </div>
 
-        <ul v-else class="mt-4 space-y-1.5">
-          <li
-            v-for="day in dayEntries"
-            :key="day.date"
-            class="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 transition duration-150 active:scale-[0.98]"
-            :class="[
-              selectMode && selectedDates.has(day.date) ? 'bg-sacred-gold/5' : day.isToday ? 'bg-sacred-bg-hover' : 'hover:bg-sacred-bg-hover/50',
-              togglingDate === day.date ? 'opacity-50 pointer-events-none' : '',
-              selectMode && !day.checkin ? 'opacity-30 pointer-events-none' : '',
-            ]"
-            @click="toggleDay(day)"
+        <!-- Calendar grid -->
+        <div class="mt-1 grid grid-cols-7 gap-1" :class="calendarLoading || bulkActioning ? 'opacity-50 pointer-events-none' : ''">
+          <div
+            v-for="(day, i) in calendarDays"
+            :key="i"
+            class="flex aspect-square items-center justify-center"
           >
-            <!-- Selection checkbox -->
-            <div v-if="selectMode && day.checkin" class="flex h-5 w-5 shrink-0 items-center justify-center rounded border transition duration-150"
-              :class="selectedDates.has(day.date) ? 'border-sacred-gold bg-sacred-gold' : 'border-sacred-border-focus bg-transparent'"
+            <button
+              v-if="day.isCurrentMonth"
+              class="relative flex h-10 w-10 items-center justify-center rounded-full text-xs font-medium transition duration-150"
+              :class="[
+                day.isFuture || day.isBeforeCreation
+                  ? 'text-sacred-muted-light/40 cursor-default'
+                  : day.checkin?.completed
+                    ? 'bg-gradient-to-br from-sacred-gold to-sacred-gold-dark text-white shadow-sm cursor-pointer active:scale-90'
+                    : day.checkin
+                      ? 'bg-sacred-muted/10 text-sacred-muted cursor-pointer active:scale-90'
+                      : 'text-sacred-text hover:bg-sacred-bg-hover cursor-pointer active:scale-90',
+                day.isToday && !day.checkin ? 'ring-1 ring-sacred-gold/40' : '',
+                togglingDate === day.date ? 'opacity-40 pointer-events-none' : '',
+              ]"
+              :disabled="day.isFuture || day.isBeforeCreation"
+              @click="toggleDay(day)"
             >
-              <SacredIcons v-if="selectedDates.has(day.date)" name="check" :size="10" class="text-white" />
-            </div>
+              {{ day.day }}
+              <span v-if="day.isToday" class="absolute -bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-sacred-gold" />
+            </button>
+          </div>
+        </div>
 
-            <!-- Status indicator -->
-            <div
-              class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition duration-150"
-              :class="day.checkin?.completed
-                ? 'bg-gradient-to-br from-sacred-gold to-sacred-gold-dark'
-                : day.checkin && !day.checkin.completed
-                  ? 'border border-sacred-border-focus bg-sacred-bg-card-deep'
-                  : 'border border-dashed border-sacred-border-light bg-transparent'"
+        <!-- Bulk actions -->
+        <div class="mt-4 flex items-center justify-between border-t border-sacred-border-light pt-3">
+          <p class="text-[10px] text-sacred-muted">
+            {{ checkedInCount }} / {{ actionableDays.length }} days
+          </p>
+          <div class="flex gap-2">
+            <button
+              v-if="checkedInCount < actionableDays.length"
+              class="min-h-[36px] rounded-lg px-3 text-[11px] font-medium text-sacred-gold transition duration-150 hover:bg-sacred-bg-hover active:scale-[0.97] disabled:opacity-50"
+              :disabled="bulkActioning"
+              @click="checkAllMonth"
             >
-              <SacredIcons v-if="day.checkin?.completed" name="check" :size="12" class="text-white" />
-              <SacredIcons v-else-if="day.checkin && !day.checkin.completed" name="skip" :size="12" class="text-sacred-muted-light" />
-              <span v-else class="text-[10px] text-sacred-muted-light">--</span>
-            </div>
-
-            <!-- Date and note -->
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2">
-                <p class="text-xs font-medium text-sacred-text">{{ day.label }}</p>
-                <span v-if="day.isToday" class="text-[9px] uppercase tracking-[0.15em] text-sacred-gold">Today</span>
-              </div>
-              <p v-if="day.checkin?.note" class="mt-0.5 truncate text-xs leading-relaxed text-sacred-text-secondary">{{ day.checkin.note }}</p>
-            </div>
-          </li>
-        </ul>
-
-        <!-- Bulk delete bar -->
-        <button
-          v-if="selectMode && selectedDates.size > 0"
-          class="mt-4 flex w-full min-h-[44px] items-center justify-center gap-2 rounded-xl bg-red-500/90 px-4 text-sm font-medium text-white transition duration-200 active:scale-[0.98] disabled:opacity-50"
-          :disabled="bulkDeleting"
-          @click="bulkDeleteSelected"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-          Remove {{ selectedDates.size }} {{ selectedDates.size === 1 ? 'entry' : 'entries' }}
-        </button>
+              Check all
+            </button>
+            <button
+              v-if="checkedInCount > 0"
+              class="min-h-[36px] rounded-lg px-3 text-[11px] font-medium text-sacred-text-secondary transition duration-150 hover:bg-sacred-bg-hover active:scale-[0.97] disabled:opacity-50"
+              :disabled="bulkActioning"
+              @click="uncheckAllMonth"
+            >
+              Uncheck all
+            </button>
+          </div>
+        </div>
       </div>
     </template>
   </div>

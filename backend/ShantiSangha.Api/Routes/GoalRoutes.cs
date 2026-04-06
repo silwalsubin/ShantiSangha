@@ -21,6 +21,7 @@ public static class GoalRoutes
         group.MapDelete("/{id:guid}", DeleteGoal);
         group.MapPost("/{id:guid}/checkin", CheckIn);
         group.MapDelete("/{id:guid}/checkin", UndoCheckIn);
+        group.MapGet("/{id:guid}/checkins", GetCheckIns);
         group.MapGet("/{id:guid}/history", GetHistory);
         group.MapGet("/{id:guid}/nudge", GetNudge);
         group.MapGet("/journey", GetJourney);
@@ -192,11 +193,6 @@ public static class GoalRoutes
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        var checkIns = goal.CheckIns
-            .OrderByDescending(c => c.Date)
-            .Select(c => new { c.Id, Date = c.Date.ToString("yyyy-MM-dd"), c.Completed, c.Note })
-            .ToList();
-
         if (goal.Type == GoalType.OneTime)
         {
             var noteCount = goal.CheckIns.Count(c => c.Note is not null);
@@ -209,7 +205,7 @@ public static class GoalRoutes
                 goal.Id, goal.Title, goal.Type, goal.TargetDate, goal.DeeperWhy,
                 goal.Progress, goal.CompletedAt, goal.CreatedAt,
                 DaysRemaining = daysRemaining, NoteCount = noteCount,
-                goal.AiNudge, CheckIns = checkIns
+                goal.AiNudge
             });
         }
         else
@@ -220,7 +216,7 @@ public static class GoalRoutes
                 goal.Id, goal.Title, goal.Type, goal.Frequency,
                 goal.FrequencyTarget, goal.DeeperWhy, goal.CreatedAt,
                 CurrentStreak = current, LongestStreak = longest,
-                goal.AiNudge, CheckIns = checkIns
+                goal.AiNudge
             });
         }
     }
@@ -407,6 +403,33 @@ public static class GoalRoutes
         await db.SaveChangesAsync();
 
         return Results.NoContent();
+    }
+
+    private static async Task<IResult> GetCheckIns(
+        Guid id, ICurrentUser currentUser, AppDbContext db,
+        string? from = null, string? to = null)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Results.Unauthorized();
+
+        var goal = await db.Goals
+            .FirstOrDefaultAsync(g => g.Id == id && g.UserId == user.Id);
+
+        if (goal is null) return Results.NotFound();
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var endDate = to is not null && DateOnly.TryParse(to, out var toParsed) ? toParsed : today;
+        var startDate = from is not null && DateOnly.TryParse(from, out var fromParsed)
+            ? fromParsed
+            : new DateOnly(endDate.Year, endDate.Month, 1);
+
+        var checkIns = await db.GoalCheckIns
+            .Where(c => c.GoalId == id && c.Date >= startDate && c.Date <= endDate)
+            .OrderBy(c => c.Date)
+            .Select(c => new { c.Id, Date = c.Date.ToString("yyyy-MM-dd"), c.Completed, c.Note })
+            .ToListAsync();
+
+        return Results.Ok(checkIns);
     }
 
     private static async Task<IResult> GetHistory(
