@@ -339,104 +339,101 @@ onMounted(() => { load() })
           </div>
         </div>
 
-        <!-- Bulk actions -->
-        <div class="mt-4 flex items-center justify-between border-t border-sacred-border-light pt-3">
-          <p class="text-[10px] text-sacred-muted">
-            {{ checkedInCount }} / {{ actionableDays.length }} days
-          </p>
-          <div class="flex gap-2">
-            <button
-              v-if="checkedInCount < actionableDays.length"
-              class="min-h-[36px] rounded-lg px-3 text-[11px] font-medium text-sacred-gold transition duration-150 hover:bg-sacred-bg-hover active:scale-[0.97] disabled:opacity-50"
-              :disabled="bulkActioning"
-              @click="showCheckAllConfirm = true"
-            >
-              Check all
-            </button>
-            <button
-              v-if="checkedInCount > 0"
-              class="min-h-[36px] rounded-lg px-3 text-[11px] font-medium text-sacred-text-secondary transition duration-150 hover:bg-sacred-bg-hover active:scale-[0.97] disabled:opacity-50"
-              :disabled="bulkActioning"
-              @click="showUncheckAllConfirm = true"
-            >
-              Uncheck all
-            </button>
-          </div>
-        </div>
+        <!-- Day count -->
+        <p class="mt-3 text-[10px] text-sacred-muted">
+          {{ checkedInCount }} / {{ actionableDays.length }} days
+        </p>
+      </div>
 
-        <!-- Check all confirmation -->
-        <div v-if="showCheckAllConfirm" class="mt-3 flex flex-col items-center gap-3 rounded-xl border border-sacred-gold/20 bg-sacred-gold/5 px-5 py-4">
-          <p class="text-center text-xs text-sacred-text-secondary">
-            Mark all remaining days in {{ monthLabel }} as completed?
-          </p>
-          <div class="flex gap-2">
-            <button
-              class="min-h-[36px] rounded-lg px-4 text-xs font-medium text-sacred-text-secondary transition duration-150 hover:bg-sacred-bg-hover"
-              @click="showCheckAllConfirm = false"
-            >
-              Cancel
-            </button>
-            <button
-              class="min-h-[36px] rounded-lg bg-gradient-to-r from-sacred-gold to-sacred-gold-dark px-4 text-xs font-medium text-white transition duration-150 active:scale-[0.97] disabled:opacity-50"
-              :disabled="bulkActioning"
-              @click="showCheckAllConfirm = false; checkAllMonth()"
-            >
-              Check all
-            </button>
-          </div>
-        </div>
+      <!-- Actions row -->
+      <div class="grid grid-cols-3 gap-2">
+        <button
+          class="flex min-h-[56px] flex-col items-center justify-center gap-1.5 rounded-2xl border border-sacred-border bg-sacred-bg-card transition duration-150 active:scale-[0.97] disabled:opacity-30"
+          :disabled="checkedInCount >= actionableDays.length || bulkActioning"
+          @click="showCheckAllConfirm = true"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-sacred-gold"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          <span class="text-[9px] font-bold uppercase tracking-[0.15em] text-sacred-gold">Check all</span>
+        </button>
+        <button
+          class="flex min-h-[56px] flex-col items-center justify-center gap-1.5 rounded-2xl border border-sacred-border bg-sacred-bg-card transition duration-150 active:scale-[0.97] disabled:opacity-30"
+          :disabled="checkedInCount === 0 || bulkActioning"
+          @click="showUncheckAllConfirm = true"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-sacred-text-secondary"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+          <span class="text-[9px] font-bold uppercase tracking-[0.15em] text-sacred-text-secondary">Uncheck all</span>
+        </button>
+        <button
+          class="flex min-h-[56px] flex-col items-center justify-center gap-1.5 rounded-2xl border border-sacred-border bg-sacred-bg-card transition duration-150 active:scale-[0.97] disabled:opacity-30"
+          :disabled="bulkActioning"
+          @click="showResetConfirm = true"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-sacred-muted"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+          <span class="text-[9px] font-bold uppercase tracking-[0.15em] text-sacred-muted">Reset</span>
+        </button>
+      </div>
 
-        <!-- Uncheck all confirmation -->
-        <div v-if="showUncheckAllConfirm" class="mt-3 flex flex-col items-center gap-3 rounded-xl border border-red-200/50 bg-red-50/30 px-5 py-4">
-          <p class="text-center text-xs text-sacred-text-secondary">
-            Remove all check-ins for {{ monthLabel }}?
-          </p>
-          <div class="flex gap-2">
-            <button
-              class="min-h-[36px] rounded-lg px-4 text-xs font-medium text-sacred-text-secondary transition duration-150 hover:bg-sacred-bg-hover"
-              @click="showUncheckAllConfirm = false"
-            >
-              Cancel
-            </button>
-            <button
-              class="min-h-[36px] rounded-lg bg-red-500/90 px-4 text-xs font-medium text-white transition duration-150 active:scale-[0.97] disabled:opacity-50"
-              :disabled="bulkActioning"
-              @click="showUncheckAllConfirm = false; uncheckAllMonth()"
-            >
-              Uncheck all
-            </button>
-          </div>
+      <!-- Confirmation dialogs -->
+      <div v-if="showCheckAllConfirm" class="rounded-xl border border-sacred-gold/20 bg-sacred-gold/5 px-5 py-4">
+        <p class="text-center text-xs text-sacred-text-secondary">
+          Mark all remaining days in {{ monthLabel }} as completed?
+        </p>
+        <div class="mt-3 flex justify-center gap-2">
+          <button
+            class="min-h-[36px] rounded-lg px-4 text-xs font-medium text-sacred-text-secondary transition duration-150 hover:bg-sacred-bg-hover"
+            @click="showCheckAllConfirm = false"
+          >
+            Cancel
+          </button>
+          <button
+            class="min-h-[36px] rounded-lg bg-gradient-to-r from-sacred-gold to-sacred-gold-dark px-4 text-xs font-medium text-white transition duration-150 active:scale-[0.97] disabled:opacity-50"
+            :disabled="bulkActioning"
+            @click="showCheckAllConfirm = false; checkAllMonth()"
+          >
+            Confirm
+          </button>
         </div>
       </div>
 
-      <!-- Reset history -->
-      <div class="flex justify-center">
-        <button
-          v-if="!showResetConfirm"
-          class="min-h-[36px] text-[11px] font-medium text-sacred-text-secondary/60 transition duration-150 hover:text-sacred-text-secondary"
-          @click="showResetConfirm = true"
-        >
-          Reset history
-        </button>
-        <div v-else class="flex flex-col items-center gap-3 rounded-xl border border-red-200/50 bg-red-50/30 px-5 py-4">
-          <p class="text-center text-xs text-sacred-text-secondary">
-            This will delete all check-in records and reset the start date to today. This cannot be undone.
-          </p>
-          <div class="flex gap-2">
-            <button
-              class="min-h-[36px] rounded-lg px-4 text-xs font-medium text-sacred-text-secondary transition duration-150 hover:bg-sacred-bg-hover"
-              @click="showResetConfirm = false"
-            >
-              Cancel
-            </button>
-            <button
-              class="min-h-[36px] rounded-lg bg-red-500/90 px-4 text-xs font-medium text-white transition duration-150 active:scale-[0.97] disabled:opacity-50"
-              :disabled="resetting"
-              @click="resetHistory"
-            >
-              {{ resetting ? 'Resetting...' : 'Reset' }}
-            </button>
-          </div>
+      <div v-if="showUncheckAllConfirm" class="rounded-xl border border-red-200/50 bg-red-50/30 px-5 py-4">
+        <p class="text-center text-xs text-sacred-text-secondary">
+          Remove all check-ins for {{ monthLabel }}?
+        </p>
+        <div class="mt-3 flex justify-center gap-2">
+          <button
+            class="min-h-[36px] rounded-lg px-4 text-xs font-medium text-sacred-text-secondary transition duration-150 hover:bg-sacred-bg-hover"
+            @click="showUncheckAllConfirm = false"
+          >
+            Cancel
+          </button>
+          <button
+            class="min-h-[36px] rounded-lg bg-red-500/90 px-4 text-xs font-medium text-white transition duration-150 active:scale-[0.97] disabled:opacity-50"
+            :disabled="bulkActioning"
+            @click="showUncheckAllConfirm = false; uncheckAllMonth()"
+          >
+            Confirm
+          </button>
+        </div>
+      </div>
+
+      <div v-if="showResetConfirm" class="rounded-xl border border-red-200/50 bg-red-50/30 px-5 py-4">
+        <p class="text-center text-xs text-sacred-text-secondary">
+          This will delete all check-in records and reset the start date to today. This cannot be undone.
+        </p>
+        <div class="mt-3 flex justify-center gap-2">
+          <button
+            class="min-h-[36px] rounded-lg px-4 text-xs font-medium text-sacred-text-secondary transition duration-150 hover:bg-sacred-bg-hover"
+            @click="showResetConfirm = false"
+          >
+            Cancel
+          </button>
+          <button
+            class="min-h-[36px] rounded-lg bg-red-500/90 px-4 text-xs font-medium text-white transition duration-150 active:scale-[0.97] disabled:opacity-50"
+            :disabled="resetting"
+            @click="resetHistory"
+          >
+            {{ resetting ? 'Resetting...' : 'Confirm' }}
+          </button>
         </div>
       </div>
     </template>

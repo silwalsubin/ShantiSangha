@@ -141,43 +141,45 @@ struct GoalCalendarView: View {
                     .opacity(bulkActioning ? 0.4 : 1)
                     .allowsHitTesting(!bulkActioning)
 
-                    // Bulk actions
-                    HStack {
-                        Text("\(checkedInCount) / \(actionableDays.count) days")
-                            .font(.sacredMicro)
-                            .foregroundColor(.sacredMuted)
-
-                        Spacer()
-
-                        if checkedInCount < actionableDays.count {
-                            Button { showCheckAllConfirm = true } label: {
-                                Text("Check all")
-                                    .font(.sacredSmallMedium)
-                                    .foregroundColor(.sacredGold)
-                            }
-                            .disabled(bulkActioning)
-                        }
-
-                        if checkedInCount > 0 {
-                            Button { showUncheckAllConfirm = true } label: {
-                                Text("Uncheck all")
-                                    .font(.sacredSmallMedium)
-                                    .foregroundColor(.sacredTextSecondary)
-                            }
-                            .disabled(bulkActioning)
-                        }
-                    }
-                    .padding(.top, 4)
+                    // Day count
+                    Text("\(checkedInCount) / \(actionableDays.count) days")
+                        .font(.sacredMicro)
+                        .foregroundColor(.sacredMuted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 4)
                 }
                 .padding(16)
                 .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
                 .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.08)))
 
-                // Reset history
-                Button { showResetConfirm = true } label: {
-                    Text("Reset history")
-                        .font(.sacredSmall)
-                        .foregroundColor(.sacredMuted.opacity(0.6))
+                // Actions row
+                HStack(spacing: 0) {
+                    actionButton(
+                        icon: "checkmark.circle",
+                        label: "Check all",
+                        color: .sacredGold,
+                        enabled: checkedInCount < actionableDays.count && !bulkActioning
+                    ) {
+                        showCheckAllConfirm = true
+                    }
+
+                    actionButton(
+                        icon: "xmark.circle",
+                        label: "Uncheck all",
+                        color: .sacredTextSecondary,
+                        enabled: checkedInCount > 0 && !bulkActioning
+                    ) {
+                        showUncheckAllConfirm = true
+                    }
+
+                    actionButton(
+                        icon: "arrow.counterclockwise",
+                        label: "Reset",
+                        color: .sacredMuted,
+                        enabled: !bulkActioning
+                    ) {
+                        showResetConfirm = true
+                    }
                 }
             }
             .padding(16)
@@ -285,6 +287,23 @@ struct GoalCalendarView: View {
 
     private var checkinMap: [String: GoalCheckIn] {
         Dictionary(uniqueKeysWithValues: checkIns.map { ($0.date, $0) })
+    }
+
+    private func actionButton(icon: String, label: String, color: Color, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 18))
+                Text(label)
+                    .font(.sacredSectionLabel)
+                    .tracking(1)
+            }
+            .foregroundColor(enabled ? color : color.opacity(0.3))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
     }
 
     private var calendarDays: [CalDay] {
