@@ -152,37 +152,41 @@ struct GoalCalendarView: View {
                     .opacity(bulkActioning ? 0.4 : 1)
                     .allowsHitTesting(!bulkActioning)
 
-                    // Day count
-                    Text("\(checkedInCount) / \(actionableDays.count) days")
-                        .font(.sacredMicro)
-                        .foregroundColor(.sacredMuted)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, 4)
+                    // Footer
+                    Divider()
+                        .background(Color.sacredMuted.opacity(0.1))
+                        .padding(.top, 8)
+
+                    HStack {
+                        Text("\(checkedInCount) / \(actionableDays.count) days")
+                            .font(.sacredMicro)
+                            .foregroundColor(.sacredMuted)
+
+                        Spacer()
+
+                        if checkedInCount < actionableDays.count {
+                            Button { showCheckAllConfirm = true } label: {
+                                Text("Check all")
+                                    .font(.sacredSmallMedium)
+                                    .foregroundColor(.sacredGold)
+                            }
+                            .disabled(bulkActioning)
+                        }
+
+                        if checkedInCount > 0 {
+                            Button { showUncheckAllConfirm = true } label: {
+                                Text("Uncheck all")
+                                    .font(.sacredSmallMedium)
+                                    .foregroundColor(.sacredTextSecondary)
+                            }
+                            .disabled(bulkActioning)
+                        }
+                    }
+                    .padding(.top, 8)
                 }
                 .padding(16)
                 .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
                 .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.08)))
-
-                // Actions row
-                HStack(spacing: 0) {
-                    actionButton(
-                        icon: "checkmark.circle",
-                        label: "Check all",
-                        color: .sacredGold,
-                        enabled: checkedInCount < actionableDays.count && !bulkActioning
-                    ) {
-                        showCheckAllConfirm = true
-                    }
-
-                    actionButton(
-                        icon: "xmark.circle",
-                        label: "Uncheck all",
-                        color: .sacredTextSecondary,
-                        enabled: checkedInCount > 0 && !bulkActioning
-                    ) {
-                        showUncheckAllConfirm = true
-                    }
-                }
             }
             .padding(16)
         }

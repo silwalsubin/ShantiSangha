@@ -350,30 +350,30 @@ onMounted(() => { load() })
           </div>
         </div>
 
-        <!-- Day count -->
-        <p class="mt-3 text-[10px] text-sacred-muted">
-          {{ checkedInCount }} / {{ actionableDays.length }} days
-        </p>
-      </div>
-
-      <!-- Actions row -->
-      <div class="grid grid-cols-2 gap-2">
-        <button
-          class="flex min-h-[56px] flex-col items-center justify-center gap-1.5 rounded-2xl border border-sacred-border bg-sacred-bg-card transition duration-150 active:scale-[0.97] disabled:opacity-30"
-          :disabled="checkedInCount >= actionableDays.length || bulkActioning"
-          @click="showCheckAllConfirm = true"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-sacred-gold"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-          <span class="text-[9px] font-bold uppercase tracking-[0.15em] text-sacred-gold">Check all</span>
-        </button>
-        <button
-          class="flex min-h-[56px] flex-col items-center justify-center gap-1.5 rounded-2xl border border-sacred-border bg-sacred-bg-card transition duration-150 active:scale-[0.97] disabled:opacity-30"
-          :disabled="checkedInCount === 0 || bulkActioning"
-          @click="showUncheckAllConfirm = true"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-sacred-text-secondary"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-          <span class="text-[9px] font-bold uppercase tracking-[0.15em] text-sacred-text-secondary">Uncheck all</span>
-        </button>
+        <!-- Footer -->
+        <div class="mt-4 flex items-center justify-between border-t border-sacred-border-light pt-3">
+          <p class="text-[10px] text-sacred-muted">
+            {{ checkedInCount }} / {{ actionableDays.length }} days
+          </p>
+          <div class="flex gap-3">
+            <button
+              v-if="checkedInCount < actionableDays.length"
+              class="text-[11px] font-medium text-sacred-gold transition duration-150 hover:text-sacred-gold-dark disabled:opacity-40"
+              :disabled="bulkActioning"
+              @click="showCheckAllConfirm = true"
+            >
+              Check all
+            </button>
+            <button
+              v-if="checkedInCount > 0"
+              class="text-[11px] font-medium text-sacred-text-secondary transition duration-150 hover:text-sacred-text disabled:opacity-40"
+              :disabled="bulkActioning"
+              @click="showUncheckAllConfirm = true"
+            >
+              Uncheck all
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Confirmation dialogs -->
