@@ -332,7 +332,7 @@ onMounted(() => { load() })
               class="relative flex h-10 w-10 items-center justify-center rounded-full text-xs font-medium transition duration-150"
               :class="[
                 day.isFuture || day.isBeforeCreation
-                  ? 'text-sacred-muted-light/40 cursor-default'
+                  ? 'text-sacred-muted/50 cursor-default'
                   : day.checkin?.completed
                     ? 'bg-gradient-to-br from-sacred-gold to-sacred-gold-dark text-white shadow-sm cursor-pointer active:scale-90'
                     : day.checkin

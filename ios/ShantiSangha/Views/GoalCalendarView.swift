@@ -126,7 +126,7 @@ struct GoalCalendarView: View {
                                             .font(.system(size: 13, weight: day.checkin?.completed == true ? .semibold : .regular, design: .serif))
                                             .foregroundColor(
                                                 day.isFuture || day.isBeforeCreation
-                                                    ? .sacredMuted.opacity(0.25)
+                                                    ? .sacredMuted.opacity(0.45)
                                                     : day.checkin?.completed == true
                                                         ? .white
                                                         : .sacredText
