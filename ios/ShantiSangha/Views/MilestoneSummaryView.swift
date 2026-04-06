@@ -129,8 +129,7 @@ struct MilestoneSummaryView: View {
                     onUndo: { Task { await vm.undoCheckIn(id: task.id) } },
                     onDelete: { Task { await vm.deleteTask(id: task.id) } },
                     onProgressUpdate: { val in Task { await vm.updateProgress(id: task.id, value: val) } },
-                    onDueDateUpdate: { date in Task { await vm.updateDueDate(id: task.id, date: date) } },
-                    neutralStyle: true
+                    onDueDateUpdate: { date in Task { await vm.updateDueDate(id: task.id, date: date) } }
                 )
             }
         }

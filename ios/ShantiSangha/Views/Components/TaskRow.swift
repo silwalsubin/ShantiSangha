@@ -9,7 +9,6 @@ struct TaskRow: View {
     let onDelete: () -> Void
     let onProgressUpdate: (Int) -> Void
     var onDueDateUpdate: ((String) -> Void)? = nil
-    var neutralStyle: Bool = false
     var activeSwipeId: Binding<String?>?
 
     @State private var showMenu = false
@@ -144,8 +143,7 @@ struct TaskRow: View {
                 // Title
                 Text(task.title)
                     .font(.sacredTextMedium)
-                    .foregroundColor(!neutralStyle && task.checkedIn && task.completedToday == true ? .sacredGreen : .sacredText)
-                    .strikethrough(!neutralStyle && task.checkedIn && task.completedToday == true, color: .sacredGreen.opacity(0.4))
+                    .foregroundColor(.sacredText)
 
                 Spacer()
 
@@ -259,9 +257,9 @@ struct TaskRow: View {
         .padding(.vertical, 12)
         .background(
             Group {
-                if swipeActive || neutralStyle {
+                if swipeActive {
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(neutralStyle ? Color.sacredBgCard : Color.sacredBgCard)
+                        .fill(Color.sacredBgCard)
                         .overlay(
                             RoundedRectangle(cornerRadius: 16)
                                 .stroke(Color.sacredMuted.opacity(0.12), lineWidth: 1)
