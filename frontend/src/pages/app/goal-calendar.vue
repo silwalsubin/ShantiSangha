@@ -41,6 +41,8 @@ const loading = ref(true)
 const calendarLoading = ref(false)
 const togglingDate = ref<string | null>(null)
 const bulkActioning = ref(false)
+const showCheckAllConfirm = ref(false)
+const showUncheckAllConfirm = ref(false)
 const showResetConfirm = ref(false)
 const resetting = ref(false)
 
@@ -347,7 +349,7 @@ onMounted(() => { load() })
               v-if="checkedInCount < actionableDays.length"
               class="min-h-[36px] rounded-lg px-3 text-[11px] font-medium text-sacred-gold transition duration-150 hover:bg-sacred-bg-hover active:scale-[0.97] disabled:opacity-50"
               :disabled="bulkActioning"
-              @click="checkAllMonth"
+              @click="showCheckAllConfirm = true"
             >
               Check all
             </button>
@@ -355,7 +357,51 @@ onMounted(() => { load() })
               v-if="checkedInCount > 0"
               class="min-h-[36px] rounded-lg px-3 text-[11px] font-medium text-sacred-text-secondary transition duration-150 hover:bg-sacred-bg-hover active:scale-[0.97] disabled:opacity-50"
               :disabled="bulkActioning"
-              @click="uncheckAllMonth"
+              @click="showUncheckAllConfirm = true"
+            >
+              Uncheck all
+            </button>
+          </div>
+        </div>
+
+        <!-- Check all confirmation -->
+        <div v-if="showCheckAllConfirm" class="mt-3 flex flex-col items-center gap-3 rounded-xl border border-sacred-gold/20 bg-sacred-gold/5 px-5 py-4">
+          <p class="text-center text-xs text-sacred-text-secondary">
+            Mark all remaining days in {{ monthLabel }} as completed?
+          </p>
+          <div class="flex gap-2">
+            <button
+              class="min-h-[36px] rounded-lg px-4 text-xs font-medium text-sacred-text-secondary transition duration-150 hover:bg-sacred-bg-hover"
+              @click="showCheckAllConfirm = false"
+            >
+              Cancel
+            </button>
+            <button
+              class="min-h-[36px] rounded-lg bg-gradient-to-r from-sacred-gold to-sacred-gold-dark px-4 text-xs font-medium text-white transition duration-150 active:scale-[0.97] disabled:opacity-50"
+              :disabled="bulkActioning"
+              @click="showCheckAllConfirm = false; checkAllMonth()"
+            >
+              Check all
+            </button>
+          </div>
+        </div>
+
+        <!-- Uncheck all confirmation -->
+        <div v-if="showUncheckAllConfirm" class="mt-3 flex flex-col items-center gap-3 rounded-xl border border-red-200/50 bg-red-50/30 px-5 py-4">
+          <p class="text-center text-xs text-sacred-text-secondary">
+            Remove all check-ins for {{ monthLabel }}?
+          </p>
+          <div class="flex gap-2">
+            <button
+              class="min-h-[36px] rounded-lg px-4 text-xs font-medium text-sacred-text-secondary transition duration-150 hover:bg-sacred-bg-hover"
+              @click="showUncheckAllConfirm = false"
+            >
+              Cancel
+            </button>
+            <button
+              class="min-h-[36px] rounded-lg bg-red-500/90 px-4 text-xs font-medium text-white transition duration-150 active:scale-[0.97] disabled:opacity-50"
+              :disabled="bulkActioning"
+              @click="showUncheckAllConfirm = false; uncheckAllMonth()"
             >
               Uncheck all
             </button>

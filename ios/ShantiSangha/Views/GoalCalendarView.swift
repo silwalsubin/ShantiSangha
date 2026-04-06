@@ -14,6 +14,8 @@ struct GoalCalendarView: View {
     @State private var calMonth: Int = Calendar.current.component(.month, from: Date())
     @State private var togglingDate: String?
     @State private var bulkActioning = false
+    @State private var showCheckAllConfirm = false
+    @State private var showUncheckAllConfirm = false
     @State private var showResetConfirm = false
     @Environment(\.dismiss) private var dismiss
     private let api = ApiService.shared
@@ -148,7 +150,7 @@ struct GoalCalendarView: View {
                         Spacer()
 
                         if checkedInCount < actionableDays.count {
-                            Button { Task { await checkAllMonth() } } label: {
+                            Button { showCheckAllConfirm = true } label: {
                                 Text("Check all")
                                     .font(.sacredSmallMedium)
                                     .foregroundColor(.sacredGold)
@@ -157,7 +159,7 @@ struct GoalCalendarView: View {
                         }
 
                         if checkedInCount > 0 {
-                            Button { Task { await uncheckAllMonth() } } label: {
+                            Button { showUncheckAllConfirm = true } label: {
                                 Text("Uncheck all")
                                     .font(.sacredSmallMedium)
                                     .foregroundColor(.sacredTextSecondary)
@@ -183,6 +185,22 @@ struct GoalCalendarView: View {
         .background(Color.sacredBg.ignoresSafeArea())
         .navigationTitle(goalTitle)
         .navigationBarTitleDisplayMode(.inline)
+        .alert("Check All", isPresented: $showCheckAllConfirm) {
+            Button("Cancel", role: .cancel) { }
+            Button("Check All") {
+                Task { await checkAllMonth() }
+            }
+        } message: {
+            Text("Mark all remaining days in \(monthLabel) as completed?")
+        }
+        .alert("Uncheck All", isPresented: $showUncheckAllConfirm) {
+            Button("Cancel", role: .cancel) { }
+            Button("Uncheck All", role: .destructive) {
+                Task { await uncheckAllMonth() }
+            }
+        } message: {
+            Text("Remove all check-ins for \(monthLabel)?")
+        }
         .alert("Reset History", isPresented: $showResetConfirm) {
             Button("Cancel", role: .cancel) { }
             Button("Reset", role: .destructive) {
