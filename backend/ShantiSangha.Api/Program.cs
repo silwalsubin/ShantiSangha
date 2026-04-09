@@ -19,6 +19,7 @@ using ShantiSangha.Shared.Interfaces;
 using ShantiSangha.Wellness;
 using System.Net.Http.Headers;
 using System.Text.Json.Serialization;
+using Npgsql;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -72,14 +73,20 @@ try
     // Current user — scoped, lazily resolved once per request
     builder.Services.AddHttpContextAccessor();
 
-    // ── Domain module registration ──────────────────────────────────────
+    // ── Shared NpgsqlDataSource with pgvector support ─────────────────────
     var connStr = appConfig.DatabaseUrl;
+    var vectorDataSourceBuilder = new NpgsqlDataSourceBuilder(connStr);
+    vectorDataSourceBuilder.UseVector();
+    var vectorDataSource = vectorDataSourceBuilder.Build();
+    builder.Services.AddSingleton(vectorDataSource);
+
+    // ── Domain module registration ──────────────────────────────────────
     builder.Services.AddIdentityModule(connStr);
     builder.Services.AddGoalsModule(connStr);
-    builder.Services.AddChatModule(connStr);
-    builder.Services.AddJournalModule(connStr);
+    builder.Services.AddChatModule(vectorDataSource);
+    builder.Services.AddJournalModule(vectorDataSource);
     builder.Services.AddWellnessModule(connStr, appConfig.VoiceBucketName);
-    builder.Services.AddInsightsModule(connStr);
+    builder.Services.AddInsightsModule(vectorDataSource);
 
     // ── Controller discovery from domain assemblies ─────────────────────
     builder.Services.AddControllers()

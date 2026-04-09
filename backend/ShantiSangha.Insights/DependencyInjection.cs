@@ -1,6 +1,7 @@
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using ShantiSangha.Insights.Data;
 using ShantiSangha.Insights.Jobs;
 using ShantiSangha.Insights.Models;
@@ -14,10 +15,10 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInsightsModule(
         this IServiceCollection services,
-        string connectionString)
+        NpgsqlDataSource dataSource)
     {
         services.AddDbContext<InsightsDbContext>(options =>
-            options.UseNpgsql(connectionString, o => o.UseVector()));
+            options.UseNpgsql(dataSource, o => o.UseVector()));
 
         services.AddScoped<InsightService>();
         services.AddScoped<SemanticSearchService>();

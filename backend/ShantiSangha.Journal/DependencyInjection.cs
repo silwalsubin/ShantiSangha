@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using ShantiSangha.Journal.Data;
 using ShantiSangha.Journal.Services;
 using ShantiSangha.Shared.Events;
@@ -10,10 +11,10 @@ namespace ShantiSangha.Journal;
 public static class DependencyInjection
 {
     public static IServiceCollection AddJournalModule(
-        this IServiceCollection services, string connectionString)
+        this IServiceCollection services, NpgsqlDataSource dataSource)
     {
         services.AddDbContext<JournalDbContext>(options =>
-            options.UseNpgsql(connectionString, o => o.UseVector()));
+            options.UseNpgsql(dataSource, o => o.UseVector()));
 
         services.AddScoped<IJournalService, JournalService>();
         services.AddScoped<IJournalQueryService, JournalQueryService>();

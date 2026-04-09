@@ -1,6 +1,7 @@
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using ShantiSangha.Chat.AI;
 using ShantiSangha.Chat.Data;
 using ShantiSangha.Chat.Jobs;
@@ -15,10 +16,10 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddChatModule(
         this IServiceCollection services,
-        string connectionString)
+        NpgsqlDataSource dataSource)
     {
         services.AddDbContext<ChatDbContext>(options =>
-            options.UseNpgsql(connectionString, o => o.UseVector()));
+            options.UseNpgsql(dataSource, o => o.UseVector()));
 
         services.AddScoped<IChatService, ChatService>();
         services.AddScoped<ISafetyService, SafetyService>();
