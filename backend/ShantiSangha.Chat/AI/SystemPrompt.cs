@@ -72,6 +72,7 @@ public static class SystemPrompt
         string? recentMoodSummary,
         IEnumerable<string>? savedInsights,
         IEnumerable<string>? conversationSummaries,
+        IEnumerable<string>? journalSummaries = null,
         IEnumerable<GoalContext>? goals = null)
     {
         var parts = new List<string> { Base };
@@ -113,6 +114,21 @@ public static class SystemPrompt
                 Summaries from their previous conversations. Use this context to build
                 continuity — they should feel that you remember their journey:
                 {summaryText}
+                """);
+        }
+
+        var journals = journalSummaries?.ToList();
+        if (journals is { Count: > 0 })
+        {
+            var journalText = string.Join("\n\n", journals);
+            parts.Add($"""
+                ## What they have been writing about
+                Summaries from their recent journal entries. These are private reflections —
+                they reveal what the person is processing beneath the surface. Use this to
+                understand their inner world. Do not quote their journal back to them unless
+                they bring it up — instead, let this awareness shape the depth and direction
+                of your responses:
+                {journalText}
                 """);
         }
 

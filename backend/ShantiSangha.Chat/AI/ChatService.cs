@@ -142,13 +142,15 @@ public class ChatService(
     {
         var displayNameTask = profileQuery.GetDisplayNameAsync(userId, cancellationToken);
         var summariesTask = summaryQuery.GetRecentSummariesAsync(userId, SummaryCount, cancellationToken);
+        var journalSummariesTask = summaryQuery.GetRecentJournalSummariesAsync(userId, SummaryCount, cancellationToken);
         var moodTask = moodQuery.GetRecentMoodSummaryAsync(userId, 7, cancellationToken);
         var goalsTask = goalQuery.GetActiveGoalsForContextAsync(userId, cancellationToken);
 
-        await Task.WhenAll(displayNameTask, summariesTask, moodTask, goalsTask);
+        await Task.WhenAll(displayNameTask, summariesTask, journalSummariesTask, moodTask, goalsTask);
 
         var displayName = displayNameTask.Result;
         var summaries = summariesTask.Result;
+        var journalSummaries = journalSummariesTask.Result;
         var moodSummary = moodTask.Result;
         var goalDtos = goalsTask.Result;
 
@@ -174,10 +176,10 @@ public class ChatService(
             Title: g.Title,
             Type: g.Type,
             CurrentStreak: g.CurrentStreak,
-            LongestStreak: 0,
-            CheckedInToday: null,
-            DaysRemaining: null,
-            IsCompleted: false,
+            LongestStreak: g.LongestStreak,
+            CheckedInToday: g.CheckedInToday,
+            DaysRemaining: g.DaysRemaining,
+            IsCompleted: g.IsCompleted,
             DeeperWhy: g.DeeperWhy)).ToList();
 
         var systemPrompt = SystemPrompt.WithContext(
@@ -185,6 +187,7 @@ public class ChatService(
             recentMoodSummary: moodSummaryText,
             savedInsights: insights,
             conversationSummaries: summaries,
+            journalSummaries: journalSummaries,
             goals: goalContexts);
 
         var history = new ChatHistory(systemPrompt);

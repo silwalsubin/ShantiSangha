@@ -17,4 +17,15 @@ public class SummaryQueryService(InsightsDbContext db) : ISummaryQueryService
             .Select(s => s.Content)
             .ToListAsync(ct);
     }
+
+    public async Task<IReadOnlyList<string>> GetRecentJournalSummariesAsync(
+        Guid userId, int count = 3, CancellationToken ct = default)
+    {
+        return await db.Summaries
+            .Where(s => s.UserId == userId && s.SourceType == SummarySourceType.Journal)
+            .OrderByDescending(s => s.CreatedAt)
+            .Take(count)
+            .Select(s => s.Content)
+            .ToListAsync(ct);
+    }
 }

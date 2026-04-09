@@ -21,11 +21,22 @@ public class GoalQueryService(GoalsDbContext db) : IGoalQueryService
 
         return goals.Select(g =>
         {
-            var (currentStreak, _) = GoalService.ComputeStreaks(g.CheckIns, today);
+            var (currentStreak, longestStreak) = GoalService.ComputeStreaks(g.CheckIns, today);
+            var checkedInToday = g.Type == GoalType.Recurring
+                ? g.CheckIns.Any(c => c.Date == today && c.Completed)
+                : (bool?)null;
+            var daysRemaining = g.Type == GoalType.OneTime && g.TargetDate.HasValue
+                ? g.TargetDate.Value.DayNumber - today.DayNumber
+                : (int?)null;
+
             return new GoalSummaryDto(
                 g.Title,
                 g.Type.ToString(),
                 currentStreak,
+                longestStreak,
+                checkedInToday,
+                daysRemaining,
+                g.CompletedAt.HasValue,
                 g.Progress,
                 g.DeeperWhy);
         }).ToList();
