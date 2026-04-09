@@ -8,14 +8,17 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
 using ShantiSangha.Api;
-using ShantiSangha.Api.Routes;
-using ShantiSangha.Api.Services;
-using ShantiSangha.Core.Services;
-using ShantiSangha.Infrastructure.AI;
-using ShantiSangha.Infrastructure.Data;
-using ShantiSangha.Infrastructure.Jobs;
-using ShantiSangha.Infrastructure.Storage;
+using ShantiSangha.Chat;
+using ShantiSangha.Chat.AI;
+using ShantiSangha.Identity;
+using ShantiSangha.Goals;
+using ShantiSangha.Insights;
+using ShantiSangha.Journal;
+using ShantiSangha.Shared;
+using ShantiSangha.Shared.Interfaces;
+using ShantiSangha.Wellness;
 using System.Net.Http.Headers;
+using System.Text.Json.Serialization;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -36,11 +39,6 @@ try
     var appConfig = AppConfig.Load(builder.Configuration);
     builder.Services.AddSingleton(appConfig);
 
-    // Database
-    builder.Services.AddDbContext<AppDbContext>(opts =>
-        opts.UseNpgsql(appConfig.DatabaseUrl, npgsql =>
-            npgsql.UseVector()));
-
     // HTTP client for OpenAI moderation API
     builder.Services.AddHttpClient("OpenAI", client =>
     {
@@ -48,7 +46,7 @@ try
             new AuthenticationHeaderValue("Bearer", appConfig.OpenAiApiKey);
     });
 
-    // Semantic Kernel + OpenAI (chat + embeddings)
+    // Semantic Kernel + OpenAI (chat + embeddings) — cross-cutting, consumed by domain projects via DI
 #pragma warning disable SKEXP0010
     var kernelBuilder = builder.Services.AddKernel()
         .AddOpenAIChatCompletion("gpt-4o", appConfig.OpenAiApiKey)
@@ -68,29 +66,33 @@ try
         Log.Information("Langfuse AI tracing enabled");
     }
 
-    // Safety + Chat + Semantic Search services
-    builder.Services.AddScoped<ISafetyService, SafetyService>();
-    builder.Services.AddScoped<ISemanticSearchService, SemanticSearchService>();
-    builder.Services.AddScoped<IChatService, ChatService>();
+    // Event bus — in-process pub/sub for cross-domain communication
+    builder.Services.AddSingleton<IEventBus, InMemoryEventBus>();
 
     // Current user — scoped, lazily resolved once per request
     builder.Services.AddHttpContextAccessor();
-    builder.Services.AddScoped<ICurrentUser, CurrentUserService>();
 
-    // AWS S3 voice storage — credentials come from ECS task role (no keys needed)
-    builder.Services.AddSingleton(sp =>
-    {
-        var cfg = sp.GetRequiredService<AppConfig>();
-        var log = sp.GetRequiredService<ILogger<StorageService>>();
-        var region = builder.Configuration["AWS_REGION"] ?? "us-east-1";
-        return new StorageService(cfg.VoiceBucketName, region, log);
-    });
+    // ── Domain module registration ──────────────────────────────────────
+    var connStr = appConfig.DatabaseUrl;
+    builder.Services.AddIdentityModule(connStr);
+    builder.Services.AddGoalsModule(connStr);
+    builder.Services.AddChatModule(connStr);
+    builder.Services.AddJournalModule(connStr);
+    builder.Services.AddWellnessModule(connStr, appConfig.VoiceBucketName);
+    builder.Services.AddInsightsModule(connStr);
 
-    // Background job classes (Hangfire resolves these via DI)
-    builder.Services.AddScoped<GenerateSummaryJob>();
-    builder.Services.AddScoped<GenerateEmbeddingJob>();
-    builder.Services.AddScoped<ExtractInsightsJob>();
-    builder.Services.AddScoped<TranscribeVoiceJob>();
+    // ── Controller discovery from domain assemblies ─────────────────────
+    builder.Services.AddControllers()
+        .AddApplicationPart(typeof(ShantiSangha.Identity.DependencyInjection).Assembly)
+        .AddApplicationPart(typeof(ShantiSangha.Goals.DependencyInjection).Assembly)
+        .AddApplicationPart(typeof(ShantiSangha.Chat.DependencyInjection).Assembly)
+        .AddApplicationPart(typeof(ShantiSangha.Journal.DependencyInjection).Assembly)
+        .AddApplicationPart(typeof(ShantiSangha.Wellness.DependencyInjection).Assembly)
+        .AddApplicationPart(typeof(ShantiSangha.Insights.DependencyInjection).Assembly)
+        .AddJsonOptions(opts =>
+        {
+            opts.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        });
 
     // Hangfire — PostgreSQL-backed job queue
     builder.Services.AddHangfire(config => config
@@ -119,7 +121,7 @@ try
             opts.TokenValidationParameters.ValidAudience = appConfig.FirebaseProjectId;
             opts.TokenValidationParameters.ValidIssuer = $"https://securetoken.google.com/{appConfig.FirebaseProjectId}";
             opts.MapInboundClaims = false;
-            opts.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+            opts.Events = new JwtBearerEvents
             {
                 OnAuthenticationFailed = context =>
                 {
@@ -144,22 +146,29 @@ try
         });
     });
 
-    // JSON — accept string enum values from frontend (e.g. "Recurring" instead of 0)
-    builder.Services.ConfigureHttpJsonOptions(opts =>
-    {
-        opts.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
-    });
-
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
 
     var app = builder.Build();
 
+    // ── Wire up cross-domain event subscriptions ────────────────────────
+    using (var scope = app.Services.CreateScope())
+    {
+        scope.ServiceProvider.UseIdentityModule();
+        scope.ServiceProvider.SubscribeInsightsEvents();
+        scope.ServiceProvider.SubscribeJournalEvents();
+    }
+
     // Run pending EF Core migrations on startup (safe to run on every deploy)
     using (var scope = app.Services.CreateScope())
     {
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        await db.Database.MigrateAsync();
+        var sp = scope.ServiceProvider;
+        await sp.GetRequiredService<ShantiSangha.Identity.Data.IdentityDbContext>().Database.MigrateAsync();
+        await sp.GetRequiredService<ShantiSangha.Goals.Data.GoalsDbContext>().Database.MigrateAsync();
+        await sp.GetRequiredService<ShantiSangha.Chat.Data.ChatDbContext>().Database.MigrateAsync();
+        await sp.GetRequiredService<ShantiSangha.Journal.Data.JournalDbContext>().Database.MigrateAsync();
+        await sp.GetRequiredService<ShantiSangha.Wellness.Data.WellnessDbContext>().Database.MigrateAsync();
+        await sp.GetRequiredService<ShantiSangha.Insights.Data.InsightsDbContext>().Database.MigrateAsync();
     }
 
     // Global error handler — returns full error details when EXPOSE_ERRORS=true
@@ -201,30 +210,21 @@ try
     app.UseAuthentication();
     app.UseAuthorization();
 
-    // All API routes under /api prefix
-    var api = app.MapGroup("/api");
-    api.MapUserRoutes();
-    api.MapConversationRoutes();
-    api.MapJournalRoutes();
-    api.MapMoodRoutes();
-    api.MapCopingRoutes();
-    api.MapVoiceRoutes();
-    api.MapInsightRoutes();
-    api.MapSearchRoutes();
-    api.MapGoalRoutes();
+    // Controllers from domain projects handle all /api/* routes
+    app.MapControllers();
 
-    // Server version info
+    // Server version info (keep as minimal API — host-level concern)
     var serverGitHash = builder.Configuration["GIT_HASH"] ?? "dev";
     var serverBuildTime = builder.Configuration["BUILD_TIME"] ?? "unknown";
-    api.MapGet("/version", () => Results.Ok(new
+    app.MapGet("/api/version", () => Results.Ok(new
     {
         gitHash = serverGitHash.Length > 7 ? serverGitHash[..7] : serverGitHash,
         gitHashFull = serverGitHash,
         buildTime = serverBuildTime
     })).AllowAnonymous();
 
-    // Debug: show JWT claims (temporary — remove after debugging)
-    api.MapGet("/debug/claims", (HttpContext ctx) => Results.Ok(
+    // Debug: show JWT claims
+    app.MapGet("/api/debug/claims", (HttpContext ctx) => Results.Ok(
         ctx.User.Claims.Select(c => new { c.Type, c.Value })
     )).RequireAuthorization();
 

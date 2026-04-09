@@ -4,8 +4,13 @@ WORKDIR /src
 
 COPY ShantiSangha.sln .
 COPY ShantiSangha.Api/ShantiSangha.Api.csproj ShantiSangha.Api/
-COPY ShantiSangha.Core/ShantiSangha.Core.csproj ShantiSangha.Core/
-COPY ShantiSangha.Infrastructure/ShantiSangha.Infrastructure.csproj ShantiSangha.Infrastructure/
+COPY ShantiSangha.Shared/ShantiSangha.Shared.csproj ShantiSangha.Shared/
+COPY ShantiSangha.Identity/ShantiSangha.Identity.csproj ShantiSangha.Identity/
+COPY ShantiSangha.Goals/ShantiSangha.Goals.csproj ShantiSangha.Goals/
+COPY ShantiSangha.Chat/ShantiSangha.Chat.csproj ShantiSangha.Chat/
+COPY ShantiSangha.Journal/ShantiSangha.Journal.csproj ShantiSangha.Journal/
+COPY ShantiSangha.Wellness/ShantiSangha.Wellness.csproj ShantiSangha.Wellness/
+COPY ShantiSangha.Insights/ShantiSangha.Insights.csproj ShantiSangha.Insights/
 
 RUN dotnet restore
 
