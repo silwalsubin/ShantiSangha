@@ -1,31 +1,76 @@
 import SwiftUI
 
-/// Reflect hub — conversations with AI spiritual companion
+/// Unified reflection hub — conversations, journals, and voice notes in one timeline.
 struct ReflectView: View {
     @State private var conversations: [ConversationItem] = []
+    @State private var journals: [JournalItem] = []
+    @State private var voiceNotes: [VoiceNoteItem] = []
     @State private var loading = true
     @State private var navigateToChat = false
+    @State private var navigateToJournal = false
     @State private var newConversationId: String?
+    @State private var newJournalId: String?
+    @State private var showReflectMenu = false
+    @State private var navigateToVoice = false
     private let api = ApiService.shared
 
-    /// Group conversations by time period
-    private var groupedConversations: [(String, [ConversationItem])] {
+    // MARK: - Unified timeline
+
+    private var timelineItems: [ReflectTimelineItem] {
+        var items: [ReflectTimelineItem] = []
+
+        for conv in conversations {
+            items.append(ReflectTimelineItem(
+                id: conv.id,
+                type: .conversation,
+                title: conv.title == "Conversation" ? nil : conv.title,
+                preview: conv.lastUserMessage ?? conv.lastMessage,
+                date: conv.updatedAt
+            ))
+        }
+
+        for journal in journals {
+            items.append(ReflectTimelineItem(
+                id: journal.id,
+                type: .journal,
+                title: journal.title,
+                preview: journal.preview,
+                date: journal.updatedAt
+            ))
+        }
+
+        for voice in voiceNotes {
+            items.append(ReflectTimelineItem(
+                id: voice.id,
+                type: .voice,
+                title: nil,
+                preview: voice.hasTranscript ? "Voice note" : "Transcribing...",
+                date: voice.updatedAt
+            ))
+        }
+
+        return items.sorted { $0.date > $1.date }
+    }
+
+    private var groupedTimeline: [(String, [ReflectTimelineItem])] {
         let calendar = Calendar.current
         let now = Date()
 
-        var groups: [String: [ConversationItem]] = [:]
+        var groups: [String: [ReflectTimelineItem]] = [:]
         var order: [String] = []
 
-        for conv in conversations {
-            let label = timePeriodLabel(for: conv.updatedAt, now: now, calendar: calendar)
+        for item in timelineItems {
+            let label = timePeriodLabel(for: item.date, now: now, calendar: calendar)
             if groups[label] == nil {
                 order.append(label)
             }
-            groups[label, default: []].append(conv)
+            groups[label, default: []].append(item)
         }
 
         return order.map { ($0, groups[$0]!) }
     }
+
+    // MARK: - Body
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -34,48 +79,32 @@ struct ReflectView: View {
                     if loading {
                         ProgressView()
                             .frame(maxWidth: .infinity, minHeight: 200)
-                    } else if conversations.isEmpty {
-                        VStack(spacing: 8) {
-                            Image(systemName: "bubble.left.and.bubble.right")
-                                .font(.sacredHero)
-                                .foregroundColor(.sacredMutedLight)
-                            Text("No conversations yet.")
-                                .font(.sacredText)
-                                .foregroundColor(.sacredTextSecondary)
-                            Text("Tap the chat button to begin a reflection.")
-                                .font(.sacredSmall)
-                                .foregroundColor(.sacredMuted)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 40)
+                    } else if timelineItems.isEmpty {
+                        emptyState
                     } else {
-                        ForEach(groupedConversations, id: \.0) { group in
+                        ForEach(groupedTimeline, id: \.0) { group in
                             let (label, items) = group
 
-                            // Section header
                             Text(label)
                                 .font(.sacredTitle)
                                 .foregroundColor(.sacredText)
                                 .padding(.top, 24)
                                 .padding(.bottom, 12)
 
-                            // Conversation cards in a single card container
                             VStack(spacing: 0) {
-                                ForEach(Array(items.enumerated()), id: \.element.id) { index, conv in
-                                    NavigationLink(destination: ChatView(conversationId: conv.id, title: conv.title)) {
-                                        conversationRow(conv, section: label)
-                                    }
-                                    .contextMenu {
-                                        Button(role: .destructive) {
-                                            Task { await deleteConversation(conv.id) }
-                                        } label: {
-                                            Label("Delete", systemImage: "trash")
+                                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                    timelineRow(item, section: label)
+                                        .contextMenu {
+                                            Button(role: .destructive) {
+                                                Task { await deleteItem(item) }
+                                            } label: {
+                                                Label("Delete", systemImage: "trash")
+                                            }
                                         }
-                                    }
 
                                     if index < items.count - 1 {
                                         Divider()
-                                            .padding(.leading, 16)
+                                            .padding(.leading, 48)
                                     }
                                 }
                             }
@@ -88,59 +117,156 @@ struct ReflectView: View {
                 .padding(.bottom, 100)
             }
             .background(Color.sacredBg.ignoresSafeArea())
-            .refreshable { await loadConversations() }
+            .refreshable { await loadAll() }
             .navigationTitle("Reflect")
             .navigationBarTitleDisplayMode(.inline)
-            .task { await loadConversations() }
+            .task { await loadAll() }
 
-            // Floating chat button
-            Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                Task { await startChat() }
-            } label: {
-                Image(systemName: "bubble.left.fill")
-                    .font(.sacredHeading)
-                    .foregroundColor(.sacredGold)
-                    .frame(width: 56, height: 56)
-                    .background(.ultraThinMaterial)
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.sacredGold.opacity(0.25), lineWidth: 1))
-                    .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
-            }
-            .padding(.trailing, 20)
-            .padding(.bottom, 20)
+            // Floating action menu
+            reflectFAB
         }
-        .background(
-            NavigationLink(
-                destination: newConversationId.map { id in
-                    ChatView(conversationId: id, title: "New Conversation")
-                },
-                isActive: $navigateToChat
-            ) {
-                EmptyView()
+        .navigationDestination(isPresented: $navigateToChat) {
+            if let id = newConversationId {
+                ChatView(conversationId: id, title: "New Conversation")
             }
-            .hidden()
-        )
+        }
+        .navigationDestination(isPresented: $navigateToJournal) {
+            if let id = newJournalId {
+                JournalEditorView(journalId: id, isNew: true)
+            }
+        }
+        .navigationDestination(isPresented: $navigateToVoice) {
+            VoiceNoteView()
+        }
     }
 
-    // MARK: - Conversation row
+    // MARK: - Empty state
 
-    private func conversationRow(_ conv: ConversationItem, section: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(formatDateTime(conv.updatedAt, in: section))
-                .font(.sacredTextSemibold)
-                .foregroundColor(.sacredText)
+    private var emptyState: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "leaf")
+                .font(.sacredHero)
+                .foregroundColor(.sacredMutedLight)
+            Text("Your reflections will appear here.")
+                .font(.sacredText)
+                .foregroundColor(.sacredTextSecondary)
+            Text("Talk, write, or speak — whatever feels right.")
+                .font(.sacredSmall)
+                .foregroundColor(.sacredMuted)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+    }
 
-            if !conv.lastMessage.isEmpty {
-                Text(conv.lastMessage.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.joined(separator: " "))
-                    .font(.sacredSmall)
-                    .foregroundColor(.sacredTextSecondary)
-                    .lineLimit(2)
+    // MARK: - Timeline row
+
+    private func timelineRow(_ item: ReflectTimelineItem, section: String) -> some View {
+        Group {
+            switch item.type {
+            case .conversation:
+                NavigationLink(destination: ChatView(conversationId: item.id, title: item.title ?? "Conversation")) {
+                    rowContent(item, section: section)
+                }
+            case .journal:
+                NavigationLink(destination: JournalEditorView(journalId: item.id, isNew: false)) {
+                    rowContent(item, section: section)
+                }
+            case .voice:
+                rowContent(item, section: section)
             }
+        }
+    }
+
+    private func rowContent(_ item: ReflectTimelineItem, section: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            // Type indicator
+            Image(systemName: item.type.icon)
+                .font(.sacredIcon)
+                .foregroundColor(item.type.color)
+                .frame(width: 24, height: 24)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 4) {
+                // Title or date
+                if let title = item.title, !title.isEmpty, title != "Untitled" {
+                    Text(title)
+                        .font(.sacredTextSemibold)
+                        .foregroundColor(.sacredText)
+                        .lineLimit(1)
+                }
+
+                Text(formatDateTime(item.date, in: section))
+                    .font(item.title != nil ? .sacredSmall : .sacredTextSemibold)
+                    .foregroundColor(item.title != nil ? .sacredMuted : .sacredText)
+
+                if !item.preview.isEmpty {
+                    Text(item.preview
+                        .components(separatedBy: .whitespacesAndNewlines)
+                        .filter { !$0.isEmpty }
+                        .joined(separator: " "))
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredTextSecondary)
+                        .lineLimit(2)
+                }
+            }
+
+            Spacer()
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: - FAB with menu
+
+    private var reflectFAB: some View {
+        VStack(spacing: 16) {
+            if showReflectMenu {
+                reflectMenuIcon(icon: "bubble.left") {
+                    showReflectMenu = false
+                    Task { await startChat() }
+                }
+                reflectMenuIcon(icon: "pencil.line") {
+                    showReflectMenu = false
+                    Task { await startJournal() }
+                }
+                reflectMenuIcon(icon: "mic") {
+                    showReflectMenu = false
+                    Task { await startVoiceNote() }
+                }
+            }
+
+            // Main FAB
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    showReflectMenu.toggle()
+                }
+            } label: {
+                Image(systemName: showReflectMenu ? "xmark" : "square.and.pencil")
+                    .font(.sacredHeading)
+                    .foregroundColor(.white)
+                    .frame(width: 56, height: 56)
+                    .background(LinearGradient.sacredGoldShiny)
+                    .clipShape(Circle())
+                    .shadow(color: .sacredGold.opacity(0.3), radius: 8, y: 4)
+            }
+        }
+        .padding(.trailing, 20)
+        .padding(.bottom, 20)
+    }
+
+    private func reflectMenuIcon(icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.sacredIcon)
+                .foregroundColor(.white)
+                .frame(width: 48, height: 48)
+                .background(LinearGradient.sacredGoldShiny)
+                .clipShape(Circle())
+                .shadow(color: .sacredGold.opacity(0.3), radius: 6, y: 3)
+        }
+        .transition(.scale.combined(with: .opacity))
     }
 
     // MARK: - Helpers
@@ -163,12 +289,6 @@ struct ReflectView: View {
         return f.string(from: date)
     }
 
-    private func formatDate(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.dateFormat = "M/d/yy"
-        return f.string(from: date)
-    }
-
     private func formatDateTime(_ date: Date, in section: String) -> String {
         let f = DateFormatter()
         switch section {
@@ -182,6 +302,16 @@ struct ReflectView: View {
         return f.string(from: date)
     }
 
+    // MARK: - Network
+
+    private func loadAll() async {
+        async let convTask: () = loadConversations()
+        async let journalTask: () = loadJournals()
+        async let voiceTask: () = loadVoiceNotes()
+        _ = await (convTask, journalTask, voiceTask)
+        loading = false
+    }
+
     private func loadConversations() async {
         do {
             let all: [ConversationItem] = try await api.get("/conversations")
@@ -189,7 +319,25 @@ struct ReflectView: View {
         } catch {
             AppLogger.shared.error("Reflect", "Failed to load conversations: \(error)")
         }
-        loading = false
+    }
+
+    private func loadJournals() async {
+        do {
+            let items: [JournalItem] = try await api.get("/journals?page=1&pageSize=50")
+            journals = items
+        } catch {
+            AppLogger.shared.error("Reflect", "Failed to load journals: \(error)")
+        }
+    }
+
+    private func loadVoiceNotes() async {
+        do {
+            let items: [VoiceNoteItem] = try await api.get("/voice/entries?page=1&pageSize=50")
+            voiceNotes = items
+        } catch {
+            // Voice notes may not be available yet — fail silently
+            AppLogger.shared.error("Reflect", "Failed to load voice notes: \(error)")
+        }
     }
 
     private func startChat() async {
@@ -202,27 +350,87 @@ struct ReflectView: View {
         }
     }
 
-    private func deleteConversation(_ id: String) async {
-        conversations.removeAll { $0.id == id }
+    private func startJournal() async {
         do {
-            try await api.delete("/conversations/\(id)")
+            let journal: JournalCreatedResponse = try await api.post("/journals", body: CreateJournalRequest(title: "", content: ""))
+            newJournalId = journal.id
+            // Small delay to ensure SwiftUI processes the ID before navigation
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            navigateToJournal = true
         } catch {
-            AppLogger.shared.error("Reflect", "Failed to delete conversation: \(error)")
-            await loadConversations()
+            AppLogger.shared.error("Reflect", "Failed to create journal: \(error)")
+        }
+    }
+
+    private func startVoiceNote() async {
+        navigateToVoice = true
+    }
+
+    private func deleteItem(_ item: ReflectTimelineItem) async {
+        switch item.type {
+        case .conversation:
+            conversations.removeAll { $0.id == item.id }
+            do { try await api.delete("/conversations/\(item.id)") } catch {
+                AppLogger.shared.error("Reflect", "Failed to delete conversation: \(error)")
+                await loadConversations()
+            }
+        case .journal:
+            journals.removeAll { $0.id == item.id }
+            do { try await api.delete("/journals/\(item.id)") } catch {
+                AppLogger.shared.error("Reflect", "Failed to delete journal: \(error)")
+                await loadJournals()
+            }
+        case .voice:
+            voiceNotes.removeAll { $0.id == item.id }
+            do { try await api.delete("/voice/entries/\(item.id)") } catch {
+                AppLogger.shared.error("Reflect", "Failed to delete voice note: \(error)")
+                await loadVoiceNotes()
+            }
         }
     }
 }
 
-// MARK: - Model
+// MARK: - Timeline item model
+
+struct ReflectTimelineItem: Identifiable {
+    let id: String
+    let type: ReflectType
+    let title: String?
+    let preview: String
+    let date: Date
+}
+
+enum ReflectType {
+    case conversation, journal, voice
+
+    var icon: String {
+        switch self {
+        case .conversation: return "bubble.left"
+        case .journal: return "pencil.line"
+        case .voice: return "mic"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .conversation: return .sacredGold
+        case .journal: return .sacredTextSecondary
+        case .voice: return .sacredMuted
+        }
+    }
+}
+
+// MARK: - API models
 
 struct ConversationItem: Identifiable, Decodable {
     let id: String
     let title: String
     var lastMessage: String
+    var lastUserMessage: String?
     var updatedAt: Date
 
     enum CodingKeys: String, CodingKey {
-        case id, title, lastMessage, updatedAt, createdAt
+        case id, title, lastMessage, lastUserMessage, updatedAt, createdAt
     }
 
     init(from decoder: Decoder) throws {
@@ -230,10 +438,9 @@ struct ConversationItem: Identifiable, Decodable {
         id = try c.decode(String.self, forKey: .id)
         title = try c.decodeIfPresent(String.self, forKey: .title) ?? "Conversation"
         let rawMessage = try c.decodeIfPresent(String.self, forKey: .lastMessage) ?? ""
-        // Trim all whitespace including non-breaking spaces
         lastMessage = rawMessage.replacingOccurrences(of: "^\\s+", with: "", options: .regularExpression)
+        lastUserMessage = try c.decodeIfPresent(String.self, forKey: .lastUserMessage)
 
-        // Parse updatedAt or createdAt
         let iso = ISO8601DateFormatter()
         iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let isoBasic = ISO8601DateFormatter()
@@ -247,4 +454,75 @@ struct ConversationItem: Identifiable, Decodable {
             updatedAt = Date()
         }
     }
+}
+
+struct JournalItem: Identifiable, Decodable {
+    let id: String
+    let title: String
+    let preview: String
+    let updatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, preview, updatedAt, createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        title = try c.decodeIfPresent(String.self, forKey: .title) ?? "Untitled"
+        preview = try c.decodeIfPresent(String.self, forKey: .preview) ?? ""
+
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let isoBasic = ISO8601DateFormatter()
+        isoBasic.formatOptions = [.withInternetDateTime]
+
+        if let dateStr = try c.decodeIfPresent(String.self, forKey: .updatedAt) {
+            updatedAt = iso.date(from: dateStr) ?? isoBasic.date(from: dateStr) ?? Date()
+        } else if let dateStr = try c.decodeIfPresent(String.self, forKey: .createdAt) {
+            updatedAt = iso.date(from: dateStr) ?? isoBasic.date(from: dateStr) ?? Date()
+        } else {
+            updatedAt = Date()
+        }
+    }
+}
+
+struct VoiceNoteItem: Identifiable, Decodable {
+    let id: String
+    let status: String
+    let hasTranscript: Bool
+    let updatedAt: Date
+
+    enum CodingKeys: String, CodingKey {
+        case id, status, hasTranscript, updatedAt, createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        status = try c.decodeIfPresent(String.self, forKey: .status) ?? "Pending"
+        hasTranscript = try c.decodeIfPresent(Bool.self, forKey: .hasTranscript) ?? false
+
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let isoBasic = ISO8601DateFormatter()
+        isoBasic.formatOptions = [.withInternetDateTime]
+
+        if let dateStr = try c.decodeIfPresent(String.self, forKey: .updatedAt) {
+            updatedAt = iso.date(from: dateStr) ?? isoBasic.date(from: dateStr) ?? Date()
+        } else if let dateStr = try c.decodeIfPresent(String.self, forKey: .createdAt) {
+            updatedAt = iso.date(from: dateStr) ?? isoBasic.date(from: dateStr) ?? Date()
+        } else {
+            updatedAt = Date()
+        }
+    }
+}
+
+struct JournalCreatedResponse: Decodable {
+    let id: String
+}
+
+struct CreateJournalRequest: Encodable {
+    let title: String
+    let content: String
 }

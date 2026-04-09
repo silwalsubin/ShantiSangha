@@ -105,14 +105,13 @@ struct HomeView: View {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 showNewTask = true
             } label: {
-                Image(systemName: "plus")
+                Image(systemName: "square.and.pencil")
                     .font(.sacredHeading)
-                    .foregroundColor(.sacredGold)
+                    .foregroundColor(.white)
                     .frame(width: 56, height: 56)
-                    .background(.ultraThinMaterial)
+                    .background(LinearGradient.sacredGoldShiny)
                     .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.sacredGold.opacity(0.25), lineWidth: 1))
-                    .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
+                    .shadow(color: .sacredGold.opacity(0.3), radius: 8, y: 4)
             }
             .padding(.trailing, 20)
             .padding(.bottom, 20)

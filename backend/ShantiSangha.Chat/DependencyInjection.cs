@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<ChatQueryService>();
         services.AddScoped<IChatQueryService>(sp => sp.GetRequiredService<ChatQueryService>());
         services.AddScoped<GenerateMessageEmbeddingJob>();
+        services.AddScoped<GenerateConversationTitleJob>();
 
         return services;
     }
@@ -40,6 +41,10 @@ public static class DependencyInjection
 
             foreach (var msgId in @event.LastMessageIds)
                 jobs.Enqueue<GenerateMessageEmbeddingJob>(j => j.RunAsync(msgId));
+
+            // Generate title after first exchange (user + assistant = 2 messages)
+            if (@event.MessageCount == 2)
+                jobs.Enqueue<GenerateConversationTitleJob>(j => j.RunAsync(@event.ConversationId));
 
             await Task.CompletedTask;
         });

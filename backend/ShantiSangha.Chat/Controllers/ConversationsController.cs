@@ -38,6 +38,11 @@ public class ConversationsController(
                     .Where(m => m.ConversationId == c.Id)
                     .OrderByDescending(m => m.CreatedAt)
                     .Select(m => m.Content)
+                    .FirstOrDefault(),
+                LastUserMessage = db.Messages
+                    .Where(m => m.ConversationId == c.Id && m.Role == MessageRole.User)
+                    .OrderByDescending(m => m.CreatedAt)
+                    .Select(m => m.Content)
                     .FirstOrDefault()
             })
             .ToListAsync(ct);
