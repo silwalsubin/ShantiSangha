@@ -6,11 +6,9 @@ struct ReflectView: View {
     @State private var journals: [JournalItem] = []
     @State private var voiceNotes: [VoiceNoteItem] = []
     @State private var loading = true
-    @State private var navigateToChat = false
-    @State private var navigateToJournal = false
     @State private var newConversationId: String?
     @State private var showReflectMenu = false
-    @State private var navigateToVoice = false
+    @State private var pendingNavigation: ReflectNavDestination?
     private let api = ApiService.shared
 
     // MARK: - Unified timeline
@@ -124,16 +122,15 @@ struct ReflectView: View {
             // Floating action menu
             reflectFAB
         }
-        .navigationDestination(isPresented: $navigateToChat) {
-            if let id = newConversationId {
+        .navigationDestination(item: $pendingNavigation) { dest in
+            switch dest {
+            case .chat(let id):
                 ChatView(conversationId: id, title: "New Conversation")
+            case .journal:
+                JournalEditorView(journalId: nil, isNew: true)
+            case .voice:
+                VoiceNoteView()
             }
-        }
-        .navigationDestination(isPresented: $navigateToJournal) {
-            JournalEditorView(journalId: nil, isNew: true)
-        }
-        .navigationDestination(isPresented: $navigateToVoice) {
-            VoiceNoteView()
         }
     }
 
@@ -169,7 +166,9 @@ struct ReflectView: View {
                     rowContent(item, section: section)
                 }
             case .voice:
-                rowContent(item, section: section)
+                NavigationLink(destination: VoiceNoteDetailView(entryId: item.id)) {
+                    rowContent(item, section: section)
+                }
             }
         }
     }
@@ -225,11 +224,11 @@ struct ReflectView: View {
                 }
                 reflectMenuIcon(icon: "pencil.line") {
                     showReflectMenu = false
-                    Task { await startJournal() }
+                    pendingNavigation = .journal
                 }
                 reflectMenuIcon(icon: "mic") {
                     showReflectMenu = false
-                    Task { await startVoiceNote() }
+                    pendingNavigation = .voice
                 }
             }
 
@@ -246,7 +245,7 @@ struct ReflectView: View {
                     .frame(width: 56, height: 56)
                     .background(LinearGradient.sacredGoldShiny)
                     .clipShape(Circle())
-                    .shadow(color: .sacredGold.opacity(0.3), radius: 8, y: 4)
+                    .shadow(color: .clear, radius: 0)
             }
         }
         .padding(.trailing, 20)
@@ -261,7 +260,7 @@ struct ReflectView: View {
                 .frame(width: 48, height: 48)
                 .background(LinearGradient.sacredGoldShiny)
                 .clipShape(Circle())
-                .shadow(color: .sacredGold.opacity(0.3), radius: 6, y: 3)
+                .shadow(color: .clear, radius: 0)
         }
         .transition(.scale.combined(with: .opacity))
     }
@@ -341,18 +340,10 @@ struct ReflectView: View {
         do {
             let conv: ConversationItem = try await api.post("/conversations", body: ["title": "New Conversation"])
             newConversationId = conv.id
-            navigateToChat = true
+            pendingNavigation = .chat(id: conv.id)
         } catch {
             AppLogger.shared.error("Reflect", "Failed to create conversation: \(error)")
         }
-    }
-
-    private func startJournal() async {
-        navigateToJournal = true
-    }
-
-    private func startVoiceNote() async {
-        navigateToVoice = true
     }
 
     private func deleteItem(_ item: ReflectTimelineItem) async {
@@ -387,6 +378,20 @@ struct ReflectTimelineItem: Identifiable {
     let title: String?
     let preview: String
     let date: Date
+}
+
+enum ReflectNavDestination: Identifiable, Hashable {
+    case chat(id: String)
+    case journal
+    case voice
+
+    var id: String {
+        switch self {
+        case .chat(let id): return "chat-\(id)"
+        case .journal: return "journal"
+        case .voice: return "voice"
+        }
+    }
 }
 
 enum ReflectType {

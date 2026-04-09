@@ -100,10 +100,11 @@ struct JournalEditorView: View {
     // MARK: - Edit handling
 
     private func onEdit() {
-        if activeId == nil && isNew {
+        if activeId == nil && isNew && !creating {
             // First edit on a new journal — create it now
+            creating = true
             Task { await createAndSave() }
-        } else {
+        } else if activeId != nil {
             scheduleAutoSave()
         }
     }
@@ -122,8 +123,6 @@ struct JournalEditorView: View {
     // MARK: - Network
 
     private func createAndSave() async {
-        guard !creating else { return }
-        creating = true
         do {
             let journal: JournalCreatedResponse = try await api.post("/journals", body: CreateJournalRequest(
                 title: title.isEmpty ? "" : title,

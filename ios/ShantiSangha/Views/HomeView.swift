@@ -111,7 +111,7 @@ struct HomeView: View {
                     .frame(width: 56, height: 56)
                     .background(LinearGradient.sacredGoldShiny)
                     .clipShape(Circle())
-                    .shadow(color: .sacredGold.opacity(0.3), radius: 8, y: 4)
+                    .shadow(color: .clear, radius: 0)
             }
             .padding(.trailing, 20)
             .padding(.bottom, 20)
