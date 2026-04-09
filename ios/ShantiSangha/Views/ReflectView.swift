@@ -9,7 +9,6 @@ struct ReflectView: View {
     @State private var navigateToChat = false
     @State private var navigateToJournal = false
     @State private var newConversationId: String?
-    @State private var newJournalId: String?
     @State private var showReflectMenu = false
     @State private var navigateToVoice = false
     private let api = ApiService.shared
@@ -131,9 +130,7 @@ struct ReflectView: View {
             }
         }
         .navigationDestination(isPresented: $navigateToJournal) {
-            if let id = newJournalId {
-                JournalEditorView(journalId: id, isNew: true)
-            }
+            JournalEditorView(journalId: nil, isNew: true)
         }
         .navigationDestination(isPresented: $navigateToVoice) {
             VoiceNoteView()
@@ -351,15 +348,7 @@ struct ReflectView: View {
     }
 
     private func startJournal() async {
-        do {
-            let journal: JournalCreatedResponse = try await api.post("/journals", body: CreateJournalRequest(title: "", content: ""))
-            newJournalId = journal.id
-            // Small delay to ensure SwiftUI processes the ID before navigation
-            try? await Task.sleep(nanoseconds: 50_000_000)
-            navigateToJournal = true
-        } catch {
-            AppLogger.shared.error("Reflect", "Failed to create journal: \(error)")
-        }
+        navigateToJournal = true
     }
 
     private func startVoiceNote() async {
