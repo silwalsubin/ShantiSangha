@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using ShantiSangha.Goals.Contracts;
 using ShantiSangha.Goals.Services;
 using ShantiSangha.Shared.Interfaces;
@@ -19,8 +19,19 @@ public class GoalsController(IGoalService goalService, ICurrentUser currentUser)
         var user = await currentUser.GetAsync();
         if (user is null) return Unauthorized();
 
-        var result = await goalService.CreateAsync(user.Id, body, ct);
-        return ToActionResult(result);
+        try
+        {
+            var result = await goalService.CreateAsync(user.Id, body, ct);
+            return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
+        }
+        catch (DbUpdateException)
+        {
+            return Conflict(new { error = "A goal with that title already exists." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 
     [HttpGet]
@@ -30,7 +41,7 @@ public class GoalsController(IGoalService goalService, ICurrentUser currentUser)
         if (user is null) return Unauthorized();
 
         var result = await goalService.ListAsync(user.Id, date, ct);
-        return ToActionResult(result);
+        return Ok(result);
     }
 
     [HttpGet("today")]
@@ -40,7 +51,7 @@ public class GoalsController(IGoalService goalService, ICurrentUser currentUser)
         if (user is null) return Unauthorized();
 
         var result = await goalService.GetTodayAsync(user.Id, date, ct);
-        return ToActionResult(result);
+        return Ok(result);
     }
 
     [HttpGet("{id:guid}")]
@@ -50,7 +61,7 @@ public class GoalsController(IGoalService goalService, ICurrentUser currentUser)
         if (user is null) return Unauthorized();
 
         var result = await goalService.GetByIdAsync(id, user.Id, date, ct);
-        return ToActionResult(result);
+        return result is null ? NotFound() : Ok(result);
     }
 
     [HttpPatch("{id:guid}")]
@@ -60,8 +71,19 @@ public class GoalsController(IGoalService goalService, ICurrentUser currentUser)
         var user = await currentUser.GetAsync();
         if (user is null) return Unauthorized();
 
-        var result = await goalService.UpdateAsync(id, user.Id, body, ct);
-        return ToActionResult(result);
+        try
+        {
+            var found = await goalService.UpdateAsync(id, user.Id, body, ct);
+            return found ? NoContent() : NotFound();
+        }
+        catch (DbUpdateException)
+        {
+            return Conflict(new { error = "A goal with that title already exists." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 
     [HttpDelete("{id:guid}")]
@@ -70,8 +92,8 @@ public class GoalsController(IGoalService goalService, ICurrentUser currentUser)
         var user = await currentUser.GetAsync();
         if (user is null) return Unauthorized();
 
-        var result = await goalService.DeleteAsync(id, user.Id, ct);
-        return ToActionResult(result);
+        var found = await goalService.DeleteAsync(id, user.Id, ct);
+        return found ? NoContent() : NotFound();
     }
 
     [HttpPost("{id:guid}/checkin")]
@@ -82,7 +104,7 @@ public class GoalsController(IGoalService goalService, ICurrentUser currentUser)
         if (user is null) return Unauthorized();
 
         var result = await goalService.CheckInAsync(id, user.Id, body, ct);
-        return ToActionResult(result);
+        return result is null ? NotFound() : Ok(result);
     }
 
     [HttpDelete("{id:guid}/checkin")]
@@ -91,8 +113,8 @@ public class GoalsController(IGoalService goalService, ICurrentUser currentUser)
         var user = await currentUser.GetAsync();
         if (user is null) return Unauthorized();
 
-        var result = await goalService.UndoCheckInAsync(id, user.Id, date, ct);
-        return ToActionResult(result);
+        var found = await goalService.UndoCheckInAsync(id, user.Id, date, ct);
+        return found ? NoContent() : NotFound();
     }
 
     [HttpGet("{id:guid}/checkins")]
@@ -103,7 +125,7 @@ public class GoalsController(IGoalService goalService, ICurrentUser currentUser)
         if (user is null) return Unauthorized();
 
         var result = await goalService.GetCheckInsAsync(id, user.Id, from, to, ct);
-        return ToActionResult(result);
+        return result is null ? NotFound() : Ok(result);
     }
 
     [HttpPost("{id:guid}/reset")]
@@ -112,8 +134,15 @@ public class GoalsController(IGoalService goalService, ICurrentUser currentUser)
         var user = await currentUser.GetAsync();
         if (user is null) return Unauthorized();
 
-        var result = await goalService.ResetAsync(id, user.Id, date, ct);
-        return ToActionResult(result);
+        try
+        {
+            var found = await goalService.ResetAsync(id, user.Id, date, ct);
+            return found ? NoContent() : NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 
     [HttpGet("{id:guid}/history")]
@@ -124,7 +153,7 @@ public class GoalsController(IGoalService goalService, ICurrentUser currentUser)
         if (user is null) return Unauthorized();
 
         var result = await goalService.GetHistoryAsync(id, user.Id, page, pageSize, ct);
-        return ToActionResult(result);
+        return result is null ? NotFound() : Ok(result);
     }
 
     [HttpGet("{id:guid}/nudge")]
@@ -134,7 +163,7 @@ public class GoalsController(IGoalService goalService, ICurrentUser currentUser)
         if (user is null) return Unauthorized();
 
         var result = await goalService.GetNudgeAsync(id, user.Id, ct);
-        return ToActionResult(result);
+        return result is null ? NotFound() : Ok(result);
     }
 
     [HttpGet("journey")]
@@ -145,7 +174,7 @@ public class GoalsController(IGoalService goalService, ICurrentUser currentUser)
         if (user is null) return Unauthorized();
 
         var result = await goalService.GetJourneyAsync(user.Id, from, to, ct);
-        return ToActionResult(result);
+        return Ok(result);
     }
 
     [HttpGet("journey/reflection")]
@@ -156,19 +185,6 @@ public class GoalsController(IGoalService goalService, ICurrentUser currentUser)
         if (user is null) return Unauthorized();
 
         var result = await goalService.GetJourneyReflectionAsync(user.Id, from, to, ct);
-        return ToActionResult(result);
-    }
-
-    private static IActionResult ToActionResult(IResult result)
-    {
-        return new HttpResultActionResult(result);
-    }
-
-    private sealed class HttpResultActionResult(IResult result) : IActionResult
-    {
-        public Task ExecuteResultAsync(ActionContext context)
-        {
-            return result.ExecuteAsync(context.HttpContext);
-        }
+        return Ok(result);
     }
 }

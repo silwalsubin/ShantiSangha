@@ -146,12 +146,6 @@ try
         });
     });
 
-    // JSON — also configure Minimal API serializer (used by GoalService's IResult responses)
-    builder.Services.ConfigureHttpJsonOptions(opts =>
-    {
-        opts.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
-    });
-
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
 

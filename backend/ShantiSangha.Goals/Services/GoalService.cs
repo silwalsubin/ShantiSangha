@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
@@ -22,11 +21,11 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
         });
     }
 
-    public async Task<IResult> CreateAsync(
+    public async Task<GoalCreatedResponse> CreateAsync(
         Guid userId, CreateGoalRequest body, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(body.Title))
-            return Results.BadRequest(new { error = "Title is required." });
+            throw new InvalidOperationException("Title is required.");
 
         DateOnly? targetDate = null;
         if (body.TargetDate is not null && DateOnly.TryParse(body.TargetDate, out var parsed))
@@ -47,24 +46,14 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
 
         db.Goals.Add(goal);
         LogActivity(goal.Id, "Created");
+        await db.SaveChangesAsync(ct);
 
-        try
-        {
-            await db.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateException)
-        {
-            return Results.Conflict(new { error = "A goal with that title already exists." });
-        }
-
-        return Results.Created($"/goals/{goal.Id}", new
-        {
-            goal.Id, goal.Title, goal.Type, goal.Frequency,
-            goal.FrequencyTarget, goal.TargetDate, goal.DeeperWhy, goal.CreatedAt
-        });
+        return new GoalCreatedResponse(
+            goal.Id, goal.Title, goal.Type.ToString(), goal.Frequency?.ToString(),
+            goal.FrequencyTarget, goal.TargetDate, goal.DeeperWhy, goal.CreatedAt);
     }
 
-    public async Task<IResult> ListAsync(
+    public async Task<List<object>> ListAsync(
         Guid userId, string? date = null, CancellationToken ct = default)
     {
         var goals = await db.Goals
@@ -77,7 +66,7 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
             ? parsed
             : DateOnly.FromDateTime(DateTime.UtcNow);
 
-        var result = goals.Select(g =>
+        return goals.Select(g =>
         {
             if (g.Type == GoalType.OneTime)
             {
@@ -87,41 +76,22 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
                     : null;
                 var todayCheckIn = g.CheckIns.FirstOrDefault(c => c.Date == today);
 
-                return (object)new
-                {
-                    g.Id,
-                    g.Title,
-                    g.Type,
-                    g.TargetDate,
-                    g.Progress,
-                    g.CompletedAt,
-                    g.CreatedAt,
-                    DaysRemaining = daysRemaining,
-                    NoteCount = noteCount,
-                    CheckIn = todayCheckIn != null ? new { todayCheckIn.Completed, todayCheckIn.Note } : null
-                };
+                return (object)new OneTimeGoalResponse(
+                    g.Id, g.Title, g.Type.ToString(), g.TargetDate, g.Progress,
+                    g.CompletedAt, g.CreatedAt, daysRemaining, noteCount,
+                    todayCheckIn != null ? new CheckInResponse(todayCheckIn.Completed, todayCheckIn.Note) : null);
             }
             else
             {
                 var (current, longest) = ComputeStreaks(g.CheckIns, today);
-                return (object)new
-                {
-                    g.Id,
-                    g.Title,
-                    g.Type,
-                    g.Frequency,
-                    g.FrequencyTarget,
-                    g.CreatedAt,
-                    CurrentStreak = current,
-                    LongestStreak = longest
-                };
+                return (object)new RecurringGoalResponse(
+                    g.Id, g.Title, g.Type.ToString(), g.Frequency?.ToString(),
+                    g.FrequencyTarget, g.CreatedAt, current, longest);
             }
-        });
-
-        return Results.Ok(result);
+        }).ToList();
     }
 
-    public async Task<IResult> GetTodayAsync(
+    public async Task<List<TodayGoalResponse>> GetTodayAsync(
         Guid userId, string? date = null, CancellationToken ct = default)
     {
         var today = date is not null && DateOnly.TryParse(date, out var parsed)
@@ -134,31 +104,24 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
             .OrderBy(g => g.CreatedAt)
             .ToListAsync(ct);
 
-        var result = goals.Select(g =>
+        return goals.Select(g =>
         {
             var (current, longest) = ComputeStreaks(g.CheckIns, today);
             var todayCheckIn = g.CheckIns.FirstOrDefault(c => c.Date == today);
-            return new
-            {
-                g.Id,
-                g.Title,
-                CurrentStreak = current,
-                LongestStreak = longest,
-                CheckIn = todayCheckIn != null ? new { todayCheckIn.Completed, todayCheckIn.Note } : null
-            };
-        });
-
-        return Results.Ok(result);
+            return new TodayGoalResponse(
+                g.Id, g.Title, current, longest,
+                todayCheckIn != null ? new CheckInResponse(todayCheckIn.Completed, todayCheckIn.Note) : null);
+        }).ToList();
     }
 
-    public async Task<IResult> GetByIdAsync(
+    public async Task<object?> GetByIdAsync(
         Guid id, Guid userId, string? date = null, CancellationToken ct = default)
     {
         var goal = await db.Goals
             .Include(g => g.CheckIns)
             .FirstOrDefaultAsync(g => g.Id == id && g.UserId == userId, ct);
 
-        if (goal is null) return Results.NotFound();
+        if (goal is null) return null;
 
         var today = date is not null && DateOnly.TryParse(date, out var parsed)
             ? parsed
@@ -171,39 +134,34 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
                 ? goal.TargetDate.Value.DayNumber - today.DayNumber
                 : null;
 
-            return Results.Ok(new
-            {
-                goal.Id, goal.Title, goal.Type, goal.TargetDate, goal.DeeperWhy,
-                goal.Progress, goal.CompletedAt, goal.CreatedAt,
-                DaysRemaining = daysRemaining, NoteCount = noteCount,
-                goal.AiNudge
-            });
+            return new OneTimeGoalDetailResponse(
+                goal.Id, goal.Title, goal.Type.ToString(), goal.TargetDate,
+                goal.DeeperWhy, goal.Progress, goal.CompletedAt, goal.CreatedAt,
+                daysRemaining, noteCount, goal.AiNudge);
         }
         else
         {
             var (current, longest) = ComputeStreaks(goal.CheckIns, today);
-            return Results.Ok(new
-            {
-                goal.Id, goal.Title, goal.Type, goal.Frequency,
+            return new RecurringGoalDetailResponse(
+                goal.Id, goal.Title, goal.Type.ToString(), goal.Frequency?.ToString(),
                 goal.FrequencyTarget, goal.DeeperWhy, goal.CreatedAt,
-                CurrentStreak = current, LongestStreak = longest,
-                goal.AiNudge
-            });
+                current, longest, goal.AiNudge);
         }
     }
 
-    public async Task<IResult> UpdateAsync(
+    /// <returns>true if updated, false if not found. Throws InvalidOperationException for validation errors.</returns>
+    public async Task<bool> UpdateAsync(
         Guid id, Guid userId, UpdateGoalRequest body, CancellationToken ct = default)
     {
         var goal = await db.Goals
             .FirstOrDefaultAsync(g => g.Id == id && g.UserId == userId, ct);
 
-        if (goal is null) return Results.NotFound();
+        if (goal is null) return false;
 
         if (body.Title is not null)
         {
             if (string.IsNullOrWhiteSpace(body.Title))
-                return Results.BadRequest(new { error = "Title cannot be empty." });
+                throw new InvalidOperationException("Title cannot be empty.");
             goal.Title = body.Title.Trim();
         }
 
@@ -243,22 +201,14 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
                 LogActivity(id, "DueDateChanged", $"{oldDate ?? "none"} \u2192 {parsedDate:MMM d, yyyy}");
             }
             else
-                return Results.BadRequest(new { error = "Invalid date format. Use yyyy-MM-dd." });
+                throw new InvalidOperationException("Invalid date format. Use yyyy-MM-dd.");
         }
 
-        try
-        {
-            await db.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateException)
-        {
-            return Results.Conflict(new { error = "A goal with that title already exists." });
-        }
-
-        return Results.NoContent();
+        await db.SaveChangesAsync(ct);
+        return true;
     }
 
-    public async Task<IResult> DeleteAsync(
+    public async Task<bool> DeleteAsync(
         Guid id, Guid userId, CancellationToken ct = default)
     {
         var goal = await db.Goals
@@ -266,23 +216,24 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
             .Include(g => g.Activities)
             .FirstOrDefaultAsync(g => g.Id == id && g.UserId == userId, ct);
 
-        if (goal is null) return Results.NotFound();
+        if (goal is null) return false;
 
         db.GoalActivities.RemoveRange(goal.Activities);
         db.GoalCheckIns.RemoveRange(goal.CheckIns);
         db.Goals.Remove(goal);
         await db.SaveChangesAsync(ct);
 
-        return Results.NoContent();
+        return true;
     }
 
-    public async Task<IResult> CheckInAsync(
+    /// <returns>CheckInResult if goal exists, null if goal not found.</returns>
+    public async Task<CheckInResult?> CheckInAsync(
         Guid id, Guid userId, CheckInRequest body, CancellationToken ct = default)
     {
         var goal = await db.Goals
             .FirstOrDefaultAsync(g => g.Id == id && g.UserId == userId, ct);
 
-        if (goal is null) return Results.NotFound();
+        if (goal is null) return null;
 
         var today = body.Date is not null && DateOnly.TryParse(body.Date, out var parsed)
             ? parsed
@@ -329,16 +280,17 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
 
         await db.SaveChangesAsync(ct);
 
-        return Results.Ok(new { existing.Id, existing.Date, existing.Completed, existing.Note });
+        return new CheckInResult(existing.Id, existing.Date, existing.Completed, existing.Note);
     }
 
-    public async Task<IResult> UndoCheckInAsync(
+    /// <returns>true if undone, false if goal or check-in not found.</returns>
+    public async Task<bool> UndoCheckInAsync(
         Guid id, Guid userId, string? date = null, CancellationToken ct = default)
     {
         var goal = await db.Goals
             .FirstOrDefaultAsync(g => g.Id == id && g.UserId == userId, ct);
 
-        if (goal is null) return Results.NotFound();
+        if (goal is null) return false;
 
         var today = date is not null && DateOnly.TryParse(date, out var parsed)
             ? parsed
@@ -347,7 +299,7 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
         var existing = await db.GoalCheckIns
             .FirstOrDefaultAsync(c => c.GoalId == id && c.Date == today, ct);
 
-        if (existing is null) return Results.NotFound();
+        if (existing is null) return false;
 
         db.GoalCheckIns.Remove(existing);
 
@@ -358,10 +310,11 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
 
         await db.SaveChangesAsync(ct);
 
-        return Results.NoContent();
+        return true;
     }
 
-    public async Task<IResult> ResetAsync(
+    /// <returns>true if reset, false if not found. Throws InvalidOperationException if not recurring.</returns>
+    public async Task<bool> ResetAsync(
         Guid id, Guid userId, string? date = null, CancellationToken ct = default)
     {
         var goal = await db.Goals
@@ -369,9 +322,9 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
             .Include(g => g.Activities)
             .FirstOrDefaultAsync(g => g.Id == id && g.UserId == userId, ct);
 
-        if (goal is null) return Results.NotFound();
+        if (goal is null) return false;
         if (goal.Type != GoalType.Recurring)
-            return Results.BadRequest(new { error = "Only recurring goals can be reset." });
+            throw new InvalidOperationException("Only recurring goals can be reset.");
 
         db.GoalCheckIns.RemoveRange(goal.CheckIns);
         db.GoalActivities.RemoveRange(goal.Activities);
@@ -386,16 +339,16 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
         LogActivity(id, "Created", "History reset");
         await db.SaveChangesAsync(ct);
 
-        return Results.NoContent();
+        return true;
     }
 
-    public async Task<IResult> GetCheckInsAsync(
+    public async Task<List<CheckInListItem>?> GetCheckInsAsync(
         Guid id, Guid userId, string? from = null, string? to = null, CancellationToken ct = default)
     {
         var goal = await db.Goals
             .FirstOrDefaultAsync(g => g.Id == id && g.UserId == userId, ct);
 
-        if (goal is null) return Results.NotFound();
+        if (goal is null) return null;
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var endDate = to is not null && DateOnly.TryParse(to, out var toParsed) ? toParsed : today;
@@ -403,22 +356,20 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
             ? fromParsed
             : new DateOnly(endDate.Year, endDate.Month, 1);
 
-        var checkIns = await db.GoalCheckIns
+        return await db.GoalCheckIns
             .Where(c => c.GoalId == id && c.Date >= startDate && c.Date <= endDate)
             .OrderBy(c => c.Date)
-            .Select(c => new { c.Id, Date = c.Date.ToString("yyyy-MM-dd"), c.Completed, c.Note })
+            .Select(c => new CheckInListItem(c.Id, c.Date.ToString("yyyy-MM-dd"), c.Completed, c.Note))
             .ToListAsync(ct);
-
-        return Results.Ok(checkIns);
     }
 
-    public async Task<IResult> GetHistoryAsync(
+    public async Task<List<GoalActivityResponse>?> GetHistoryAsync(
         Guid id, Guid userId, int page = 1, int pageSize = 50, CancellationToken ct = default)
     {
         var goal = await db.Goals
             .FirstOrDefaultAsync(g => g.Id == id && g.UserId == userId, ct);
 
-        if (goal is null) return Results.NotFound();
+        if (goal is null) return null;
 
         pageSize = Math.Clamp(pageSize, 1, 100);
 
@@ -427,7 +378,7 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
             .OrderByDescending(a => a.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(a => new { a.Id, a.Action, a.Detail, a.CreatedAt })
+            .Select(a => new GoalActivityResponse(a.Id, a.Action, a.Detail, a.CreatedAt))
             .ToListAsync(ct);
 
         var hasCreated = await db.GoalActivities
@@ -435,13 +386,13 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
 
         if (!hasCreated)
         {
-            activities.Add(new { Id = goal.Id, Action = "Created", Detail = (string?)null, goal.CreatedAt });
+            activities.Add(new GoalActivityResponse(goal.Id, "Created", null, goal.CreatedAt));
         }
 
-        return Results.Ok(activities);
+        return activities;
     }
 
-    public async Task<IResult> GetNudgeAsync(
+    public async Task<NudgeResult?> GetNudgeAsync(
         Guid id, Guid userId, CancellationToken ct = default)
     {
         var goal = await db.Goals
@@ -449,12 +400,12 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
             .Include(g => g.Activities.OrderByDescending(a => a.CreatedAt).Take(10))
             .FirstOrDefaultAsync(g => g.Id == id && g.UserId == userId, ct);
 
-        if (goal is null) return Results.NotFound();
+        if (goal is null) return null;
 
         if (goal.AiNudge is not null && goal.AiNudgeAt.HasValue
             && DateTime.UtcNow - goal.AiNudgeAt.Value < TimeSpan.FromHours(12))
         {
-            return Results.Ok(new { nudge = goal.AiNudge });
+            return new NudgeResult(goal.AiNudge);
         }
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -513,15 +464,15 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
                 await db.SaveChangesAsync(ct);
             }
 
-            return Results.Ok(new { nudge });
+            return new NudgeResult(nudge);
         }
         catch
         {
-            return Results.Ok(new { nudge = goal.AiNudge });
+            return new NudgeResult(goal.AiNudge);
         }
     }
 
-    public async Task<IResult> GetJourneyAsync(
+    public async Task<JourneyResponse> GetJourneyAsync(
         Guid userId, string? from = null, string? to = null, CancellationToken ct = default)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -555,19 +506,12 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
             var effectiveStart = goalCreatedDate > startDate ? goalCreatedDate : startDate;
             var goalTotalDays = Math.Max(0, endDate.DayNumber - effectiveStart.DayNumber + 1);
 
-            return new
-            {
-                g.Id,
-                g.Title,
-                DaysCompleted = daysCompleted,
-                TotalDays = goalTotalDays,
-                CurrentStreak = current,
-                LongestStreak = longest,
-                Days = Enumerable.Range(0, totalDays)
+            return new JourneyPractice(
+                g.Id, g.Title, daysCompleted, goalTotalDays, current, longest,
+                Enumerable.Range(0, totalDays)
                     .Select(i => startDate.AddDays(i))
-                    .Select(d => new { Date = d.ToString("yyyy-MM-dd"), Completed = dates.Contains(d) })
-                    .ToList()
-            };
+                    .Select(d => new JourneyDay(d.ToString("yyyy-MM-dd"), dates.Contains(d)))
+                    .ToList());
         }).ToList();
 
         var completedCommitments = await db.Goals
@@ -575,30 +519,26 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
                 && g.CompletedAt != null
                 && DateOnly.FromDateTime(g.CompletedAt!.Value) >= startDate
                 && DateOnly.FromDateTime(g.CompletedAt!.Value) <= endDate)
-            .Select(g => new { g.Id, g.Title, g.CompletedAt })
+            .Select(g => new JourneyCompletedCommitment(g.Id, g.Title, g.CompletedAt))
             .ToListAsync(ct);
 
         var totalCompleted = practices.Sum(p => p.DaysCompleted);
         var totalPossible = practices.Sum(p => p.TotalDays);
 
-        return Results.Ok(new
-        {
-            From = startDate.ToString("yyyy-MM-dd"),
-            To = endDate.ToString("yyyy-MM-dd"),
-            TotalDays = totalDays,
-            Practices = practices,
-            CompletedCommitments = completedCommitments,
-            Summary = new
-            {
-                PracticesCompleted = totalCompleted,
-                PracticesPossible = totalPossible,
-                CompletionRate = totalPossible > 0 ? Math.Round(100.0 * totalCompleted / totalPossible) : 0,
-                CommitmentsFinished = completedCommitments.Count
-            }
-        });
+        return new JourneyResponse(
+            startDate.ToString("yyyy-MM-dd"),
+            endDate.ToString("yyyy-MM-dd"),
+            totalDays,
+            practices,
+            completedCommitments,
+            new JourneySummary(
+                totalCompleted,
+                totalPossible,
+                totalPossible > 0 ? Math.Round(100.0 * totalCompleted / totalPossible) : 0,
+                completedCommitments.Count));
     }
 
-    public async Task<IResult> GetJourneyReflectionAsync(
+    public async Task<JourneyReflectionResponse> GetJourneyReflectionAsync(
         Guid userId, string? from = null, string? to = null, CancellationToken ct = default)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -657,11 +597,11 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
                 """);
             history.AddUserMessage(context);
             var result = await chat.GetChatMessageContentAsync(history, cancellationToken: ct);
-            return Results.Ok(new { reflection = result.Content?.Trim() });
+            return new JourneyReflectionResponse(result.Content?.Trim());
         }
         catch
         {
-            return Results.Ok(new { reflection = (string?)null });
+            return new JourneyReflectionResponse(null);
         }
     }
 
