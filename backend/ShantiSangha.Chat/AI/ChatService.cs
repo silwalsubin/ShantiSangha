@@ -9,6 +9,7 @@ using ShantiSangha.Chat.Safety;
 using ShantiSangha.Chat.Services;
 using ShantiSangha.Shared.Events;
 using ShantiSangha.Shared.Interfaces;
+using ShantiSangha.Shared.Models;
 
 namespace ShantiSangha.Chat.AI;
 
@@ -140,32 +141,53 @@ public class ChatService(
         CancellationToken cancellationToken,
         string? currentMessage = null)
     {
-        var displayNameTask = profileQuery.GetDisplayNameAsync(userId, cancellationToken);
-        var summariesTask = summaryQuery.GetRecentSummariesAsync(userId, SummaryCount, cancellationToken);
-        var journalSummariesTask = summaryQuery.GetRecentJournalSummariesAsync(userId, SummaryCount, cancellationToken);
-        var moodTask = moodQuery.GetRecentMoodSummaryAsync(userId, 7, cancellationToken);
-        var goalsTask = goalQuery.GetActiveGoalsForContextAsync(userId, cancellationToken);
+        // Load all context in parallel — each task is fault-tolerant so a single
+        // failure (e.g. embedding search) doesn't kill the entire conversation.
+        string? displayName = null;
+        IReadOnlyList<string> summaries = [];
+        IReadOnlyList<string> journalSummaries = [];
+        MoodSummaryDto? moodSummary = null;
+        IReadOnlyList<GoalSummaryDto> goalDtos = [];
+        IReadOnlyList<string> insights = [];
 
-        await Task.WhenAll(displayNameTask, summariesTask, journalSummariesTask, moodTask, goalsTask);
-
-        var displayName = displayNameTask.Result;
-        var summaries = summariesTask.Result;
-        var journalSummaries = journalSummariesTask.Result;
-        var moodSummary = moodTask.Result;
-        var goalDtos = goalsTask.Result;
-
-        // Use semantic search when we have a message to query with, otherwise fall back to recency
-        IReadOnlyList<string> insights;
-        if (!string.IsNullOrWhiteSpace(currentMessage))
+        try
         {
-            insights = await insightQuery.SearchInsightsAsync(userId, currentMessage, InsightCount, cancellationToken);
+            var displayNameTask = profileQuery.GetDisplayNameAsync(userId, cancellationToken);
+            var summariesTask = summaryQuery.GetRecentSummariesAsync(userId, SummaryCount, cancellationToken);
+            var journalSummariesTask = summaryQuery.GetRecentJournalSummariesAsync(userId, SummaryCount, cancellationToken);
+            var moodTask = moodQuery.GetRecentMoodSummaryAsync(userId, 7, cancellationToken);
+            var goalsTask = goalQuery.GetActiveGoalsForContextAsync(userId, cancellationToken);
 
-            if (insights.Count == 0)
-                insights = await insightQuery.GetRecentInsightsAsync(userId, InsightCount, cancellationToken);
+            await Task.WhenAll(displayNameTask, summariesTask, journalSummariesTask, moodTask, goalsTask);
+
+            displayName = displayNameTask.Result;
+            summaries = summariesTask.Result;
+            journalSummaries = journalSummariesTask.Result;
+            moodSummary = moodTask.Result;
+            goalDtos = goalsTask.Result;
         }
-        else
+        catch (Exception ex)
         {
-            insights = await insightQuery.GetRecentInsightsAsync(userId, InsightCount, cancellationToken);
+            logger.LogWarning(ex, "Failed to load some context for conversation {ConversationId} — continuing with partial context", conversationId);
+        }
+
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(currentMessage))
+            {
+                insights = await insightQuery.SearchInsightsAsync(userId, currentMessage, InsightCount, cancellationToken);
+
+                if (insights.Count == 0)
+                    insights = await insightQuery.GetRecentInsightsAsync(userId, InsightCount, cancellationToken);
+            }
+            else
+            {
+                insights = await insightQuery.GetRecentInsightsAsync(userId, InsightCount, cancellationToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to load insights for conversation {ConversationId} — continuing without insights", conversationId);
         }
 
         string? moodSummaryText = moodSummary is not null
