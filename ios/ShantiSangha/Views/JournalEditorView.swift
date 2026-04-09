@@ -70,6 +70,12 @@ struct JournalEditorView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .task { await setup() }
+        .onDisappear {
+            // Delete empty journals when user backs out without writing
+            if let id = serverId, content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Task { try? await api.delete("/journals/\(id)") }
+            }
+        }
     }
 
     // MARK: - Setup

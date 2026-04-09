@@ -118,6 +118,13 @@ struct ReflectView: View {
             .navigationTitle("Reflect")
             .navigationBarTitleDisplayMode(.inline)
             .task { await loadAll() }
+            .onAppear {
+                Task {
+                    // Brief delay to let any in-flight deletes (empty journals) complete
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    await loadAll()
+                }
+            }
 
             // Floating action menu
             reflectFAB
@@ -222,7 +229,7 @@ struct ReflectView: View {
                     showReflectMenu = false
                     Task { await startChat() }
                 }
-                reflectMenuIcon(icon: "pencil") {
+                reflectMenuIcon(icon: "doc.text") {
                     showReflectMenu = false
                     pendingNavigation = .journal
                 }
@@ -400,7 +407,7 @@ enum ReflectType {
     var icon: String {
         switch self {
         case .conversation: return "bubble.left"
-        case .journal: return "pencil"
+        case .journal: return "doc.text"
         case .voice: return "mic"
         }
     }
