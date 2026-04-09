@@ -222,7 +222,7 @@ struct ReflectView: View {
                     showReflectMenu = false
                     Task { await startChat() }
                 }
-                reflectMenuIcon(icon: "pencil.line") {
+                reflectMenuIcon(icon: "pencil") {
                     showReflectMenu = false
                     pendingNavigation = .journal
                 }
@@ -400,7 +400,7 @@ enum ReflectType {
     var icon: String {
         switch self {
         case .conversation: return "bubble.left"
-        case .journal: return "pencil.line"
+        case .journal: return "pencil"
         case .voice: return "mic"
         }
     }
@@ -408,8 +408,8 @@ enum ReflectType {
     var color: Color {
         switch self {
         case .conversation: return .sacredGold
-        case .journal: return .sacredTextSecondary
-        case .voice: return .sacredMuted
+        case .journal: return .sacredGold
+        case .voice: return .sacredGold
         }
     }
 }

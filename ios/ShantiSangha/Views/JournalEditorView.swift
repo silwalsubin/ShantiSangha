@@ -1,22 +1,19 @@
 import SwiftUI
 
 /// Journal editor — write or edit a private reflection.
-/// For new journals, nothing is created on the server until the user starts typing.
 struct JournalEditorView: View {
     let journalId: String?
     let isNew: Bool
 
-    @State private var activeId: String?
+    @State private var serverId: String?
     @State private var title = ""
     @State private var content = ""
     @State private var loading = true
     @State private var saving = false
     @State private var lastSaved: Date?
-    @State private var creating = false
     @Environment(\.dismiss) private var dismiss
     private let api = ApiService.shared
 
-    // Auto-save debounce
     @State private var saveTask: Task<Void, Never>?
 
     var body: some View {
@@ -28,13 +25,11 @@ struct JournalEditorView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        // Title field
                         TextField("Title (optional)", text: $title)
                             .font(.sacredHeading)
                             .foregroundColor(.sacredText)
-                            .onChange(of: title) { onEdit() }
+                            .onChange(of: title) { debounceSave() }
 
-                        // Content field
                         ZStack(alignment: .topLeading) {
                             if content.isEmpty {
                                 Text("What's on your mind...")
@@ -42,13 +37,12 @@ struct JournalEditorView: View {
                                     .foregroundColor(.sacredMuted)
                                     .padding(.top, 8)
                             }
-
                             TextEditor(text: $content)
                                 .font(.sacredText)
                                 .foregroundColor(.sacredText)
                                 .scrollContentBackground(.hidden)
                                 .frame(minHeight: 300)
-                                .onChange(of: content) { onEdit() }
+                                .onChange(of: content) { debounceSave() }
                         }
                     }
                     .padding(16)
@@ -56,23 +50,18 @@ struct JournalEditorView: View {
 
                 // Status bar
                 HStack {
-                    if saving || creating {
+                    if saving {
                         HStack(spacing: 6) {
-                            ProgressView()
-                                .scaleEffect(0.7)
-                            Text(creating ? "Creating..." : "Saving...")
-                                .font(.sacredSmall)
-                                .foregroundColor(.sacredMuted)
+                            ProgressView().scaleEffect(0.7)
+                            Text("Saving...").font(.sacredSmall).foregroundColor(.sacredMuted)
                         }
                     } else if let saved = lastSaved {
                         Text("Saved \(saved.formatted(.relative(presentation: .named)))")
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredMuted)
+                            .font(.sacredSmall).foregroundColor(.sacredMuted)
                     }
                     Spacer()
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 16).padding(.vertical, 8)
                 .background(Color.sacredBg)
             }
         }
@@ -80,77 +69,35 @@ struct JournalEditorView: View {
         .navigationTitle(isNew ? "New Entry" : "Journal")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-        .task {
-            if let id = journalId {
-                activeId = id
-                await loadJournal()
-            }
-            // For new journals: don't create anything yet — wait for first edit
-            loading = false
-        }
-        .onDisappear {
-            saveTask?.cancel()
-            // Final save only if we have an entry with content
-            if activeId != nil && !content.isEmpty {
-                Task { await save() }
-            }
-        }
+        .task { await setup() }
     }
 
-    // MARK: - Edit handling
+    // MARK: - Setup
 
-    private func onEdit() {
-        if activeId == nil && isNew && !creating {
-            // First edit on a new journal — create it now
-            creating = true
-            Task { await createAndSave() }
-        } else if activeId != nil {
-            scheduleAutoSave()
+    private func setup() async {
+        if let id = journalId {
+            // Editing existing
+            serverId = id
+            await loadJournal()
+        } else {
+            // Create immediately — same pattern as conversations
+            await createJournal()
         }
+        loading = false
     }
 
-    private func scheduleAutoSave() {
-        guard activeId != nil else { return }
+    // MARK: - Save
+
+    private func debounceSave() {
         saveTask?.cancel()
         saveTask = Task {
-            try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5s debounce
-            if !Task.isCancelled {
-                await save()
-            }
-        }
-    }
-
-    // MARK: - Network
-
-    private func createAndSave() async {
-        do {
-            let journal: JournalCreatedResponse = try await api.post("/journals", body: CreateJournalRequest(
-                title: title.isEmpty ? "" : title,
-                content: content
-            ))
-            activeId = journal.id
-            lastSaved = Date()
-        } catch {
-            AppLogger.shared.error("Journal", "Failed to create journal: \(error)")
-        }
-        creating = false
-        // Schedule a follow-up save in case content changed while creating
-        scheduleAutoSave()
-    }
-
-    private func loadJournal() async {
-        guard let id = activeId else { return }
-        do {
-            let journal: JournalDetailResponse = try await api.get("/journals/\(id)")
-            title = journal.title ?? ""
-            content = journal.content ?? ""
-        } catch {
-            AppLogger.shared.error("Journal", "Failed to load journal: \(error)")
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            if !Task.isCancelled { await save() }
         }
     }
 
     private func save() async {
-        guard let id = activeId, !saving, !creating else { return }
+        guard let id = serverId, !saving else { return }
         saving = true
         do {
             let _: EmptyResponse = try await api.patch("/journals/\(id)", body: UpdateJournalRequest(
@@ -159,9 +106,32 @@ struct JournalEditorView: View {
             ))
             lastSaved = Date()
         } catch {
-            AppLogger.shared.error("Journal", "Failed to save journal: \(error)")
+            AppLogger.shared.error("Journal", "Failed to save: \(error)")
         }
         saving = false
+    }
+
+    // MARK: - Network
+
+    private func createJournal() async {
+        do {
+            let journal: JournalCreatedResponse = try await api.post(
+                "/journals", body: CreateJournalRequest(title: "Untitled", content: " "))
+            serverId = journal.id
+        } catch {
+            AppLogger.shared.error("Journal", "Failed to create: \(error)")
+        }
+    }
+
+    private func loadJournal() async {
+        guard let id = serverId else { return }
+        do {
+            let journal: JournalDetailResponse = try await api.get("/journals/\(id)")
+            title = journal.title ?? ""
+            content = journal.content ?? ""
+        } catch {
+            AppLogger.shared.error("Journal", "Failed to load: \(error)")
+        }
     }
 }
 

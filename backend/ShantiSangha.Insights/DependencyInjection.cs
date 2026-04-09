@@ -39,16 +39,23 @@ public static class DependencyInjection
 
         eventBus.Subscribe<MessagesSavedEvent>(async (@event, ct) =>
         {
-            var jobs = services.GetRequiredService<IBackgroundJobClient>();
-
-            // Generate summary every 10 messages
-            if (@event.MessageCount % 10 == 0)
+            try
             {
-                var summaryJobId = jobs.Enqueue<GenerateSummaryJob>(
-                    j => j.RunForConversationAsync(@event.ConversationId, @event.UserId));
+                var jobs = services.GetRequiredService<IBackgroundJobClient>();
 
-                jobs.ContinueJobWith<ExtractInsightsJob>(summaryJobId,
-                    j => j.RunAsync(@event.ConversationId, SummarySourceType.Conversation, @event.UserId));
+                // Generate summary every 10 messages
+                if (@event.MessageCount % 10 == 0)
+                {
+                    var summaryJobId = jobs.Enqueue<GenerateSummaryJob>(
+                        j => j.RunForConversationAsync(@event.ConversationId, @event.UserId));
+
+                    jobs.ContinueJobWith<ExtractInsightsJob>(summaryJobId,
+                        j => j.RunAsync(@event.ConversationId, SummarySourceType.Conversation, @event.UserId));
+                }
+            }
+            catch
+            {
+                // Don't let background job failures break message saving
             }
 
             await Task.CompletedTask;
@@ -56,13 +63,20 @@ public static class DependencyInjection
 
         eventBus.Subscribe<JournalCreatedEvent>(async (@event, ct) =>
         {
-            var jobs = services.GetRequiredService<IBackgroundJobClient>();
+            try
+            {
+                var jobs = services.GetRequiredService<IBackgroundJobClient>();
 
-            var summaryJobId = jobs.Enqueue<GenerateSummaryJob>(
-                j => j.RunForJournalAsync(@event.JournalId, @event.UserId));
+                var summaryJobId = jobs.Enqueue<GenerateSummaryJob>(
+                    j => j.RunForJournalAsync(@event.JournalId, @event.UserId));
 
-            jobs.ContinueJobWith<ExtractInsightsJob>(summaryJobId,
-                j => j.RunAsync(@event.JournalId, SummarySourceType.Journal, @event.UserId));
+                jobs.ContinueJobWith<ExtractInsightsJob>(summaryJobId,
+                    j => j.RunAsync(@event.JournalId, SummarySourceType.Journal, @event.UserId));
+            }
+            catch
+            {
+                // Don't let background job failures break journal creation
+            }
 
             await Task.CompletedTask;
         });
