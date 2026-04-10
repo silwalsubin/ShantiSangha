@@ -152,6 +152,72 @@ extension RadialGradient {
     )
 }
 
+/// Cymbal-textured gold — concentric rings like a brushed metal cymbal.
+/// Use on circular FAB buttons for a tactile, sacred-instrument feel.
+struct CymbalGoldModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background(
+                ZStack {
+                    // Bright golden base
+                    RadialGradient(
+                        stops: [
+                            .init(color: .sacredGoldShine, location: 0),
+                            .init(color: .sacredGold, location: 0.5),
+                            .init(color: .sacredGoldDark, location: 1),
+                        ],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: 40
+                    )
+
+                    // Concentric ring grooves — centered
+                    Canvas { ctx, size in
+                        let center = CGPoint(x: size.width * 0.5, y: size.height * 0.5)
+                        let maxRadius = min(size.width, size.height) * 0.5
+                        let ringCount = 16
+
+                        for i in 0..<ringCount {
+                            let t = CGFloat(i + 2) / CGFloat(ringCount + 2)
+                            let radius = maxRadius * t
+                            let rect = CGRect(
+                                x: center.x - radius,
+                                y: center.y - radius,
+                                width: radius * 2,
+                                height: radius * 2
+                            )
+                            let ring = Path(ellipseIn: rect)
+                            let bright = (i % 2 == 0)
+                            ctx.stroke(
+                                ring,
+                                with: .color(bright ? .white.opacity(0.18) : .black.opacity(0.1)),
+                                lineWidth: 0.15
+                            )
+                        }
+                    }
+
+                    // Highlight sheen — top-left
+                    RadialGradient(
+                        stops: [
+                            .init(color: .white.opacity(0.3), location: 0),
+                            .init(color: .white.opacity(0.05), location: 0.4),
+                            .init(color: .clear, location: 0.7),
+                        ],
+                        center: .init(x: 0.35, y: 0.3),
+                        startRadius: 0,
+                        endRadius: 25
+                    )
+                }
+            )
+    }
+}
+
+extension View {
+    func cymbalGold() -> some View {
+        modifier(CymbalGoldModifier())
+    }
+}
+
 /// Reusable shiny gold gradients — metallic highlight for sacred elements.
 extension LinearGradient {
     /// Shiny gold — horizontal with center highlight band

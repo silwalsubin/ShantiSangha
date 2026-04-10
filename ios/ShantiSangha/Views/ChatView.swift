@@ -6,6 +6,7 @@ struct ChatView: View {
     let conversationId: String
     let title: String
 
+    @State private var displayTitle: String = "Conversation"
     @State private var messages: [ChatMessage] = []
     @State private var inputText = ""
     @State private var loading = true
@@ -81,7 +82,7 @@ struct ChatView: View {
             .background(Color.sacredBg)
         }
         .background(Color.sacredBg.ignoresSafeArea())
-        .navigationTitle("Conversation")
+        .navigationTitle(displayTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .task { await loadMessages() }
@@ -193,6 +194,9 @@ struct ChatView: View {
         do {
             let conversation: ConversationDetail = try await api.get("/conversations/\(conversationId)")
             messages = conversation.messages
+            if let t = conversation.title, t != "Conversation", t != "New Conversation", !t.isEmpty {
+                displayTitle = t
+            }
         } catch {
             AppLogger.shared.error("Chat", "Failed to load messages: \(error)")
         }
@@ -269,6 +273,18 @@ struct ChatView: View {
         }
 
         sending = false
+
+        // Refresh title — may have been auto-generated after first exchange
+        if displayTitle == "Conversation" {
+            Task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                if let conv: ConversationDetail = try? await api.get("/conversations/\(conversationId)") {
+                    if let t = conv.title, t != "Conversation", t != "New Conversation", !t.isEmpty {
+                        displayTitle = t
+                    }
+                }
+            }
+        }
     }
 }
 

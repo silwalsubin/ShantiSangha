@@ -109,9 +109,8 @@ struct HomeView: View {
                     .font(.sacredHeading)
                     .foregroundColor(.white)
                     .frame(width: 56, height: 56)
-                    .background(LinearGradient.sacredGoldShiny)
+                    .cymbalGold()
                     .clipShape(Circle())
-                    .shadow(color: .clear, radius: 0)
             }
             .padding(.trailing, 20)
             .padding(.bottom, 20)

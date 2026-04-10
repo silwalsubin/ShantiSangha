@@ -39,9 +39,7 @@ struct MainTabView: View {
                 JourneyView()
             }
             .tabItem {
-                Image(systemName: "leaf")
-                    .environment(\.symbolVariants, .none)
-                    .fontWeight(.ultraLight)
+                Image("tab.peepal")
                 Text("Journey")
             }
             .tag(2)

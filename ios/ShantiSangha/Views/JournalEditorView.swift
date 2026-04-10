@@ -10,11 +10,23 @@ struct JournalEditorView: View {
     @State private var content = ""
     @State private var loading = true
     @State private var saving = false
+    @State private var saveFailed = false
     @State private var lastSaved: Date?
     @Environment(\.dismiss) private var dismiss
     private let api = ApiService.shared
 
     @State private var saveTask: Task<Void, Never>?
+
+    private static let placeholders = [
+        "What felt true today...",
+        "What are you grateful for...",
+        "What did you notice about yourself today...",
+        "What made you smile today...",
+        "What are you learning right now...",
+        "What moment stood out today...",
+        "What is on your heart...",
+    ]
+    @State private var placeholder = placeholders.randomElement()!
 
     var body: some View {
         VStack(spacing: 0) {
@@ -32,7 +44,7 @@ struct JournalEditorView: View {
 
                         ZStack(alignment: .topLeading) {
                             if content.isEmpty {
-                                Text("What's on your mind...")
+                                Text(placeholder)
                                     .font(.sacredText)
                                     .foregroundColor(.sacredMuted)
                                     .padding(.top, 8)
@@ -55,6 +67,9 @@ struct JournalEditorView: View {
                             ProgressView().scaleEffect(0.7)
                             Text("Saving...").font(.sacredSmall).foregroundColor(.sacredMuted)
                         }
+                    } else if saveFailed {
+                        Text("Not saved")
+                            .font(.sacredSmallSemibold).foregroundColor(.sacredRed)
                     } else if let saved = lastSaved {
                         Text("Saved \(saved.formatted(.relative(presentation: .named)))")
                             .font(.sacredSmall).foregroundColor(.sacredMuted)
@@ -105,6 +120,7 @@ struct JournalEditorView: View {
     private func save() async {
         guard let id = serverId, !saving else { return }
         saving = true
+        saveFailed = false
         do {
             let _: EmptyResponse = try await api.patch("/journals/\(id)", body: UpdateJournalRequest(
                 title: title.isEmpty ? nil : title,
@@ -112,6 +128,7 @@ struct JournalEditorView: View {
             ))
             lastSaved = Date()
         } catch {
+            saveFailed = true
             AppLogger.shared.error("Journal", "Failed to save: \(error)")
         }
         saving = false

@@ -78,7 +78,7 @@ struct VoiceNoteView: View {
                                 .font(.sacredHeading)
                                 .foregroundColor(.white)
                                 .frame(width: 64, height: 64)
-                                .background(LinearGradient.sacredGoldShiny)
+                                .cymbalGold()
                                 .clipShape(Circle())
                                 .shadow(color: .sacredGold.opacity(0.3), radius: 8, y: 4)
                         }
@@ -92,7 +92,7 @@ struct VoiceNoteView: View {
                                     .font(.sacredHero)
                                     .foregroundColor(.white)
                                     .frame(width: 80, height: 80)
-                                    .background(LinearGradient.sacredGoldShiny)
+                                    .cymbalGold()
                                     .clipShape(Circle())
                                     .shadow(color: .sacredGold.opacity(0.3), radius: 12, y: 6)
 

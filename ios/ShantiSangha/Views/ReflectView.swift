@@ -17,11 +17,12 @@ struct ReflectView: View {
         var items: [ReflectTimelineItem] = []
 
         for conv in conversations {
+            let hasTitle = conv.title != "Conversation" && conv.title != "New Conversation"
             items.append(ReflectTimelineItem(
                 id: conv.id,
                 type: .conversation,
-                title: conv.title == "Conversation" ? nil : conv.title,
-                preview: conv.lastUserMessage ?? conv.lastMessage,
+                title: hasTitle ? conv.title : conv.lastUserMessage,
+                preview: hasTitle ? (conv.lastUserMessage ?? conv.lastMessage) : conv.lastMessage,
                 date: conv.updatedAt
             ))
         }
@@ -41,7 +42,7 @@ struct ReflectView: View {
                 id: voice.id,
                 type: .voice,
                 title: nil,
-                preview: voice.hasTranscript ? "Voice note" : "Transcribing...",
+                preview: voice.transcriptPreview ?? (voice.hasTranscript ? "Voice note" : "Transcribing..."),
                 date: voice.updatedAt
             ))
         }
@@ -250,9 +251,8 @@ struct ReflectView: View {
                     .font(.sacredHeading)
                     .foregroundColor(.white)
                     .frame(width: 56, height: 56)
-                    .background(LinearGradient.sacredGoldShiny)
+                    .cymbalGold()
                     .clipShape(Circle())
-                    .shadow(color: .clear, radius: 0)
             }
         }
         .padding(.trailing, 20)
@@ -265,9 +265,8 @@ struct ReflectView: View {
                 .font(.sacredIcon)
                 .foregroundColor(.white)
                 .frame(width: 48, height: 48)
-                .background(LinearGradient.sacredGoldShiny)
+                .cymbalGold()
                 .clipShape(Circle())
-                .shadow(color: .clear, radius: 0)
         }
         .transition(.scale.combined(with: .opacity))
     }
@@ -492,10 +491,11 @@ struct VoiceNoteItem: Identifiable, Decodable {
     let id: String
     let status: String
     let hasTranscript: Bool
+    let transcriptPreview: String?
     let updatedAt: Date
 
     enum CodingKeys: String, CodingKey {
-        case id, status, hasTranscript, updatedAt, createdAt
+        case id, status, hasTranscript, transcriptPreview, updatedAt, createdAt
     }
 
     init(from decoder: Decoder) throws {
@@ -503,6 +503,7 @@ struct VoiceNoteItem: Identifiable, Decodable {
         id = try c.decode(String.self, forKey: .id)
         status = try c.decodeIfPresent(String.self, forKey: .status) ?? "Pending"
         hasTranscript = try c.decodeIfPresent(Bool.self, forKey: .hasTranscript) ?? false
+        transcriptPreview = try c.decodeIfPresent(String.self, forKey: .transcriptPreview)
 
         let iso = ISO8601DateFormatter()
         iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

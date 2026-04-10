@@ -64,6 +64,7 @@ public class VoiceService(WellnessDbContext db, StorageService storage) : IVoice
                 v.CreatedAt,
                 v.UpdatedAt,
                 v.Transcript != null,
+                v.Transcript != null ? (v.Transcript.Length > 120 ? v.Transcript.Substring(0, 120) + "\u2026" : v.Transcript) : null,
                 v.DraftJournalId))
             .ToListAsync(ct);
     }
