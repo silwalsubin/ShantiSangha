@@ -1,7 +1,7 @@
 import SwiftUI
+import FirebaseAuth
 
-/// Home screen — "What needs your attention today?"
-/// Mirrors frontend/src/pages/app/home.vue
+/// Home screen — daily practices and goals
 struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
     @State private var showNewTask = false
@@ -12,16 +12,10 @@ struct HomeView: View {
         ZStack(alignment: .bottomTrailing) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    // Header
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("YOUR DHARMA")
-                            .font(.sacredMicroBold)
-                            .tracking(3)
-                            .foregroundColor(.sacredLabel)
-                        Text("What needs your attention?")
-                            .font(.sacredTitle)
-                            .foregroundColor(.sacredText)
-                    }
+                    // Greeting
+                    Text(timeGreeting)
+                        .font(.sacredTitle)
+                        .foregroundColor(.sacredText)
 
                     if vm.loading {
                         VStack(spacing: 12) {
@@ -34,12 +28,12 @@ struct HomeView: View {
                         .padding(.top, 24)
                     } else if !vm.hasTasks {
                         VStack(spacing: 16) {
-                            Text("You haven't set any tasks yet.")
+                            Text("You haven't set any practices yet.")
                                 .font(.sacredText)
                                 .foregroundColor(.sacredTextSecondary)
 
                             Button { showNewTask = true } label: {
-                                Text("Set your first task")
+                                Text("Set your first practice")
                                     .font(.sacredTextSemibold)
                                     .foregroundColor(.white)
                                     .padding(.horizontal, 24)
@@ -128,6 +122,18 @@ struct HomeView: View {
         }
     }
 
+    // MARK: - Time greeting
+
+    private var timeGreeting: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        let firstName = Auth.auth().currentUser?.displayName?
+            .components(separatedBy: " ").first
+        let name = firstName.map { ", \($0)" } ?? ""
+        if hour < 12 { return "Good morning\(name)" }
+        if hour < 17 { return "Good afternoon\(name)" }
+        return "Good evening\(name)"
+    }
+
     // MARK: - Progress ring
 
     private var progressRing: some View {
@@ -138,22 +144,26 @@ struct HomeView: View {
         return ZStack {
             Circle()
                 .stroke(Color.sacredMuted.opacity(0.15), lineWidth: 4)
-            Circle()
-                .trim(from: 0, to: progress)
-                .stroke(
-                    LinearGradient.sacredGoldShiny,
-                    style: StrokeStyle(lineWidth: 4, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-90))
-                .animation(.easeOut(duration: 0.5), value: progress)
+            if done > 0 {
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(
+                        LinearGradient.sacredGoldShiny,
+                        style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+                    .animation(.easeOut(duration: 0.5), value: progress)
+            }
 
-            VStack(spacing: 0) {
-                Text("\(done)")
-                    .font(.sacredTextSemibold)
-                    .foregroundColor(.sacredGold)
-                Text("of \(total)")
-                    .font(.sacredMicro)
-                    .foregroundColor(.sacredMuted)
+            if done > 0 {
+                VStack(spacing: 0) {
+                    Text("\(done)")
+                        .font(.sacredTextSemibold)
+                        .foregroundColor(.sacredGold)
+                    Text("of \(total)")
+                        .font(.sacredMicro)
+                        .foregroundColor(.sacredMuted)
+                }
             }
         }
         .frame(width: 48, height: 48)

@@ -93,9 +93,9 @@ struct MilestoneTimelineView: View {
 
     private var commitmentRing: some View {
         let progress = totalMilestones > 0 ? Double(doneMilestones) / Double(totalMilestones) : 0
-        let ringColor: Color = hasOverdue ? .sacredRed : .sacredGold
+        let ringColor: Color = hasOverdue ? .sacredMuted : .sacredGold
         let gradient = LinearGradient(
-            colors: hasOverdue ? [.sacredRed, .sacredRed.opacity(0.7)] : [.sacredGoldShine, .sacredGold],
+            colors: hasOverdue ? [.sacredMuted, .sacredMuted.opacity(0.7)] : [.sacredGoldShine, .sacredGold],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
@@ -103,19 +103,23 @@ struct MilestoneTimelineView: View {
         return ZStack {
             Circle()
                 .stroke(Color.sacredMuted.opacity(0.15), lineWidth: 4)
-            Circle()
-                .trim(from: 0, to: progress)
-                .stroke(gradient, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-                .animation(.easeOut(duration: 0.5), value: progress)
+            if doneMilestones > 0 {
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(gradient, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .animation(.easeOut(duration: 0.5), value: progress)
+            }
 
-            VStack(spacing: 0) {
-                Text("\(doneMilestones)")
-                    .font(.sacredTextSemibold)
-                    .foregroundColor(ringColor)
-                Text("of \(totalMilestones)")
-                    .font(.sacredMicro)
-                    .foregroundColor(.sacredMuted)
+            if doneMilestones > 0 {
+                VStack(spacing: 0) {
+                    Text("\(doneMilestones)")
+                        .font(.sacredTextSemibold)
+                        .foregroundColor(ringColor)
+                    Text("of \(totalMilestones)")
+                        .font(.sacredMicro)
+                        .foregroundColor(.sacredMuted)
+                }
             }
         }
         .frame(width: 48, height: 48)

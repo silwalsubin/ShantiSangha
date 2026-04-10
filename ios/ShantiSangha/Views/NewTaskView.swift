@@ -11,59 +11,52 @@ struct NewTaskView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // Header
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("NEW TASK")
-                        .font(.sacredSectionLabel)
-                        .tracking(3)
-                        .foregroundColor(.sacredLabel)
-                    Text("Set an intention")
+            VStack(alignment: .leading, spacing: 28) {
+                // Question 1: What
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("What would you like to work on?")
                         .font(.sacredTitle)
                         .foregroundColor(.sacredText)
-                }
-                .padding(.top, 24)
 
-                // Type picker
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("TYPE")
-                        .font(.sacredSectionLabel)
-                        .tracking(3)
-                        .foregroundColor(.sacredLabel)
-                    HStack(spacing: 8) {
-                        typePill("Daily practice", icon: "flame.fill", taskType: .recurring)
-                        typePill("Commitment", icon: "calendar.badge.clock", taskType: .oneTime)
-                    }
-                }
-
-                // Title
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("INTENTION")
-                        .font(.sacredSectionLabel)
-                        .tracking(3)
-                        .foregroundColor(.sacredLabel)
-                    TextField(type == .recurring ? "I want to practice..." : "I want to achieve...", text: $title)
+                    TextField("Meditate, exercise, read...", text: $title)
                         .textFieldStyle(.plain)
                         .font(.sacredText)
                         .padding(14)
                         .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBgCard))
                         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.12)))
                 }
+                .padding(.top, 24)
 
-                // Target date for milestones
-                if type == .oneTime {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("TARGET DATE")
-                            .font(.sacredSectionLabel)
-                            .tracking(3)
-                            .foregroundColor(.sacredLabel)
-                        DatePicker("", selection: $targetDate, displayedComponents: .date)
-                            .datePickerStyle(.graphical)
-                            .tint(.sacredGold)
+                // Question 2: How often
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("How would you approach this?")
+                        .font(.sacredTextSemibold)
+                        .foregroundColor(.sacredText)
+
+                    HStack(spacing: 10) {
+                        approachButton("Every day", selected: type == .recurring) {
+                            withAnimation(.easeInOut(duration: 0.2)) { type = .recurring }
+                        }
+                        approachButton("By a date", selected: type == .oneTime) {
+                            withAnimation(.easeInOut(duration: 0.2)) { type = .oneTime }
+                        }
                     }
                 }
 
-                // Save button
+                // Date picker — only when "By a date"
+                if type == .oneTime {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("When would you like to achieve this?")
+                            .font(.sacredTextSemibold)
+                            .foregroundColor(.sacredText)
+                        DatePicker("", selection: $targetDate, in: Date()..., displayedComponents: .date)
+                            .datePickerStyle(.graphical)
+                            .tint(.sacredGold)
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
+                // Save
                 Button {
                     guard !title.trimmingCharacters(in: .whitespaces).isEmpty else { return }
                     saving = true
@@ -76,10 +69,9 @@ struct NewTaskView: View {
                     HStack {
                         Spacer()
                         if saving {
-                            ProgressView()
-                                .tint(.white)
+                            ProgressView().tint(.white)
                         } else {
-                            Text("Save")
+                            Text(type == .recurring ? "Start this practice" : "Set this goal")
                                 .font(.sacredTextSemibold)
                         }
                         Spacer()
@@ -97,27 +89,26 @@ struct NewTaskView: View {
             .padding(.horizontal, 16)
         }
         .background(Color.sacredBg.ignoresSafeArea())
-        .navigationTitle("New Task")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .tabBar)
     }
 
-    private func typePill(_ label: String, icon: String, taskType: TaskType) -> some View {
-        Button { type = taskType } label: {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.sacredSmall)
-                Text(label)
-                    .font(.sacredSmallSemibold)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(type == taskType ? Color.sacredGold.opacity(0.06) : Color.clear)
-                    .overlay(RoundedRectangle(cornerRadius: 16)
-                        .stroke(type == taskType ? Color.sacredGold : Color.sacredMuted.opacity(0.12)))
-            )
-            .foregroundColor(type == taskType ? .sacredGold : .sacredTextSecondary)
+    // MARK: - Approach button
+
+    private func approachButton(_ label: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.sacredTextSemibold)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(selected ? Color.sacredGold.opacity(0.08) : Color.clear)
+                        .overlay(RoundedRectangle(cornerRadius: 16)
+                            .stroke(selected ? Color.sacredGold : Color.sacredMuted.opacity(0.15), lineWidth: selected ? 1.5 : 1))
+                )
+                .foregroundColor(selected ? .sacredGold : .sacredTextSecondary)
         }
     }
 

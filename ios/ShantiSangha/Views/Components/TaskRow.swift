@@ -343,12 +343,10 @@ private func dueDateLabel(daysRemaining days: Int) -> String {
     if days == 0 { return "Today" }
     if days == 1 { return "Tomorrow" }
     if days < 0 {
-        let overdue = abs(days)
-        if overdue >= 30 {
-            let months = overdue / 30
-            return "\(months) month\(months == 1 ? "" : "s") overdue"
-        }
-        return "\(overdue) day\(overdue == 1 ? "" : "s") overdue"
+        let date = Calendar.current.date(byAdding: .day, value: days, to: Date())!
+        let f = DateFormatter()
+        f.dateFormat = "MMM d"
+        return "Past \(f.string(from: date))"
     }
     let date = Calendar.current.date(byAdding: .day, value: days, to: Date())!
     let f = DateFormatter()
