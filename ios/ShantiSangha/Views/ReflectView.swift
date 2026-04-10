@@ -18,11 +18,12 @@ struct ReflectView: View {
 
         for conv in conversations {
             let hasTitle = conv.title != "Conversation" && conv.title != "New Conversation"
+            let fallbackTitle = conv.lastUserMessage ?? conv.lastMessage
             items.append(ReflectTimelineItem(
                 id: conv.id,
                 type: .conversation,
-                title: hasTitle ? conv.title : conv.lastUserMessage,
-                preview: hasTitle ? (conv.lastUserMessage ?? conv.lastMessage) : conv.lastMessage,
+                title: hasTitle ? conv.title : fallbackTitle,
+                preview: hasTitle ? (conv.lastUserMessage ?? conv.lastMessage) : "",
                 date: conv.updatedAt
             ))
         }
@@ -203,18 +204,16 @@ struct ReflectView: View {
                     .font(item.title != nil ? .sacredSmall : .sacredTextSemibold)
                     .foregroundColor(item.title != nil ? .sacredMuted : .sacredText)
 
-                if !item.preview.isEmpty {
-                    Text(item.preview
-                        .components(separatedBy: .whitespacesAndNewlines)
-                        .filter { !$0.isEmpty }
-                        .joined(separator: " "))
+                if !item.preview.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Text(item.preview.trimmingCharacters(in: .whitespacesAndNewlines))
                         .font(.sacredSmall)
                         .foregroundColor(.sacredTextSecondary)
                         .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
-
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
