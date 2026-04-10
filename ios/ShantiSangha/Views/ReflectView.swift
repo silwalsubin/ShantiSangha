@@ -39,11 +39,12 @@ struct ReflectView: View {
         }
 
         for voice in voiceNotes {
+            let transcript = voice.transcriptPreview ?? (voice.hasTranscript ? "Voice note" : "Transcribing...")
             items.append(ReflectTimelineItem(
                 id: voice.id,
                 type: .voice,
-                title: nil,
-                preview: voice.transcriptPreview ?? (voice.hasTranscript ? "Voice note" : "Transcribing..."),
+                title: transcript,
+                preview: "",
                 date: voice.updatedAt
             ))
         }

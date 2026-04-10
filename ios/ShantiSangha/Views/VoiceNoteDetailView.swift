@@ -65,6 +65,17 @@ struct VoiceNoteDetailView: View {
         .navigationTitle("Voice Note")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if let transcript = entry?.transcript, !transcript.isEmpty {
+                    ShareLink(item: transcript) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
+                    }
+                }
+            }
+        }
         .task { await loadEntry() }
     }
 

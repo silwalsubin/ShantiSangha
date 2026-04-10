@@ -85,7 +85,27 @@ struct ChatView: View {
         .navigationTitle(displayTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if !messages.isEmpty {
+                    ShareLink(item: shareText) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
+                    }
+                }
+            }
+        }
         .task { await loadMessages() }
+    }
+
+    // MARK: - Share
+
+    private var shareText: String {
+        messages.map { msg in
+            let label = msg.role == "user" ? "Me" : "ShantiSangha"
+            return "\(label): \(msg.content)"
+        }.joined(separator: "\n\n")
     }
 
     // MARK: - Message bubble

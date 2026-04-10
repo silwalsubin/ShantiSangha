@@ -84,6 +84,17 @@ struct JournalEditorView: View {
         .navigationTitle(isNew ? "New Entry" : "Journal")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if !content.trimmingCharacters(in: .whitespaces).isEmpty {
+                    ShareLink(item: shareText) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
+                    }
+                }
+            }
+        }
         .task { await setup() }
         .onDisappear {
             // Delete empty journals when user backs out without writing
@@ -105,6 +116,13 @@ struct JournalEditorView: View {
             await createJournal()
         }
         loading = false
+    }
+
+    // MARK: - Share
+
+    private var shareText: String {
+        let heading = title.isEmpty ? "" : "\(title)\n\n"
+        return "\(heading)\(content)"
     }
 
     // MARK: - Save
