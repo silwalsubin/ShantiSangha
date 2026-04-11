@@ -34,10 +34,10 @@ struct NewTaskView: View {
                         .foregroundColor(.sacredText)
 
                     HStack(spacing: 10) {
-                        approachButton("Every day", selected: type == .recurring) {
+                        approachButton("Every day", icon: "arrow.triangle.2.circlepath", selected: type == .recurring) {
                             withAnimation(.easeInOut(duration: 0.2)) { type = .recurring }
                         }
-                        approachButton("By a date", selected: type == .oneTime) {
+                        approachButton("By a date", icon: "calendar.badge.clock", selected: type == .oneTime) {
                             withAnimation(.easeInOut(duration: 0.2)) { type = .oneTime }
                         }
                     }
@@ -95,10 +95,14 @@ struct NewTaskView: View {
 
     // MARK: - Approach button
 
-    private func approachButton(_ label: String, selected: Bool, action: @escaping () -> Void) -> some View {
+    private func approachButton(_ label: String, icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(label)
-                .font(.sacredTextSemibold)
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.sacredSmall)
+                Text(label)
+                    .font(.sacredTextSemibold)
+            }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
                 .frame(maxWidth: .infinity)
