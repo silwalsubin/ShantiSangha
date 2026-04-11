@@ -8,6 +8,7 @@ public class WellnessDbContext(DbContextOptions<WellnessDbContext> options) : Db
     public DbSet<MoodCheckin> MoodCheckins => Set<MoodCheckin>();
     public DbSet<CopingSession> CopingSessions => Set<CopingSession>();
     public DbSet<VoiceEntry> VoiceEntries => Set<VoiceEntry>();
+    public DbSet<DailyMantra> DailyMantras => Set<DailyMantra>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -19,6 +20,11 @@ public class WellnessDbContext(DbContextOptions<WellnessDbContext> options) : Db
         modelBuilder.Entity<VoiceEntry>(e =>
         {
             e.Property(v => v.Status).HasConversion<string>();
+        });
+
+        modelBuilder.Entity<DailyMantra>(e =>
+        {
+            e.HasIndex(m => new { m.UserId, m.Date }).IsUnique();
         });
     }
 }

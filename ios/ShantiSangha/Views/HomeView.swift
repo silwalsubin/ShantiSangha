@@ -7,15 +7,33 @@ struct HomeView: View {
     @State private var showNewTask = false
     @State private var showRecurringSummary = false
     @State private var showMilestoneSummary = false
+    @State private var mantra: String?
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
+                    // Daily mantra
+                    if let mantra {
+                        Text(mantra)
+                            .font(.system(size: 16, weight: .regular, design: .serif))
+                            .italic()
+                            .foregroundColor(.sacredTextSecondary)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.bottom, 6)
+                    }
+
                     // Greeting
                     Text(timeGreeting)
                         .font(.sacredTitle)
                         .foregroundColor(.sacredText)
+
+                    // Gentle evening nudge
+                    if shouldShowNudge {
+                        nudgeCard
+                            .padding(.top, 16)
+                    }
 
                     if vm.loading {
                         VStack(spacing: 12) {
@@ -92,7 +110,10 @@ struct HomeView: View {
             }
             .background(Color.sacredBg.ignoresSafeArea())
             .refreshable { await vm.load() }
-            .task { await vm.load() }
+            .task {
+                await vm.load()
+                await loadMantra()
+            }
 
             // Floating add button
             Button {
@@ -119,6 +140,67 @@ struct HomeView: View {
         }
         .navigationDestination(isPresented: $showMilestoneSummary) {
             MilestoneSummaryView(vm: vm, initialFilter: vm.commitmentFilter)
+        }
+    }
+
+    // MARK: - Gentle nudge
+
+    private static let nudgeMessages = [
+        "Your practices are here when you're ready.",
+        "No rush. Just a quiet reminder that you showed up by opening the app.",
+        "Even a small step counts. What feels doable right now?",
+        "The day isn't over yet. You're here — that matters.",
+        "A moment of stillness is still a practice.",
+        "You opened the app. That's the hardest part.",
+        "Whatever you can do today is enough.",
+    ]
+
+    @State private var nudgeMessage = nudgeMessages.randomElement()!
+
+    private var shouldShowNudge: Bool {
+        let hour = Calendar.current.component(.hour, from: Date())
+        return hour >= 18 && !vm.loading && vm.totalRecurring > 0 && vm.doneRecurring == 0
+    }
+
+    private var nudgeCard: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "leaf")
+                .font(.sacredIcon)
+                .foregroundColor(.sacredGold)
+                .padding(.top, 2)
+
+            Text(nudgeMessage)
+                .font(.sacredText)
+                .foregroundColor(.sacredTextSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.sacredGold.opacity(0.04))
+                .overlay(RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.sacredGold.opacity(0.1)))
+        )
+    }
+
+    // MARK: - Mantra
+
+    private func loadMantra() async {
+        do {
+            let response: MantraResponse = try await ApiService.shared.get("/mantra/today")
+            if let content = response.content, !content.isEmpty {
+                mantra = content
+            } else {
+                // Generation triggered — retry after a few seconds
+                try? await Task.sleep(nanoseconds: 4_000_000_000)
+                let retry: MantraResponse = try await ApiService.shared.get("/mantra/today")
+                if let content = retry.content, !content.isEmpty {
+                    mantra = content
+                }
+            }
+        } catch {
+            // Mantra is non-critical — fail silently
         }
     }
 
@@ -193,5 +275,10 @@ struct HomeView: View {
             }
         }
     }
+}
 
+// MARK: - Mantra response
+
+private struct MantraResponse: Decodable {
+    let content: String?
 }
