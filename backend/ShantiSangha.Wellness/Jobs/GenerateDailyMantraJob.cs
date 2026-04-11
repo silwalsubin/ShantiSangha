@@ -123,7 +123,7 @@ public class GenerateDailyMantraJob(
                     CreatedAt = DateTime.UtcNow
                 });
                 await db.SaveChangesAsync();
-                logger.LogDebug("Generated daily mantra for user {UserId}: {Mantra}", userId, mantra);
+                logger.LogInformation("Generated daily mantra for user {UserId}: {Mantra}", userId, mantra);
             }
         }
         catch (Exception ex)

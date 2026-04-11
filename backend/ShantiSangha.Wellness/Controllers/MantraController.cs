@@ -2,6 +2,7 @@ using Hangfire;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using ShantiSangha.Shared.Interfaces;
 using ShantiSangha.Wellness.Data;
 using ShantiSangha.Wellness.Jobs;
@@ -14,7 +15,8 @@ namespace ShantiSangha.Wellness.Controllers;
 public class MantraController(
     WellnessDbContext db,
     ICurrentUser currentUser,
-    IBackgroundJobClient jobs) : ControllerBase
+    IBackgroundJobClient jobs,
+    ILogger<MantraController> logger) : ControllerBase
 {
     [HttpGet("today")]
     public async Task<IActionResult> GetToday(CancellationToken ct)
@@ -30,9 +32,13 @@ public class MantraController(
             .FirstOrDefaultAsync(ct);
 
         if (mantra is not null)
+        {
+            logger.LogInformation("Mantra cache hit for user {UserId} on {Date}", user.Id, today);
             return Ok(mantra);
+        }
 
         // No mantra yet — trigger generation and return empty
+        logger.LogInformation("Mantra cache miss for user {UserId} on {Date} — enqueueing generation", user.Id, today);
         jobs.Enqueue<GenerateDailyMantraJob>(j => j.RunAsync(user.Id));
 
         return Ok(new { Content = (string?)null, Date = today });

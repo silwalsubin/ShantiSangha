@@ -247,16 +247,26 @@ struct HomeView: View {
     private func loadMantra() async {
         do {
             let response: MantraResponse = try await ApiService.shared.get("/mantra/today")
+            AppLogger.shared.info("Mantra", "Initial fetch: content=\(response.content ?? "nil")")
+
             if let content = response.content, !content.isEmpty {
                 mantra = content
-            } else {
-                try? await Task.sleep(nanoseconds: 4_000_000_000)
+                return
+            }
+
+            // Poll up to 5 times with 3s delay (15s total) for generation
+            for attempt in 1...5 {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
                 let retry: MantraResponse = try await ApiService.shared.get("/mantra/today")
+                AppLogger.shared.info("Mantra", "Retry \(attempt): content=\(retry.content ?? "nil")")
                 if let content = retry.content, !content.isEmpty {
                     mantra = content
+                    return
                 }
             }
-        } catch {}
+        } catch {
+            AppLogger.shared.error("Mantra", "Failed to load: \(error)")
+        }
     }
 
     // MARK: - Time greeting
