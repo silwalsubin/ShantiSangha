@@ -1,7 +1,7 @@
 import SwiftUI
 import FirebaseAuth
 
-/// Home screen — daily practices and goals
+/// Home screen — daily practices and goals at a glance
 struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
     @State private var showNewTask = false
@@ -29,7 +29,7 @@ struct HomeView: View {
                         .font(.sacredTitle)
                         .foregroundColor(.sacredText)
 
-                    // Gentle evening nudge
+                    // Evening nudge
                     if shouldShowNudge {
                         nudgeCard
                             .padding(.top, 16)
@@ -45,62 +45,16 @@ struct HomeView: View {
                         }
                         .padding(.top, 24)
                     } else if !vm.hasTasks {
-                        VStack(spacing: 16) {
-                            Text("You haven't set any practices yet.")
-                                .font(.sacredText)
-                                .foregroundColor(.sacredTextSecondary)
-
-                            Button { showNewTask = true } label: {
-                                Text("Set your first practice")
-                                    .font(.sacredTextSemibold)
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 24)
-                                    .padding(.vertical, 12)
-                                    .background(LinearGradient.sacredGoldShiny)
-                                    .clipShape(Capsule())
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 24)
+                        emptyState
                     } else {
-                        // Recurring tasks
+                        // ── Daily Practices ──
                         if vm.totalRecurring > 0 {
-                            Button { showRecurringSummary = true } label: {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "arrow.triangle.2.circlepath")
-                                        .font(.system(size: 18))
-                                        .foregroundColor(.sacredGold)
-                                    Rectangle()
-                                        .fill(Color.sacredMuted.opacity(0.15))
-                                        .frame(height: 1)
-                                    progressRing
-                                }
-                            }
-                            .padding(.top, 16)
-                            .padding(.bottom, 12)
-
-                            if !vm.pendingRecurring.isEmpty {
-                                taskList(vm.pendingRecurring)
-                            }
+                            practicesSection
                         }
 
-                        // Commitments
-                        if vm.totalMilestones > 0 {
-                            MilestoneTimelineView(
-                                milestones: vm.filteredCommitments,
-                                onDone: { id in Task { await vm.checkIn(id: id, completed: true) } },
-                                onSkip: { id in Task { await vm.checkIn(id: id, completed: false) } },
-                                onDelete: { id in Task { await vm.deleteTask(id: id) } },
-                                onProgressUpdate: { id, val in Task { await vm.updateProgress(id: id, value: val) } },
-                                onDueDateUpdate: { id, date in Task { await vm.updateDueDate(id: id, date: date) } },
-                                onShowAll: { showMilestoneSummary = true },
-                                filter: $vm.commitmentFilter,
-                                activeSwipeId: $vm.activeSwipeId,
-                                totalMilestones: vm.filteredTotal,
-                                doneMilestones: vm.filteredDone,
-                                hasOverdue: vm.filteredOverdue
-                            )
-                            .padding(.top, 20)
+                        // ── Goals ──
+                        if vm.pendingGoalCount > 0 {
+                            goalsSection
                         }
                     }
                 }
@@ -115,7 +69,7 @@ struct HomeView: View {
                 await loadMantra()
             }
 
-            // Floating add button
+            // FAB
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 showNewTask = true
@@ -141,6 +95,198 @@ struct HomeView: View {
         .navigationDestination(isPresented: $showMilestoneSummary) {
             MilestoneSummaryView(vm: vm, initialFilter: vm.commitmentFilter)
         }
+    }
+
+    // MARK: - Empty state
+
+    private var emptyState: some View {
+        VStack(spacing: 16) {
+            Text("You haven't set any practices yet.")
+                .font(.sacredText)
+                .foregroundColor(.sacredTextSecondary)
+
+            Button { showNewTask = true } label: {
+                Text("Set your first practice")
+                    .font(.sacredTextSemibold)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(LinearGradient.sacredGoldShiny)
+                    .clipShape(Capsule())
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 24)
+    }
+
+    // MARK: - Practices section
+
+    private var practicesSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Section header — tappable
+            Button { showRecurringSummary = true } label: {
+                HStack {
+                    Text("Daily Practices")
+                        .font(.sacredSectionLabel)
+                        .tracking(3)
+                        .foregroundColor(.sacredLabel)
+                    Spacer()
+                    Text("\(vm.doneRecurring) of \(vm.totalRecurring)")
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredMuted)
+                    Image(systemName: "chevron.right")
+                        .font(.sacredMicro)
+                        .foregroundColor(.sacredMuted)
+                }
+            }
+            .padding(.top, 28)
+            .padding(.bottom, 12)
+
+            // All done message
+            if vm.allPracticesDone {
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark.circle")
+                        .font(.sacredIcon)
+                        .foregroundColor(.sacredGold)
+                    Text("All practices complete. You showed up today.")
+                        .font(.sacredText)
+                        .foregroundColor(.sacredTextSecondary)
+                }
+                .padding(.vertical, 16)
+            }
+
+            // Practice rows — pending first, then completed (muted)
+            VStack(spacing: 0) {
+                ForEach(Array(vm.allRecurring.enumerated()), id: \.element.id) { index, task in
+                    practiceRow(task)
+
+                    if index < vm.allRecurring.count - 1 {
+                        Divider()
+                            .padding(.leading, 36)
+                    }
+                }
+            }
+        }
+    }
+
+    private func practiceRow(_ task: AppTask) -> some View {
+        let isDone = task.checkedIn
+
+        return HStack(spacing: 12) {
+            // Check circle — tappable
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                if isDone {
+                    Task { await vm.undoCheckIn(id: task.id) }
+                } else {
+                    Task { await vm.checkIn(id: task.id, completed: true) }
+                }
+            } label: {
+                Image(systemName: isDone ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22))
+                    .foregroundColor(isDone ? .sacredGold : .sacredMuted.opacity(0.4))
+            }
+
+            // Title
+            Text(task.title)
+                .font(.sacredText)
+                .foregroundColor(isDone ? .sacredMuted : .sacredText)
+                .strikethrough(isDone, color: .sacredMuted.opacity(0.3))
+
+            Spacer()
+
+            // Streak count
+            if task.currentStreak > 0 {
+                Text("\(task.currentStreak)d")
+                    .font(.sacredSmall)
+                    .foregroundColor(isDone ? .sacredMuted : .sacredGold)
+            }
+        }
+        .padding(.vertical, 14)
+        .animation(.easeOut(duration: 0.2), value: isDone)
+    }
+
+    // MARK: - Goals section
+
+    private var goalsSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Section header — tappable
+            Button { showMilestoneSummary = true } label: {
+                HStack {
+                    Text("Goals")
+                        .font(.sacredSectionLabel)
+                        .tracking(3)
+                        .foregroundColor(.sacredLabel)
+                    Spacer()
+                    Text("\(vm.pendingGoalCount)")
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredMuted)
+                    Image(systemName: "chevron.right")
+                        .font(.sacredMicro)
+                        .foregroundColor(.sacredMuted)
+                }
+            }
+            .padding(.top, 28)
+            .padding(.bottom, 12)
+
+            // Urgent goal rows
+            VStack(spacing: 0) {
+                ForEach(Array(vm.urgentGoals.enumerated()), id: \.element.id) { index, task in
+                    goalRow(task)
+
+                    if index < vm.urgentGoals.count - 1 {
+                        Divider()
+                            .padding(.leading, 36)
+                    }
+                }
+            }
+        }
+    }
+
+    private func goalRow(_ task: AppTask) -> some View {
+        HStack(spacing: 12) {
+            // Diamond icon
+            Image(systemName: "diamond")
+                .font(.system(size: 14))
+                .foregroundColor(.sacredGold)
+
+            // Title
+            Text(task.title)
+                .font(.sacredText)
+                .foregroundColor(.sacredText)
+                .lineLimit(2)
+
+            Spacer()
+
+            // Due date
+            Text(goalDateLabel(task.daysRemaining))
+                .font(.sacredSmall)
+                .foregroundColor(goalDateColor(task.daysRemaining))
+        }
+        .padding(.vertical, 14)
+    }
+
+    private func goalDateLabel(_ days: Int?) -> String {
+        guard let days else { return "" }
+        if days == 0 { return "Today" }
+        if days == 1 { return "Tomorrow" }
+        if days < 0 {
+            let date = Calendar.current.date(byAdding: .day, value: days, to: Date())!
+            let f = DateFormatter()
+            f.dateFormat = "MMM d"
+            return "Past \(f.string(from: date))"
+        }
+        let date = Calendar.current.date(byAdding: .day, value: days, to: Date())!
+        let f = DateFormatter()
+        f.dateFormat = "MMM d"
+        return f.string(from: date)
+    }
+
+    private func goalDateColor(_ days: Int?) -> Color {
+        guard let days else { return .sacredMuted }
+        if days < 0 { return .sacredMuted }
+        if days == 0 { return .sacredGold }
+        return .sacredTextSecondary
     }
 
     // MARK: - Gentle nudge
@@ -192,16 +338,13 @@ struct HomeView: View {
             if let content = response.content, !content.isEmpty {
                 mantra = content
             } else {
-                // Generation triggered — retry after a few seconds
                 try? await Task.sleep(nanoseconds: 4_000_000_000)
                 let retry: MantraResponse = try await ApiService.shared.get("/mantra/today")
                 if let content = retry.content, !content.isEmpty {
                     mantra = content
                 }
             }
-        } catch {
-            // Mantra is non-critical — fail silently
-        }
+        } catch {}
     }
 
     // MARK: - Time greeting
@@ -214,66 +357,6 @@ struct HomeView: View {
         if hour < 12 { return "Good morning\(name)" }
         if hour < 17 { return "Good afternoon\(name)" }
         return "Good evening\(name)"
-    }
-
-    // MARK: - Progress ring
-
-    private var progressRing: some View {
-        let total = vm.totalRecurring
-        let done = vm.doneRecurring
-        let progress = total > 0 ? Double(done) / Double(total) : 0
-
-        return ZStack {
-            Circle()
-                .stroke(Color.sacredMuted.opacity(0.15), lineWidth: 4)
-            if done > 0 {
-                Circle()
-                    .trim(from: 0, to: progress)
-                    .stroke(
-                        LinearGradient.sacredGoldShiny,
-                        style: StrokeStyle(lineWidth: 4, lineCap: .round)
-                    )
-                    .rotationEffect(.degrees(-90))
-                    .animation(.easeOut(duration: 0.5), value: progress)
-            }
-
-            if done > 0 {
-                VStack(spacing: 0) {
-                    Text("\(done)")
-                        .font(.sacredTextSemibold)
-                        .foregroundColor(.sacredGold)
-                    Text("of \(total)")
-                        .font(.sacredMicro)
-                        .foregroundColor(.sacredMuted)
-                }
-            }
-        }
-        .frame(width: 48, height: 48)
-    }
-
-    // MARK: - Task list
-
-    private func taskList(_ tasks: [AppTask]) -> some View {
-        VStack(spacing: 0) {
-            ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
-                TaskRow(
-                    task: task,
-                    onDone: { Task { await vm.checkIn(id: task.id, completed: true) } },
-                    onSkip: { Task { await vm.checkIn(id: task.id, completed: false) } },
-                    onUndo: { Task { await vm.undoCheckIn(id: task.id) } },
-                    onDelete: { Task { await vm.deleteTask(id: task.id) } },
-                    onProgressUpdate: { val in Task { await vm.updateProgress(id: task.id, value: val) } },
-                    onDueDateUpdate: { date in Task { await vm.updateDueDate(id: task.id, date: date) } },
-                    activeSwipeId: $vm.activeSwipeId
-                )
-
-                if index < tasks.count - 1 {
-                    Divider()
-                        .padding(.leading, 52)
-                        .padding(.trailing, 16)
-                }
-            }
-        }
     }
 }
 

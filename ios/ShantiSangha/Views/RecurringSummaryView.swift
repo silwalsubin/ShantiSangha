@@ -105,8 +105,8 @@ struct RecurringSummaryView: View {
     }
 
     private func taskList(_ tasks: [AppTask]) -> some View {
-        VStack(spacing: 8) {
-            ForEach(tasks) { task in
+        VStack(spacing: 0) {
+            ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
                 TaskRow(
                     task: task,
                     onDone: { Task { await vm.checkIn(id: task.id, completed: true) } },
@@ -116,6 +116,12 @@ struct RecurringSummaryView: View {
                     onProgressUpdate: { _ in },
                     activeSwipeId: $activeSwipeId
                 )
+
+                if index < tasks.count - 1 {
+                    Divider()
+                        .padding(.leading, 52)
+                        .padding(.trailing, 16)
+                }
             }
         }
     }

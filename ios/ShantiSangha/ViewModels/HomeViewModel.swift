@@ -94,6 +94,28 @@ class HomeViewModel: ObservableObject {
 
     var pendingTasks: [AppTask] { pendingRecurring + filteredCommitments }
 
+    /// All recurring tasks — pending first, then completed
+    var allRecurring: [AppTask] {
+        let recurring = tasks.filter { $0.type == .recurring }
+        let pending = recurring.filter { !$0.checkedIn }
+        let done = recurring.filter { $0.checkedIn }
+        return pending + done
+    }
+
+    var allPracticesDone: Bool { totalRecurring > 0 && doneRecurring == totalRecurring }
+
+    /// Urgent goals for Home — overdue + due today + due this week, max 5
+    var urgentGoals: [AppTask] {
+        tasks.filter { $0.type == .oneTime && $0.completedAt == nil }
+            .sorted { ($0.daysRemaining ?? 0) < ($1.daysRemaining ?? 0) }
+            .prefix(5)
+            .map { $0 }
+    }
+
+    var pendingGoalCount: Int {
+        tasks.filter { $0.type == .oneTime && $0.completedAt == nil }.count
+    }
+
     var completedTasks: [AppTask] { tasks.filter { $0.checkedIn && $0.completedToday == true } }
     var skippedTasks: [AppTask] { tasks.filter { $0.checkedIn && $0.completedToday == false } }
 

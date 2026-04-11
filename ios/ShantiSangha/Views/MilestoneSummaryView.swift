@@ -120,8 +120,8 @@ struct MilestoneSummaryView: View {
     }
 
     private func taskList(_ tasks: [AppTask]) -> some View {
-        VStack(spacing: 8) {
-            ForEach(tasks) { task in
+        VStack(spacing: 0) {
+            ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
                 TaskRow(
                     task: task,
                     onDone: { Task { await vm.checkIn(id: task.id, completed: true) } },
@@ -131,6 +131,12 @@ struct MilestoneSummaryView: View {
                     onProgressUpdate: { val in Task { await vm.updateProgress(id: task.id, value: val) } },
                     onDueDateUpdate: { date in Task { await vm.updateDueDate(id: task.id, date: date) } }
                 )
+
+                if index < tasks.count - 1 {
+                    Divider()
+                        .padding(.leading, 52)
+                        .padding(.trailing, 16)
+                }
             }
         }
     }
