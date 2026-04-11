@@ -82,4 +82,16 @@ public class VoiceService(WellnessDbContext db, StorageService storage) : IVoice
                 v.UpdatedAt))
             .FirstOrDefaultAsync(ct);
     }
+
+    public async Task<bool> DeleteEntryAsync(Guid userId, Guid entryId, CancellationToken ct = default)
+    {
+        var entry = await db.VoiceEntries
+            .FirstOrDefaultAsync(v => v.Id == entryId && v.UserId == userId, ct);
+
+        if (entry is null) return false;
+
+        db.VoiceEntries.Remove(entry);
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
 }

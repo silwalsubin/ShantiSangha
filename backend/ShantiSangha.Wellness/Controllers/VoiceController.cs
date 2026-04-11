@@ -69,4 +69,14 @@ public class VoiceController(IVoiceService voiceService, ICurrentUser currentUse
 
         return Ok(result);
     }
+
+    [HttpDelete("entries/{id:guid}")]
+    public async Task<IActionResult> DeleteEntry(Guid id, CancellationToken ct)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+
+        var deleted = await voiceService.DeleteEntryAsync(user.Id, id, ct);
+        return deleted ? NoContent() : NotFound();
+    }
 }
