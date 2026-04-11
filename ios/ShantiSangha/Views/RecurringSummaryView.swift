@@ -24,23 +24,6 @@ struct RecurringSummaryView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                // Progress header
-                HStack(spacing: 12) {
-                    Image(systemName: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 18))
-                        .foregroundColor(.sacredGold)
-                    Rectangle()
-                        .fill(Color.sacredMuted.opacity(0.15))
-                        .frame(height: 1)
-                    progressRing
-                }
-                .padding(.top, 24)
-
-                Text("\(vm.doneRecurring) of \(vm.totalRecurring) complete")
-                    .font(.sacredTitle)
-                    .foregroundColor(.sacredText)
-                    .padding(.top, 8)
-
                 // Pending
                 if !pending.isEmpty {
                     sectionLabel("PENDING")
@@ -63,8 +46,9 @@ struct RecurringSummaryView: View {
             .padding(.bottom, 40)
         }
         .background(Color.sacredBg.ignoresSafeArea())
-        .navigationTitle("")
+        .navigationTitle("Practices")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .tabBar)
     }
 
     private var progressRing: some View {
@@ -74,25 +58,20 @@ struct RecurringSummaryView: View {
 
         return ZStack {
             Circle()
-                .stroke(Color.sacredMuted.opacity(0.15), lineWidth: 5)
+                .stroke(Color.sacredMuted.opacity(0.15), lineWidth: 3)
             Circle()
                 .trim(from: 0, to: progress)
                 .stroke(
                     LinearGradient.sacredGoldShiny,
-                    style: StrokeStyle(lineWidth: 5, lineCap: .round)
+                    style: StrokeStyle(lineWidth: 3, lineCap: .round)
                 )
                 .rotationEffect(.degrees(-90))
 
-            VStack(spacing: 0) {
-                Text("\(done)")
-                    .font(.sacredHeading)
-                    .foregroundColor(.sacredGold)
-                Text("of \(total)")
-                    .font(.sacredSmall)
-                    .foregroundColor(.sacredMuted)
-            }
+            Text("\(done)/\(total)")
+                .font(.sacredMicroBold)
+                .foregroundColor(.sacredGold)
         }
-        .frame(width: 64, height: 64)
+        .frame(width: 32, height: 32)
     }
 
     private func sectionLabel(_ label: String) -> some View {

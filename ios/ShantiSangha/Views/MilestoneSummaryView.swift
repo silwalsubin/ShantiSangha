@@ -49,46 +49,29 @@ struct MilestoneSummaryView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                // Header
-                HStack(spacing: 12) {
-                    Image(systemName: "calendar.badge.clock")
-                        .font(.system(size: 18))
-                        .foregroundColor(.sacredGold)
-                    Rectangle()
-                        .fill(Color.sacredMuted.opacity(0.15))
-                        .frame(height: 1)
-                    commitmentRing
-                }
-                .padding(.top, 24)
-
-                Text("\(filteredDone) of \(filteredTotal) complete")
-                    .font(.sacredTitle)
-                    .foregroundColor(.sacredText)
-                    .padding(.top, 8)
-
                 // Filter pills
-                HStack(spacing: 6) {
-                    ForEach(CommitmentFilter.allCases, id: \.self) { option in
-                        Button {
-                            withAnimation(.easeOut(duration: 0.2)) { filter = option }
-                        } label: {
-                            Text(option.rawValue)
-                                .font(.sacredMicro)
-                                .foregroundColor(filter == option ? .sacredGold : .sacredMuted)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .background(
-                                    Capsule()
-                                        .fill(filter == option ? Color.sacredGold.opacity(0.12) : Color.clear)
-                                )
-                                .overlay(
-                                    Capsule()
-                                        .stroke(filter == option ? Color.sacredGold.opacity(0.3) : Color.sacredMuted.opacity(0.15), lineWidth: 1)
-                                )
+                    HStack(spacing: 6) {
+                        ForEach(CommitmentFilter.allCases, id: \.self) { option in
+                            Button {
+                                withAnimation(.easeOut(duration: 0.2)) { filter = option }
+                            } label: {
+                                Text(option.rawValue)
+                                    .font(.sacredMicro)
+                                    .foregroundColor(filter == option ? .sacredGold : .sacredMuted)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(
+                                        Capsule()
+                                            .fill(filter == option ? Color.sacredGold.opacity(0.12) : Color.clear)
+                                    )
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(filter == option ? Color.sacredGold.opacity(0.3) : Color.sacredMuted.opacity(0.15), lineWidth: 1)
+                                    )
+                            }
                         }
                     }
-                }
-                .padding(.top, 12)
+                    .padding(.top, 16)
 
                 // Pending
                 if !filteredPending.isEmpty {
@@ -106,7 +89,8 @@ struct MilestoneSummaryView: View {
             .padding(.bottom, 40)
         }
         .background(Color.sacredBg.ignoresSafeArea())
-        .navigationTitle("")
+        .navigationTitle("Goals")
+        .toolbar(.hidden, for: .tabBar)
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -145,31 +129,26 @@ struct MilestoneSummaryView: View {
 
     private var commitmentRing: some View {
         let progress = filteredTotal > 0 ? Double(filteredDone) / Double(filteredTotal) : 0
-        let ringColor: Color = hasOverdue ? .sacredRed : .sacredGold
+        let ringColor: Color = hasOverdue ? .sacredMuted : .sacredGold
         let gradient = LinearGradient(
-            colors: hasOverdue ? [.sacredRed, .sacredRed.opacity(0.7)] : [.sacredGoldShine, .sacredGold],
+            colors: hasOverdue ? [.sacredMuted, .sacredMuted.opacity(0.7)] : [.sacredGoldShine, .sacredGold],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
 
         return ZStack {
             Circle()
-                .stroke(Color.sacredMuted.opacity(0.15), lineWidth: 4)
+                .stroke(Color.sacredMuted.opacity(0.15), lineWidth: 3)
             Circle()
                 .trim(from: 0, to: progress)
-                .stroke(gradient, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                .stroke(gradient, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 .animation(.easeOut(duration: 0.5), value: progress)
 
-            VStack(spacing: 0) {
-                Text("\(filteredDone)")
-                    .font(.sacredTextSemibold)
-                    .foregroundColor(ringColor)
-                Text("of \(filteredTotal)")
-                    .font(.sacredMicro)
-                    .foregroundColor(.sacredMuted)
-            }
+            Text("\(filteredDone)/\(filteredTotal)")
+                .font(.sacredMicroBold)
+                .foregroundColor(ringColor)
         }
-        .frame(width: 48, height: 48)
+        .frame(width: 32, height: 32)
     }
 }
