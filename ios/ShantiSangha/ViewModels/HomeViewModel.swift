@@ -96,10 +96,8 @@ class HomeViewModel: ObservableObject {
 
     /// All recurring tasks — pending first, then completed
     var allRecurring: [AppTask] {
-        let recurring = tasks.filter { $0.type == .recurring }
-        let pending = recurring.filter { !$0.checkedIn }
-        let done = recurring.filter { $0.checkedIn }
-        return pending + done
+        tasks.filter { $0.type == .recurring }
+            .sorted { !$0.checkedIn && $1.checkedIn }
     }
 
     var allPracticesDone: Bool { totalRecurring > 0 && doneRecurring == totalRecurring }
