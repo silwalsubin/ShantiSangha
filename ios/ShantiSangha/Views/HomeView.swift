@@ -9,6 +9,7 @@ struct HomeView: View {
     @State private var showRecurringSummary = false
     @State private var showMilestoneSummary = false
     @State private var mantra: String?
+    @State private var showFAB = true
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -100,21 +101,26 @@ struct HomeView: View {
             }
             .onChange(of: vm.doneRecurring) { updateWidgetData() }
             .onChange(of: vm.doneMilestones) { updateWidgetData() }
+            .onAppear { withAnimation(.easeOut(duration: 0.25)) { showFAB = true } }
+            .onDisappear { showFAB = false }
 
             // FAB
-            Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                showNewTask = true
-            } label: {
-                Image(systemName: "square.and.pencil")
-                    .font(.sacredHeading)
-                    .foregroundColor(.white)
-                    .frame(width: 56, height: 56)
-                    .cymbalGold()
-                    .clipShape(Circle())
+            if showFAB {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    showNewTask = true
+                } label: {
+                    Image(systemName: "square.and.pencil")
+                        .font(.sacredHeading)
+                        .foregroundColor(.white)
+                        .frame(width: 56, height: 56)
+                        .cymbalGold()
+                        .clipShape(Circle())
+                }
+                .padding(.trailing, 20)
+                .padding(.bottom, 20)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            .padding(.trailing, 20)
-            .padding(.bottom, 20)
         }
         .navigationDestination(isPresented: $showNewTask) {
             NewTaskView { title, type, targetDate in
