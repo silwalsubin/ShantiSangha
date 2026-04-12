@@ -137,7 +137,7 @@ struct DashboardWidgetView: View {
                     Image(systemName: "calendar.badge.clock")
                         .font(.system(size: 10))
                     if entry.goalsOverdue > 0 {
-                        Text("\(entry.goalsOverdue) overdue")
+                        Text("\(entry.goalsOverdue) carried over")
                     }
                     if entry.goalsDueToday > 0 {
                         if entry.goalsOverdue > 0 { Text("·") }

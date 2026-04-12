@@ -235,6 +235,84 @@ try
         ctx.User.Claims.Select(c => new { c.Type, c.Value })
     )).RequireAuthorization();
 
+    // Debug: Hangfire job stats
+    app.MapGet("/api/debug/hangfire", () =>
+    {
+        var monitor = JobStorage.Current.GetMonitoringApi();
+        var stats = monitor.GetStatistics();
+
+        // Get recent failed jobs
+        var failedJobs = monitor.FailedJobs(0, 10)
+            .Select(j => new
+            {
+                j.Key,
+                j.Value.Job?.Type?.Name,
+                j.Value.Job?.Method?.Name,
+                j.Value.Reason,
+                j.Value.FailedAt,
+                ExceptionMessage = j.Value.ExceptionMessage?.Length > 200
+                    ? j.Value.ExceptionMessage[..200] : j.Value.ExceptionMessage
+            });
+
+        // Get recent succeeded jobs
+        var succeededJobs = monitor.SucceededJobs(0, 10)
+            .Select(j => new
+            {
+                j.Key,
+                j.Value.Job?.Type?.Name,
+                j.Value.Job?.Method?.Name,
+                j.Value.SucceededAt,
+                Duration = j.Value.TotalDuration
+            });
+
+        // Get enqueued jobs
+        var queues = monitor.Queues();
+        var enqueuedDetails = queues.Select(q => new
+        {
+            q.Name,
+            q.Length,
+            q.Fetched
+        });
+
+        // Get processing jobs
+        var processingJobs = monitor.ProcessingJobs(0, 10)
+            .Select(j => new
+            {
+                j.Key,
+                j.Value.Job?.Type?.Name,
+                j.Value.Job?.Method?.Name,
+                j.Value.StartedAt
+            });
+
+        return Results.Ok(new
+        {
+            stats = new
+            {
+                stats.Enqueued,
+                stats.Scheduled,
+                stats.Processing,
+                stats.Succeeded,
+                stats.Failed,
+                stats.Deleted,
+                stats.Servers,
+                stats.Recurring
+            },
+            queues = enqueuedDetails,
+            recentSucceeded = succeededJobs,
+            recentFailed = failedJobs,
+            processing = processingJobs
+        });
+    }).RequireAuthorization();
+
+    // Debug: Trigger a test Hangfire job (generates mantra for current user)
+    app.MapPost("/api/debug/hangfire/test-mantra", async (HttpContext ctx, IBackgroundJobClient jobs) =>
+    {
+        var currentUser = ctx.RequestServices.GetRequiredService<ShantiSangha.Shared.Interfaces.ICurrentUser>();
+        var user = await currentUser.GetAsync();
+        jobs.Enqueue<ShantiSangha.Wellness.Jobs.GenerateDailyMantraJob>(j => j.RunAsync(user.Id));
+        return Results.Ok(new { triggered = "GenerateDailyMantraJob", userId = user.Id });
+    }).RequireAuthorization();
+
     // Health check at root (no /api prefix)
     app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
         .AllowAnonymous();

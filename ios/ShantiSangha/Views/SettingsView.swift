@@ -112,6 +112,25 @@ struct SettingsView: View {
                 // App Server
                 serverCard
 
+                // Hangfire debug
+                NavigationLink(destination: HangfireDebugView()) {
+                    HStack {
+                        Image(systemName: "gearshape.2")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
+                        Text("Hangfire Jobs")
+                            .font(.sacredText)
+                            .foregroundColor(.sacredText)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
+                    }
+                    .padding(16)
+                    .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
+                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.1)))
+                }
+
                 // Logs
                 NavigationLink(destination: LogsView()) {
                     HStack {

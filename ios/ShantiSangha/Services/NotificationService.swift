@@ -138,7 +138,7 @@ class NotificationService: ObservableObject {
                 )
             }
         } else if daysRemaining < 0 && daysRemaining >= -3 {
-            // Overdue (up to 3 days) — gentle morning reminder
+            // Carried over (up to 3 days) — gentle morning reminder
             var dateComponents = DateComponents()
             dateComponents.hour = 9
             dateComponents.minute = 0
@@ -149,7 +149,7 @@ class NotificationService: ObservableObject {
                 scheduleNotification(
                     id: "overdue-\(task.id)",
                     title: task.title,
-                    body: "\(task.title) is \(overdueDays) day\(overdueDays == 1 ? "" : "s") past due.",
+                    body: "\(task.title) has been waiting for \(overdueDays) day\(overdueDays == 1 ? "" : "s").",
                     dateComponents: dateComponents
                 )
             }

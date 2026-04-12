@@ -120,7 +120,7 @@ class HomeViewModel: ObservableObject {
         let dueToday = pending.filter { $0.daysRemaining == 0 }.count
 
         var parts: [String] = []
-        if overdue > 0 { parts.append("\(overdue) overdue") }
+        if overdue > 0 { parts.append("\(overdue) carried over") }
         if dueToday > 0 { parts.append("\(dueToday) due today") }
         if parts.isEmpty { return "\(pending.count) active" }
         return parts.joined(separator: "\n")
