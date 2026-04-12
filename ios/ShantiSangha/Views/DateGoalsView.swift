@@ -76,7 +76,7 @@ struct DateGoalsView: View {
             }
         }
         .navigationDestination(isPresented: $showNewTask) {
-            NewTaskView { title, type, targetDate in
+            QuickAddGoalView(targetDate: date) { title, type, targetDate in
                 await vm.createTask(title: title, type: type, targetDate: targetDate)
             }
         }

@@ -176,9 +176,20 @@ class TaskRepository: ObservableObject {
     func createTask(title: String, type: TaskType, targetDate: String? = nil) async {
         // Create locally with temp ID
         let tempId = UUID().uuidString
+
+        // Compute daysRemaining from targetDate so it shows immediately in date-filtered views
+        var daysRemaining: Int? = nil
+        if let targetDate = targetDate {
+            let df = DateFormatter()
+            df.dateFormat = "yyyy-MM-dd"
+            if let target = df.date(from: targetDate) {
+                daysRemaining = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: Date()), to: target).day
+            }
+        }
+
         let newTask = AppTask(
             id: tempId, title: title, type: type,
-            daysRemaining: nil, progress: 0
+            daysRemaining: daysRemaining, progress: 0
         )
         tasks.append(newTask)
         insertLocal(newTask, pending: true)
@@ -195,13 +206,20 @@ class TaskRepository: ObservableObject {
 
     /// Called by SyncService after a create operation resolves the real server ID
     func replaceTempWithReal(tempId: String, real: AppTask) {
-        // Update in-memory tasks
+        // Update in-memory tasks, preserving locally-computed fields the server may not return
         if let idx = tasks.firstIndex(where: { $0.id == tempId }) {
-            tasks[idx] = real
+            var merged = real
+            if merged.daysRemaining == nil {
+                merged.daysRemaining = tasks[idx].daysRemaining
+            }
+            tasks[idx] = merged
+            // Update local DB
+            deleteLocal(id: tempId)
+            insertLocal(merged, pending: false)
+        } else {
+            deleteLocal(id: tempId)
+            insertLocal(real, pending: false)
         }
-        // Update local DB
-        deleteLocal(id: tempId)
-        insertLocal(real, pending: false)
     }
 
     /// Called by SyncService after a successful sync to clear pending flag

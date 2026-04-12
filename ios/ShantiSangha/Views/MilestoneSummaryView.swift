@@ -1,20 +1,18 @@
 import SwiftUI
 
-/// Calendar-based goals overview. Tapping a date navigates to DateGoalsView.
-/// Compact date strip expands into full month grid.
+/// Goals list — shows today's goals and carried-over items.
+/// Calendar is accessible via toolbar button.
 struct MilestoneSummaryView: View {
     @ObservedObject var vm: HomeViewModel
     @State private var navigateToDate: Date?
     @State private var showDateGoals = false
-    @State private var expanded = false
-    @State private var displayedMonth: Date = Calendar.current.startOfDay(for: Date())
+    @State private var showCalendar = false
 
     private let calendar = Calendar.current
     private let today = Calendar.current.startOfDay(for: Date())
 
     // MARK: - Grouped goals by date
 
-    /// Groups pending goals (due today + overdue) by their due date, sorted earliest first
     private var groupedGoals: [(date: Date, label: String, tasks: [AppTask])] {
         let pending = vm.allMilestones.filter { task in
             guard task.completedAt == nil else { return false }
@@ -22,7 +20,6 @@ struct MilestoneSummaryView: View {
             return daysRemaining <= 0
         }
 
-        // Group by due date
         var grouped: [Date: [AppTask]] = [:]
         for task in pending {
             let days = task.daysRemaining ?? 0
@@ -43,40 +40,29 @@ struct MilestoneSummaryView: View {
         }
     }
 
-    // All overdue items (flat list, sorted by most overdue first)
-    private var overdueGoals: [AppTask] {
-        vm.allMilestones.filter { $0.completedAt == nil && ($0.daysRemaining ?? 1) < 0 }
-            .sorted { ($0.daysRemaining ?? 0) < ($1.daysRemaining ?? 0) }
-    }
-
     // MARK: - Body
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                // Calendar
-                calendarSection
-                    .padding(.top, 12)
-
-                // Today group — always shown
-                dateGroupHeader("Due today", date: today)
-                if let todayGroup = groupedGoals.first(where: { calendar.isDate($0.date, inSameDayAs: today) }) {
-                    taskList(todayGroup.tasks)
+                // Check if everything is clear
+                if groupedGoals.isEmpty {
+                    allClearView
                 } else {
-                    Text("You're all clear today")
-                        .font(.sacredSmall)
-                        .foregroundColor(.sacredGreen)
-                        .padding(.leading, 46)
-                        .padding(.bottom, 4)
-                }
+                    // Today group
+                    if let todayGroup = groupedGoals.first(where: { calendar.isDate($0.date, inSameDayAs: today) }) {
+                        dateGroupHeader("Today", date: today)
+                        taskList(todayGroup.tasks)
+                    }
 
-                // Overdue section — grouped by date with date headers
-                let overdueGroups = groupedGoals.filter { !calendar.isDate($0.date, inSameDayAs: today) }
-                if !overdueGroups.isEmpty {
-                    overdueSectionHeader
-                    ForEach(overdueGroups, id: \.date) { group in
-                        dateGroupHeader(group.label, date: group.date)
-                        taskList(group.tasks)
+                    // Carried over section
+                    let overdueGroups = groupedGoals.filter { !calendar.isDate($0.date, inSameDayAs: today) }
+                    if !overdueGroups.isEmpty {
+                        overdueSectionHeader
+                        ForEach(overdueGroups, id: \.date) { group in
+                            dateGroupHeader(group.label, date: group.date)
+                            taskList(group.tasks)
+                        }
                     }
                 }
             }
@@ -87,12 +73,53 @@ struct MilestoneSummaryView: View {
         .navigationTitle("Goals")
         .toolbar(.hidden, for: .tabBar)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showCalendar = true
+                } label: {
+                    Image(systemName: "calendar")
+                        .font(.sacredSmallMedium)
+                        .foregroundColor(.sacredGold)
+                }
+            }
+        }
         .navigationDestination(isPresented: $showDateGoals) {
             DateGoalsView(vm: vm, date: navigateToDate ?? today)
         }
+        .navigationDestination(isPresented: $showCalendar) {
+            GoalCalendarBrowseView(vm: vm)
+        }
     }
 
-    // MARK: - Overdue section header
+    // MARK: - Carried over header
+
+    // MARK: - All clear celebration
+
+    private var allClearView: some View {
+        VStack(spacing: 16) {
+            Spacer().frame(height: 40)
+
+            Image(systemName: "leaf.fill")
+                .font(.system(size: 36))
+                .foregroundColor(.sacredGreen)
+
+            Text("You're all clear")
+                .font(.sacredHeading)
+                .foregroundColor(.sacredText)
+
+            Text("Nothing waiting for you today.\nEnjoy the stillness.")
+                .font(.sacredSmall)
+                .foregroundColor(.sacredMuted)
+                .multilineTextAlignment(.center)
+                .lineSpacing(4)
+
+            Spacer().frame(height: 20)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Carried over header
 
     private var overdueSectionHeader: some View {
         HStack(spacing: 8) {
@@ -100,231 +127,13 @@ struct MilestoneSummaryView: View {
                 .font(.sacredSectionLabel)
                 .tracking(3)
                 .foregroundColor(.sacredMuted)
-
             Spacer()
         }
         .padding(.top, 28)
         .padding(.bottom, 0)
     }
 
-    // MARK: - Calendar section
-
-    private var calendarSection: some View {
-        VStack(spacing: 0) {
-            if expanded {
-                fullMonthCalendar
-            } else {
-                compactDateStrip
-            }
-        }
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBgCard))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.08)))
-    }
-
-    // MARK: - Compact date strip
-
-    private var compactDateStrip: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Text(monthYearLabel(for: today))
-                    .font(.sacredTextMedium)
-                    .foregroundColor(.sacredText)
-
-                Spacer()
-
-                Button {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        displayedMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: today))!
-                        expanded = true
-                    }
-                } label: {
-                    Image(systemName: "chevron.down")
-                        .font(.sacredSmall)
-                        .foregroundColor(.sacredMuted)
-                        .frame(width: 32, height: 32)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 10)
-
-            dayOfWeekHeaders
-                .padding(.horizontal, 8)
-
-            let weekDates = datesForWeek(containing: today)
-            HStack(spacing: 0) {
-                ForEach(weekDates, id: \.self) { date in
-                    dateCell(date)
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.bottom, 10)
-        }
-    }
-
-    // MARK: - Full month calendar
-
-    private var fullMonthCalendar: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Button { navigateMonth(-1) } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.sacredSmallMedium)
-                        .foregroundColor(.sacredGold)
-                        .frame(width: 44, height: 44)
-                }
-
-                Spacer()
-
-                Button {
-                    withAnimation(.easeInOut(duration: 0.3)) { expanded = false }
-                } label: {
-                    HStack(spacing: 6) {
-                        Text(monthYearLabel(for: displayedMonth))
-                            .font(.sacredTextMedium)
-                            .foregroundColor(.sacredText)
-                        Image(systemName: "chevron.up")
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredMuted)
-                    }
-                }
-
-                Spacer()
-
-                Button { navigateMonth(1) } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.sacredSmallMedium)
-                        .foregroundColor(.sacredGold)
-                        .frame(width: 44, height: 44)
-                }
-            }
-            .padding(.horizontal, 4)
-
-            dayOfWeekHeaders
-                .padding(.horizontal, 8)
-
-            let days = datesForMonth(displayedMonth)
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 7), spacing: 4) {
-                ForEach(days, id: \.self) { date in
-                    if date == .distantPast {
-                        Color.clear.frame(height: 40)
-                    } else {
-                        dateCell(date)
-                    }
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.bottom, 10)
-        }
-    }
-
-    // MARK: - Date cell
-
-    private func dateCell(_ date: Date) -> some View {
-        let isToday = calendar.isDate(date, inSameDayAs: today)
-        let dayNum = calendar.component(.day, from: date)
-        let goalsOnDate = goalsCount(for: date)
-
-        return Button {
-            navigateToDate = date
-            showDateGoals = true
-        } label: {
-            VStack(spacing: 2) {
-                ZStack {
-                    if isToday {
-                        Circle()
-                            .fill(LinearGradient(
-                                colors: [.sacredGold, .sacredGoldDark],
-                                startPoint: .topLeading, endPoint: .bottomTrailing
-                            ))
-                    }
-
-                    Text("\(dayNum)")
-                        .font(.system(size: 15, weight: isToday ? .semibold : .regular, design: .serif))
-                        .foregroundColor(
-                            isToday ? .white :
-                            date > today ? .sacredText.opacity(0.3) :
-                            .sacredText
-                        )
-                }
-                .frame(width: 36, height: 36)
-
-                // Goal count badge
-                if goalsOnDate > 0 {
-                    Text("\(goalsOnDate)")
-                        .font(.system(size: 8, weight: .bold, design: .serif))
-                        .foregroundColor(.sacredGold)
-                        .frame(height: 10)
-                } else {
-                    Color.clear.frame(height: 10)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - Day of week headers
-
-    private var dayOfWeekHeaders: some View {
-        let labels = ["S", "M", "T", "W", "T", "F", "S"]
-        return HStack(spacing: 0) {
-            ForEach(Array(labels.enumerated()), id: \.offset) { _, label in
-                Text(label)
-                    .font(.sacredSectionLabel)
-                    .tracking(1)
-                    .foregroundColor(.sacredMuted)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 20)
-            }
-        }
-    }
-
-    // MARK: - Helpers
-
-    private func monthYearLabel(for date: Date) -> String {
-        let df = DateFormatter()
-        df.dateFormat = "MMMM yyyy"
-        return df.string(from: date)
-    }
-
-    private func datesForWeek(containing date: Date) -> [Date] {
-        let weekday = calendar.component(.weekday, from: date)
-        let startOfWeek = calendar.date(byAdding: .day, value: -(weekday - 1), to: date)!
-        return (0..<7).map { calendar.date(byAdding: .day, value: $0, to: startOfWeek)! }
-    }
-
-    private func datesForMonth(_ monthDate: Date) -> [Date] {
-        let comps = calendar.dateComponents([.year, .month], from: monthDate)
-        let firstOfMonth = calendar.date(from: comps)!
-        let startWeekday = calendar.component(.weekday, from: firstOfMonth)
-        let daysInMonth = calendar.range(of: .day, in: .month, for: firstOfMonth)!.count
-
-        var dates: [Date] = []
-        for _ in 0..<(startWeekday - 1) {
-            dates.append(.distantPast)
-        }
-        for d in 0..<daysInMonth {
-            dates.append(calendar.date(byAdding: .day, value: d, to: firstOfMonth)!)
-        }
-        return dates
-    }
-
-    private func navigateMonth(_ delta: Int) {
-        withAnimation(.easeInOut(duration: 0.2)) {
-            displayedMonth = calendar.date(byAdding: .month, value: delta, to: displayedMonth)!
-        }
-    }
-
-    private func goalsCount(for date: Date) -> Int {
-        let targetDate = calendar.startOfDay(for: date)
-        return vm.allMilestones.filter { task in
-            guard let daysRemaining = task.daysRemaining else { return false }
-            let dueDate = calendar.startOfDay(for: calendar.date(byAdding: .day, value: daysRemaining, to: today)!)
-            return dueDate == targetDate
-        }.count
-    }
-
-    // MARK: - Date group header & task list
+    // MARK: - Date group header
 
     private func dateGroupHeader(_ label: String, date: Date) -> some View {
         let isToday = calendar.isDate(date, inSameDayAs: today)
@@ -376,7 +185,9 @@ struct MilestoneSummaryView: View {
         }
     }
 
-    private func taskList(_ tasks: [AppTask], hideDueDate: Bool = true) -> some View {
+    // MARK: - Task list
+
+    private func taskList(_ tasks: [AppTask]) -> some View {
         VStack(spacing: 0) {
             ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
                 TaskRow(
@@ -387,7 +198,7 @@ struct MilestoneSummaryView: View {
                     onDelete: { Task { await vm.deleteTask(id: task.id) } },
                     onProgressUpdate: { val in Task { await vm.updateProgress(id: task.id, value: val) } },
                     onDueDateUpdate: { date in Task { await vm.updateDueDate(id: task.id, date: date) } },
-                    hideDueDate: hideDueDate
+                    hideDueDate: true
                 )
 
                 if index < tasks.count - 1 {
