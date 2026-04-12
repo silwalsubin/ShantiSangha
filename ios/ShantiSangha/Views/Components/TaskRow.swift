@@ -9,6 +9,7 @@ struct TaskRow: View {
     let onDelete: () -> Void
     let onProgressUpdate: (Int) -> Void
     var onDueDateUpdate: ((String) -> Void)? = nil
+    var hideDueDate: Bool = false
     var activeSwipeId: Binding<String?>?
 
     @State private var showMenu = false
@@ -153,7 +154,7 @@ struct TaskRow: View {
                 }
 
                 // Milestone due date
-                if task.type == .oneTime, let days = task.daysRemaining {
+                if task.type == .oneTime, !hideDueDate, let days = task.daysRemaining {
                     Text(dueDateLabel(daysRemaining: days))
                         .font(days <= 0 ? .sacredSmallSemibold : .sacredSmall)
                         .foregroundColor(days < 0 ? .sacredRed : days == 0 ? .sacredGold : .sacredMuted)

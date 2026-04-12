@@ -131,7 +131,7 @@ struct HomeView: View {
             RecurringSummaryView(vm: vm)
         }
         .navigationDestination(isPresented: $showMilestoneSummary) {
-            MilestoneSummaryView(vm: vm, initialFilter: vm.commitmentFilter)
+            MilestoneSummaryView(vm: vm)
         }
     }
 

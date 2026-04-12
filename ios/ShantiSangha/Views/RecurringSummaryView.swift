@@ -26,13 +26,13 @@ struct RecurringSummaryView: View {
             VStack(alignment: .leading, spacing: 0) {
                 // Pending
                 if !pending.isEmpty {
-                    sectionLabel("PENDING")
+                    sectionLabel("ACTIVE")
                     taskList(pending)
                 }
 
                 // Completed
                 if !completed.isEmpty {
-                    sectionLabel("COMPLETED")
+                    sectionLabel("DONE")
                     taskList(completed)
                 }
 
