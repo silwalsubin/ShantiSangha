@@ -31,18 +31,25 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate {
     func application(_ application: UIApplication,
                      didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         Messaging.messaging().apnsToken = deviceToken
+        Task { @MainActor in
+            AppLogger.shared.info("Push", "APNs token received")
+        }
     }
 
     func application(_ application: UIApplication,
                      didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        print("[Push] Failed to register for remote notifications: \(error)")
+        Task { @MainActor in
+            AppLogger.shared.error("Push", "Failed to register: \(error.localizedDescription)")
+        }
     }
 
     // MARK: - FCM token
 
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
         guard let token = fcmToken else { return }
-        print("[Push] FCM token received")
+        Task { @MainActor in
+            AppLogger.shared.info("Push", "FCM token received")
+        }
         Task { await PushTokenService.shared.registerToken(token) }
     }
 
@@ -51,6 +58,10 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate {
     func application(_ application: UIApplication,
                      didReceiveRemoteNotification userInfo: [AnyHashable: Any],
                      fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+        let type = userInfo["type"] as? String ?? "unknown"
+        Task { @MainActor in
+            AppLogger.shared.info("Push", "Silent push received: \(type)")
+        }
         Task {
             await SilentPushHandler.handle(userInfo: userInfo)
             completionHandler(.newData)
