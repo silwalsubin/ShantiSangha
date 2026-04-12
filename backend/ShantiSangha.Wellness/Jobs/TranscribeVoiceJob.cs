@@ -15,6 +15,7 @@ public class TranscribeVoiceJob(
     StorageService storage,
     IHttpClientFactory httpClientFactory,
     IEventBus eventBus,
+    IPushNotificationService pushService,
     ILogger<TranscribeVoiceJob> logger)
 {
     public async Task RunAsync(Guid voiceEntryId)
@@ -59,6 +60,8 @@ public class TranscribeVoiceJob(
                 entry.CreatedAt));
 
             logger.LogInformation("Transcribed voice entry {Id}, published VoiceTranscribedEvent", voiceEntryId);
+
+            await pushService.SendSilentPushAsync(entry.UserId, new Dictionary<string, string> { ["type"] = "voice" });
         }
         catch (Exception ex)
         {

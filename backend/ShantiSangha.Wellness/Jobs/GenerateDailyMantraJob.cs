@@ -15,6 +15,7 @@ public class GenerateDailyMantraJob(
     ISummaryQueryService summaryQuery,
     IInsightQueryService insightQuery,
     IProfileQueryService profileQuery,
+    IPushNotificationService pushService,
     ILogger<GenerateDailyMantraJob> logger)
 {
     public async Task RunAsync(Guid userId)
@@ -124,6 +125,8 @@ public class GenerateDailyMantraJob(
                 });
                 await db.SaveChangesAsync();
                 logger.LogInformation("Generated daily mantra for user {UserId}: {Mantra}", userId, mantra);
+
+                await pushService.SendSilentPushAsync(userId, new Dictionary<string, string> { ["type"] = "mantra" });
             }
         }
         catch (Exception ex)

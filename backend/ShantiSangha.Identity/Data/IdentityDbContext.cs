@@ -8,6 +8,7 @@ public class IdentityDbContext(DbContextOptions<IdentityDbContext> options) : Db
     public DbSet<User> Users => Set<User>();
     public DbSet<Profile> Profiles => Set<Profile>();
     public DbSet<SafetyEvent> SafetyEvents => Set<SafetyEvent>();
+    public DbSet<DeviceToken> DeviceTokens => Set<DeviceToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -27,6 +28,13 @@ public class IdentityDbContext(DbContextOptions<IdentityDbContext> options) : Db
         {
             e.Property(s => s.EventType).HasConversion<string>();
             e.HasIndex(s => new { s.UserId, s.CreatedAt });
+        });
+
+        modelBuilder.Entity<DeviceToken>(e =>
+        {
+            e.HasIndex(d => d.Token).IsUnique();
+            e.HasIndex(d => d.UserId);
+            e.HasOne<User>().WithMany().HasForeignKey(d => d.UserId);
         });
     }
 }

@@ -1,3 +1,5 @@
+using FirebaseAdmin;
+using Google.Apis.Auth.OAuth2;
 using Hangfire;
 using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -109,6 +111,27 @@ try
         .UsePostgreSqlStorage(o => o.UseNpgsqlConnection(appConfig.DatabaseUrl)));
     builder.Services.AddHangfireServer();
 
+    // Firebase Admin — for sending push notifications via FCM
+    if (FirebaseApp.DefaultInstance == null)
+    {
+        var firebaseCredJson = builder.Configuration["FIREBASE_SERVICE_ACCOUNT_JSON"];
+        if (!string.IsNullOrEmpty(firebaseCredJson))
+        {
+            FirebaseApp.Create(new AppOptions
+            {
+                Credential = GoogleCredential.FromJson(firebaseCredJson),
+                ProjectId = appConfig.FirebaseProjectId
+            });
+        }
+        else
+        {
+            // Falls back to GOOGLE_APPLICATION_CREDENTIALS env var or Application Default Credentials
+            FirebaseApp.Create(new AppOptions { ProjectId = appConfig.FirebaseProjectId });
+        }
+    }
+    builder.Services.AddScoped<IPushNotificationService, ShantiSangha.Api.Services.PushNotificationService>();
+    builder.Services.AddScoped<ShantiSangha.Shared.Jobs.SendPushNotificationJob>();
+
     // OpenTelemetry — traces and metrics
     builder.Services.AddOpenTelemetry()
         .ConfigureResource(r => r.AddService("ShantiSangha.Api"))
@@ -176,6 +199,7 @@ try
         await sp.GetRequiredService<ShantiSangha.Journal.Data.JournalDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Wellness.Data.WellnessDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Insights.Data.InsightsDbContext>().Database.MigrateAsync();
+
     }
 
     // Global error handler — returns full error details when EXPOSE_ERRORS=true

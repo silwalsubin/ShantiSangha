@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 import FirebaseAuth
+import FirebaseMessaging
 import GoogleSignIn
 import GoogleSignInSwift
 
@@ -61,6 +62,7 @@ class AuthService: ObservableObject {
     }
 
     func signOut() {
+        Task { await PushTokenService.shared.unregisterToken() }
         try? Auth.auth().signOut()
         GIDSignIn.sharedInstance.signOut()
     }
@@ -68,7 +70,17 @@ class AuthService: ObservableObject {
     private func configureApiToken() {
         Task {
             await ApiService.shared.setTokenProvider {
-                try? await Auth.auth().currentUser?.getIDToken()
+                let token = try? await Auth.auth().currentUser?.getIDToken()
+                // Share token with widget extension via App Group
+                if let token {
+                    UserDefaults(suiteName: WidgetData.appGroupId)?.set(token, forKey: "widget.authToken")
+                }
+                return token
+            }
+
+            // Register FCM token with backend after API auth is ready
+            if let fcmToken = Messaging.messaging().fcmToken {
+                await PushTokenService.shared.registerToken(fcmToken)
             }
         }
     }

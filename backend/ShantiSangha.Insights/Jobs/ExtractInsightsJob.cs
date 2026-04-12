@@ -11,6 +11,7 @@ namespace ShantiSangha.Insights.Jobs;
 public class ExtractInsightsJob(
     InsightsDbContext db,
     Kernel kernel,
+    ShantiSangha.Shared.Interfaces.IPushNotificationService pushService,
     ILogger<ExtractInsightsJob> logger)
 {
     public async Task RunAsync(Guid sourceId, SummarySourceType sourceType, Guid userId)
@@ -76,6 +77,8 @@ public class ExtractInsightsJob(
         {
             await db.SaveChangesAsync();
             logger.LogInformation("Extracted {Count} insight(s) from {SourceType} {SourceId}", newInsights.Count, sourceType, sourceId);
+
+            await pushService.SendSilentPushAsync(userId, new Dictionary<string, string> { ["type"] = "insight" });
         }
     }
 

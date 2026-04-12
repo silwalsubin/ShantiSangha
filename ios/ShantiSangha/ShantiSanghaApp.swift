@@ -1,15 +1,21 @@
 import SwiftUI
 import SwiftData
 import FirebaseCore
+import FirebaseMessaging
 import GoogleSignIn
 
-class AppDelegate: NSObject, UIApplicationDelegate {
+class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         FirebaseApp.configure()
         GIDSignIn.sharedInstance.configuration = GIDConfiguration(
             clientID: "361305168424-umc433jdki16tbit3ou2kkjv1p7k327g.apps.googleusercontent.com"
         )
+
+        // FCM setup
+        Messaging.messaging().delegate = self
+        application.registerForRemoteNotifications()
+
         AuthService.shared.startListening()
         return true
     }
@@ -18,6 +24,37 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                      open url: URL,
                      options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
         return GIDSignIn.sharedInstance.handle(url)
+    }
+
+    // MARK: - APNs token forwarded to FCM
+
+    func application(_ application: UIApplication,
+                     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        Messaging.messaging().apnsToken = deviceToken
+    }
+
+    func application(_ application: UIApplication,
+                     didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        print("[Push] Failed to register for remote notifications: \(error)")
+    }
+
+    // MARK: - FCM token
+
+    func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
+        guard let token = fcmToken else { return }
+        print("[Push] FCM token received")
+        Task { await PushTokenService.shared.registerToken(token) }
+    }
+
+    // MARK: - Silent push handler
+
+    func application(_ application: UIApplication,
+                     didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+                     fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+        Task {
+            await SilentPushHandler.handle(userInfo: userInfo)
+            completionHandler(.newData)
+        }
     }
 }
 
