@@ -76,6 +76,13 @@ variable "domain_name" {
   default     = "shantisangha.com"
 }
 
+variable "firebase_service_account_json" {
+  description = "Firebase Admin SDK service account JSON (for push notifications)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "langfuse_public_key" {
   description = "Langfuse public key (optional, leave empty to disable)"
   type        = string

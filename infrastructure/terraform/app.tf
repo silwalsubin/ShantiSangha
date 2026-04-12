@@ -149,7 +149,7 @@ resource "aws_ecs_task_definition" "api" {
       { name = "FRONTEND_ORIGIN",       value = "https://${var.domain_name},https://${aws_cloudfront_distribution.frontend.domain_name},http://localhost:5173" }
     ]
 
-    secrets = [
+    secrets = concat([
       {
         name      = "DATABASE_URL"
         valueFrom = aws_secretsmanager_secret.database_url.arn
@@ -158,7 +158,12 @@ resource "aws_ecs_task_definition" "api" {
         name      = "OPENAI_API_KEY"
         valueFrom = aws_secretsmanager_secret.app["openai_api_key"].arn
       }
-    ]
+    ], local.firebase_enabled ? [
+      {
+        name      = "FIREBASE_SERVICE_ACCOUNT_JSON"
+        valueFrom = aws_secretsmanager_secret.firebase[0].arn
+      }
+    ] : [])
 
     logConfiguration = {
       logDriver = "awslogs"

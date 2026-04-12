@@ -38,6 +38,23 @@ resource "aws_secretsmanager_secret_version" "app" {
   }, each.key)
 }
 
+# Optional: Firebase service account (for FCM push notifications)
+
+locals {
+  firebase_enabled = nonsensitive(var.firebase_service_account_json != "")
+}
+
+resource "aws_secretsmanager_secret" "firebase" {
+  count = local.firebase_enabled ? 1 : 0
+  name  = "${var.app_name}/firebase_service_account_json"
+}
+
+resource "aws_secretsmanager_secret_version" "firebase" {
+  count         = local.firebase_enabled ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.firebase[0].id
+  secret_string = var.firebase_service_account_json
+}
+
 # Optional: Langfuse
 
 resource "aws_secretsmanager_secret" "langfuse" {
