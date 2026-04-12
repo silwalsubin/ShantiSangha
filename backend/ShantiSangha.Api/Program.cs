@@ -304,14 +304,27 @@ try
         });
     }).RequireAuthorization();
 
-    // Debug: Trigger a test Hangfire job (generates mantra for current user)
+    // Debug: Force-regenerate mantra (deletes today's mantra, then enqueues job)
     app.MapPost("/api/debug/hangfire/test-mantra", async (HttpContext ctx, IBackgroundJobClient jobs) =>
     {
         var currentUser = ctx.RequestServices.GetRequiredService<ShantiSangha.Shared.Interfaces.ICurrentUser>();
         var user = await currentUser.GetAsync();
         var userId = user!.Id;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        // Delete existing mantra so the job actually generates a new one
+        var wellnessDb = ctx.RequestServices.GetRequiredService<ShantiSangha.Wellness.Data.WellnessDbContext>();
+        var existing = await wellnessDb.DailyMantras
+            .Where(m => m.UserId == userId && m.Date == today)
+            .ToListAsync();
+        if (existing.Count > 0)
+        {
+            wellnessDb.DailyMantras.RemoveRange(existing);
+            await wellnessDb.SaveChangesAsync();
+        }
+
         jobs.Enqueue<ShantiSangha.Wellness.Jobs.GenerateDailyMantraJob>(j => j.RunAsync(userId));
-        return Results.Ok(new { triggered = "GenerateDailyMantraJob", userId });
+        return Results.Ok(new { triggered = "GenerateDailyMantraJob", userId, deleted = existing.Count });
     }).RequireAuthorization();
 
     // Health check at root (no /api prefix)
