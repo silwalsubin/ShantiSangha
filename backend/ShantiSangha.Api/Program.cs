@@ -246,8 +246,8 @@ try
             .Select(j => new
             {
                 j.Key,
-                j.Value.Job?.Type?.Name,
-                j.Value.Job?.Method?.Name,
+                Name = j.Value.Job?.Type?.Name,
+                MethodName = j.Value.Job?.Method?.Name,
                 j.Value.Reason,
                 j.Value.FailedAt,
                 ExceptionMessage = j.Value.ExceptionMessage?.Length > 200
@@ -259,8 +259,8 @@ try
             .Select(j => new
             {
                 j.Key,
-                j.Value.Job?.Type?.Name,
-                j.Value.Job?.Method?.Name,
+                Name = j.Value.Job?.Type?.Name,
+                MethodName = j.Value.Job?.Method?.Name,
                 j.Value.SucceededAt,
                 Duration = j.Value.TotalDuration
             });
@@ -279,8 +279,8 @@ try
             .Select(j => new
             {
                 j.Key,
-                j.Value.Job?.Type?.Name,
-                j.Value.Job?.Method?.Name,
+                Name = j.Value.Job?.Type?.Name,
+                MethodName = j.Value.Job?.Method?.Name,
                 j.Value.StartedAt
             });
 
@@ -309,8 +309,9 @@ try
     {
         var currentUser = ctx.RequestServices.GetRequiredService<ShantiSangha.Shared.Interfaces.ICurrentUser>();
         var user = await currentUser.GetAsync();
-        jobs.Enqueue<ShantiSangha.Wellness.Jobs.GenerateDailyMantraJob>(j => j.RunAsync(user.Id));
-        return Results.Ok(new { triggered = "GenerateDailyMantraJob", userId = user.Id });
+        var userId = user!.Id;
+        jobs.Enqueue<ShantiSangha.Wellness.Jobs.GenerateDailyMantraJob>(j => j.RunAsync(userId));
+        return Results.Ok(new { triggered = "GenerateDailyMantraJob", userId });
     }).RequireAuthorization();
 
     // Health check at root (no /api prefix)

@@ -106,7 +106,7 @@ struct GoalCalendarBrowseView: View {
                         .font(.system(size: 15, weight: isToday ? .semibold : .regular, design: .serif))
                         .foregroundColor(
                             isToday ? .white :
-                            date > today ? .sacredText.opacity(0.3) :
+                            date < today ? .sacredText.opacity(0.3) :
                             .sacredText
                         )
                 }
