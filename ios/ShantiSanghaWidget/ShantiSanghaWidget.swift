@@ -16,8 +16,6 @@ struct ShantiSanghaEntry: TimelineEntry {
 // MARK: - Timeline Provider
 
 struct ShantiSanghaProvider: TimelineProvider {
-    private let baseURL = "https://shantisangha.com/api"
-    private let defaults = UserDefaults(suiteName: WidgetData.appGroupId)
 
     func placeholder(in context: Context) -> ShantiSanghaEntry {
         ShantiSanghaEntry(
@@ -34,13 +32,12 @@ struct ShantiSanghaProvider: TimelineProvider {
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<ShantiSanghaEntry>) -> Void) {
-        // Try to fetch fresh data from the API
-        Task {
-            await refreshFromServer()
-            let entry = localEntry()
-            let nextUpdate = Calendar.current.date(byAdding: .minute, value: 30, to: Date())!
-            completion(Timeline(entries: [entry], policy: .after(nextUpdate)))
-        }
+        // Read from shared WidgetData (written by main app and SilentPushHandler).
+        // The main app updates WidgetData on open, and silent pushes refresh it
+        // in the background — no need for the widget to make its own API calls.
+        let entry = localEntry()
+        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 30, to: Date())!
+        completion(Timeline(entries: [entry], policy: .after(nextUpdate)))
     }
 
     private func localEntry() -> ShantiSanghaEntry {
@@ -55,65 +52,6 @@ struct ShantiSanghaProvider: TimelineProvider {
         )
     }
 
-    // MARK: - Server fetch
-
-    private func refreshFromServer() async {
-        guard let token = defaults?.string(forKey: "widget.authToken") else { return }
-
-        let dateStr = formatDate(Date())
-
-        // Fetch mantra and goals in parallel
-        async let mantraResult = fetchJSON("\(baseURL)/mantra/today", token: token)
-        async let goalsResult = fetchJSON("\(baseURL)/goals?date=\(dateStr)", token: token)
-        async let todayResult = fetchJSON("\(baseURL)/goals/today?date=\(dateStr)", token: token)
-
-        let mantraData = await mantraResult
-        let goalsData = await goalsResult
-        let todayData = await todayResult
-
-        // Update mantra
-        if let mantraData,
-           let dict = try? JSONSerialization.jsonObject(with: mantraData) as? [String: Any],
-           let content = dict["content"] as? String, !content.isEmpty {
-            WidgetData.mantra = content
-        }
-
-        // Update goals
-        if let goalsData,
-           let goals = try? JSONSerialization.jsonObject(with: goalsData) as? [[String: Any]] {
-            let milestones = goals.filter { ($0["type"] as? String) == "OneTime" }
-            let pending = milestones.filter { $0["completedAt"] == nil || $0["completedAt"] is NSNull }
-            let overdue = pending.filter { ($0["daysRemaining"] as? Int ?? 1) < 0 }.count
-            let dueToday = pending.filter { ($0["daysRemaining"] as? Int) == 0 }.count
-            WidgetData.goalsOverdue = overdue
-            WidgetData.goalsDueToday = dueToday
-        }
-
-        // Update practices
-        if let todayData,
-           let tasks = try? JSONSerialization.jsonObject(with: todayData) as? [[String: Any]] {
-            let recurring = tasks.filter { ($0["type"] as? String) == "Recurring" }
-            let done = recurring.filter { ($0["checkIn"] as? [String: Any]) != nil }.count
-            WidgetData.practicesDone = done
-            WidgetData.practicesTotal = recurring.count
-        }
-
-        WidgetData.lastUpdated = Date()
-    }
-
-    private func fetchJSON(_ urlString: String, token: String) async -> Data? {
-        guard let url = URL(string: urlString) else { return nil }
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.timeoutInterval = 10
-        return try? await URLSession.shared.data(for: request).0
-    }
-
-    private func formatDate(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        return f.string(from: date)
-    }
 }
 
 // MARK: - Small Widget (Mantra only)
