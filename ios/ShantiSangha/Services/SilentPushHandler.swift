@@ -5,7 +5,7 @@ import WidgetKit
 enum SilentPushHandler {
     static func handle(userInfo: [AnyHashable: Any]) async {
         let type = userInfo["type"] as? String ?? "unknown"
-        AppLogger.shared.info("Push", "Silent push received: type=\(type)")
+        await AppLogger.shared.info("Push", "Silent push received: type=\(type)")
 
         let api = ApiService.shared
         let dateStr = formatDate(Date())
@@ -28,7 +28,7 @@ enum SilentPushHandler {
         await refreshGoalsAndPractices(api: api, dateStr: dateStr)
 
         WidgetCenter.shared.reloadAllTimelines()
-        AppLogger.shared.info("Push", "Widget timelines reloaded after silent push")
+        await AppLogger.shared.info("Push", "Widget timelines reloaded after silent push")
     }
 
     private static func refreshMantra(api: ApiService) async {
@@ -38,7 +38,7 @@ enum SilentPushHandler {
                 WidgetData.mantra = content
             }
         } catch {
-            AppLogger.shared.error("Push", "Failed to refresh mantra: \(error.localizedDescription)")
+            await AppLogger.shared.error("Push", "Failed to refresh mantra: \(error.localizedDescription)")
         }
     }
 
@@ -51,7 +51,7 @@ enum SilentPushHandler {
             WidgetData.goalsOverdue = pending.filter { ($0.daysRemaining ?? 1) < 0 }.count
             WidgetData.goalsDueToday = pending.filter { $0.daysRemaining == 0 }.count
         } catch {
-            AppLogger.shared.error("Push", "Failed to refresh goals: \(error.localizedDescription)")
+            await AppLogger.shared.error("Push", "Failed to refresh goals: \(error.localizedDescription)")
         }
 
         // Fetch practices
@@ -61,7 +61,7 @@ enum SilentPushHandler {
             WidgetData.practicesDone = recurring.filter { $0.checkedIn }.count
             WidgetData.practicesTotal = recurring.count
         } catch {
-            AppLogger.shared.error("Push", "Failed to refresh practices: \(error.localizedDescription)")
+            await AppLogger.shared.error("Push", "Failed to refresh practices: \(error.localizedDescription)")
         }
 
         WidgetData.lastUpdated = Date()

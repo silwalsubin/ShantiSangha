@@ -12,9 +12,9 @@ actor PushTokenService {
             struct Req: Encodable { let token: String; let platform = "ios" }
             let _: EmptyResponse = try await ApiService.shared.post("/me/device-token", body: Req(token: token))
             lastRegisteredToken = token
-            AppLogger.shared.info("Push", "Device token registered")
+            await AppLogger.shared.info("Push", "Device token registered")
         } catch {
-            AppLogger.shared.error("Push", "Failed to register token: \(error.localizedDescription)")
+            await AppLogger.shared.error("Push", "Failed to register token: \(error.localizedDescription)")
         }
     }
 
@@ -23,9 +23,9 @@ actor PushTokenService {
         do {
             try await ApiService.shared.delete("/me/device-token?token=\(token)")
             lastRegisteredToken = nil
-            AppLogger.shared.info("Push", "Device token unregistered")
+            await AppLogger.shared.info("Push", "Device token unregistered")
         } catch {
-            AppLogger.shared.error("Push", "Failed to unregister token: \(error.localizedDescription)")
+            await AppLogger.shared.error("Push", "Failed to unregister token: \(error.localizedDescription)")
         }
     }
 }
