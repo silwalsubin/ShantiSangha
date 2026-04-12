@@ -58,7 +58,7 @@ struct MantraWidgetView: View {
         VStack(alignment: .leading, spacing: 6) {
             Image(systemName: "sparkle")
                 .font(.system(size: 12))
-                .foregroundColor(Color(hex: "#c4873b"))
+                .foregroundColor(sacredGold)
 
             Spacer()
 
@@ -66,13 +66,13 @@ struct MantraWidgetView: View {
                 Text(mantra)
                     .font(.system(size: 13, weight: .regular, design: .serif))
                     .italic()
-                    .foregroundColor(Color(hex: "#2b1e10"))
+                    .foregroundColor(sacredText)
                     .lineLimit(4)
                     .minimumScaleFactor(0.8)
             } else {
                 Text("Open the app to begin your practice.")
                     .font(.system(size: 13, weight: .regular, design: .serif))
-                    .foregroundColor(Color(hex: "#6b5740"))
+                    .foregroundColor(sacredTextSecondary)
             }
         }
         .padding(16)
@@ -88,15 +88,16 @@ struct DashboardWidgetView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 12) {
-                // Progress circle — compact
+                // Progress circle + label
+                VStack(spacing: 4) {
                 ZStack {
                     Circle()
-                        .stroke(Color(hex: "#9a8568").opacity(0.12), lineWidth: 5)
+                        .stroke(sacredMuted.opacity(0.12), lineWidth: 5)
                     if entry.practicesTotal > 0 {
                         Circle()
                             .trim(from: 0, to: Double(entry.practicesDone) / Double(entry.practicesTotal))
                             .stroke(
-                                Color(hex: "#c4873b"),
+                                sacredGold,
                                 style: StrokeStyle(lineWidth: 5, lineCap: .round)
                             )
                             .rotationEffect(.degrees(-90))
@@ -104,20 +105,25 @@ struct DashboardWidgetView: View {
                     VStack(spacing: 0) {
                         Text("\(entry.practicesDone)")
                             .font(.system(size: 18, weight: .bold, design: .serif))
-                            .foregroundColor(Color(hex: "#c4873b"))
+                            .foregroundColor(sacredGold)
                         Text("of \(entry.practicesTotal)")
                             .font(.system(size: 8, design: .serif))
-                            .foregroundColor(Color(hex: "#9a8568"))
+                            .foregroundColor(sacredMuted)
                     }
                 }
                 .frame(width: 52, height: 52)
+
+                Text("Practices")
+                    .font(.system(size: 9, weight: .semibold, design: .serif))
+                    .foregroundColor(sacredTextSecondary)
+                }
 
                 // Mantra — takes remaining space
                 if let mantra = entry.mantra, !mantra.isEmpty {
                     Text(mantra)
                         .font(.system(size: 13, weight: .regular, design: .serif))
                         .italic()
-                        .foregroundColor(Color(hex: "#2b1e10"))
+                        .foregroundColor(sacredText)
                         .minimumScaleFactor(0.75)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -126,27 +132,20 @@ struct DashboardWidgetView: View {
             Spacer()
 
             // Goals summary at bottom
-            HStack(spacing: 8) {
-                Text("Practices")
-                    .font(.system(size: 10, weight: .semibold, design: .serif))
-                    .foregroundColor(Color(hex: "#6b5740"))
-
-                if entry.goalsOverdue > 0 || entry.goalsDueToday > 0 {
-                    Text("·").foregroundColor(Color(hex: "#9a8568"))
-                    HStack(spacing: 4) {
-                        Image(systemName: "diamond")
-                            .font(.system(size: 7))
-                        if entry.goalsOverdue > 0 {
-                            Text("\(entry.goalsOverdue) overdue")
-                        }
-                        if entry.goalsDueToday > 0 {
-                            if entry.goalsOverdue > 0 { Text("·") }
-                            Text("\(entry.goalsDueToday) today")
-                        }
+            if entry.goalsOverdue > 0 || entry.goalsDueToday > 0 {
+                HStack(spacing: 4) {
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.system(size: 10))
+                    if entry.goalsOverdue > 0 {
+                        Text("\(entry.goalsOverdue) overdue")
                     }
-                    .font(.system(size: 10, design: .serif))
-                    .foregroundColor(Color(hex: "#9a8568"))
+                    if entry.goalsDueToday > 0 {
+                        if entry.goalsOverdue > 0 { Text("·") }
+                        Text("\(entry.goalsDueToday) today")
+                    }
                 }
+                .font(.system(size: 10, design: .serif))
+                .foregroundColor(sacredMuted)
             }
         }
         .padding(14)
@@ -163,10 +162,12 @@ struct ShantiSanghaMantraWidget: Widget {
         StaticConfiguration(kind: kind, provider: ShantiSanghaProvider()) { entry in
             if #available(iOS 17.0, *) {
                 MantraWidgetView(entry: entry)
-                    .containerBackground(Color(hex: "#faf5ed"), for: .widget)
+                    .containerBackground(for: .widget) {
+                        sacredBg
+                    }
             } else {
                 MantraWidgetView(entry: entry)
-                    .background(Color(hex: "#faf5ed"))
+                    .background(sacredBg)
             }
         }
         .configurationDisplayName("Daily Mantra")
@@ -182,10 +183,12 @@ struct ShantiSanghaDashboardWidget: Widget {
         StaticConfiguration(kind: kind, provider: ShantiSanghaProvider()) { entry in
             if #available(iOS 17.0, *) {
                 DashboardWidgetView(entry: entry)
-                    .containerBackground(Color(hex: "#faf5ed"), for: .widget)
+                    .containerBackground(for: .widget) {
+                        sacredBg
+                    }
             } else {
                 DashboardWidgetView(entry: entry)
-                    .background(Color(hex: "#faf5ed"))
+                    .background(sacredBg)
             }
         }
         .configurationDisplayName("Today's Practice")
@@ -204,7 +207,25 @@ struct ShantiSanghaWidgetBundle: WidgetBundle {
     }
 }
 
-// MARK: - Color helper
+// MARK: - Color helpers (adaptive for light/dark mode)
+
+private let sacredBg = Color(UIColor { traits in
+    traits.userInterfaceStyle == .dark ? UIColor(hex: "#1a1410") : UIColor(hex: "#faf5ed")
+})
+
+private let sacredText = Color(UIColor { traits in
+    traits.userInterfaceStyle == .dark ? UIColor(hex: "#f5ebe0") : UIColor(hex: "#2b1e10")
+})
+
+private let sacredTextSecondary = Color(UIColor { traits in
+    traits.userInterfaceStyle == .dark ? UIColor(hex: "#c4a882") : UIColor(hex: "#6b5740")
+})
+
+private let sacredMuted = Color(UIColor { traits in
+    traits.userInterfaceStyle == .dark ? UIColor(hex: "#8a7a64") : UIColor(hex: "#9a8568")
+})
+
+private let sacredGold = Color(hex: "#c4873b")
 
 private extension Color {
     init(hex: String) {
@@ -215,6 +236,20 @@ private extension Color {
             red: Double((int >> 16) & 0xFF) / 255,
             green: Double((int >> 8) & 0xFF) / 255,
             blue: Double(int & 0xFF) / 255
+        )
+    }
+}
+
+private extension UIColor {
+    convenience init(hex: String) {
+        let h = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: h).scanHexInt64(&int)
+        self.init(
+            red: CGFloat((int >> 16) & 0xFF) / 255,
+            green: CGFloat((int >> 8) & 0xFF) / 255,
+            blue: CGFloat(int & 0xFF) / 255,
+            alpha: 1
         )
     }
 }
