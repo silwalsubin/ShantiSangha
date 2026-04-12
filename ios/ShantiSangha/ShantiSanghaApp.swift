@@ -16,6 +16,10 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate {
         Messaging.messaging().delegate = self
         application.registerForRemoteNotifications()
 
+        Task { @MainActor in
+            AppLogger.shared.info("Push", "registerForRemoteNotifications called")
+        }
+
         AuthService.shared.startListening()
         return true
     }
