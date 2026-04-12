@@ -1,10 +1,11 @@
 import SwiftUI
 import SwiftData
+import UserNotifications
 import FirebaseCore
 import FirebaseMessaging
 import GoogleSignIn
 
-class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate {
+class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         FirebaseApp.configure()
@@ -14,10 +15,24 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate {
 
         // FCM setup
         Messaging.messaging().delegate = self
-        application.registerForRemoteNotifications()
+        UNUserNotificationCenter.current().delegate = self
 
-        Task { @MainActor in
-            AppLogger.shared.info("Push", "registerForRemoteNotifications called")
+        Task {
+            do {
+                let granted = try await UNUserNotificationCenter.current()
+                    .requestAuthorization(options: [.alert, .badge, .sound])
+                await MainActor.run {
+                    AppLogger.shared.info("Push", "Notification auth: \(granted ? "granted" : "denied")")
+                }
+                await MainActor.run {
+                    UIApplication.shared.registerForRemoteNotifications()
+                    AppLogger.shared.info("Push", "registerForRemoteNotifications called")
+                }
+            } catch {
+                await MainActor.run {
+                    AppLogger.shared.error("Push", "Notification auth error: \(error.localizedDescription)")
+                }
+            }
         }
 
         AuthService.shared.startListening()
