@@ -86,54 +86,56 @@ struct DashboardWidgetView: View {
     let entry: ShantiSanghaEntry
 
     var body: some View {
-        HStack(spacing: 16) {
-            // Progress circle
-            VStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 12) {
+                // Progress circle — compact
                 ZStack {
                     Circle()
-                        .stroke(Color(hex: "#9a8568").opacity(0.12), lineWidth: 6)
+                        .stroke(Color(hex: "#9a8568").opacity(0.12), lineWidth: 5)
                     if entry.practicesTotal > 0 {
                         Circle()
                             .trim(from: 0, to: Double(entry.practicesDone) / Double(entry.practicesTotal))
                             .stroke(
                                 Color(hex: "#c4873b"),
-                                style: StrokeStyle(lineWidth: 6, lineCap: .round)
+                                style: StrokeStyle(lineWidth: 5, lineCap: .round)
                             )
                             .rotationEffect(.degrees(-90))
                     }
-                    VStack(spacing: 1) {
+                    VStack(spacing: 0) {
                         Text("\(entry.practicesDone)")
-                            .font(.system(size: 24, weight: .bold, design: .serif))
+                            .font(.system(size: 18, weight: .bold, design: .serif))
                             .foregroundColor(Color(hex: "#c4873b"))
                         Text("of \(entry.practicesTotal)")
-                            .font(.system(size: 9, design: .serif))
+                            .font(.system(size: 8, design: .serif))
                             .foregroundColor(Color(hex: "#9a8568"))
                     }
                 }
-                .frame(width: 72, height: 72)
+                .frame(width: 52, height: 52)
 
+                // Mantra — takes remaining space
+                if let mantra = entry.mantra, !mantra.isEmpty {
+                    Text(mantra)
+                        .font(.system(size: 13, weight: .regular, design: .serif))
+                        .italic()
+                        .foregroundColor(Color(hex: "#2b1e10"))
+                        .minimumScaleFactor(0.75)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Spacer()
+
+            // Goals summary at bottom
+            HStack(spacing: 8) {
                 Text("Practices")
                     .font(.system(size: 10, weight: .semibold, design: .serif))
                     .foregroundColor(Color(hex: "#6b5740"))
-            }
-
-            // Mantra + goals summary
-            VStack(alignment: .leading, spacing: 6) {
-                if let mantra = entry.mantra, !mantra.isEmpty {
-                    Text(mantra)
-                        .font(.system(size: 12, weight: .regular, design: .serif))
-                        .italic()
-                        .foregroundColor(Color(hex: "#2b1e10"))
-                        .lineLimit(3)
-                        .minimumScaleFactor(0.8)
-                }
-
-                Spacer()
 
                 if entry.goalsOverdue > 0 || entry.goalsDueToday > 0 {
+                    Text("·").foregroundColor(Color(hex: "#9a8568"))
                     HStack(spacing: 4) {
                         Image(systemName: "diamond")
-                            .font(.system(size: 8))
+                            .font(.system(size: 7))
                         if entry.goalsOverdue > 0 {
                             Text("\(entry.goalsOverdue) overdue")
                         }
@@ -147,8 +149,8 @@ struct DashboardWidgetView: View {
                 }
             }
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
 }
 
