@@ -1,5 +1,6 @@
 import SwiftUI
 import FirebaseAuth
+import WidgetKit
 
 /// Home screen — daily dashboard with progress circles
 struct HomeView: View {
@@ -88,11 +89,17 @@ struct HomeView: View {
                 .padding(.bottom, 100)
             }
             .background(Color.sacredBg.ignoresSafeArea())
-            .refreshable { await vm.load() }
+            .refreshable {
+                await vm.load()
+                updateWidgetData()
+            }
             .task {
                 await vm.load()
                 await loadMantra()
+                updateWidgetData()
             }
+            .onChange(of: vm.doneRecurring) { updateWidgetData() }
+            .onChange(of: vm.doneMilestones) { updateWidgetData() }
 
             // FAB
             Button {
@@ -240,6 +247,21 @@ struct HomeView: View {
                 .overlay(RoundedRectangle(cornerRadius: 16)
                     .stroke(Color.sacredGold.opacity(0.1)))
         )
+    }
+
+    // MARK: - Widget data sync
+
+    private func updateWidgetData() {
+        let pending = vm.tasks.filter { $0.type == .oneTime && $0.completedAt == nil }
+        WidgetData.update(
+            mantra: mantra,
+            practicesDone: vm.doneRecurring,
+            practicesTotal: vm.totalRecurring,
+            goalsOverdue: pending.filter { ($0.daysRemaining ?? 1) < 0 }.count,
+            goalsDueToday: pending.filter { $0.daysRemaining == 0 }.count,
+            userName: Auth.auth().currentUser?.displayName?.components(separatedBy: " ").first
+        )
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     // MARK: - Mantra

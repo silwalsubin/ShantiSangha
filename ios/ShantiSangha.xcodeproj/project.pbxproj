@@ -11,12 +11,22 @@
 		045258EF2F7B107400A03634 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 045258EE2F7B107400A03634 /* GoogleSignInSwift */; };
 		045258F22F7B118100A03634 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 045258F12F7B118100A03634 /* FirebaseAuth */; };
 		045258F42F7B118900A03634 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 045258F32F7B118900A03634 /* FirebaseCore */; };
+		04546F692F8B19B20026D26F /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 04546F682F8B19B20026D26F /* WidgetKit.framework */; };
+		04546F6B2F8B19B20026D26F /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 04546F6A2F8B19B20026D26F /* SwiftUI.framework */; };
+		04546F7A2F8B19B30026D26F /* ShantiSanghaWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 04546F672F8B19B20026D26F /* ShantiSanghaWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		0456C3CF9D12840A26ECAA6C /* FeedbackServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95AD8709C353998FDE5BE52E /* FeedbackServiceTests.swift */; };
 		1C6E8B19452EBF1F0FBF377F /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 608EE11F5A81C4476766F59E /* Foundation.framework */; };
 		244EBA0B449278CC7958DB5B /* TaskModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A09E248379299BAC76B4CF2 /* TaskModelTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		04546F782F8B19B30026D26F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 04A24D8E2F7AFC1400775F13 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 04546F662F8B19B20026D26F;
+			remoteInfo = ShantiSanghaWidgetExtension;
+		};
 		73DF12EFC99BBB3E3ADB394A /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 04A24D8E2F7AFC1400775F13 /* Project object */;
@@ -26,7 +36,25 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		04546F7F2F8B19B30026D26F /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				04546F7A2F8B19B30026D26F /* ShantiSanghaWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		04546F672F8B19B20026D26F /* ShantiSanghaWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShantiSanghaWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		04546F682F8B19B20026D26F /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		04546F6A2F8B19B20026D26F /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		04546F802F8B19DC0026D26F /* ShantiSanghaWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ShantiSanghaWidgetExtension.entitlements; sourceTree = "<group>"; };
 		04A24D962F7AFC1400775F13 /* ShantiSangha.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ShantiSangha.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		608EE11F5A81C4476766F59E /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		7A09E248379299BAC76B4CF2 /* TaskModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskModelTests.swift; sourceTree = "<group>"; };
@@ -34,11 +62,38 @@
 		EB354C813E86D53BA84588A6 /* ShantiSanghaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShantiSanghaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		04546F7B2F8B19B30026D26F /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 04546F662F8B19B20026D26F /* ShantiSanghaWidgetExtension */;
+		};
+		04546F862F8B26C40026D26F /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Shared/WidgetData.swift,
+			);
+			target = 04546F662F8B19B20026D26F /* ShantiSanghaWidgetExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		04A24D982F7AFC1400775F13 /* ShantiSangha */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = ShantiSangha; sourceTree = "<group>"; };
+		04546F6C2F8B19B20026D26F /* ShantiSanghaWidget */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (04546F7B2F8B19B30026D26F /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = ShantiSanghaWidget; sourceTree = "<group>"; };
+		04A24D982F7AFC1400775F13 /* ShantiSangha */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (04546F862F8B26C40026D26F /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = ShantiSangha; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		04546F642F8B19B20026D26F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				04546F6B2F8B19B20026D26F /* SwiftUI.framework in Frameworks */,
+				04546F692F8B19B20026D26F /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		04A24D932F7AFC1400775F13 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -65,6 +120,8 @@
 			isa = PBXGroup;
 			children = (
 				96E7420C74145C979CA12D67 /* iOS */,
+				04546F682F8B19B20026D26F /* WidgetKit.framework */,
+				04546F6A2F8B19B20026D26F /* SwiftUI.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -72,7 +129,9 @@
 		04A24D8D2F7AFC1400775F13 = {
 			isa = PBXGroup;
 			children = (
+				04546F802F8B19DC0026D26F /* ShantiSanghaWidgetExtension.entitlements */,
 				04A24D982F7AFC1400775F13 /* ShantiSangha */,
+				04546F6C2F8B19B20026D26F /* ShantiSanghaWidget */,
 				045258F02F7B118100A03634 /* Frameworks */,
 				04A24D972F7AFC1400775F13 /* Products */,
 				AAD30E61CB8C3C0D28AE320A /* ShantiSanghaTests */,
@@ -84,6 +143,7 @@
 			children = (
 				04A24D962F7AFC1400775F13 /* ShantiSangha.app */,
 				EB354C813E86D53BA84588A6 /* ShantiSanghaTests.xctest */,
+				04546F672F8B19B20026D26F /* ShantiSanghaWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -126,6 +186,28 @@
 			productReference = EB354C813E86D53BA84588A6 /* ShantiSanghaTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		04546F662F8B19B20026D26F /* ShantiSanghaWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 04546F7C2F8B19B30026D26F /* Build configuration list for PBXNativeTarget "ShantiSanghaWidgetExtension" */;
+			buildPhases = (
+				04546F632F8B19B20026D26F /* Sources */,
+				04546F642F8B19B20026D26F /* Frameworks */,
+				04546F652F8B19B20026D26F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				04546F6C2F8B19B20026D26F /* ShantiSanghaWidget */,
+			);
+			name = ShantiSanghaWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = ShantiSanghaWidgetExtension;
+			productReference = 04546F672F8B19B20026D26F /* ShantiSanghaWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		04A24D952F7AFC1400775F13 /* ShantiSangha */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 04A24DA12F7AFC1600775F13 /* Build configuration list for PBXNativeTarget "ShantiSangha" */;
@@ -133,10 +215,12 @@
 				04A24D922F7AFC1400775F13 /* Sources */,
 				04A24D932F7AFC1400775F13 /* Frameworks */,
 				04A24D942F7AFC1400775F13 /* Resources */,
+				04546F7F2F8B19B30026D26F /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				04546F792F8B19B30026D26F /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				04A24D982F7AFC1400775F13 /* ShantiSangha */,
@@ -159,9 +243,12 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1540;
+				LastSwiftUpdateCheck = 2640;
 				LastUpgradeCheck = 1540;
 				TargetAttributes = {
+					04546F662F8B19B20026D26F = {
+						CreatedOnToolsVersion = 26.4;
+					};
 					04A24D952F7AFC1400775F13 = {
 						CreatedOnToolsVersion = 15.4;
 					};
@@ -187,11 +274,19 @@
 			targets = (
 				04A24D952F7AFC1400775F13 /* ShantiSangha */,
 				036D118A165478DCC2E12937 /* ShantiSanghaTests */,
+				04546F662F8B19B20026D26F /* ShantiSanghaWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		04546F652F8B19B20026D26F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		04A24D942F7AFC1400775F13 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -209,6 +304,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		04546F632F8B19B20026D26F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		04A24D922F7AFC1400775F13 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -228,6 +330,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		04546F792F8B19B30026D26F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 04546F662F8B19B20026D26F /* ShantiSanghaWidgetExtension */;
+			targetProxy = 04546F782F8B19B30026D26F /* PBXContainerItemProxy */;
+		};
 		5DD37EA92576EE2B44565BD1 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = ShantiSangha;
@@ -237,6 +344,70 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		04546F7D2F8B19B30026D26F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = ShantiSanghaWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BN6WSF9259;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ShantiSanghaWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ShantiSanghaWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.shantisangha.app.ShantiSanghaWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		04546F7E2F8B19B30026D26F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = ShantiSanghaWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BN6WSF9259;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ShantiSanghaWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ShantiSanghaWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.shantisangha.app.ShantiSanghaWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		04A24D9F2F7AFC1600775F13 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -363,6 +534,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ShantiSangha/ShantiSangha.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = BN6WSF9259;
@@ -394,6 +566,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ShantiSangha/ShantiSangha.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = BN6WSF9259;
@@ -463,6 +636,15 @@
 			buildConfigurations = (
 				B43053D139D71A7CA13C9FC1 /* Release */,
 				8FEB45B6A229C4D7C6067556 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		04546F7C2F8B19B30026D26F /* Build configuration list for PBXNativeTarget "ShantiSanghaWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				04546F7D2F8B19B30026D26F /* Debug */,
+				04546F7E2F8B19B30026D26F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
