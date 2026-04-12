@@ -17,22 +17,11 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
         Messaging.messaging().delegate = self
         UNUserNotificationCenter.current().delegate = self
 
-        Task {
-            do {
-                let granted = try await UNUserNotificationCenter.current()
-                    .requestAuthorization(options: [.alert, .badge, .sound])
-                await MainActor.run {
-                    AppLogger.shared.info("Push", "Notification auth: \(granted ? "granted" : "denied")")
-                }
-                await MainActor.run {
-                    UIApplication.shared.registerForRemoteNotifications()
-                    AppLogger.shared.info("Push", "registerForRemoteNotifications called")
-                }
-            } catch {
-                await MainActor.run {
-                    AppLogger.shared.error("Push", "Notification auth error: \(error.localizedDescription)")
-                }
-            }
+        // Register for remote notifications synchronously in didFinishLaunching
+        application.registerForRemoteNotifications()
+
+        Task { @MainActor in
+            AppLogger.shared.info("Push", "registerForRemoteNotifications called")
         }
 
         AuthService.shared.startListening()
