@@ -17,9 +17,14 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
         Messaging.messaging().delegate = self
         UNUserNotificationCenter.current().delegate = self
 
-        // Register for remote notifications synchronously in didFinishLaunching
+        #if !DEBUG
+        // Only register for remote notifications in release builds
+        // to avoid simulator/dev tokens conflicting with real device
         application.registerForRemoteNotifications()
         AppLogger.shared.info("Push", "registerForRemoteNotifications called")
+        #else
+        AppLogger.shared.info("Push", "Skipping FCM registration in debug build")
+        #endif
 
         AuthService.shared.startListening()
         return true
@@ -70,8 +75,12 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
 
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
         guard let token = fcmToken else { return }
+        #if DEBUG
+        AppLogger.shared.info("Push", "FCM token received but skipping registration (debug build)")
+        #else
         AppLogger.shared.info("Push", "FCM token: \(token.prefix(20))...")
         Task { await PushTokenService.shared.registerToken(token) }
+        #endif
     }
 
     // MARK: - Remote notification received (silent + background pushes)

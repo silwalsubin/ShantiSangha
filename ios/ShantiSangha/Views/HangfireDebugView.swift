@@ -12,8 +12,6 @@ struct HangfireDebugView: View {
     @State private var queues: [QueueEntry] = []
     @State private var triggeringMantra = false
     @State private var triggerResult: String?
-    @State private var testingPush = false
-    @State private var testPushResult: String?
 
     private let api = ApiService.shared
 
@@ -214,31 +212,6 @@ struct HangfireDebugView: View {
                     .foregroundColor(.sacredGreen)
             }
 
-            Divider().padding(.vertical, 4)
-
-            Button {
-                Task { await testDirectPush() }
-            } label: {
-                HStack {
-                    Image(systemName: "bell.badge")
-                        .font(.sacredSmall)
-                    Text("Test Direct Push (visible notification)")
-                        .font(.sacredSmallMedium)
-                    Spacer()
-                    if testingPush {
-                        ProgressView().tint(.sacredGold)
-                    }
-                }
-                .foregroundColor(.sacredGold)
-            }
-            .disabled(testingPush)
-
-            if let pushResult = testPushResult {
-                Text(pushResult)
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundColor(.sacredMuted)
-                    .textSelection(.enabled)
-            }
         }
     }
 
@@ -325,31 +298,6 @@ struct HangfireDebugView: View {
         triggeringMantra = false
     }
 
-    private func testDirectPush() async {
-        testingPush = true
-        testPushResult = nil
-        do {
-            let result: TestPushResult = try await api.post("/debug/hangfire/test-push")
-            var lines = ["Tokens: \(result.tokenCount)"]
-            if let dryRun = result.dryRunCheck {
-                lines.append("DryRun: \(dryRun)")
-            }
-            for r in result.results {
-                var parts = ["\(r.status)"]
-                if let code = r.errorCode { parts.append("code=\(code)") }
-                if let http = r.httpStatus { parts.append("http=\(http)") }
-                if let mid = r.messageId { parts.append("id=\(mid)") }
-                if let err = r.error { parts.append(err) }
-                if let prefix = r.tokenPrefix { parts.append("token=\(prefix)") }
-                if let updated = r.updatedAt { parts.append("updated=\(updated)") }
-                lines.append(parts.joined(separator: "\n  "))
-            }
-            testPushResult = lines.joined(separator: "\n")
-        } catch {
-            testPushResult = "Error: \(error.localizedDescription)"
-        }
-        testingPush = false
-    }
 }
 
 // MARK: - Response models
@@ -415,18 +363,3 @@ private struct TriggerResult: Codable {
     let userId: String
 }
 
-private struct TestPushResult: Codable {
-    let tokenCount: Int
-    let dryRunCheck: String?
-    let results: [PushSendResult]
-}
-
-private struct PushSendResult: Codable {
-    let status: String
-    let messageId: String?
-    let error: String?
-    let errorCode: String?
-    let httpStatus: String?
-    let tokenPrefix: String?
-    let updatedAt: String?
-}

@@ -78,10 +78,12 @@ class AuthService: ObservableObject {
                 return token
             }
 
-            // Register FCM token with backend after API auth is ready
+            // Register FCM token with backend after API auth is ready (release only)
+            #if !DEBUG
             if let fcmToken = Messaging.messaging().fcmToken {
                 await PushTokenService.shared.registerToken(fcmToken)
             }
+            #endif
         }
     }
 }

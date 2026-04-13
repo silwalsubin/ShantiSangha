@@ -119,18 +119,12 @@ try
 
         if (!string.IsNullOrEmpty(firebaseCredJson))
         {
-            // Log first 50 chars to debug escaping issues (safe — no secrets in prefix)
-            Log.Information("Firebase Admin: JSON starts with: {Prefix}", firebaseCredJson[..Math.Min(50, firebaseCredJson.Length)]);
-            Log.Information("Firebase Admin: JSON length: {Length}, contains private_key: {HasKey}",
-                firebaseCredJson.Length, firebaseCredJson.Contains("private_key"));
-
-            // If the JSON is double-escaped (stored as a string within a string), unescape it
+            // Handle double-escaped JSON (stored as a string within a string)
             if (firebaseCredJson.StartsWith("\"") || firebaseCredJson.StartsWith("\\"))
             {
                 try
                 {
                     firebaseCredJson = System.Text.Json.JsonSerializer.Deserialize<string>(firebaseCredJson) ?? firebaseCredJson;
-                    Log.Information("Firebase Admin: unescaped JSON, new length: {Length}", firebaseCredJson.Length);
                 }
                 catch { /* not double-escaped, use as-is */ }
             }
@@ -140,11 +134,11 @@ try
                 Credential = GoogleCredential.FromJson(firebaseCredJson),
                 ProjectId = appConfig.FirebaseProjectId
             });
-            Log.Information("Firebase Admin: initialized successfully");
+            Log.Information("Firebase Admin initialized with service account");
         }
         else
         {
-            Log.Warning("Firebase Admin: no FIREBASE_SERVICE_ACCOUNT_JSON found, using default credentials");
+            Log.Warning("Firebase Admin: no FIREBASE_SERVICE_ACCOUNT_JSON found, falling back to default credentials");
             FirebaseApp.Create(new AppOptions { ProjectId = appConfig.FirebaseProjectId });
         }
     }
@@ -369,157 +363,6 @@ try
         jobs.Enqueue<ShantiSangha.Wellness.Jobs.GenerateDailyMantraJob>(j => j.RunAsync(userId));
         return Results.Ok(new { triggered = "GenerateDailyMantraJob", userId, deleted = existing.Count });
     }).RequireAuthorization();
-
-    // Debug: Send a direct test push with full error reporting
-    app.MapPost("/api/debug/hangfire/test-push", async (HttpContext ctx) =>
-    {
-        var currentUser = ctx.RequestServices.GetRequiredService<ShantiSangha.Shared.Interfaces.ICurrentUser>();
-        var user = await currentUser.GetAsync();
-        var userId = user!.Id;
-
-        var identityDb = ctx.RequestServices.GetRequiredService<ShantiSangha.Identity.Data.IdentityDbContext>();
-        var tokens = await identityDb.DeviceTokens
-            .Where(d => d.UserId == userId)
-            .Select(d => new { d.Token, d.Platform, d.UpdatedAt })
-            .ToListAsync();
-
-        if (tokens.Count == 0)
-            return Results.Ok(new { error = "No device tokens found for user" });
-
-        // First: verify FCM works with a dry-run (same as credential diagnostic)
-        string? dryRunCheck = null;
-        try
-        {
-            var dryMsg = new FirebaseAdmin.Messaging.Message
-            {
-                Token = "dry_run_test",
-                Notification = new FirebaseAdmin.Messaging.Notification { Title = "test" }
-            };
-            await FirebaseAdmin.Messaging.FirebaseMessaging.DefaultInstance.SendAsync(dryMsg, dryRun: true);
-            dryRunCheck = "ok";
-        }
-        catch (FirebaseAdmin.Messaging.FirebaseMessagingException dex)
-        {
-            dryRunCheck = $"{dex.MessagingErrorCode}: {dex.Message}";
-        }
-        catch (Exception dex)
-        {
-            dryRunCheck = $"unexpected: {dex.Message}";
-        }
-
-        var results = new List<object>();
-        foreach (var device in tokens)
-        {
-            try
-            {
-                var message = new FirebaseAdmin.Messaging.Message
-                {
-                    Token = device.Token,
-                    Notification = new FirebaseAdmin.Messaging.Notification
-                    {
-                        Title = "Push Test",
-                        Body = "If you see this, push notifications work!"
-                    },
-                    Data = new Dictionary<string, string> { ["type"] = "test" }
-                };
-
-                var messageId = await FirebaseAdmin.Messaging.FirebaseMessaging.DefaultInstance.SendAsync(message);
-                results.Add(new { device.Token, device.Platform, device.UpdatedAt, status = "sent", messageId });
-            }
-            catch (FirebaseAdmin.Messaging.FirebaseMessagingException fex)
-            {
-                results.Add(new
-                {
-                    tokenPrefix = device.Token[..Math.Min(20, device.Token.Length)] + "...",
-                    device.Platform,
-                    device.UpdatedAt,
-                    status = "failed",
-                    errorCode = fex.MessagingErrorCode?.ToString(),
-                    httpStatus = fex.HttpResponse?.StatusCode.ToString(),
-                    error = fex.Message
-                });
-            }
-            catch (Exception ex)
-            {
-                results.Add(new
-                {
-                    tokenPrefix = device.Token[..Math.Min(20, device.Token.Length)] + "...",
-                    device.Platform,
-                    device.UpdatedAt,
-                    status = "failed",
-                    error = ex.Message,
-                    type = ex.GetType().FullName,
-                    inner = ex.InnerException?.Message
-                });
-            }
-        }
-
-        return Results.Ok(new { userId, tokenCount = tokens.Count, dryRunCheck, results });
-    }).RequireAuthorization();
-
-    // Debug: Diagnose Firebase credential + FCM API health
-    app.MapGet("/api/debug/firebase-credential", async () =>
-    {
-        try
-        {
-            var fbApp = FirebaseApp.DefaultInstance;
-            if (fbApp == null)
-                return Results.Ok(new { status = "error", message = "FirebaseApp.DefaultInstance is null" });
-
-            var options = fbApp.Options;
-            var credential = options.Credential;
-            var projectId = options.ProjectId;
-
-            // Step 1: Test OAuth token generation
-            var accessToken = await credential.UnderlyingCredential.GetAccessTokenForRequestAsync();
-
-            // Step 2: Test FCM API with dry_run (validates API is enabled + permissions, doesn't actually send)
-            string? fcmDryRunResult = null;
-            string? fcmDryRunError = null;
-            try
-            {
-                var testMessage = new FirebaseAdmin.Messaging.Message
-                {
-                    Token = "dry_run_test_token",
-                    Notification = new FirebaseAdmin.Messaging.Notification
-                    {
-                        Title = "test",
-                        Body = "test"
-                    }
-                };
-                var messageId = await FirebaseAdmin.Messaging.FirebaseMessaging.DefaultInstance
-                    .SendAsync(testMessage, dryRun: true);
-                fcmDryRunResult = messageId;
-            }
-            catch (FirebaseAdmin.Messaging.FirebaseMessagingException fex)
-            {
-                // INVALID_ARGUMENT is expected (fake token) — means FCM API works!
-                // Any auth error means the API or permissions are broken
-                fcmDryRunResult = fex.MessagingErrorCode?.ToString();
-                fcmDryRunError = fex.Message;
-            }
-
-            return Results.Ok(new
-            {
-                status = "ok",
-                projectId,
-                credentialType = credential.UnderlyingCredential.GetType().Name,
-                tokenOk = accessToken?.Length > 0,
-                fcmDryRunResult,
-                fcmDryRunError
-            });
-        }
-        catch (Exception ex)
-        {
-            return Results.Ok(new
-            {
-                status = "error",
-                error = ex.Message,
-                type = ex.GetType().FullName,
-                inner = ex.InnerException?.Message
-            });
-        }
-    }).AllowAnonymous();
 
     // Health check at root (no /api prefix)
     app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
