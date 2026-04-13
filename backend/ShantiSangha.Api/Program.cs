@@ -119,7 +119,22 @@ try
 
         if (!string.IsNullOrEmpty(firebaseCredJson))
         {
-            Log.Information("Firebase Admin: initializing with service account JSON ({Length} chars)", firebaseCredJson.Length);
+            // Log first 50 chars to debug escaping issues (safe — no secrets in prefix)
+            Log.Information("Firebase Admin: JSON starts with: {Prefix}", firebaseCredJson[..Math.Min(50, firebaseCredJson.Length)]);
+            Log.Information("Firebase Admin: JSON length: {Length}, contains private_key: {HasKey}",
+                firebaseCredJson.Length, firebaseCredJson.Contains("private_key"));
+
+            // If the JSON is double-escaped (stored as a string within a string), unescape it
+            if (firebaseCredJson.StartsWith("\"") || firebaseCredJson.StartsWith("\\"))
+            {
+                try
+                {
+                    firebaseCredJson = System.Text.Json.JsonSerializer.Deserialize<string>(firebaseCredJson) ?? firebaseCredJson;
+                    Log.Information("Firebase Admin: unescaped JSON, new length: {Length}", firebaseCredJson.Length);
+                }
+                catch { /* not double-escaped, use as-is */ }
+            }
+
             FirebaseApp.Create(new AppOptions
             {
                 Credential = GoogleCredential.FromJson(firebaseCredJson),
