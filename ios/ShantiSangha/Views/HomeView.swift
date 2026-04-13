@@ -270,7 +270,8 @@ struct HomeView: View {
             goalsDueToday: pending.filter { $0.daysRemaining == 0 }.count,
             userName: Auth.auth().currentUser?.displayName?.components(separatedBy: " ").first
         )
-        WidgetCenter.shared.reloadAllTimelines()
+        WidgetCenter.shared.reloadTimelines(ofKind: "ShantiSanghaMantra")
+        WidgetCenter.shared.reloadTimelines(ofKind: "ShantiSanghaDashboard")
     }
 
     // MARK: - Mantra

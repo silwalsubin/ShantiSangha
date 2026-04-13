@@ -35,7 +35,8 @@ enum SilentPushHandler {
         // the widget runs in a separate process and needs to see the updated values
         UserDefaults(suiteName: WidgetData.appGroupId)?.synchronize()
 
-        WidgetCenter.shared.reloadAllTimelines()
+        WidgetCenter.shared.reloadTimelines(ofKind: "ShantiSanghaMantra")
+        WidgetCenter.shared.reloadTimelines(ofKind: "ShantiSanghaDashboard")
 
         // Notify in-app views to refresh
         await MainActor.run {
