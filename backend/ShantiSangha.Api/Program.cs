@@ -114,18 +114,22 @@ try
     // Firebase Admin — for sending push notifications via FCM
     if (FirebaseApp.DefaultInstance == null)
     {
-        var firebaseCredJson = builder.Configuration["FIREBASE_SERVICE_ACCOUNT_JSON"];
+        var firebaseCredJson = builder.Configuration["FIREBASE_SERVICE_ACCOUNT_JSON"]
+            ?? Environment.GetEnvironmentVariable("FIREBASE_SERVICE_ACCOUNT_JSON");
+
         if (!string.IsNullOrEmpty(firebaseCredJson))
         {
+            Log.Information("Firebase Admin: initializing with service account JSON ({Length} chars)", firebaseCredJson.Length);
             FirebaseApp.Create(new AppOptions
             {
                 Credential = GoogleCredential.FromJson(firebaseCredJson),
                 ProjectId = appConfig.FirebaseProjectId
             });
+            Log.Information("Firebase Admin: initialized successfully");
         }
         else
         {
-            // Falls back to GOOGLE_APPLICATION_CREDENTIALS env var or Application Default Credentials
+            Log.Warning("Firebase Admin: no FIREBASE_SERVICE_ACCOUNT_JSON found, using default credentials");
             FirebaseApp.Create(new AppOptions { ProjectId = appConfig.FirebaseProjectId });
         }
     }
