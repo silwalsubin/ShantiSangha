@@ -31,6 +31,13 @@ public class DeviceTokenController(IdentityDbContext db, ICurrentUser currentUse
         }
         else
         {
+            // Remove stale tokens for this user + platform (e.g. after reinstall)
+            var staleTokens = await db.DeviceTokens
+                .Where(d => d.UserId == user.Id && d.Platform == request.Platform)
+                .ToListAsync(ct);
+            if (staleTokens.Count > 0)
+                db.DeviceTokens.RemoveRange(staleTokens);
+
             db.DeviceTokens.Add(new DeviceToken
             {
                 Id = Guid.NewGuid(),

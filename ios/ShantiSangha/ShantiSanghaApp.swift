@@ -13,23 +13,13 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
             clientID: "361305168424-umc433jdki16tbit3ou2kkjv1p7k327g.apps.googleusercontent.com"
         )
 
-        // FCM setup
+        // FCM setup (swizzling is OFF — we forward everything manually)
         Messaging.messaging().delegate = self
         UNUserNotificationCenter.current().delegate = self
 
         // Register for remote notifications synchronously in didFinishLaunching
         application.registerForRemoteNotifications()
         AppLogger.shared.info("Push", "registerForRemoteNotifications called")
-
-        // Observe FCM data messages as a backup path —
-        // SwiftUI's @UIApplicationDelegateAdaptor may not forward
-        // didReceiveRemoteNotification:fetchCompletionHandler: for silent pushes
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleFCMDataMessage(_:)),
-            name: Notification.Name("com.google.firebase.messaging.notificationReceived"),
-            object: nil
-        )
 
         AuthService.shared.startListening()
         return true
@@ -41,10 +31,11 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
         return GIDSignIn.sharedInstance.handle(url)
     }
 
-    // MARK: - APNs token forwarded to FCM
+    // MARK: - APNs token forwarded to FCM (manual, swizzling OFF)
 
     func application(_ application: UIApplication,
                      didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        // Manually forward APNs token to Firebase (required with swizzling OFF)
         Messaging.messaging().apnsToken = deviceToken
         AppLogger.shared.info("Push", "APNs token received (\(deviceToken.count) bytes)")
 
@@ -64,7 +55,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
             } catch {
                 AppLogger.shared.error("Push", "FCM token attempt \(attempt)/\(maxAttempts) failed: \(error.localizedDescription)")
                 if attempt < maxAttempts {
-                    try? await Task.sleep(nanoseconds: UInt64(attempt) * 3_000_000_000) // 3s, 6s backoff
+                    try? await Task.sleep(nanoseconds: UInt64(attempt) * 3_000_000_000)
                 }
             }
         }
@@ -72,12 +63,10 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
 
     func application(_ application: UIApplication,
                      didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        Task { @MainActor in
-            AppLogger.shared.error("Push", "Failed to register: \(error.localizedDescription)")
-        }
+        AppLogger.shared.error("Push", "Failed to register for remote notifications: \(error.localizedDescription)")
     }
 
-    // MARK: - FCM token & messages
+    // MARK: - FCM token
 
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
         guard let token = fcmToken else { return }
@@ -85,44 +74,36 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
         Task { await PushTokenService.shared.registerToken(token) }
     }
 
-    // MARK: - Silent push handler
+    // MARK: - Remote notification received (silent + background pushes)
 
     func application(_ application: UIApplication,
                      didReceiveRemoteNotification userInfo: [AnyHashable: Any],
                      fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+        // Manually forward to Firebase (required with swizzling OFF)
+        Messaging.messaging().appDidReceiveMessage(userInfo)
+
         let type = userInfo["type"] as? String ?? "unknown"
         let keys = userInfo.keys.map { "\($0)" }.joined(separator: ", ")
         AppLogger.shared.info("Push", "didReceiveRemoteNotification: type=\(type) keys=[\(keys)]")
+
         Task {
             await SilentPushHandler.handle(userInfo: userInfo)
             completionHandler(.newData)
         }
     }
 
-    /// Backup handler for FCM data messages via NotificationCenter
-    @objc private func handleFCMDataMessage(_ notification: Notification) {
-        guard let userInfo = notification.userInfo else {
-            AppLogger.shared.info("Push", "FCM NotificationCenter fired but no userInfo")
-            return
-        }
-        let type = userInfo["type"] as? String ?? "unknown"
-        let keys = userInfo.keys.map { "\($0)" }.joined(separator: ", ")
-        AppLogger.shared.info("Push", "FCM data message via NotificationCenter: type=\(type) keys=[\(keys)]")
-        Task {
-            await SilentPushHandler.handle(userInfo: userInfo)
-        }
-    }
-
-    // MARK: - UNUserNotificationCenterDelegate (called by Firebase swizzling)
+    // MARK: - UNUserNotificationCenterDelegate
 
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 willPresent notification: UNNotification,
                                 withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         let userInfo = notification.request.content.userInfo
+        // Manually forward to Firebase (required with swizzling OFF)
+        Messaging.messaging().appDidReceiveMessage(userInfo)
+
         let type = userInfo["type"] as? String ?? "unknown"
-        Task { @MainActor in
-            AppLogger.shared.info("Push", "willPresent notification: \(type)")
-        }
+        AppLogger.shared.info("Push", "willPresent notification: \(type)")
+
         Task {
             await SilentPushHandler.handle(userInfo: userInfo)
         }
@@ -133,10 +114,12 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
                                 didReceive response: UNNotificationResponse,
                                 withCompletionHandler completionHandler: @escaping () -> Void) {
         let userInfo = response.notification.request.content.userInfo
+        // Manually forward to Firebase (required with swizzling OFF)
+        Messaging.messaging().appDidReceiveMessage(userInfo)
+
         let type = userInfo["type"] as? String ?? "unknown"
-        Task { @MainActor in
-            AppLogger.shared.info("Push", "didReceive response: \(type)")
-        }
+        AppLogger.shared.info("Push", "didReceive response: \(type)")
+
         Task {
             await SilentPushHandler.handle(userInfo: userInfo)
         }
