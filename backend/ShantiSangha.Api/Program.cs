@@ -386,12 +386,32 @@ try
         if (tokens.Count == 0)
             return Results.Ok(new { error = "No device tokens found for user" });
 
+        // First: verify FCM works with a dry-run (same as credential diagnostic)
+        string? dryRunCheck = null;
+        try
+        {
+            var dryMsg = new FirebaseAdmin.Messaging.Message
+            {
+                Token = "dry_run_test",
+                Notification = new FirebaseAdmin.Messaging.Notification { Title = "test" }
+            };
+            await FirebaseAdmin.Messaging.FirebaseMessaging.DefaultInstance.SendAsync(dryMsg, dryRun: true);
+            dryRunCheck = "ok";
+        }
+        catch (FirebaseAdmin.Messaging.FirebaseMessagingException dex)
+        {
+            dryRunCheck = $"{dex.MessagingErrorCode}: {dex.Message}";
+        }
+        catch (Exception dex)
+        {
+            dryRunCheck = $"unexpected: {dex.Message}";
+        }
+
         var results = new List<object>();
         foreach (var device in tokens)
         {
             try
             {
-                // Try a visible notification first (easier to confirm delivery)
                 var message = new FirebaseAdmin.Messaging.Message
                 {
                     Token = device.Token,
@@ -404,15 +424,37 @@ try
                 };
 
                 var messageId = await FirebaseAdmin.Messaging.FirebaseMessaging.DefaultInstance.SendAsync(message);
-                results.Add(new { device.Token, status = "sent", messageId });
+                results.Add(new { device.Token, device.Platform, device.UpdatedAt, status = "sent", messageId });
+            }
+            catch (FirebaseAdmin.Messaging.FirebaseMessagingException fex)
+            {
+                results.Add(new
+                {
+                    tokenPrefix = device.Token[..Math.Min(20, device.Token.Length)] + "...",
+                    device.Platform,
+                    device.UpdatedAt,
+                    status = "failed",
+                    errorCode = fex.MessagingErrorCode?.ToString(),
+                    httpStatus = fex.HttpResponse?.StatusCode.ToString(),
+                    error = fex.Message
+                });
             }
             catch (Exception ex)
             {
-                results.Add(new { device.Token, status = "failed", error = ex.Message, type = ex.GetType().Name });
+                results.Add(new
+                {
+                    tokenPrefix = device.Token[..Math.Min(20, device.Token.Length)] + "...",
+                    device.Platform,
+                    device.UpdatedAt,
+                    status = "failed",
+                    error = ex.Message,
+                    type = ex.GetType().FullName,
+                    inner = ex.InnerException?.Message
+                });
             }
         }
 
-        return Results.Ok(new { userId, tokenCount = tokens.Count, results });
+        return Results.Ok(new { userId, tokenCount = tokens.Count, dryRunCheck, results });
     }).RequireAuthorization();
 
     // Debug: Diagnose Firebase credential + FCM API health
