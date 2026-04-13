@@ -38,6 +38,14 @@ public class DeviceTokenController(IdentityDbContext db, ICurrentUser currentUse
             if (staleTokens.Count > 0)
                 db.DeviceTokens.RemoveRange(staleTokens);
 
+            // Enforce max 5 devices per user (remove oldest if at limit)
+            var allUserTokens = await db.DeviceTokens
+                .Where(d => d.UserId == user.Id)
+                .OrderByDescending(d => d.UpdatedAt)
+                .ToListAsync(ct);
+            if (allUserTokens.Count >= 5)
+                db.DeviceTokens.RemoveRange(allUserTokens.Skip(4));
+
             db.DeviceTokens.Add(new DeviceToken
             {
                 Id = Guid.NewGuid(),
