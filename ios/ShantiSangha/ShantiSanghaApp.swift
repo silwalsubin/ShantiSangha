@@ -22,6 +22,12 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
 
         Task { @MainActor in
             AppLogger.shared.info("Push", "registerForRemoteNotifications called")
+
+            // Check APNs token after a delay — Firebase swizzling may intercept the delegate callback
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                let apnsToken = Messaging.messaging().apnsToken
+                AppLogger.shared.info("Push", "APNs token after 5s: \(apnsToken != nil ? "present" : "nil")")
+            }
         }
 
         AuthService.shared.startListening()
