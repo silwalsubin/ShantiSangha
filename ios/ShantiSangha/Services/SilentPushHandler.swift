@@ -27,6 +27,10 @@ enum SilentPushHandler {
         // Always refresh goals/practices since they're in the widget
         await refreshGoalsAndPractices(api: api, dateStr: dateStr)
 
+        // Force UserDefaults to flush to disk before telling WidgetKit to reload —
+        // the widget runs in a separate process and needs to see the updated values
+        UserDefaults(suiteName: WidgetData.appGroupId)?.synchronize()
+
         WidgetCenter.shared.reloadAllTimelines()
         await AppLogger.shared.info("Push", "Widget timelines reloaded after silent push")
     }
@@ -36,6 +40,9 @@ enum SilentPushHandler {
             let response: MantraResponse = try await api.get("/mantra/today")
             if let content = response.content, !content.isEmpty {
                 WidgetData.mantra = content
+                await AppLogger.shared.info("Push", "Mantra updated: \(content.prefix(40))...")
+            } else {
+                await AppLogger.shared.info("Push", "Mantra response empty, keeping existing")
             }
         } catch {
             await AppLogger.shared.error("Push", "Failed to refresh mantra: \(error.localizedDescription)")

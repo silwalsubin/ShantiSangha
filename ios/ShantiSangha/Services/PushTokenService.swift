@@ -8,12 +8,13 @@ actor PushTokenService {
 
     func registerToken(_ token: String) async {
         guard token != lastRegisteredToken else { return }
+        lastRegisteredToken = token
         do {
             struct Req: Encodable { let token: String; let platform = "ios" }
             let _: EmptyResponse = try await ApiService.shared.post("/me/device-token", body: Req(token: token))
-            lastRegisteredToken = token
             await AppLogger.shared.info("Push", "Device token registered")
         } catch {
+            lastRegisteredToken = nil
             await AppLogger.shared.error("Push", "Failed to register token: \(error.localizedDescription)")
         }
     }
