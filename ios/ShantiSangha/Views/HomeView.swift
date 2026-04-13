@@ -101,6 +101,9 @@ struct HomeView: View {
             }
             .onChange(of: vm.doneRecurring) { updateWidgetData() }
             .onChange(of: vm.doneMilestones) { updateWidgetData() }
+            .onReceive(NotificationCenter.default.publisher(for: .silentPushReceived)) { _ in
+                Task { await loadMantra() }
+            }
             .onAppear { withAnimation(.easeOut(duration: 0.25)) { showFAB = true } }
             .onDisappear { showFAB = false }
 

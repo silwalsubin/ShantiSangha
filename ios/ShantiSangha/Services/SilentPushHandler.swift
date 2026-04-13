@@ -1,6 +1,10 @@
 import Foundation
 import WidgetKit
 
+extension Notification.Name {
+    static let silentPushReceived = Notification.Name("silentPushReceived")
+}
+
 /// Handles silent push notifications — refreshes local data and reloads widget timelines.
 enum SilentPushHandler {
     static func handle(userInfo: [AnyHashable: Any]) async {
@@ -32,6 +36,12 @@ enum SilentPushHandler {
         UserDefaults(suiteName: WidgetData.appGroupId)?.synchronize()
 
         WidgetCenter.shared.reloadAllTimelines()
+
+        // Notify in-app views to refresh
+        await MainActor.run {
+            NotificationCenter.default.post(name: .silentPushReceived, object: nil, userInfo: ["type": type])
+        }
+
         await AppLogger.shared.info("Push", "Widget timelines reloaded after silent push")
     }
 
