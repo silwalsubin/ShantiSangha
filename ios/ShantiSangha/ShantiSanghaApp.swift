@@ -21,6 +21,16 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
         application.registerForRemoteNotifications()
         AppLogger.shared.info("Push", "registerForRemoteNotifications called")
 
+        // Observe FCM data messages as a backup path —
+        // SwiftUI's @UIApplicationDelegateAdaptor may not forward
+        // didReceiveRemoteNotification:fetchCompletionHandler: for silent pushes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleFCMDataMessage(_:)),
+            name: Notification.Name("com.google.firebase.messaging.notificationReceived"),
+            object: nil
+        )
+
         AuthService.shared.startListening()
         return true
     }
@@ -67,13 +77,11 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
         }
     }
 
-    // MARK: - FCM token
+    // MARK: - FCM token & messages
 
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
         guard let token = fcmToken else { return }
-        Task { @MainActor in
-            AppLogger.shared.info("Push", "FCM token: \(token)")
-        }
+        AppLogger.shared.info("Push", "FCM token: \(token.prefix(20))...")
         Task { await PushTokenService.shared.registerToken(token) }
     }
 
@@ -83,12 +91,25 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
                      didReceiveRemoteNotification userInfo: [AnyHashable: Any],
                      fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
         let type = userInfo["type"] as? String ?? "unknown"
-        Task { @MainActor in
-            AppLogger.shared.info("Push", "didReceiveRemoteNotification: \(type)")
-        }
+        let keys = userInfo.keys.map { "\($0)" }.joined(separator: ", ")
+        AppLogger.shared.info("Push", "didReceiveRemoteNotification: type=\(type) keys=[\(keys)]")
         Task {
             await SilentPushHandler.handle(userInfo: userInfo)
             completionHandler(.newData)
+        }
+    }
+
+    /// Backup handler for FCM data messages via NotificationCenter
+    @objc private func handleFCMDataMessage(_ notification: Notification) {
+        guard let userInfo = notification.userInfo else {
+            AppLogger.shared.info("Push", "FCM NotificationCenter fired but no userInfo")
+            return
+        }
+        let type = userInfo["type"] as? String ?? "unknown"
+        let keys = userInfo.keys.map { "\($0)" }.joined(separator: ", ")
+        AppLogger.shared.info("Push", "FCM data message via NotificationCenter: type=\(type) keys=[\(keys)]")
+        Task {
+            await SilentPushHandler.handle(userInfo: userInfo)
         }
     }
 

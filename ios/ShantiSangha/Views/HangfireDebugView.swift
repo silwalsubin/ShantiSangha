@@ -237,7 +237,7 @@ struct HangfireDebugView: View {
                 Text(pushResult)
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundColor(.sacredMuted)
-                    .lineLimit(10)
+                    .textSelection(.enabled)
             }
         }
     }
@@ -330,10 +330,21 @@ struct HangfireDebugView: View {
         testPushResult = nil
         do {
             let result: TestPushResult = try await api.post("/debug/hangfire/test-push")
-            let lines = result.results.map { r in
-                "\(r.status): \(r.messageId ?? r.error ?? "unknown")"
+            var lines = ["Tokens: \(result.tokenCount)"]
+            if let dryRun = result.dryRunCheck {
+                lines.append("DryRun: \(dryRun)")
             }
-            testPushResult = "Tokens: \(result.tokenCount)\n\(lines.joined(separator: "\n"))"
+            for r in result.results {
+                var parts = ["\(r.status)"]
+                if let code = r.errorCode { parts.append("code=\(code)") }
+                if let http = r.httpStatus { parts.append("http=\(http)") }
+                if let mid = r.messageId { parts.append("id=\(mid)") }
+                if let err = r.error { parts.append(err) }
+                if let prefix = r.tokenPrefix { parts.append("token=\(prefix)") }
+                if let updated = r.updatedAt { parts.append("updated=\(updated)") }
+                lines.append(parts.joined(separator: "\n  "))
+            }
+            testPushResult = lines.joined(separator: "\n")
         } catch {
             testPushResult = "Error: \(error.localizedDescription)"
         }
@@ -406,6 +417,7 @@ private struct TriggerResult: Codable {
 
 private struct TestPushResult: Codable {
     let tokenCount: Int
+    let dryRunCheck: String?
     let results: [PushSendResult]
 }
 
@@ -413,4 +425,8 @@ private struct PushSendResult: Codable {
     let status: String
     let messageId: String?
     let error: String?
+    let errorCode: String?
+    let httpStatus: String?
+    let tokenPrefix: String?
+    let updatedAt: String?
 }
