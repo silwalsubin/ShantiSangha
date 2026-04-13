@@ -415,7 +415,7 @@ try
         return Results.Ok(new { userId, tokenCount = tokens.Count, results });
     }).RequireAuthorization();
 
-    // Debug: Diagnose Firebase credential health
+    // Debug: Diagnose Firebase credential + FCM API health
     app.MapGet("/api/debug/firebase-credential", async () =>
     {
         try
@@ -428,16 +428,43 @@ try
             var credential = options.Credential;
             var projectId = options.ProjectId;
 
-            // Try to get an access token — this is the exact step that fails during SendAsync
+            // Step 1: Test OAuth token generation
             var accessToken = await credential.UnderlyingCredential.GetAccessTokenForRequestAsync();
+
+            // Step 2: Test FCM API with dry_run (validates API is enabled + permissions, doesn't actually send)
+            string? fcmDryRunResult = null;
+            string? fcmDryRunError = null;
+            try
+            {
+                var testMessage = new FirebaseAdmin.Messaging.Message
+                {
+                    Token = "dry_run_test_token",
+                    Notification = new FirebaseAdmin.Messaging.Notification
+                    {
+                        Title = "test",
+                        Body = "test"
+                    }
+                };
+                var messageId = await FirebaseAdmin.Messaging.FirebaseMessaging.DefaultInstance
+                    .SendAsync(testMessage, dryRun: true);
+                fcmDryRunResult = messageId;
+            }
+            catch (FirebaseAdmin.Messaging.FirebaseMessagingException fex)
+            {
+                // INVALID_ARGUMENT is expected (fake token) — means FCM API works!
+                // Any auth error means the API or permissions are broken
+                fcmDryRunResult = fex.MessagingErrorCode?.ToString();
+                fcmDryRunError = fex.Message;
+            }
 
             return Results.Ok(new
             {
                 status = "ok",
                 projectId,
                 credentialType = credential.UnderlyingCredential.GetType().Name,
-                tokenPrefix = accessToken?[..Math.Min(20, accessToken.Length)] + "...",
-                tokenLength = accessToken?.Length
+                tokenOk = accessToken?.Length > 0,
+                fcmDryRunResult,
+                fcmDryRunError
             });
         }
         catch (Exception ex)
