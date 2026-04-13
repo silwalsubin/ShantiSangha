@@ -12,6 +12,8 @@ struct HangfireDebugView: View {
     @State private var queues: [QueueEntry] = []
     @State private var triggeringMantra = false
     @State private var triggerResult: String?
+    @State private var testingPush = false
+    @State private var testPushResult: String?
 
     private let api = ApiService.shared
 
@@ -211,6 +213,32 @@ struct HangfireDebugView: View {
                     .font(.system(size: 10, design: .serif))
                     .foregroundColor(.sacredGreen)
             }
+
+            Divider().padding(.vertical, 4)
+
+            Button {
+                Task { await testDirectPush() }
+            } label: {
+                HStack {
+                    Image(systemName: "bell.badge")
+                        .font(.sacredSmall)
+                    Text("Test Direct Push (visible notification)")
+                        .font(.sacredSmallMedium)
+                    Spacer()
+                    if testingPush {
+                        ProgressView().tint(.sacredGold)
+                    }
+                }
+                .foregroundColor(.sacredGold)
+            }
+            .disabled(testingPush)
+
+            if let pushResult = testPushResult {
+                Text(pushResult)
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundColor(.sacredMuted)
+                    .lineLimit(10)
+            }
         }
     }
 
@@ -296,6 +324,21 @@ struct HangfireDebugView: View {
         }
         triggeringMantra = false
     }
+
+    private func testDirectPush() async {
+        testingPush = true
+        testPushResult = nil
+        do {
+            let result: TestPushResult = try await api.post("/debug/hangfire/test-push")
+            let lines = result.results.map { r in
+                "\(r.status): \(r.messageId ?? r.error ?? "unknown")"
+            }
+            testPushResult = "Tokens: \(result.tokenCount)\n\(lines.joined(separator: "\n"))"
+        } catch {
+            testPushResult = "Error: \(error.localizedDescription)"
+        }
+        testingPush = false
+    }
 }
 
 // MARK: - Response models
@@ -359,4 +402,15 @@ private struct FailedJobEntry: Codable {
 private struct TriggerResult: Codable {
     let triggered: String
     let userId: String
+}
+
+private struct TestPushResult: Codable {
+    let tokenCount: Int
+    let results: [PushSendResult]
+}
+
+private struct PushSendResult: Codable {
+    let status: String
+    let messageId: String?
+    let error: String?
 }

@@ -23,10 +23,26 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
         Task { @MainActor in
             AppLogger.shared.info("Push", "registerForRemoteNotifications called")
 
-            // Check APNs token after a delay — Firebase swizzling may intercept the delegate callback
+            // Check APNs token after a delay and force FCM token refresh
             DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
                 let apnsToken = Messaging.messaging().apnsToken
-                AppLogger.shared.info("Push", "APNs token after 5s: \(apnsToken != nil ? "present" : "nil")")
+                AppLogger.shared.info("Push", "APNs token after 5s: \(apnsToken != nil ? "present (\(apnsToken!.count) bytes)" : "nil")")
+
+                // Delete and re-fetch FCM token to ensure it's linked with APNs token
+                Task {
+                    do {
+                        try await Messaging.messaging().deleteToken()
+                        let newToken = try await Messaging.messaging().token()
+                        await MainActor.run {
+                            AppLogger.shared.info("Push", "FCM token refreshed: \(newToken.prefix(20))...")
+                        }
+                        await PushTokenService.shared.registerToken(newToken)
+                    } catch {
+                        await MainActor.run {
+                            AppLogger.shared.error("Push", "FCM token refresh failed: \(error.localizedDescription)")
+                        }
+                    }
+                }
             }
         }
 
@@ -62,7 +78,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
         guard let token = fcmToken else { return }
         Task { @MainActor in
-            AppLogger.shared.info("Push", "FCM token received")
+            AppLogger.shared.info("Push", "FCM token: \(token)")
         }
         Task { await PushTokenService.shared.registerToken(token) }
     }
@@ -74,12 +90,42 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
                      fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
         let type = userInfo["type"] as? String ?? "unknown"
         Task { @MainActor in
-            AppLogger.shared.info("Push", "Silent push received: \(type)")
+            AppLogger.shared.info("Push", "didReceiveRemoteNotification: \(type)")
         }
         Task {
             await SilentPushHandler.handle(userInfo: userInfo)
             completionHandler(.newData)
         }
+    }
+
+    // MARK: - UNUserNotificationCenterDelegate (called by Firebase swizzling)
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        let userInfo = notification.request.content.userInfo
+        let type = userInfo["type"] as? String ?? "unknown"
+        Task { @MainActor in
+            AppLogger.shared.info("Push", "willPresent notification: \(type)")
+        }
+        Task {
+            await SilentPushHandler.handle(userInfo: userInfo)
+        }
+        completionHandler([])
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        let userInfo = response.notification.request.content.userInfo
+        let type = userInfo["type"] as? String ?? "unknown"
+        Task { @MainActor in
+            AppLogger.shared.info("Push", "didReceive response: \(type)")
+        }
+        Task {
+            await SilentPushHandler.handle(userInfo: userInfo)
+        }
+        completionHandler()
     }
 }
 

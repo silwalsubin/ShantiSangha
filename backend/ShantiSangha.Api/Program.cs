@@ -351,6 +351,51 @@ try
         return Results.Ok(new { triggered = "GenerateDailyMantraJob", userId, deleted = existing.Count });
     }).RequireAuthorization();
 
+    // Debug: Send a direct test push with full error reporting
+    app.MapPost("/api/debug/hangfire/test-push", async (HttpContext ctx) =>
+    {
+        var currentUser = ctx.RequestServices.GetRequiredService<ShantiSangha.Shared.Interfaces.ICurrentUser>();
+        var user = await currentUser.GetAsync();
+        var userId = user!.Id;
+
+        var identityDb = ctx.RequestServices.GetRequiredService<ShantiSangha.Identity.Data.IdentityDbContext>();
+        var tokens = await identityDb.DeviceTokens
+            .Where(d => d.UserId == userId)
+            .Select(d => new { d.Token, d.Platform, d.UpdatedAt })
+            .ToListAsync();
+
+        if (tokens.Count == 0)
+            return Results.Ok(new { error = "No device tokens found for user" });
+
+        var results = new List<object>();
+        foreach (var device in tokens)
+        {
+            try
+            {
+                // Try a visible notification first (easier to confirm delivery)
+                var message = new FirebaseAdmin.Messaging.Message
+                {
+                    Token = device.Token,
+                    Notification = new FirebaseAdmin.Messaging.Notification
+                    {
+                        Title = "Push Test",
+                        Body = "If you see this, push notifications work!"
+                    },
+                    Data = new Dictionary<string, string> { ["type"] = "test" }
+                };
+
+                var messageId = await FirebaseAdmin.Messaging.FirebaseMessaging.DefaultInstance.SendAsync(message);
+                results.Add(new { device.Token, status = "sent", messageId });
+            }
+            catch (Exception ex)
+            {
+                results.Add(new { device.Token, status = "failed", error = ex.Message, type = ex.GetType().Name });
+            }
+        }
+
+        return Results.Ok(new { userId, tokenCount = tokens.Count, results });
+    }).RequireAuthorization();
+
     // Health check at root (no /api prefix)
     app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
         .AllowAnonymous();
