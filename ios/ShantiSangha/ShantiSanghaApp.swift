@@ -19,32 +19,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
 
         // Register for remote notifications synchronously in didFinishLaunching
         application.registerForRemoteNotifications()
-
-        Task { @MainActor in
-            AppLogger.shared.info("Push", "registerForRemoteNotifications called")
-
-            // Check APNs token after a delay and force FCM token refresh
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-                let apnsToken = Messaging.messaging().apnsToken
-                AppLogger.shared.info("Push", "APNs token after 5s: \(apnsToken != nil ? "present (\(apnsToken!.count) bytes)" : "nil")")
-
-                // Delete and re-fetch FCM token to ensure it's linked with APNs token
-                Task {
-                    do {
-                        try await Messaging.messaging().deleteToken()
-                        let newToken = try await Messaging.messaging().token()
-                        await MainActor.run {
-                            AppLogger.shared.info("Push", "FCM token refreshed: \(newToken.prefix(20))...")
-                        }
-                        await PushTokenService.shared.registerToken(newToken)
-                    } catch {
-                        await MainActor.run {
-                            AppLogger.shared.error("Push", "FCM token refresh failed: \(error.localizedDescription)")
-                        }
-                    }
-                }
-            }
-        }
+        AppLogger.shared.info("Push", "registerForRemoteNotifications called")
 
         AuthService.shared.startListening()
         return true
@@ -61,8 +36,27 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
     func application(_ application: UIApplication,
                      didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         Messaging.messaging().apnsToken = deviceToken
-        Task { @MainActor in
-            AppLogger.shared.info("Push", "APNs token received")
+        AppLogger.shared.info("Push", "APNs token received (\(deviceToken.count) bytes)")
+
+        // Now that APNs token is set, request FCM token with retry
+        Task {
+            await self.fetchFCMTokenWithRetry(maxAttempts: 3)
+        }
+    }
+
+    private func fetchFCMTokenWithRetry(maxAttempts: Int) async {
+        for attempt in 1...maxAttempts {
+            do {
+                let token = try await Messaging.messaging().token()
+                AppLogger.shared.info("Push", "FCM token obtained (attempt \(attempt)): \(token.prefix(20))...")
+                await PushTokenService.shared.registerToken(token)
+                return
+            } catch {
+                AppLogger.shared.error("Push", "FCM token attempt \(attempt)/\(maxAttempts) failed: \(error.localizedDescription)")
+                if attempt < maxAttempts {
+                    try? await Task.sleep(nanoseconds: UInt64(attempt) * 3_000_000_000) // 3s, 6s backoff
+                }
+            }
         }
     }
 

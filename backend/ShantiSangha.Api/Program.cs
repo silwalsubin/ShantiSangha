@@ -415,6 +415,43 @@ try
         return Results.Ok(new { userId, tokenCount = tokens.Count, results });
     }).RequireAuthorization();
 
+    // Debug: Diagnose Firebase credential health
+    app.MapGet("/api/debug/firebase-credential", async () =>
+    {
+        try
+        {
+            var fbApp = FirebaseApp.DefaultInstance;
+            if (fbApp == null)
+                return Results.Ok(new { status = "error", message = "FirebaseApp.DefaultInstance is null" });
+
+            var options = fbApp.Options;
+            var credential = options.Credential;
+            var projectId = options.ProjectId;
+
+            // Try to get an access token — this is the exact step that fails during SendAsync
+            var accessToken = await credential.UnderlyingCredential.GetAccessTokenForRequestAsync();
+
+            return Results.Ok(new
+            {
+                status = "ok",
+                projectId,
+                credentialType = credential.UnderlyingCredential.GetType().Name,
+                tokenPrefix = accessToken?[..Math.Min(20, accessToken.Length)] + "...",
+                tokenLength = accessToken?.Length
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.Ok(new
+            {
+                status = "error",
+                error = ex.Message,
+                type = ex.GetType().FullName,
+                inner = ex.InnerException?.Message
+            });
+        }
+    }).AllowAnonymous();
+
     // Health check at root (no /api prefix)
     app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
         .AllowAnonymous();
