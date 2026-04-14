@@ -317,22 +317,28 @@ struct HomeView: View {
         let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
         let dateStr = df.string(from: Date())
         do {
+            await AppLogger.shared.info("Reflection", "Fetching /reflection/today?date=\(dateStr)")
             let response: DailyReflectionResponse = try await ApiService.shared.get("/reflection/today?date=\(dateStr)")
+            await AppLogger.shared.info("Reflection", "Response: content=\(response.content?.prefix(40) ?? "nil")")
             if let content = response.content, !content.isEmpty {
                 reflection = content
                 return
             }
 
             // Generation triggered — poll for result
-            for _ in 1...5 {
+            for i in 1...5 {
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
                 let retry: DailyReflectionResponse = try await ApiService.shared.get("/reflection/today?date=\(dateStr)")
+                await AppLogger.shared.info("Reflection", "Poll \(i)/5: content=\(retry.content?.prefix(40) ?? "nil")")
                 if let content = retry.content, !content.isEmpty {
                     reflection = content
                     return
                 }
             }
-        } catch {}
+            await AppLogger.shared.warn("Reflection", "Gave up after 5 polls")
+        } catch {
+            await AppLogger.shared.error("Reflection", "Failed: \(error.localizedDescription)")
+        }
     }
 
     // MARK: - Time greeting
