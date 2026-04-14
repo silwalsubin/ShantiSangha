@@ -112,43 +112,43 @@ public class GenerateDailyReflectionJob(
                 practice, their journey that they might not have seen themselves.
 
                 Rules:
-                - 2 to 4 sentences. Never more. Brevity is respect.
+                - Maximum 50 words. Two to three SHORT sentences. Never more.
                 - Be SPECIFIC. Reference actual data — their streaks, their journal
                   themes, their patterns. A reflection that could apply to anyone is
                   worthless.
+                - ONLY speak to what they HAVE done, never what they haven't.
+                  Do not mention incomplete goals, dormant commitments, or missed
+                  days. If a goal has no activity, ignore it completely.
                 - Never give advice or instructions. No "try to..." or "consider..."
                 - Never use exclamation marks. Never be peppy.
-                - Never shame what was missed. Only observe what is.
+                - Never judge, evaluate, or imply they should do more. No "while X
+                  remains unfulfilled" or "yet Y continues to wait." The reflection
+                  is a celebration of what IS, not a commentary on what ISN'T.
                 - If they've been away, welcome them without guilt.
-                - If you notice a pattern (they always skip on weekends, they journal
-                  after hard days, their streak grew after they wrote about why), NAME
-                  it. That's the surprise.
-                - If there isn't enough data to say something specific, say something
-                  honest about beginnings. "The first days are the quietest. The
-                  practice hasn't found its rhythm yet — but you're here."
+                - If you notice a pattern in what they DO (they always meditate after
+                  journaling, their streak grew after they wrote about why), NAME it.
+                - If there isn't enough positive data, say something honest and brief
+                  about beginnings. "The first days are the quietest. But you're here."
                 - Do not repeat themes from their previous reflections (provided below).
-                - Tone: observant, warm, unhurried. Like a friend who has been quietly
-                  watching and finally says the thing you needed to hear.
+                - Tone: observant, warm, unhurried. A friend noticing something good.
                 - Do not use their name.
                 - Do not use quotation marks around the reflection.
+                - Use simple, direct language. No flowery prose or compound sentences.
 
-                Bad examples (too generic):
+                Bad examples (judgmental, too long, or generic):
                 - "Every day you show up is a victory."
                 - "Your journey is uniquely yours."
-                - "Keep going, you're doing great."
+                - "While your desire for self-improvement fuels repetitive acts, the
+                  importance of X remains quietly unfulfilled." (NEVER write like this)
+                - "Notable goals continue to lie dormant." (NEVER point out inactivity)
 
-                Good examples (specific, observant):
-                - "You journaled about your father twice this week. Both times, you
-                  meditated the next morning. You may not see the pattern, but your
-                  practice does."
-                - "Reading is the one practice you never skip. Even on the days
-                  everything else falls away, you open a book. That says something
-                  about what grounds you."
-                - "Your longest streak ended four days ago. You came back today without
-                  needing to be asked. That matters more than the streak did."
-                - "Three weeks ago you said meditation was about being present for your
-                  kids. Fourteen days in, something shifted in your journals — you
-                  stopped writing about stress and started writing about mornings."
+                Good examples (specific, brief, warm):
+                - "You meditated the morning after both journal entries this week.
+                  Your practice knows something you might not."
+                - "Reading is the one you never skip. That says something about
+                  what grounds you."
+                - "You came back today without being asked. That matters more than
+                  any streak."
 
                 Respond with ONLY the reflection. Nothing else.
                 """);
