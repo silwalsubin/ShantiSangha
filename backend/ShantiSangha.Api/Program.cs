@@ -347,12 +347,14 @@ try
         var currentUser = ctx.RequestServices.GetRequiredService<ShantiSangha.Shared.Interfaces.ICurrentUser>();
         var user = await currentUser.GetAsync();
         var userId = user!.Id;
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        // Cover both UTC and possible local dates (UTC-12 to UTC+14)
+        var utcToday = DateOnly.FromDateTime(DateTime.UtcNow);
+        var yesterday = utcToday.AddDays(-1);
+        var tomorrow = utcToday.AddDays(1);
 
-        // Delete existing mantra so the job actually generates a new one
         var wellnessDb = ctx.RequestServices.GetRequiredService<ShantiSangha.Wellness.Data.WellnessDbContext>();
         var existing = await wellnessDb.DailyMantras
-            .Where(m => m.UserId == userId && m.Date == today)
+            .Where(m => m.UserId == userId && m.Date >= yesterday && m.Date <= tomorrow)
             .ToListAsync();
         if (existing.Count > 0)
         {
@@ -370,11 +372,13 @@ try
         var currentUser = ctx.RequestServices.GetRequiredService<ShantiSangha.Shared.Interfaces.ICurrentUser>();
         var user = await currentUser.GetAsync();
         var userId = user!.Id;
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var utcToday = DateOnly.FromDateTime(DateTime.UtcNow);
+        var yesterday = utcToday.AddDays(-1);
+        var tomorrow = utcToday.AddDays(1);
 
         var wellnessDb = ctx.RequestServices.GetRequiredService<ShantiSangha.Wellness.Data.WellnessDbContext>();
         var existing = await wellnessDb.DailyReflections
-            .Where(r => r.UserId == userId && r.Date == today)
+            .Where(r => r.UserId == userId && r.Date >= yesterday && r.Date <= tomorrow)
             .ToListAsync();
         if (existing.Count > 0)
         {
