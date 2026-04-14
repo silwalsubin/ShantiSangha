@@ -15,7 +15,7 @@ public interface IGoalService
     Task<bool> ResetAsync(Guid id, Guid userId, string? date = null, CancellationToken ct = default);
     Task<List<CheckInListItem>?> GetCheckInsAsync(Guid id, Guid userId, string? from = null, string? to = null, CancellationToken ct = default);
     Task<List<GoalActivityResponse>?> GetHistoryAsync(Guid id, Guid userId, int page = 1, int pageSize = 50, CancellationToken ct = default);
-    Task<NudgeResult?> GetNudgeAsync(Guid id, Guid userId, CancellationToken ct = default);
+    Task<NudgeResult?> GetNudgeAsync(Guid id, Guid userId, string? date = null, CancellationToken ct = default);
     Task<JourneyResponse> GetJourneyAsync(Guid userId, string? from = null, string? to = null, CancellationToken ct = default);
     Task<JourneyReflectionResponse> GetJourneyReflectionAsync(Guid userId, string? from = null, string? to = null, CancellationToken ct = default);
 }

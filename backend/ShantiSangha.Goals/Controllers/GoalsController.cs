@@ -157,12 +157,12 @@ public class GoalsController(IGoalService goalService, ICurrentUser currentUser)
     }
 
     [HttpGet("{id:guid}/nudge")]
-    public async Task<IActionResult> GetNudge(Guid id, CancellationToken ct = default)
+    public async Task<IActionResult> GetNudge(Guid id, string? date = null, CancellationToken ct = default)
     {
         var user = await currentUser.GetAsync();
         if (user is null) return Unauthorized();
 
-        var result = await goalService.GetNudgeAsync(id, user.Id, ct);
+        var result = await goalService.GetNudgeAsync(id, user.Id, date, ct);
         return result is null ? NotFound() : Ok(result);
     }
 

@@ -18,9 +18,9 @@ public class GenerateDailyMantraJob(
     IPushNotificationService pushService,
     ILogger<GenerateDailyMantraJob> logger)
 {
-    public async Task RunAsync(Guid userId)
+    public async Task RunAsync(Guid userId, DateOnly? localDate = null)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = localDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
 
         // Already generated today?
         var exists = await db.DailyMantras.AnyAsync(m => m.UserId == userId && m.Date == today);
@@ -30,7 +30,7 @@ public class GenerateDailyMantraJob(
         {
             // Gather context about this person
             var displayName = await profileQuery.GetDisplayNameAsync(userId);
-            var goals = await goalQuery.GetActiveGoalsForContextAsync(userId);
+            var goals = await goalQuery.GetActiveGoalsForContextAsync(userId, today);
             var summaries = await summaryQuery.GetRecentSummariesAsync(userId, 3);
             var journalSummaries = await summaryQuery.GetRecentJournalSummariesAsync(userId, 3);
             var insights = await insightQuery.GetRecentInsightsAsync(userId, 3);

@@ -360,7 +360,7 @@ try
             await wellnessDb.SaveChangesAsync();
         }
 
-        jobs.Enqueue<ShantiSangha.Wellness.Jobs.GenerateDailyMantraJob>(j => j.RunAsync(userId));
+        jobs.Enqueue<ShantiSangha.Wellness.Jobs.GenerateDailyMantraJob>(j => j.RunAsync(userId, (DateOnly?)null));
         return Results.Ok(new { triggered = "GenerateDailyMantraJob", userId, deleted = existing.Count });
     }).RequireAuthorization();
 

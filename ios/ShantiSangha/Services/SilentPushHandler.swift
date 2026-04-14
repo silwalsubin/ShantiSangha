@@ -16,7 +16,7 @@ enum SilentPushHandler {
 
         switch type {
         case "mantra":
-            await refreshMantra(api: api)
+            await refreshMantra(api: api, dateStr: dateStr)
         case "voice":
             // Voice transcription completed — no widget data to update,
             // but reload timelines in case we add voice data to widget later
@@ -46,9 +46,9 @@ enum SilentPushHandler {
         await AppLogger.shared.info("Push", "Widget timelines reloaded after silent push")
     }
 
-    private static func refreshMantra(api: ApiService) async {
+    private static func refreshMantra(api: ApiService, dateStr: String) async {
         do {
-            let response: MantraResponse = try await api.get("/mantra/today")
+            let response: MantraResponse = try await api.get("/mantra/today?date=\(dateStr)")
             if let content = response.content, !content.isEmpty {
                 WidgetData.mantra = content
                 await AppLogger.shared.info("Push", "Mantra updated: \(content.prefix(40))...")

@@ -358,7 +358,8 @@ struct GoalDetailView: View {
         // Fetch fresh nudge in background
         Task {
             do {
-                let result: NudgeResponse = try await api.get("/goals/\(goalId)/nudge")
+                let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+                let result: NudgeResponse = try await api.get("/goals/\(goalId)/nudge?date=\(df.string(from: Date()))")
                 if let fresh = result.nudge {
                     withAnimation(.easeIn(duration: 0.3)) { nudge = fresh }
                 }

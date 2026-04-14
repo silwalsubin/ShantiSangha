@@ -4,5 +4,5 @@ namespace ShantiSangha.Shared.Interfaces;
 
 public interface IGoalQueryService
 {
-    Task<IReadOnlyList<GoalSummaryDto>> GetActiveGoalsForContextAsync(Guid userId, CancellationToken ct = default);
+    Task<IReadOnlyList<GoalSummaryDto>> GetActiveGoalsForContextAsync(Guid userId, DateOnly? localDate = null, CancellationToken ct = default);
 }

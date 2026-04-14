@@ -19,12 +19,14 @@ public class MantraController(
     ILogger<MantraController> logger) : ControllerBase
 {
     [HttpGet("today")]
-    public async Task<IActionResult> GetToday(CancellationToken ct)
+    public async Task<IActionResult> GetToday([FromQuery] string? date, CancellationToken ct)
     {
         var user = await currentUser.GetAsync();
         if (user is null) return Unauthorized();
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = date is not null && DateOnly.TryParse(date, out var parsed)
+            ? parsed
+            : DateOnly.FromDateTime(DateTime.UtcNow);
 
         var mantra = await db.DailyMantras
             .Where(m => m.UserId == user.Id && m.Date == today)
@@ -39,7 +41,7 @@ public class MantraController(
 
         // No mantra yet — trigger generation and return empty
         logger.LogInformation("Mantra cache miss for user {UserId} on {Date} — enqueueing generation", user.Id, today);
-        jobs.Enqueue<GenerateDailyMantraJob>(j => j.RunAsync(user.Id));
+        jobs.Enqueue<GenerateDailyMantraJob>(j => j.RunAsync(user.Id, today));
 
         return Ok(new { Content = (string?)null, Date = today });
     }

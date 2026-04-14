@@ -9,9 +9,9 @@ namespace ShantiSangha.Goals.Services;
 public class GoalQueryService(GoalsDbContext db) : IGoalQueryService
 {
     public async Task<IReadOnlyList<GoalSummaryDto>> GetActiveGoalsForContextAsync(
-        Guid userId, CancellationToken ct = default)
+        Guid userId, DateOnly? localDate = null, CancellationToken ct = default)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = localDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
 
         var goals = await db.Goals
             .Where(g => g.UserId == userId && g.ArchivedAt == null)

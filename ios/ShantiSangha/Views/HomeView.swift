@@ -277,8 +277,10 @@ struct HomeView: View {
     // MARK: - Mantra
 
     private func loadMantra() async {
+        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+        let dateStr = df.string(from: Date())
         do {
-            let response: MantraResponse = try await ApiService.shared.get("/mantra/today")
+            let response: MantraResponse = try await ApiService.shared.get("/mantra/today?date=\(dateStr)")
             if let content = response.content, !content.isEmpty {
                 mantra = content
                 return
@@ -287,7 +289,7 @@ struct HomeView: View {
             // Generation triggered — poll for result
             for _ in 1...5 {
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
-                let retry: MantraResponse = try await ApiService.shared.get("/mantra/today")
+                let retry: MantraResponse = try await ApiService.shared.get("/mantra/today?date=\(dateStr)")
                 if let content = retry.content, !content.isEmpty {
                     mantra = content
                     return

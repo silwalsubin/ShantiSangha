@@ -156,7 +156,7 @@ public class ChatService(
             var summariesTask = summaryQuery.GetRecentSummariesAsync(userId, SummaryCount, cancellationToken);
             var journalSummariesTask = summaryQuery.GetRecentJournalSummariesAsync(userId, SummaryCount, cancellationToken);
             var moodTask = moodQuery.GetRecentMoodSummaryAsync(userId, 7, cancellationToken);
-            var goalsTask = goalQuery.GetActiveGoalsForContextAsync(userId, cancellationToken);
+            var goalsTask = goalQuery.GetActiveGoalsForContextAsync(userId, ct: cancellationToken);
 
             await Task.WhenAll(displayNameTask, summariesTask, journalSummariesTask, moodTask, goalsTask);
 

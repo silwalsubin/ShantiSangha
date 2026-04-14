@@ -350,8 +350,7 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
 
         if (goal is null) return null;
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var endDate = to is not null && DateOnly.TryParse(to, out var toParsed) ? toParsed : today;
+        var endDate = to is not null && DateOnly.TryParse(to, out var toParsed) ? toParsed : DateOnly.FromDateTime(DateTime.UtcNow);
         var startDate = from is not null && DateOnly.TryParse(from, out var fromParsed)
             ? fromParsed
             : new DateOnly(endDate.Year, endDate.Month, 1);
@@ -393,7 +392,7 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
     }
 
     public async Task<NudgeResult?> GetNudgeAsync(
-        Guid id, Guid userId, CancellationToken ct = default)
+        Guid id, Guid userId, string? date = null, CancellationToken ct = default)
     {
         var goal = await db.Goals
             .Include(g => g.CheckIns)
@@ -408,7 +407,9 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
             return new NudgeResult(goal.AiNudge);
         }
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = date is not null && DateOnly.TryParse(date, out var parsedDate)
+            ? parsedDate
+            : DateOnly.FromDateTime(DateTime.UtcNow);
         var daysSinceCreation = today.DayNumber - DateOnly.FromDateTime(goal.CreatedAt).DayNumber;
         var recentActivity = goal.Activities
             .OrderByDescending(a => a.CreatedAt)
@@ -475,9 +476,9 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
     public async Task<JourneyResponse> GetJourneyAsync(
         Guid userId, string? from = null, string? to = null, CancellationToken ct = default)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var endDate = to is not null && DateOnly.TryParse(to, out var toParsed) ? toParsed : today;
+        var endDate = to is not null && DateOnly.TryParse(to, out var toParsed) ? toParsed : DateOnly.FromDateTime(DateTime.UtcNow);
         var startDate = from is not null && DateOnly.TryParse(from, out var fromParsed) ? fromParsed : endDate.AddDays(-6);
+        var today = endDate;
 
         var goals = await db.Goals
             .Where(g => g.UserId == userId && g.ArchivedAt == null && g.Type == GoalType.Recurring)
@@ -541,8 +542,7 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
     public async Task<JourneyReflectionResponse> GetJourneyReflectionAsync(
         Guid userId, string? from = null, string? to = null, CancellationToken ct = default)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var endDate = to is not null && DateOnly.TryParse(to, out var toParsed) ? toParsed : today;
+        var endDate = to is not null && DateOnly.TryParse(to, out var toParsed) ? toParsed : DateOnly.FromDateTime(DateTime.UtcNow);
         var startDate = from is not null && DateOnly.TryParse(from, out var fromParsed) ? fromParsed : endDate.AddDays(-6);
         var totalDays = endDate.DayNumber - startDate.DayNumber + 1;
 
