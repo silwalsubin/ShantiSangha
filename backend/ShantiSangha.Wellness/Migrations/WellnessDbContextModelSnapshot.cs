@@ -76,29 +76,31 @@ namespace ShantiSangha.Wellness.Migrations
                     b.ToTable("DailyMantras");
                 });
 
-            modelBuilder.Entity("ShantiSangha.Wellness.Models.MoodCheckin", b =>
+            modelBuilder.Entity("ShantiSangha.Wellness.Models.DailyReflection", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Notes")
-                        .HasColumnType("text");
-
-                    b.Property<int>("Score")
-                        .HasColumnType("integer");
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
 
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId", "CreatedAt");
+                    b.HasIndex("UserId", "Date")
+                        .IsUnique();
 
-                    b.ToTable("MoodCheckins");
+                    b.ToTable("DailyReflections");
                 });
 
             modelBuilder.Entity("ShantiSangha.Wellness.Models.VoiceEntry", b =>

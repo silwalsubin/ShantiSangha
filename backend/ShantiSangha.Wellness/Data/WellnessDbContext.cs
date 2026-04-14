@@ -5,18 +5,13 @@ namespace ShantiSangha.Wellness.Data;
 
 public class WellnessDbContext(DbContextOptions<WellnessDbContext> options) : DbContext(options)
 {
-    public DbSet<MoodCheckin> MoodCheckins => Set<MoodCheckin>();
     public DbSet<CopingSession> CopingSessions => Set<CopingSession>();
     public DbSet<VoiceEntry> VoiceEntries => Set<VoiceEntry>();
     public DbSet<DailyMantra> DailyMantras => Set<DailyMantra>();
+    public DbSet<DailyReflection> DailyReflections => Set<DailyReflection>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<MoodCheckin>(e =>
-        {
-            e.HasIndex(m => new { m.UserId, m.CreatedAt });
-        });
-
         modelBuilder.Entity<VoiceEntry>(e =>
         {
             e.Property(v => v.Status).HasConversion<string>();
@@ -25,6 +20,11 @@ public class WellnessDbContext(DbContextOptions<WellnessDbContext> options) : Db
         modelBuilder.Entity<DailyMantra>(e =>
         {
             e.HasIndex(m => new { m.UserId, m.Date }).IsUnique();
+        });
+
+        modelBuilder.Entity<DailyReflection>(e =>
+        {
+            e.HasIndex(r => new { r.UserId, r.Date }).IsUnique();
         });
     }
 }

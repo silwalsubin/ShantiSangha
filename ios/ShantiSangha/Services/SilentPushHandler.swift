@@ -17,6 +17,9 @@ enum SilentPushHandler {
         switch type {
         case "mantra":
             await refreshMantra(api: api, dateStr: dateStr)
+        case "reflection":
+            // Reflection generated — HomeView will pick it up via notification
+            break
         case "voice":
             // Voice transcription completed — no widget data to update,
             // but reload timelines in case we add voice data to widget later

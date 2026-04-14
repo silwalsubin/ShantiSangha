@@ -1,10 +1,10 @@
 namespace ShantiSangha.Wellness.Models;
 
-public class MoodCheckin
+public class DailyReflection
 {
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
-    public int Score { get; set; } // 1-10
-    public string? Notes { get; set; }
+    public DateOnly Date { get; set; }
+    public string Content { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
 }

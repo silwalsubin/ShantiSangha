@@ -20,7 +20,6 @@ public class ChatService(
     IInsightQueryService insightQuery,
     ISummaryQueryService summaryQuery,
     IGoalQueryService goalQuery,
-    IMoodQueryService moodQuery,
     IProfileQueryService profileQuery,
     IEventBus eventBus,
     ILogger<ChatService> logger) : IChatService
@@ -146,7 +145,6 @@ public class ChatService(
         string? displayName = null;
         IReadOnlyList<string> summaries = [];
         IReadOnlyList<string> journalSummaries = [];
-        MoodSummaryDto? moodSummary = null;
         IReadOnlyList<GoalSummaryDto> goalDtos = [];
         IReadOnlyList<string> insights = [];
 
@@ -155,15 +153,13 @@ public class ChatService(
             var displayNameTask = profileQuery.GetDisplayNameAsync(userId, cancellationToken);
             var summariesTask = summaryQuery.GetRecentSummariesAsync(userId, SummaryCount, cancellationToken);
             var journalSummariesTask = summaryQuery.GetRecentJournalSummariesAsync(userId, SummaryCount, cancellationToken);
-            var moodTask = moodQuery.GetRecentMoodSummaryAsync(userId, 7, cancellationToken);
             var goalsTask = goalQuery.GetActiveGoalsForContextAsync(userId, ct: cancellationToken);
 
-            await Task.WhenAll(displayNameTask, summariesTask, journalSummariesTask, moodTask, goalsTask);
+            await Task.WhenAll(displayNameTask, summariesTask, journalSummariesTask, goalsTask);
 
             displayName = displayNameTask.Result;
             summaries = summariesTask.Result;
             journalSummaries = journalSummariesTask.Result;
-            moodSummary = moodTask.Result;
             goalDtos = goalsTask.Result;
         }
         catch (Exception ex)
@@ -190,10 +186,6 @@ public class ChatService(
             logger.LogWarning(ex, "Failed to load insights for conversation {ConversationId} — continuing without insights", conversationId);
         }
 
-        string? moodSummaryText = moodSummary is not null
-            ? $"Over the past week their mood scores averaged {moodSummary.AverageScore:F1}/10."
-            : null;
-
         var goalContexts = goalDtos.Select(g => new GoalContext(
             Title: g.Title,
             Type: g.Type,
@@ -206,7 +198,6 @@ public class ChatService(
 
         var systemPrompt = SystemPrompt.WithContext(
             displayName: displayName,
-            recentMoodSummary: moodSummaryText,
             savedInsights: insights,
             conversationSummaries: summaries,
             journalSummaries: journalSummaries,

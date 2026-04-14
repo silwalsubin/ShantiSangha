@@ -9,6 +9,7 @@ struct HomeView: View {
     @State private var showRecurringSummary = false
     @State private var showMilestoneSummary = false
     @State private var mantra: String?
+    @State private var reflection: String?
     @State private var showFAB = true
 
     var body: some View {
@@ -31,6 +32,12 @@ struct HomeView: View {
                     Text(timeGreeting)
                         .font(.sacredTitle)
                         .foregroundColor(.sacredText)
+
+                    // Daily reflection
+                    if let reflection {
+                        ReflectionCardView(content: reflection)
+                            .padding(.top, 16)
+                    }
 
                     // Evening nudge
                     if shouldShowNudge {
@@ -96,13 +103,19 @@ struct HomeView: View {
             }
             .task {
                 await vm.load()
-                await loadMantra()
+                async let mantraTask: () = loadMantra()
+                async let reflectionTask: () = loadReflection()
+                _ = await (mantraTask, reflectionTask)
                 updateWidgetData()
             }
             .onChange(of: vm.doneRecurring) { updateWidgetData() }
             .onChange(of: vm.doneMilestones) { updateWidgetData() }
-            .onReceive(NotificationCenter.default.publisher(for: .silentPushReceived)) { _ in
-                Task { await loadMantra() }
+            .onReceive(NotificationCenter.default.publisher(for: .silentPushReceived)) { notification in
+                let type = notification.userInfo?["type"] as? String
+                Task {
+                    if type == "mantra" { await loadMantra() }
+                    if type == "reflection" { await loadReflection() }
+                }
             }
             .onAppear { withAnimation(.easeOut(duration: 0.25)) { showFAB = true } }
             .onDisappear { showFAB = false }
@@ -298,6 +311,30 @@ struct HomeView: View {
         } catch {}
     }
 
+    // MARK: - Reflection
+
+    private func loadReflection() async {
+        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+        let dateStr = df.string(from: Date())
+        do {
+            let response: DailyReflectionResponse = try await ApiService.shared.get("/reflection/today?date=\(dateStr)")
+            if let content = response.content, !content.isEmpty {
+                reflection = content
+                return
+            }
+
+            // Generation triggered — poll for result
+            for _ in 1...5 {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                let retry: DailyReflectionResponse = try await ApiService.shared.get("/reflection/today?date=\(dateStr)")
+                if let content = retry.content, !content.isEmpty {
+                    reflection = content
+                    return
+                }
+            }
+        } catch {}
+    }
+
     // MARK: - Time greeting
 
     private var timeGreeting: String {
@@ -314,3 +351,8 @@ struct HomeView: View {
 private struct MantraResponse: Decodable {
     let content: String?
 }
+
+private struct DailyReflectionResponse: Decodable {
+    let content: String?
+}
+

@@ -26,11 +26,10 @@ public static class DependencyInjection
             return new StorageService(voiceBucketName, region, logger);
         });
 
-        services.AddScoped<IMoodService, MoodService>();
         services.AddScoped<ICopingService, CopingService>();
         services.AddScoped<IVoiceService, VoiceService>();
-        services.AddScoped<IMoodQueryService, MoodQueryService>();
         services.AddScoped<GenerateDailyMantraJob>();
+        services.AddScoped<GenerateDailyReflectionJob>();
 
         return services;
     }

@@ -82,7 +82,6 @@ public static class SystemPrompt
 
     public static string WithContext(
         string? displayName,
-        string? recentMoodSummary,
         IEnumerable<string>? savedInsights,
         IEnumerable<string>? conversationSummaries,
         IEnumerable<string>? journalSummaries = null,
@@ -95,15 +94,6 @@ public static class SystemPrompt
                 ## About this person
                 Their name is {displayName}. Use it naturally in conversation when it feels
                 right — not in every response.
-                """);
-
-        if (recentMoodSummary is not null)
-            parts.Add($"""
-                ## How they have been feeling recently
-                {recentMoodSummary}
-                Use this context to be more attuned to their emotional state. Do not mention
-                the mood scores directly — instead, let this inform the gentleness or energy
-                of your response.
                 """);
 
         var insights = savedInsights?.ToList();
