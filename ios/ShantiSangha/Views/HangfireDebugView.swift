@@ -11,6 +11,7 @@ struct HangfireDebugView: View {
     @State private var processing: [JobEntry] = []
     @State private var queues: [QueueEntry] = []
     @State private var triggeringMantra = false
+    @State private var triggeringReflection = false
     @State private var triggerResult: String?
 
     private let api = ApiService.shared
@@ -206,6 +207,23 @@ struct HangfireDebugView: View {
             }
             .disabled(triggeringMantra)
 
+            Button {
+                Task { await triggerReflectionJob() }
+            } label: {
+                HStack {
+                    Image(systemName: "eye")
+                        .font(.sacredSmall)
+                    Text("Trigger Reflection Generation")
+                        .font(.sacredSmallMedium)
+                    Spacer()
+                    if triggeringReflection {
+                        ProgressView().tint(.sacredGold)
+                    }
+                }
+                .foregroundColor(.sacredGold)
+            }
+            .disabled(triggeringReflection)
+
             if let result = triggerResult {
                 Text(result)
                     .font(.system(size: 10, design: .serif))
@@ -289,13 +307,26 @@ struct HangfireDebugView: View {
         do {
             let result: TriggerResult = try await api.post("/debug/hangfire/test-mantra")
             triggerResult = "Triggered \(result.triggered)"
-            // Refresh stats after a short delay
             try? await Task.sleep(nanoseconds: 2_000_000_000)
             await fetchStatus()
         } catch {
             triggerResult = "Error: \(error.localizedDescription)"
         }
         triggeringMantra = false
+    }
+
+    private func triggerReflectionJob() async {
+        triggeringReflection = true
+        triggerResult = nil
+        do {
+            let result: TriggerResult = try await api.post("/debug/hangfire/test-reflection")
+            triggerResult = "Triggered \(result.triggered)"
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            await fetchStatus()
+        } catch {
+            triggerResult = "Error: \(error.localizedDescription)"
+        }
+        triggeringReflection = false
     }
 
 }

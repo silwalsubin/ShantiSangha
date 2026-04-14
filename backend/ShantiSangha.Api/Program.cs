@@ -364,6 +364,28 @@ try
         return Results.Ok(new { triggered = "GenerateDailyMantraJob", userId, deleted = existing.Count });
     }).RequireAuthorization();
 
+    // Debug: Force-regenerate reflection (deletes today's reflection, then enqueues job)
+    app.MapPost("/api/debug/hangfire/test-reflection", async (HttpContext ctx, IBackgroundJobClient jobs) =>
+    {
+        var currentUser = ctx.RequestServices.GetRequiredService<ShantiSangha.Shared.Interfaces.ICurrentUser>();
+        var user = await currentUser.GetAsync();
+        var userId = user!.Id;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var wellnessDb = ctx.RequestServices.GetRequiredService<ShantiSangha.Wellness.Data.WellnessDbContext>();
+        var existing = await wellnessDb.DailyReflections
+            .Where(r => r.UserId == userId && r.Date == today)
+            .ToListAsync();
+        if (existing.Count > 0)
+        {
+            wellnessDb.DailyReflections.RemoveRange(existing);
+            await wellnessDb.SaveChangesAsync();
+        }
+
+        jobs.Enqueue<ShantiSangha.Wellness.Jobs.GenerateDailyReflectionJob>(j => j.RunAsync(userId, (DateOnly?)null));
+        return Results.Ok(new { triggered = "GenerateDailyReflectionJob", userId, deleted = existing.Count });
+    }).RequireAuthorization();
+
     // Health check at root (no /api prefix)
     app.MapGet("/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
         .AllowAnonymous();
