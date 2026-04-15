@@ -84,14 +84,7 @@ public class GenerateDailyReflectionJob(
             }
             else
             {
-                // Check if they have a mantra history as proxy for app usage
-                var lastMantra = await db.DailyMantras
-                    .Where(m => m.UserId == userId)
-                    .OrderByDescending(m => m.Date)
-                    .FirstOrDefaultAsync();
-
-                if (lastMantra is null)
-                    contextParts.Add("This is their first day using the app.");
+                contextParts.Add("This is their first day using the app.");
             }
 
             if (previousReflections.Count > 0)

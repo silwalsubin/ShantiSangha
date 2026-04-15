@@ -9,11 +9,11 @@ enum WidgetData {
         UserDefaults(suiteName: appGroupId)
     }
 
-    // MARK: - Mantra
+    // MARK: - Reflection
 
-    static var mantra: String? {
-        get { defaults?.string(forKey: "widget.mantra") }
-        set { defaults?.set(newValue, forKey: "widget.mantra") }
+    static var reflection: String? {
+        get { defaults?.string(forKey: "widget.reflection") }
+        set { defaults?.set(newValue, forKey: "widget.reflection") }
     }
 
     // MARK: - Practices
@@ -56,14 +56,14 @@ enum WidgetData {
 
     /// Call from the main app whenever data changes to keep widget fresh
     static func update(
-        mantra: String?,
+        reflection: String?,
         practicesDone: Int,
         practicesTotal: Int,
         goalsOverdue: Int,
         goalsDueToday: Int,
         userName: String?
     ) {
-        self.mantra = mantra
+        self.reflection = reflection
         self.practicesDone = practicesDone
         self.practicesTotal = practicesTotal
         self.goalsOverdue = goalsOverdue

@@ -15,11 +15,8 @@ enum SilentPushHandler {
         let dateStr = formatDate(Date())
 
         switch type {
-        case "mantra":
-            await refreshMantra(api: api, dateStr: dateStr)
         case "reflection":
-            // Reflection generated — HomeView will pick it up via notification
-            break
+            await refreshReflection(api: api, dateStr: dateStr)
         case "voice":
             // Voice transcription completed — no widget data to update,
             // but reload timelines in case we add voice data to widget later
@@ -38,7 +35,7 @@ enum SilentPushHandler {
         // the widget runs in a separate process and needs to see the updated values
         UserDefaults(suiteName: WidgetData.appGroupId)?.synchronize()
 
-        WidgetCenter.shared.reloadTimelines(ofKind: "ShantiSanghaMantra")
+        WidgetCenter.shared.reloadTimelines(ofKind: "ShantiSanghaReflection")
         WidgetCenter.shared.reloadTimelines(ofKind: "ShantiSanghaDashboard")
 
         // Notify in-app views to refresh
@@ -49,17 +46,17 @@ enum SilentPushHandler {
         await AppLogger.shared.info("Push", "Widget timelines reloaded after silent push")
     }
 
-    private static func refreshMantra(api: ApiService, dateStr: String) async {
+    private static func refreshReflection(api: ApiService, dateStr: String) async {
         do {
-            let response: MantraResponse = try await api.get("/mantra/today?date=\(dateStr)")
+            let response: DailyReflectionResponse = try await api.get("/reflection/today?date=\(dateStr)")
             if let content = response.content, !content.isEmpty {
-                WidgetData.mantra = content
-                await AppLogger.shared.info("Push", "Mantra updated: \(content.prefix(40))...")
+                WidgetData.reflection = content
+                await AppLogger.shared.info("Push", "Reflection updated: \(content.prefix(40))...")
             } else {
-                await AppLogger.shared.info("Push", "Mantra response empty, keeping existing")
+                await AppLogger.shared.info("Push", "Reflection response empty, keeping existing")
             }
         } catch {
-            await AppLogger.shared.error("Push", "Failed to refresh mantra: \(error.localizedDescription)")
+            await AppLogger.shared.error("Push", "Failed to refresh reflection: \(error.localizedDescription)")
         }
     }
 
@@ -95,7 +92,6 @@ enum SilentPushHandler {
     }
 }
 
-// Reuse the same response type from HomeView
-private struct MantraResponse: Decodable {
+private struct DailyReflectionResponse: Decodable {
     let content: String?
 }

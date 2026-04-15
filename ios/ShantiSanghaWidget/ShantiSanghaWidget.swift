@@ -5,7 +5,7 @@ import SwiftUI
 
 struct ShantiSanghaEntry: TimelineEntry {
     let date: Date
-    let mantra: String?
+    let reflection: String?
     let practicesDone: Int
     let practicesTotal: Int
     let goalsOverdue: Int
@@ -20,7 +20,7 @@ struct ShantiSanghaProvider: TimelineProvider {
     func placeholder(in context: Context) -> ShantiSanghaEntry {
         ShantiSanghaEntry(
             date: Date(),
-            mantra: "The breath you take right now is the only one that matters.",
+            reflection: "Your practice has a rhythm now. The days you show up are the ones you shape.",
             practicesDone: 2, practicesTotal: 4,
             goalsOverdue: 0, goalsDueToday: 1,
             userName: nil
@@ -43,7 +43,7 @@ struct ShantiSanghaProvider: TimelineProvider {
     private func localEntry() -> ShantiSanghaEntry {
         ShantiSanghaEntry(
             date: Date(),
-            mantra: WidgetData.mantra,
+            reflection: WidgetData.reflection,
             practicesDone: WidgetData.practicesDone,
             practicesTotal: WidgetData.practicesTotal,
             goalsOverdue: WidgetData.goalsOverdue,
@@ -54,9 +54,9 @@ struct ShantiSanghaProvider: TimelineProvider {
 
 }
 
-// MARK: - Small Widget (Mantra only)
+// MARK: - Small Widget (Reflection only)
 
-struct MantraWidgetView: View {
+struct ReflectionWidgetView: View {
     let entry: ShantiSanghaEntry
 
     var body: some View {
@@ -67,13 +67,13 @@ struct MantraWidgetView: View {
 
             Spacer()
 
-            if let mantra = entry.mantra, !mantra.isEmpty {
-                Text(mantra)
-                    .font(.system(size: 13, weight: .regular, design: .serif))
+            if let reflection = entry.reflection, !reflection.isEmpty {
+                Text(reflection)
+                    .font(.system(size: 12, weight: .regular, design: .serif))
                     .italic()
                     .foregroundColor(sacredText)
-                    .lineLimit(4)
-                    .minimumScaleFactor(0.8)
+                    .lineLimit(6)
+                    .minimumScaleFactor(0.75)
             } else {
                 Text("Open the app to begin your practice.")
                     .font(.system(size: 13, weight: .regular, design: .serif))
@@ -85,7 +85,7 @@ struct MantraWidgetView: View {
     }
 }
 
-// MARK: - Medium Widget (Progress + Mantra)
+// MARK: - Medium Widget (Progress + Reflection)
 
 struct DashboardWidgetView: View {
     let entry: ShantiSanghaEntry
@@ -123,13 +123,13 @@ struct DashboardWidgetView: View {
                     .foregroundColor(sacredTextSecondary)
                 }
 
-                // Mantra — takes remaining space
-                if let mantra = entry.mantra, !mantra.isEmpty {
-                    Text(mantra)
-                        .font(.system(size: 13, weight: .regular, design: .serif))
+                // Reflection — takes remaining space
+                if let reflection = entry.reflection, !reflection.isEmpty {
+                    Text(reflection)
+                        .font(.system(size: 12, weight: .regular, design: .serif))
                         .italic()
                         .foregroundColor(sacredText)
-                        .minimumScaleFactor(0.75)
+                        .minimumScaleFactor(0.7)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -160,23 +160,23 @@ struct DashboardWidgetView: View {
 
 // MARK: - Widget Configuration
 
-struct ShantiSanghaMantraWidget: Widget {
-    let kind: String = "ShantiSanghaMantra"
+struct ShantiSanghaReflectionWidget: Widget {
+    let kind: String = "ShantiSanghaReflection"
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: ShantiSanghaProvider()) { entry in
             if #available(iOS 17.0, *) {
-                MantraWidgetView(entry: entry)
+                ReflectionWidgetView(entry: entry)
                     .containerBackground(for: .widget) {
                         sacredBg
                     }
             } else {
-                MantraWidgetView(entry: entry)
+                ReflectionWidgetView(entry: entry)
                     .background(sacredBg)
             }
         }
-        .configurationDisplayName("Daily Mantra")
-        .description("Your personal mantra for the day.")
+        .configurationDisplayName("Daily Reflection")
+        .description("A personal observation the app wrote for you today.")
         .supportedFamilies([.systemSmall])
     }
 }
@@ -197,7 +197,7 @@ struct ShantiSanghaDashboardWidget: Widget {
             }
         }
         .configurationDisplayName("Today's Practice")
-        .description("Your daily practice progress and mantra.")
+        .description("Your daily practice progress and reflection.")
         .supportedFamilies([.systemMedium])
     }
 }
@@ -207,7 +207,7 @@ struct ShantiSanghaDashboardWidget: Widget {
 @main
 struct ShantiSanghaWidgetBundle: WidgetBundle {
     var body: some Widget {
-        ShantiSanghaMantraWidget()
+        ShantiSanghaReflectionWidget()
         ShantiSanghaDashboardWidget()
     }
 }

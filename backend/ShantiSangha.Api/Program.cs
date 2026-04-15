@@ -341,31 +341,6 @@ try
         });
     }).RequireAuthorization();
 
-    // Debug: Force-regenerate mantra (deletes today's mantra, then enqueues job)
-    app.MapPost("/api/debug/hangfire/test-mantra", async (HttpContext ctx, IBackgroundJobClient jobs) =>
-    {
-        var currentUser = ctx.RequestServices.GetRequiredService<ShantiSangha.Shared.Interfaces.ICurrentUser>();
-        var user = await currentUser.GetAsync();
-        var userId = user!.Id;
-        // Cover both UTC and possible local dates (UTC-12 to UTC+14)
-        var utcToday = DateOnly.FromDateTime(DateTime.UtcNow);
-        var yesterday = utcToday.AddDays(-1);
-        var tomorrow = utcToday.AddDays(1);
-
-        var wellnessDb = ctx.RequestServices.GetRequiredService<ShantiSangha.Wellness.Data.WellnessDbContext>();
-        var existing = await wellnessDb.DailyMantras
-            .Where(m => m.UserId == userId && m.Date >= yesterday && m.Date <= tomorrow)
-            .ToListAsync();
-        if (existing.Count > 0)
-        {
-            wellnessDb.DailyMantras.RemoveRange(existing);
-            await wellnessDb.SaveChangesAsync();
-        }
-
-        jobs.Enqueue<ShantiSangha.Wellness.Jobs.GenerateDailyMantraJob>(j => j.RunAsync(userId, (DateOnly?)null));
-        return Results.Ok(new { triggered = "GenerateDailyMantraJob", userId, deleted = existing.Count });
-    }).RequireAuthorization();
-
     // Debug: Force-regenerate reflection (deletes today's reflection, then enqueues job)
     app.MapPost("/api/debug/hangfire/test-reflection", async (HttpContext ctx, IBackgroundJobClient jobs) =>
     {

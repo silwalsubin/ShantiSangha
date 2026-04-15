@@ -8,7 +8,6 @@ struct HomeView: View {
     @State private var showNewTask = false
     @State private var showRecurringSummary = false
     @State private var showMilestoneSummary = false
-    @State private var mantra: String?
     @State private var reflection: String?
     @State private var showFAB = true
 
@@ -16,18 +15,6 @@ struct HomeView: View {
         ZStack(alignment: .bottomTrailing) {
             ScrollView {
                 VStack(spacing: 0) {
-                    // Daily mantra
-                    if let mantra {
-                        Text(mantra)
-                            .font(.system(size: 16, weight: .regular, design: .serif))
-                            .italic()
-                            .foregroundColor(.sacredTextSecondary)
-                            .multilineTextAlignment(.center)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.horizontal, 24)
-                            .padding(.bottom, 8)
-                    }
-
                     // Greeting
                     Text(timeGreeting)
                         .font(.sacredTitle)
@@ -103,9 +90,7 @@ struct HomeView: View {
             }
             .task {
                 await vm.load()
-                async let mantraTask: () = loadMantra()
-                async let reflectionTask: () = loadReflection()
-                _ = await (mantraTask, reflectionTask)
+                await loadReflection()
                 updateWidgetData()
             }
             .onChange(of: vm.doneRecurring) { updateWidgetData() }
@@ -113,7 +98,6 @@ struct HomeView: View {
             .onReceive(NotificationCenter.default.publisher(for: .silentPushReceived)) { notification in
                 let type = notification.userInfo?["type"] as? String
                 Task {
-                    if type == "mantra" { await loadMantra() }
                     if type == "reflection" { await loadReflection() }
                 }
             }
@@ -276,39 +260,15 @@ struct HomeView: View {
     private func updateWidgetData() {
         let pending = vm.tasks.filter { $0.type == .oneTime && $0.completedAt == nil }
         WidgetData.update(
-            mantra: mantra,
+            reflection: reflection,
             practicesDone: vm.doneRecurring,
             practicesTotal: vm.totalRecurring,
             goalsOverdue: pending.filter { ($0.daysRemaining ?? 1) < 0 }.count,
             goalsDueToday: pending.filter { $0.daysRemaining == 0 }.count,
             userName: Auth.auth().currentUser?.displayName?.components(separatedBy: " ").first
         )
-        WidgetCenter.shared.reloadTimelines(ofKind: "ShantiSanghaMantra")
+        WidgetCenter.shared.reloadTimelines(ofKind: "ShantiSanghaReflection")
         WidgetCenter.shared.reloadTimelines(ofKind: "ShantiSanghaDashboard")
-    }
-
-    // MARK: - Mantra
-
-    private func loadMantra() async {
-        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
-        let dateStr = df.string(from: Date())
-        do {
-            let response: MantraResponse = try await ApiService.shared.get("/mantra/today?date=\(dateStr)")
-            if let content = response.content, !content.isEmpty {
-                mantra = content
-                return
-            }
-
-            // Generation triggered — poll for result
-            for _ in 1...5 {
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                let retry: MantraResponse = try await ApiService.shared.get("/mantra/today?date=\(dateStr)")
-                if let content = retry.content, !content.isEmpty {
-                    mantra = content
-                    return
-                }
-            }
-        } catch {}
     }
 
     // MARK: - Reflection
@@ -352,10 +312,6 @@ struct HomeView: View {
         if hour < 17 { return "Good afternoon\(name)" }
         return "Good evening\(name)"
     }
-}
-
-private struct MantraResponse: Decodable {
-    let content: String?
 }
 
 private struct DailyReflectionResponse: Decodable {

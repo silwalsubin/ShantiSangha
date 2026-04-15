@@ -28,7 +28,6 @@ public static class DependencyInjection
 
         services.AddScoped<ICopingService, CopingService>();
         services.AddScoped<IVoiceService, VoiceService>();
-        services.AddScoped<GenerateDailyMantraJob>();
         services.AddScoped<GenerateDailyReflectionJob>();
 
         return services;

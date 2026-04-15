@@ -10,7 +10,6 @@ struct HangfireDebugView: View {
     @State private var recentFailed: [FailedJobEntry] = []
     @State private var processing: [JobEntry] = []
     @State private var queues: [QueueEntry] = []
-    @State private var triggeringMantra = false
     @State private var triggeringReflection = false
     @State private var triggerResult: String?
 
@@ -191,23 +190,6 @@ struct HangfireDebugView: View {
     private var actionsCard: some View {
         card(title: "TEST ACTIONS") {
             Button {
-                Task { await triggerMantraJob() }
-            } label: {
-                HStack {
-                    Image(systemName: "sparkles")
-                        .font(.sacredSmall)
-                    Text("Trigger Mantra Generation")
-                        .font(.sacredSmallMedium)
-                    Spacer()
-                    if triggeringMantra {
-                        ProgressView().tint(.sacredGold)
-                    }
-                }
-                .foregroundColor(.sacredGold)
-            }
-            .disabled(triggeringMantra)
-
-            Button {
                 Task { await triggerReflectionJob() }
             } label: {
                 HStack {
@@ -299,20 +281,6 @@ struct HangfireDebugView: View {
             self.error = error.localizedDescription
         }
         loading = false
-    }
-
-    private func triggerMantraJob() async {
-        triggeringMantra = true
-        triggerResult = nil
-        do {
-            let result: TriggerResult = try await api.post("/debug/hangfire/test-mantra")
-            triggerResult = "Triggered \(result.triggered)"
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
-            await fetchStatus()
-        } catch {
-            triggerResult = "Error: \(error.localizedDescription)"
-        }
-        triggeringMantra = false
     }
 
     private func triggerReflectionJob() async {
