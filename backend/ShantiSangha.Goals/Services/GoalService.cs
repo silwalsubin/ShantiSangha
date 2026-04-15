@@ -501,6 +501,18 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
 
         var context = string.Join("\n", lines);
 
+        // Cache check — hash the input context so any data change invalidates
+        var inputHash = ComputeInputHash(context);
+        var cached = await db.JourneyReflections
+            .FirstOrDefaultAsync(r => r.UserId == userId
+                && r.FromDate == startDate
+                && r.ToDate == endDate, ct);
+
+        if (cached is not null && cached.InputHash == inputHash)
+        {
+            return new JourneyReflectionResponse(cached.Content);
+        }
+
         try
         {
             var chat = kernel.GetRequiredService<IChatCompletionService>();
@@ -513,12 +525,46 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
                 """);
             history.AddUserMessage(context);
             var result = await chat.GetChatMessageContentAsync(history, cancellationToken: ct);
-            return new JourneyReflectionResponse(result.Content?.Trim());
+            var content = result.Content?.Trim();
+
+            if (!string.IsNullOrWhiteSpace(content))
+            {
+                if (cached is not null)
+                {
+                    cached.Content = content;
+                    cached.InputHash = inputHash;
+                    cached.CreatedAt = DateTime.UtcNow;
+                }
+                else
+                {
+                    db.JourneyReflections.Add(new JourneyReflection
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = userId,
+                        FromDate = startDate,
+                        ToDate = endDate,
+                        Content = content,
+                        InputHash = inputHash,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+                await db.SaveChangesAsync(ct);
+            }
+
+            return new JourneyReflectionResponse(content);
         }
         catch
         {
-            return new JourneyReflectionResponse(null);
+            // Fall back to stale cache if generation failed
+            return new JourneyReflectionResponse(cached?.Content);
         }
+    }
+
+    private static string ComputeInputHash(string input)
+    {
+        var bytes = System.Text.Encoding.UTF8.GetBytes(input);
+        var hash = System.Security.Cryptography.SHA256.HashData(bytes);
+        return Convert.ToHexString(hash);
     }
 
     internal static (int CurrentStreak, int LongestStreak) ComputeStreaks(

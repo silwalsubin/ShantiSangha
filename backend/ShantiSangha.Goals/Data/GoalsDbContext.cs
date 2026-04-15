@@ -8,6 +8,7 @@ public class GoalsDbContext(DbContextOptions<GoalsDbContext> options) : DbContex
     public DbSet<Goal> Goals => Set<Goal>();
     public DbSet<GoalCheckIn> GoalCheckIns => Set<GoalCheckIn>();
     public DbSet<GoalActivity> GoalActivities => Set<GoalActivity>();
+    public DbSet<JourneyReflection> JourneyReflections => Set<JourneyReflection>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -28,6 +29,11 @@ public class GoalsDbContext(DbContextOptions<GoalsDbContext> options) : DbContex
         modelBuilder.Entity<GoalActivity>(e =>
         {
             e.HasIndex(a => new { a.GoalId, a.CreatedAt });
+        });
+
+        modelBuilder.Entity<JourneyReflection>(e =>
+        {
+            e.HasIndex(r => new { r.UserId, r.FromDate, r.ToDate }).IsUnique();
         });
     }
 }
