@@ -177,6 +177,10 @@ struct SettingsView: View {
             .padding(.horizontal, 16)
         }
         .background(Color.sacredBg.ignoresSafeArea())
+        .refreshable {
+            serverStatus = .loading
+            await fetchServerVersion()
+        }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .task { await fetchServerVersion() }
