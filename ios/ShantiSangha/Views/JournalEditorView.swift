@@ -113,9 +113,23 @@ struct JournalEditorView: View {
             await loadJournal()
         } else {
             // Create immediately — same pattern as conversations
-            await createJournal()
+            async let create: () = createJournal()
+            async let prompt: () = fetchPrompt()
+            _ = await (create, prompt)
         }
         loading = false
+    }
+
+    private func fetchPrompt() async {
+        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+        do {
+            let response: JournalPromptResponse = try await api.get("/journal/prompt?date=\(df.string(from: Date()))")
+            if let p = response.prompt, !p.isEmpty {
+                placeholder = p
+            }
+        } catch {
+            // Fall back to the static placeholder already set
+        }
     }
 
     // MARK: - Share
@@ -187,4 +201,8 @@ struct JournalDetailResponse: Decodable {
 struct UpdateJournalRequest: Encodable {
     let title: String?
     let content: String?
+}
+
+struct JournalPromptResponse: Decodable {
+    let prompt: String?
 }

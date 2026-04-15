@@ -7,6 +7,7 @@ public class WellnessDbContext(DbContextOptions<WellnessDbContext> options) : Db
 {
     public DbSet<VoiceEntry> VoiceEntries => Set<VoiceEntry>();
     public DbSet<DailyReflection> DailyReflections => Set<DailyReflection>();
+    public DbSet<DailyJournalPrompt> DailyJournalPrompts => Set<DailyJournalPrompt>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -18,6 +19,11 @@ public class WellnessDbContext(DbContextOptions<WellnessDbContext> options) : Db
         modelBuilder.Entity<DailyReflection>(e =>
         {
             e.HasIndex(r => new { r.UserId, r.Date }).IsUnique();
+        });
+
+        modelBuilder.Entity<DailyJournalPrompt>(e =>
+        {
+            e.HasIndex(p => new { p.UserId, p.Date }).IsUnique();
         });
     }
 }

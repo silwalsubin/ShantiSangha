@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useApi } from '@/composables/useApi'
 import SacredIcons from '@/components/icons/SacredIcons.vue'
@@ -11,6 +11,18 @@ const title = ref('')
 const content = ref('')
 const saving = ref(false)
 const error = ref('')
+const promptText = ref('What is on your mind? Write freely -- this is your private space.')
+
+onMounted(async () => {
+  try {
+    const today = new Date()
+    const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+    const res = await api.get<{ prompt: string | null }>(`/journal/prompt?date=${dateStr}`)
+    if (res.prompt) promptText.value = res.prompt
+  } catch {
+    // Fallback placeholder already set
+  }
+})
 
 async function save() {
   if (!content.value.trim()) {
@@ -75,7 +87,7 @@ async function save() {
           <label class="mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.2em] text-sacred-label">Your thoughts</label>
           <textarea
             v-model="content"
-            placeholder="What is on your mind? Write freely -- this is your private space."
+            :placeholder="promptText"
             rows="12"
             class="w-full resize-y rounded-2xl border border-sacred-border bg-sacred-bg-card px-4 py-3 text-sacred-text leading-relaxed placeholder-sacred-muted-light outline-none transition duration-200 focus:border-sacred-gold focus:ring-1 focus:ring-sacred-gold"
           />
