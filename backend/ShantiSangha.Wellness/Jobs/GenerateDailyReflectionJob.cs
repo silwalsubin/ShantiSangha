@@ -48,6 +48,8 @@ public class GenerateDailyReflectionJob(
                 contextParts.Add($"Their name is {displayName}.");
 
             // Goals with pattern data
+            var milestoneThresholds = new HashSet<int> { 7, 14, 30, 60, 100, 365 };
+            var milestonesHitToday = new List<string>();
             foreach (var g in goals)
             {
                 var streak = g.CurrentStreak > 0 ? $" (current streak: {g.CurrentStreak} days, longest: {g.LongestStreak})" : " (no active streak)";
@@ -59,7 +61,17 @@ public class GenerateDailyReflectionJob(
                     _ => ""
                 };
                 contextParts.Add($"- {g.Type} goal: {g.Title}{streak}{checkedIn}{why}");
+
+                // A milestone was crossed today if they checked in today and their
+                // streak landed on a threshold value.
+                if (g.CheckedInToday == true && milestoneThresholds.Contains(g.CurrentStreak))
+                {
+                    milestonesHitToday.Add($"{g.Title} reached {g.CurrentStreak} days today");
+                }
             }
+
+            if (milestonesHitToday.Count > 0)
+                contextParts.Add($"MILESTONE(S) HIT TODAY:\n{string.Join("\n", milestonesHitToday.Select(m => $"  - {m}"))}");
 
             if (summaries.Count > 0)
                 contextParts.Add($"Recent conversation themes:\n{string.Join("\n", summaries.Select(s => $"  - {s}"))}");
@@ -120,6 +132,12 @@ public class GenerateDailyReflectionJob(
                 - If they've been away, welcome them without guilt.
                 - If you notice a pattern in what they DO (they always meditate after
                   journaling, their streak grew after they wrote about why), NAME it.
+                - If a MILESTONE is noted in the context (a streak threshold crossed
+                  today — 7, 14, 30, 60, 100, or 365 days), acknowledge it simply.
+                  No gamification language. No "congrats" or "achievement." Observe
+                  what this number means about them, not the number itself. Example:
+                  "Thirty days of meditation. The practice has become a person, not
+                  a task."
                 - If there isn't enough positive data, say something honest and brief
                   about beginnings. "The first days are the quietest. But you're here."
                 - Do not repeat themes from their previous reflections (provided below).
