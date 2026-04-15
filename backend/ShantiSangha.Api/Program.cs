@@ -215,19 +215,26 @@ try
 
     }
 
-    // Recurring jobs — runs hourly, pre-generates daily reflections overnight
-    // in each user's local timezone so first-open is instant.
-    RecurringJob.AddOrUpdate<ShantiSangha.Wellness.Jobs.ScheduleDailyReflectionsJob>(
-        "pregenerate-daily-reflections",
-        job => job.RunAsync(),
-        "0 * * * *"); // every hour at minute 0
+    // Recurring jobs — use the DI-resolved manager since static JobStorage.Current
+    // may not be initialized at app startup with some Hangfire configurations.
+    using (var scope = app.Services.CreateScope())
+    {
+        var recurring = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
 
-    // Morning reflection push — runs hourly, sends today's reflection to each
-    // user's lock screen at their configured reminder hour (local time).
-    RecurringJob.AddOrUpdate<ShantiSangha.Wellness.Jobs.SendMorningReflectionPushJob>(
-        "morning-reflection-push",
-        job => job.RunAsync(),
-        "0 * * * *"); // every hour at minute 0
+        // Runs hourly; pre-generates daily reflections overnight in each user's
+        // local timezone so first-open is instant.
+        recurring.AddOrUpdate<ShantiSangha.Wellness.Jobs.ScheduleDailyReflectionsJob>(
+            "pregenerate-daily-reflections",
+            job => job.RunAsync(),
+            "0 * * * *");
+
+        // Runs hourly; sends today's reflection to each user's lock screen at
+        // their configured reminder hour (local time).
+        recurring.AddOrUpdate<ShantiSangha.Wellness.Jobs.SendMorningReflectionPushJob>(
+            "morning-reflection-push",
+            job => job.RunAsync(),
+            "0 * * * *");
+    }
 
     // Global error handler — returns full error details when EXPOSE_ERRORS=true
     if (appConfig.ExposeErrors)
