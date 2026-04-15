@@ -102,6 +102,12 @@ public class JournalService(JournalDbContext db, IEventBus eventBus) : IJournalS
         db.Journals.Add(journal);
         await db.SaveChangesAsync(ct);
 
+        // Draft event links the voice entry to its auto-created journal (for UI ownership).
         await eventBus.PublishAsync(new JournalDraftCreatedEvent(e.VoiceEntryId, journal.Id), ct);
+
+        // Created event triggers the same AI pipeline as user-written journals:
+        // summary generation, insight extraction, and embeddings. Without this,
+        // voice notes are invisible to chat context and the Journey insights feed.
+        await eventBus.PublishAsync(new JournalCreatedEvent(journal.Id, e.UserId), ct);
     }
 }
