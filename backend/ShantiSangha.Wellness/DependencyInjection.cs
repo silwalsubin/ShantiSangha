@@ -26,7 +26,6 @@ public static class DependencyInjection
             return new StorageService(voiceBucketName, region, logger);
         });
 
-        services.AddScoped<ICopingService, CopingService>();
         services.AddScoped<IVoiceService, VoiceService>();
         services.AddScoped<GenerateDailyReflectionJob>();
 

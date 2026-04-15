@@ -5,7 +5,6 @@ namespace ShantiSangha.Wellness.Data;
 
 public class WellnessDbContext(DbContextOptions<WellnessDbContext> options) : DbContext(options)
 {
-    public DbSet<CopingSession> CopingSessions => Set<CopingSession>();
     public DbSet<VoiceEntry> VoiceEntries => Set<VoiceEntry>();
     public DbSet<DailyReflection> DailyReflections => Set<DailyReflection>();
 
