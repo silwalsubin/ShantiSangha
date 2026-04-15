@@ -82,6 +82,7 @@ public static class SystemPrompt
 
     public static string WithContext(
         string? displayName,
+        string? todaysReflection,
         IEnumerable<string>? savedInsights,
         IEnumerable<string>? conversationSummaries,
         IEnumerable<string>? journalSummaries = null,
@@ -94,6 +95,19 @@ public static class SystemPrompt
                 ## About this person
                 Their name is {displayName}. Use it naturally in conversation when it feels
                 right — not in every response.
+                """);
+
+        if (!string.IsNullOrWhiteSpace(todaysReflection))
+            parts.Add($"""
+                ## The reflection shown to them on Home today
+                When this person opened the app today, they read this reflection written for them:
+
+                "{todaysReflection}"
+
+                This is the AI-generated observation they saw first. They may reference it
+                ("what you said about X", "that pattern you mentioned"). Be ready to discuss
+                it. You can build on it, but do not simply repeat it — they already read it.
+                If they don't bring it up, don't force it in.
                 """);
 
         var insights = savedInsights?.ToList();

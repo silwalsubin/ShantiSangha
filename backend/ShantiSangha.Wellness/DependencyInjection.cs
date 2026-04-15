@@ -27,6 +27,7 @@ public static class DependencyInjection
         });
 
         services.AddScoped<IVoiceService, VoiceService>();
+        services.AddScoped<IReflectionQueryService, ReflectionQueryService>();
         services.AddScoped<GenerateDailyReflectionJob>();
 
         return services;

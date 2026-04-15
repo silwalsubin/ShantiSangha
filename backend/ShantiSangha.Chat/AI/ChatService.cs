@@ -20,6 +20,7 @@ public class ChatService(
     IInsightQueryService insightQuery,
     ISummaryQueryService summaryQuery,
     IGoalQueryService goalQuery,
+    IReflectionQueryService reflectionQuery,
     IProfileQueryService profileQuery,
     IEventBus eventBus,
     ILogger<ChatService> logger) : IChatService
@@ -143,6 +144,7 @@ public class ChatService(
         // Load all context in parallel — each task is fault-tolerant so a single
         // failure (e.g. embedding search) doesn't kill the entire conversation.
         string? displayName = null;
+        string? todaysReflection = null;
         IReadOnlyList<string> summaries = [];
         IReadOnlyList<string> journalSummaries = [];
         IReadOnlyList<GoalSummaryDto> goalDtos = [];
@@ -154,13 +156,15 @@ public class ChatService(
             var summariesTask = summaryQuery.GetRecentSummariesAsync(userId, SummaryCount, cancellationToken);
             var journalSummariesTask = summaryQuery.GetRecentJournalSummariesAsync(userId, SummaryCount, cancellationToken);
             var goalsTask = goalQuery.GetActiveGoalsForContextAsync(userId, ct: cancellationToken);
+            var reflectionTask = reflectionQuery.GetRecentReflectionAsync(userId, cancellationToken);
 
-            await Task.WhenAll(displayNameTask, summariesTask, journalSummariesTask, goalsTask);
+            await Task.WhenAll(displayNameTask, summariesTask, journalSummariesTask, goalsTask, reflectionTask);
 
             displayName = displayNameTask.Result;
             summaries = summariesTask.Result;
             journalSummaries = journalSummariesTask.Result;
             goalDtos = goalsTask.Result;
+            todaysReflection = reflectionTask.Result;
         }
         catch (Exception ex)
         {
@@ -198,6 +202,7 @@ public class ChatService(
 
         var systemPrompt = SystemPrompt.WithContext(
             displayName: displayName,
+            todaysReflection: todaysReflection,
             savedInsights: insights,
             conversationSummaries: summaries,
             journalSummaries: journalSummaries,
