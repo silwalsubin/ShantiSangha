@@ -137,7 +137,7 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
             return new OneTimeGoalDetailResponse(
                 goal.Id, goal.Title, goal.Type.ToString(), goal.TargetDate,
                 goal.DeeperWhy, goal.Progress, goal.CompletedAt, goal.CreatedAt,
-                daysRemaining, noteCount, goal.AiNudge);
+                daysRemaining, noteCount);
         }
         else
         {
@@ -145,7 +145,7 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
             return new RecurringGoalDetailResponse(
                 goal.Id, goal.Title, goal.Type.ToString(), goal.Frequency?.ToString(),
                 goal.FrequencyTarget, goal.DeeperWhy, goal.CreatedAt,
-                current, longest, goal.AiNudge);
+                current, longest);
         }
     }
 
@@ -333,8 +333,6 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
             ? parsed
             : DateOnly.FromDateTime(DateTime.UtcNow);
         goal.CreatedAt = today.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        goal.AiNudge = null;
-        goal.AiNudgeAt = null;
 
         LogActivity(id, "Created", "History reset");
         await db.SaveChangesAsync(ct);
@@ -389,88 +387,6 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
         }
 
         return activities;
-    }
-
-    public async Task<NudgeResult?> GetNudgeAsync(
-        Guid id, Guid userId, string? date = null, CancellationToken ct = default)
-    {
-        var goal = await db.Goals
-            .Include(g => g.CheckIns)
-            .Include(g => g.Activities.OrderByDescending(a => a.CreatedAt).Take(10))
-            .FirstOrDefaultAsync(g => g.Id == id && g.UserId == userId, ct);
-
-        if (goal is null) return null;
-
-        if (goal.AiNudge is not null && goal.AiNudgeAt.HasValue
-            && DateTime.UtcNow - goal.AiNudgeAt.Value < TimeSpan.FromHours(12))
-        {
-            return new NudgeResult(goal.AiNudge);
-        }
-
-        var today = date is not null && DateOnly.TryParse(date, out var parsedDate)
-            ? parsedDate
-            : DateOnly.FromDateTime(DateTime.UtcNow);
-        var daysSinceCreation = today.DayNumber - DateOnly.FromDateTime(goal.CreatedAt).DayNumber;
-        var recentActivity = goal.Activities
-            .OrderByDescending(a => a.CreatedAt)
-            .Take(10)
-            .Select(a => $"- {a.Action}{(a.Detail != null ? $": {a.Detail}" : "")} ({a.CreatedAt:MMM d})")
-            .ToList();
-
-        var context = $"""
-            Task: "{goal.Title}"
-            Type: {(goal.Type == GoalType.Recurring ? "Daily practice" : "Commitment with due date")}
-            Created: {daysSinceCreation} days ago
-            """;
-
-        if (goal.Type == GoalType.Recurring)
-        {
-            var (current, longest) = ComputeStreaks(goal.CheckIns, today);
-            context += $"\nCurrent streak: {current} days\nLongest streak: {longest} days";
-        }
-        else
-        {
-            if (goal.TargetDate.HasValue)
-            {
-                var daysLeft = goal.TargetDate.Value.DayNumber - today.DayNumber;
-                context += $"\nDue: {(daysLeft < 0 ? $"{Math.Abs(daysLeft)} days overdue" : daysLeft == 0 ? "Today" : $"in {daysLeft} days")}";
-            }
-            context += $"\nProgress: {goal.Progress}%";
-            if (goal.CompletedAt.HasValue) context += "\nStatus: Completed";
-        }
-
-        if (goal.DeeperWhy is not null)
-            context += $"\nDeeper why: \"{goal.DeeperWhy}\"";
-
-        if (recentActivity.Count > 0)
-            context += $"\n\nRecent activity:\n{string.Join("\n", recentActivity)}";
-
-        try
-        {
-            var chat = kernel.GetRequiredService<IChatCompletionService>();
-            var history = new ChatHistory("""
-                You are a gentle spiritual companion. Given a user's task and its history,
-                write ONE short encouraging sentence (under 20 words). Be warm, specific to
-                their situation, and never generic. Reference their actual progress or patterns.
-                No quotes, no emojis, no exclamation marks. Speak as a wise friend.
-                """);
-            history.AddUserMessage(context);
-            var result = await chat.GetChatMessageContentAsync(history, cancellationToken: ct);
-            var nudge = result.Content?.Trim();
-
-            if (!string.IsNullOrEmpty(nudge))
-            {
-                goal.AiNudge = nudge;
-                goal.AiNudgeAt = DateTime.UtcNow;
-                await db.SaveChangesAsync(ct);
-            }
-
-            return new NudgeResult(nudge);
-        }
-        catch
-        {
-            return new NudgeResult(goal.AiNudge);
-        }
     }
 
     public async Task<JourneyResponse> GetJourneyAsync(

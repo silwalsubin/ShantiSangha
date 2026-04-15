@@ -96,7 +96,6 @@ struct Goal: Codable, Identifiable {
     let progress: Int?
     let noteCount: Int?
     let createdAt: String
-    let aiNudge: String?
 }
 
 struct GoalCheckIn: Codable, Identifiable {
@@ -112,10 +111,6 @@ struct CheckIn: Codable, Identifiable {
     let completed: Bool
     let note: String?
     let createdAt: String
-}
-
-struct NudgeResponse: Codable {
-    let nudge: String?
 }
 
 struct GoalActivityItem: Codable, Identifiable {

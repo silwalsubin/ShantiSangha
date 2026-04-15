@@ -66,8 +66,7 @@ public record RecurringGoalDetailResponse(
     string? DeeperWhy,
     DateTime CreatedAt,
     int CurrentStreak,
-    int LongestStreak,
-    string? AiNudge);
+    int LongestStreak);
 
 public record OneTimeGoalDetailResponse(
     Guid Id,
@@ -79,8 +78,7 @@ public record OneTimeGoalDetailResponse(
     DateTime? CompletedAt,
     DateTime CreatedAt,
     int? DaysRemaining,
-    int NoteCount,
-    string? AiNudge);
+    int NoteCount);
 
 public record TodayGoalResponse(
     Guid Id,
@@ -96,8 +94,6 @@ public record CheckInResult(Guid Id, DateOnly Date, bool Completed, string? Note
 public record CheckInListItem(Guid Id, string Date, bool Completed, string? Note);
 
 public record GoalActivityResponse(Guid Id, string Action, string? Detail, DateTime CreatedAt);
-
-public record NudgeResult(string? Nudge);
 
 public record JourneyPractice(
     Guid Id,

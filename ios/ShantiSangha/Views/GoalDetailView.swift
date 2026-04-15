@@ -13,7 +13,6 @@ struct GoalDetailView: View {
     @State private var whyText = ""
     @State private var showTitleEditor = false
     @State private var titleText = ""
-    @State private var nudge: String?
     @State private var showProgress = false
     @State private var progressValue: Double = 0
     @State private var navigateToDueDate = false
@@ -87,18 +86,6 @@ struct GoalDetailView: View {
                             }
                             .buttonStyle(.plain)
                         }
-                    }
-
-                    // AI nudge
-                    if let nudge = nudge {
-                        Text(nudge)
-                            .font(.sacredBody)
-                            .italic()
-                            .foregroundColor(.sacredText)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(16)
-                            .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredGold.opacity(0.06)))
-                            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredGold.opacity(0.12)))
                     }
 
                     // Deeper Why
@@ -349,24 +336,10 @@ struct GoalDetailView: View {
         do {
             let g: Goal = try await api.get(goalPathWithDate)
             goal = g
-            nudge = g.aiNudge
         } catch {
             print("Failed to load goal: \(error)")
         }
         loading = false
-
-        // Fetch fresh nudge in background
-        Task {
-            do {
-                let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
-                let result: NudgeResponse = try await api.get("/goals/\(goalId)/nudge?date=\(df.string(from: Date()))")
-                if let fresh = result.nudge {
-                    withAnimation(.easeIn(duration: 0.3)) { nudge = fresh }
-                }
-            } catch {
-                print("Failed to load nudge: \(error)")
-            }
-        }
     }
 
     private func markComplete() async {
