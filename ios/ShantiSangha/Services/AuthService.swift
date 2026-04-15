@@ -91,10 +91,22 @@ class AuthService: ObservableObject {
 
     private func syncTimezone() async {
         let tz = TimeZone.current.identifier
-        let body: [String: Any] = ["timezone": tz]
+        var body: [String: Any] = ["timezone": tz]
+
+        // Also sync the reminder hour on first login so server-side morning
+        // pushes know when to fire for this user.
+        let notif = await NotificationService.shared
+        let enabled = await notif.isEnabled
+        let hour = await notif.reminderHour
+        if enabled {
+            body["reminderHour"] = hour
+        } else {
+            body["clearReminderHour"] = true
+        }
+
         guard let data = try? JSONSerialization.data(withJSONObject: body) else { return }
         let _: TimezoneSyncResponse? = try? await ApiService.shared.patchRaw("/me", body: data)
-        await AppLogger.shared.info("Auth", "Timezone synced: \(tz)")
+        await AppLogger.shared.info("Auth", "Profile synced: tz=\(tz) reminderEnabled=\(enabled) hour=\(hour)")
     }
 }
 

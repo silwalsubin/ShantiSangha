@@ -70,6 +70,9 @@ namespace ShantiSangha.Identity.Migrations
                     b.Property<bool>("OnboardingCompleted")
                         .HasColumnType("boolean");
 
+                    b.Property<int?>("ReminderHour")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Timezone")
                         .HasColumnType("text");
 

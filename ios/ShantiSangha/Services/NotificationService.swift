@@ -8,15 +8,37 @@ class NotificationService: ObservableObject {
     static let shared = NotificationService()
 
     @Published var isEnabled: Bool = UserDefaults.standard.bool(forKey: "notificationsEnabled") {
-        didSet { UserDefaults.standard.set(isEnabled, forKey: "notificationsEnabled") }
+        didSet {
+            UserDefaults.standard.set(isEnabled, forKey: "notificationsEnabled")
+            Task { await syncReminderToServer() }
+        }
     }
 
-    @Published var reminderHour: Int = UserDefaults.standard.object(forKey: "reminderHour") as? Int ?? 20 {
-        didSet { UserDefaults.standard.set(reminderHour, forKey: "reminderHour") }
+    @Published var reminderHour: Int = UserDefaults.standard.object(forKey: "reminderHour") as? Int ?? 8 {
+        didSet {
+            UserDefaults.standard.set(reminderHour, forKey: "reminderHour")
+            Task { await syncReminderToServer() }
+        }
     }
 
     @Published var reminderMinute: Int = UserDefaults.standard.object(forKey: "reminderMinute") as? Int ?? 0 {
         didSet { UserDefaults.standard.set(reminderMinute, forKey: "reminderMinute") }
+    }
+
+    /// PATCH /me with reminderHour so the backend morning-push job knows when
+    /// to deliver today's reflection. When reminders are disabled, clears the
+    /// stored hour so the job skips this user.
+    private func syncReminderToServer() async {
+        let body: [String: Any]
+        if isEnabled {
+            body = ["reminderHour": reminderHour]
+        } else {
+            body = ["clearReminderHour": true]
+        }
+        guard let data = try? JSONSerialization.data(withJSONObject: body) else { return }
+        struct Empty: Decodable {}
+        let _: Empty? = try? await ApiService.shared.patchRaw("/me", body: data)
+        await AppLogger.shared.info("Notifications", "Reminder synced: enabled=\(isEnabled) hour=\(reminderHour)")
     }
 
     private let center = UNUserNotificationCenter.current()

@@ -20,4 +20,12 @@ public class ProfileQueryService(IdentityDbContext db) : IProfileQueryService
             .Select(p => new UserTimezoneInfo(p.UserId, p.Timezone))
             .ToListAsync(ct);
     }
+
+    public async Task<IReadOnlyList<UserReminderInfo>> GetUsersWithRemindersAsync(CancellationToken ct = default)
+    {
+        return await db.Profiles
+            .Where(p => p.ReminderHour != null)
+            .Select(p => new UserReminderInfo(p.UserId, p.Timezone, p.ReminderHour))
+            .ToListAsync(ct);
+    }
 }

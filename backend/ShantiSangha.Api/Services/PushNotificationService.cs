@@ -64,4 +64,62 @@ public class PushNotificationService(
             }
         }
     }
+
+    public async Task SendAlertPushAsync(Guid userId, string title, string body, Dictionary<string, string>? data = null, CancellationToken ct = default)
+    {
+        var tokens = await db.DeviceTokens
+            .Where(d => d.UserId == userId)
+            .Select(d => new { d.Id, d.Token })
+            .ToListAsync(ct);
+
+        if (tokens.Count == 0)
+        {
+            logger.LogDebug("No device tokens for user {UserId}, skipping alert push", userId);
+            return;
+        }
+
+        foreach (var device in tokens)
+        {
+            try
+            {
+                var message = new Message
+                {
+                    Token = device.Token,
+                    Notification = new Notification { Title = title, Body = body },
+                    Data = data ?? new Dictionary<string, string>(),
+                    Apns = new ApnsConfig
+                    {
+                        Headers = new Dictionary<string, string>
+                        {
+                            ["apns-push-type"] = "alert",
+                            ["apns-priority"] = "10"
+                        },
+                        Aps = new Aps
+                        {
+                            Alert = new ApsAlert { Title = title, Body = body },
+                            Sound = "default"
+                        }
+                    }
+                };
+
+                await FirebaseMessaging.DefaultInstance.SendAsync(message, ct);
+                logger.LogInformation("Alert push sent to user {UserId} device {DeviceId} type={Type}",
+                    userId, device.Id, data?.GetValueOrDefault("type") ?? "none");
+            }
+            catch (FirebaseMessagingException ex) when (ex.MessagingErrorCode == MessagingErrorCode.Unregistered)
+            {
+                logger.LogWarning("Removing stale device token {DeviceId} for user {UserId}", device.Id, userId);
+                var stale = await db.DeviceTokens.FindAsync([device.Id], ct);
+                if (stale is not null)
+                {
+                    db.DeviceTokens.Remove(stale);
+                    await db.SaveChangesAsync(ct);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to send alert push to device {DeviceId} for user {UserId}", device.Id, userId);
+            }
+        }
+    }
 }

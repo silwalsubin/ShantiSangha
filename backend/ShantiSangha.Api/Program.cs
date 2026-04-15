@@ -222,6 +222,13 @@ try
         job => job.RunAsync(),
         "0 * * * *"); // every hour at minute 0
 
+    // Morning reflection push — runs hourly, sends today's reflection to each
+    // user's lock screen at their configured reminder hour (local time).
+    RecurringJob.AddOrUpdate<ShantiSangha.Wellness.Jobs.SendMorningReflectionPushJob>(
+        "morning-reflection-push",
+        job => job.RunAsync(),
+        "0 * * * *"); // every hour at minute 0
+
     // Global error handler — returns full error details when EXPOSE_ERRORS=true
     if (appConfig.ExposeErrors)
     {
