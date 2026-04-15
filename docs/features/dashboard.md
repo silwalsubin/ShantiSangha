@@ -1,30 +1,27 @@
-# Dashboard
+# Home
 
 ## Purpose
-The daily landing page. Sets the tone for the user's practice and provides quick access to everything that matters today.
+The daily landing page. Sets the tone for the user's practice and surfaces the two things that matter today: the reflection and the practices.
 
 ## Value
 - First thing users see — determines if they engage or leave
-- Daily verse provides spiritual grounding and a reason to return
-- Quick actions reduce friction to start any practice
-- At-a-glance summaries show recent activity without navigating
+- The daily reflection gives them a reason to open the app (something they didn't ask for, written about them)
+- Practice progress circles show at-a-glance whether today's discipline is done
+- Quick check-in actions reduce friction
 
 ## How it works
 - Time-aware greeting (morning/afternoon/evening)
-- Daily scripture verse (currently hardcoded, planned: rotating)
-- Mood check-in card (disappears after today's check-in)
-- Mood trend summary with bar chart
-- Recent conversations list (last 3)
-- Recent journal entries (last 2)
-- Quick action buttons for new conversation and new journal
+- Daily reflection card below the greeting (see `docs/features/reflection.md`)
+- Progress circles for recurring practices and one-time goals
+- Check-in flow for each practice/goal
+- FAB for adding a new task
+- Evening nudge card appears after 6 PM if practices are still undone
 
 ## Key files
-- Frontend: `frontend/src/pages/app/dashboard.vue`
-- Data comes from: `/api/moods/trends`, `/api/conversations?limit=3`, `/api/journals?limit=2`
+- iOS: `ios/ShantiSangha/Views/HomeView.swift`
+- Frontend: `frontend/src/pages/app/home.vue`
 
-## Q2 improvements planned
-- "Today's practice" — personalized daily suggestion based on mood/history
-- Practice streak counter
-- Progress summary (meditation minutes, journal count, mood trend)
-- Quick actions: "How am I feeling?", "Start a reflection", "Breathe"
-- Rotating daily verses from Gita, Dhammapada, Upanishads
+## Data sources
+- `/api/reflection/today?date=YYYY-MM-DD` — today's AI reflection
+- `/api/goals/today?date=YYYY-MM-DD` — today's recurring practices
+- `/api/goals?date=YYYY-MM-DD` — all goals (for milestone circle)

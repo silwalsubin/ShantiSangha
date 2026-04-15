@@ -21,7 +21,7 @@ A spiritual practice should feel effortless — open the app, ground yourself, r
 
 ```
 Open app
-  → Home: ground yourself (verse, mood check-in, suggested practice)
+  → Home: ground yourself (daily reflection, check in on practices)
     → Reflect: process what you feel (talk, write, or speak)
       → Journey: see how you've grown (trends, insights, history)
         → Home: tomorrow, begin again

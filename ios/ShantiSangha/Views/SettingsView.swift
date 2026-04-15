@@ -179,7 +179,9 @@ struct SettingsView: View {
         .background(Color.sacredBg.ignoresSafeArea())
         .refreshable {
             serverStatus = .loading
-            await fetchServerVersion()
+            // Run in a detached task so the network request isn't cancelled
+            // when the pull-to-refresh gesture ends.
+            await Task { await fetchServerVersion() }.value
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
@@ -331,6 +333,10 @@ struct SettingsView: View {
         do {
             let version: ServerVersion = try await api.get("/version")
             serverStatus = .connected(version)
+        } catch is CancellationError {
+            // Task was cancelled (e.g. pull-to-refresh ended) — don't report as unreachable
+        } catch let error as URLError where error.code == .cancelled {
+            // URLSession cancellation — same reason, don't report as unreachable
         } catch {
             serverStatus = .unreachable(error.localizedDescription)
         }

@@ -123,7 +123,7 @@ Which of the 3 tabs does it live in? How many taps to reach it? Would a first-ti
 
 ### Step 5: Check for duplication
 
-Does this overlap with goals, chat, journal, or coping? If yes, enhance the existing feature instead.
+Does this overlap with goals, chat, journal, or reflection? If yes, enhance the existing feature instead.
 
 ### Step 6: Consider what you would REMOVE to add this
 
@@ -144,14 +144,13 @@ These are the approved features. Any addition must justify its existence against
 
 | Feature | Purpose | Tab |
 |---------|---------|-----|
-| Daily verse | Spiritual grounding on open | Home |
+| Daily reflection | AI-generated personal observation — the reason to return | Home |
 | Goals (recurring) | Build daily discipline through practices | Home |
 | Goals (one-time) | Track meaningful commitments | Home |
 | Check-ins | Daily accountability, visible streaks | Home |
 | AI companion (chat) | Reflect through conversation, get wisdom in context | Reflect |
 | Journal | Process feelings through writing | Reflect |
 | Voice notes | Reflect when writing feels too heavy | Reflect |
-| Coping exercises | Ground yourself in difficult moments | Home |
 | Journey view | See streaks, consistency, growth over time | Journey |
 | AI insights | Patterns extracted from reflections | Journey |
 | AI nudges | Gentle, context-aware encouragement on goals | Home |
