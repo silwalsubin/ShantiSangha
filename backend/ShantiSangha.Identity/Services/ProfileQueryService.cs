@@ -13,4 +13,11 @@ public class ProfileQueryService(IdentityDbContext db) : IProfileQueryService
             .Select(p => p.DisplayName)
             .FirstOrDefaultAsync(ct);
     }
+
+    public async Task<IReadOnlyList<UserTimezoneInfo>> GetAllUserTimezonesAsync(CancellationToken ct = default)
+    {
+        return await db.Profiles
+            .Select(p => new UserTimezoneInfo(p.UserId, p.Timezone))
+            .ToListAsync(ct);
+    }
 }

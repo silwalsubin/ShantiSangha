@@ -215,6 +215,13 @@ try
 
     }
 
+    // Recurring jobs — runs hourly, pre-generates daily reflections overnight
+    // in each user's local timezone so first-open is instant.
+    RecurringJob.AddOrUpdate<ShantiSangha.Wellness.Jobs.ScheduleDailyReflectionsJob>(
+        "pregenerate-daily-reflections",
+        job => job.RunAsync(),
+        "0 * * * *"); // every hour at minute 0
+
     // Global error handler — returns full error details when EXPOSE_ERRORS=true
     if (appConfig.ExposeErrors)
     {
