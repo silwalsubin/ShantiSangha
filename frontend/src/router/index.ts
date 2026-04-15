@@ -7,6 +7,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { auth } from '@/services/firebase'
 import { onAuthStateChanged } from 'firebase/auth'
+import { useApi } from '@/composables/useApi'
 
 function waitForAuth(): Promise<void> {
   return new Promise((resolve) => {
@@ -49,9 +50,23 @@ const router = createRouter({
   ],
 })
 
+let timezoneSynced = false
+
+async function syncTimezone() {
+  if (timezoneSynced) return
+  timezoneSynced = true
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    await useApi().patch<void>('/me', { timezone: tz })
+  } catch {
+    timezoneSynced = false
+  }
+}
+
 router.beforeEach(async (to) => {
   await waitForAuth()
   const isSignedIn = !!auth.currentUser
+  if (isSignedIn) void syncTimezone()
   if (to.meta.guestOnly && isSignedIn) return '/app/home'
   if (to.meta.requiresAuth && !isSignedIn) return '/login'
 })

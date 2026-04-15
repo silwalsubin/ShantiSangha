@@ -78,6 +78,8 @@ class AuthService: ObservableObject {
                 return token
             }
 
+            await syncTimezone()
+
             // Register FCM token with backend after API auth is ready (release only)
             #if !DEBUG
             if let fcmToken = Messaging.messaging().fcmToken {
@@ -86,4 +88,14 @@ class AuthService: ObservableObject {
             #endif
         }
     }
+
+    private func syncTimezone() async {
+        let tz = TimeZone.current.identifier
+        let body: [String: Any] = ["timezone": tz]
+        guard let data = try? JSONSerialization.data(withJSONObject: body) else { return }
+        let _: TimezoneSyncResponse? = try? await ApiService.shared.patchRaw("/me", body: data)
+        await AppLogger.shared.info("Auth", "Timezone synced: \(tz)")
+    }
 }
+
+private struct TimezoneSyncResponse: Decodable {}
