@@ -319,7 +319,9 @@ struct ReflectView: View {
             let all: [ConversationItem] = try await api.get("/conversations")
             conversations = all.filter { !$0.lastMessage.isEmpty }
         } catch {
-            AppLogger.shared.error("Reflect", "Failed to load conversations: \(error)")
+            if !error.isCancellation {
+                AppLogger.shared.error("Reflect", "Failed to load conversations: \(error)")
+            }
         }
     }
 
@@ -328,7 +330,9 @@ struct ReflectView: View {
             let items: [JournalItem] = try await api.get("/journals?page=1&pageSize=50")
             journals = items
         } catch {
-            AppLogger.shared.error("Reflect", "Failed to load journals: \(error)")
+            if !error.isCancellation {
+                AppLogger.shared.error("Reflect", "Failed to load journals: \(error)")
+            }
         }
     }
 
@@ -337,8 +341,9 @@ struct ReflectView: View {
             let items: [VoiceNoteItem] = try await api.get("/voice/entries?page=1&pageSize=50")
             voiceNotes = items
         } catch {
-            // Voice notes may not be available yet — fail silently
-            AppLogger.shared.error("Reflect", "Failed to load voice notes: \(error)")
+            if !error.isCancellation {
+                AppLogger.shared.error("Reflect", "Failed to load voice notes: \(error)")
+            }
         }
     }
 

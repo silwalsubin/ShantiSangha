@@ -218,7 +218,9 @@ struct ChatView: View {
                 displayTitle = t
             }
         } catch {
-            AppLogger.shared.error("Chat", "Failed to load messages: \(error)")
+            if !error.isCancellation {
+                AppLogger.shared.error("Chat", "Failed to load messages: \(error)")
+            }
         }
         loading = false
     }
@@ -283,12 +285,14 @@ struct ChatView: View {
                 }
             }
         } catch {
-            AppLogger.shared.error("Chat", "Stream error: \(error)")
-            if let idx = messages.firstIndex(where: { $0.id == assistantId }) {
-                if messages[idx].content.isEmpty {
-                    messages[idx].content = "Sorry, something went wrong. Please try again."
+            if !error.isCancellation {
+                AppLogger.shared.error("Chat", "Stream error: \(error)")
+                if let idx = messages.firstIndex(where: { $0.id == assistantId }) {
+                    if messages[idx].content.isEmpty {
+                        messages[idx].content = "Sorry, something went wrong. Please try again."
+                    }
+                    messages[idx].timestamp = Date()
                 }
-                messages[idx].timestamp = Date()
             }
         }
 

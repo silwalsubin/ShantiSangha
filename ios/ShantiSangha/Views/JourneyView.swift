@@ -193,7 +193,9 @@ struct JourneyView: View {
         do {
             journey = try await api.get("/goals/journey?from=\(from)&to=\(to)")
         } catch {
-            print("Failed to load journey: \(error)")
+            if !error.isCancellation {
+                AppLogger.shared.error("Journey", "Failed to load journey: \(error)")
+            }
         }
         loading = false
 
@@ -203,7 +205,9 @@ struct JourneyView: View {
             let result: ReflectionResponse = try await api.get("/goals/journey/reflection?from=\(from)&to=\(to)")
             withAnimation(.easeIn(duration: 0.3)) { reflection = result.reflection }
         } catch {
-            print("Failed to load reflection: \(error)")
+            if !error.isCancellation {
+                AppLogger.shared.error("Journey", "Failed to load reflection: \(error)")
+            }
         }
         reflectionLoading = false
     }

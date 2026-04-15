@@ -105,7 +105,9 @@ struct VoiceNoteDetailView: View {
         do {
             entry = try await api.get("/voice/entries/\(entryId)")
         } catch {
-            AppLogger.shared.error("VoiceDetail", "Failed to load entry: \(error)")
+            if !error.isCancellation {
+                AppLogger.shared.error("VoiceDetail", "Failed to load entry: \(error)")
+            }
         }
         loading = false
     }

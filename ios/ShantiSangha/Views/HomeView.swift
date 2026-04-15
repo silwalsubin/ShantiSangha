@@ -297,7 +297,9 @@ struct HomeView: View {
             }
             await AppLogger.shared.warn("Reflection", "Gave up after 5 polls")
         } catch {
-            await AppLogger.shared.error("Reflection", "Failed: \(error.localizedDescription)")
+            if !error.isCancellation {
+                await AppLogger.shared.error("Reflection", "Failed: \(error.localizedDescription)")
+            }
         }
     }
 

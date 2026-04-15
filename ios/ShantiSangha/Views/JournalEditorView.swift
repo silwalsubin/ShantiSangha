@@ -160,8 +160,10 @@ struct JournalEditorView: View {
             ))
             lastSaved = Date()
         } catch {
-            saveFailed = true
-            AppLogger.shared.error("Journal", "Failed to save: \(error)")
+            if !error.isCancellation {
+                saveFailed = true
+                AppLogger.shared.error("Journal", "Failed to save: \(error)")
+            }
         }
         saving = false
     }
@@ -174,7 +176,9 @@ struct JournalEditorView: View {
                 "/journals", body: CreateJournalRequest(title: "Untitled", content: " "))
             serverId = journal.id
         } catch {
-            AppLogger.shared.error("Journal", "Failed to create: \(error)")
+            if !error.isCancellation {
+                AppLogger.shared.error("Journal", "Failed to create: \(error)")
+            }
         }
     }
 
@@ -185,7 +189,9 @@ struct JournalEditorView: View {
             title = journal.title ?? ""
             content = journal.content ?? ""
         } catch {
-            AppLogger.shared.error("Journal", "Failed to load: \(error)")
+            if !error.isCancellation {
+                AppLogger.shared.error("Journal", "Failed to load: \(error)")
+            }
         }
     }
 }

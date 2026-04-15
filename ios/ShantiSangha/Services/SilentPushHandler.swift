@@ -56,7 +56,9 @@ enum SilentPushHandler {
                 await AppLogger.shared.info("Push", "Reflection response empty, keeping existing")
             }
         } catch {
-            await AppLogger.shared.error("Push", "Failed to refresh reflection: \(error.localizedDescription)")
+            if !error.isCancellation {
+                await AppLogger.shared.error("Push", "Failed to refresh reflection: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -69,7 +71,9 @@ enum SilentPushHandler {
             WidgetData.goalsOverdue = pending.filter { ($0.daysRemaining ?? 1) < 0 }.count
             WidgetData.goalsDueToday = pending.filter { $0.daysRemaining == 0 }.count
         } catch {
-            await AppLogger.shared.error("Push", "Failed to refresh goals: \(error.localizedDescription)")
+            if !error.isCancellation {
+                await AppLogger.shared.error("Push", "Failed to refresh goals: \(error.localizedDescription)")
+            }
         }
 
         // Fetch practices
@@ -79,7 +83,9 @@ enum SilentPushHandler {
             WidgetData.practicesDone = recurring.filter { $0.checkedIn }.count
             WidgetData.practicesTotal = recurring.count
         } catch {
-            await AppLogger.shared.error("Push", "Failed to refresh practices: \(error.localizedDescription)")
+            if !error.isCancellation {
+                await AppLogger.shared.error("Push", "Failed to refresh practices: \(error.localizedDescription)")
+            }
         }
 
         WidgetData.lastUpdated = Date()

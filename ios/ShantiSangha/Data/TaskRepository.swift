@@ -96,7 +96,9 @@ class TaskRepository: ObservableObject {
 
             tasks = result
         } catch {
-            AppLogger.shared.error("Repo", "Refresh failed: \(error)")
+            if !error.isCancellation {
+                AppLogger.shared.error("Repo", "Refresh failed: \(error)")
+            }
             // Keep showing local data
         }
 
