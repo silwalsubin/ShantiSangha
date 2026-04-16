@@ -1,0 +1,12 @@
+{
+  "eval_id": 2,
+  "eval_name": "daily-mantras",
+  "configuration": "with_skill",
+  "expectations": [
+    {"text": "Redirects toward invisible content", "passed": true, "evidence": "Explicitly applies the Invisible Content Principle, says 'mantras belong inside the reflection, not next to it'"},
+    {"text": "Explains why browsable collection is wrong", "passed": true, "evidence": "Walks through all 5 content invisibility tests, cites 'No Verse of the Day widget' from skill"},
+    {"text": "Mentions reflections/chat as delivery mechanism", "passed": true, "evidence": "Proposes enhancing reflection prompt to draw from scriptural sources, with concrete before/after example"},
+    {"text": "Uses skill frameworks", "passed": true, "evidence": "Full 6-step evaluation, Three Questions, Retention Test, Duplication Check, Invisible Content Principle"},
+    {"text": "Provides concrete before/after example", "passed": true, "evidence": "Shows exact text: reflection without vs with invisible scriptural layer"}
+  ]
+}

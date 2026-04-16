@@ -1,0 +1,111 @@
+{
+  "skill_name": "product-guardian",
+  "iteration": 1,
+  "configurations": [
+    {
+      "name": "with_skill",
+      "evals": [
+        {
+          "eval_name": "community-forum",
+          "pass_rate": 1.0,
+          "passed": 5,
+          "total": 5,
+          "tokens": 21780,
+          "duration_seconds": 61.1
+        },
+        {
+          "eval_name": "whats-next",
+          "pass_rate": 1.0,
+          "passed": 6,
+          "total": 6,
+          "tokens": 80274,
+          "duration_seconds": 140.0
+        },
+        {
+          "eval_name": "daily-mantras",
+          "pass_rate": 1.0,
+          "passed": 5,
+          "total": 5,
+          "tokens": 22030,
+          "duration_seconds": 70.8
+        },
+        {
+          "eval_name": "user-dropoff",
+          "pass_rate": 1.0,
+          "passed": 5,
+          "total": 5,
+          "tokens": 40627,
+          "duration_seconds": 145.1
+        },
+        {
+          "eval_name": "meditation-timer",
+          "pass_rate": 1.0,
+          "passed": 5,
+          "total": 5,
+          "tokens": 21983,
+          "duration_seconds": 71.4
+        }
+      ],
+      "aggregate": {
+        "mean_pass_rate": 1.0,
+        "mean_tokens": 37339,
+        "mean_duration_seconds": 97.7
+      }
+    },
+    {
+      "name": "without_skill",
+      "evals": [
+        {
+          "eval_name": "community-forum",
+          "pass_rate": 0.6,
+          "passed": 3,
+          "total": 5,
+          "tokens": 13461,
+          "duration_seconds": 47.7
+        },
+        {
+          "eval_name": "whats-next",
+          "pass_rate": 0.67,
+          "passed": 4,
+          "total": 6,
+          "tokens": 70193,
+          "duration_seconds": 110.1
+        },
+        {
+          "eval_name": "daily-mantras",
+          "pass_rate": 0.6,
+          "passed": 3,
+          "total": 5,
+          "tokens": 17117,
+          "duration_seconds": 57.9
+        },
+        {
+          "eval_name": "user-dropoff",
+          "pass_rate": 0.8,
+          "passed": 4,
+          "total": 5,
+          "tokens": 19768,
+          "duration_seconds": 83.7
+        },
+        {
+          "eval_name": "meditation-timer",
+          "pass_rate": 0.6,
+          "passed": 3,
+          "total": 5,
+          "tokens": 14455,
+          "duration_seconds": 57.1
+        }
+      ],
+      "aggregate": {
+        "mean_pass_rate": 0.65,
+        "mean_tokens": 26999,
+        "mean_duration_seconds": 71.3
+      }
+    }
+  ],
+  "delta": {
+    "pass_rate": "+0.35 (100% vs 65%)",
+    "tokens": "+38% more tokens with skill",
+    "duration": "+37% longer with skill"
+  }
+}

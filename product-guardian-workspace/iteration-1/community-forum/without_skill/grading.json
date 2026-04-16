@@ -1,0 +1,12 @@
+{
+  "eval_id": 0,
+  "eval_name": "community-forum",
+  "configuration": "without_skill",
+  "expectations": [
+    {"text": "Rejects the feature clearly", "passed": true, "evidence": "Opens with 'Verdict: No. Do not build this.'"},
+    {"text": "Cites privacy/sacred space principle", "passed": true, "evidence": "Quotes the Privacy design principle directly from docs"},
+    {"text": "Offers specific alternative", "passed": true, "evidence": "Anonymous aggregate stats, AI companion encouragement, milestone moments"},
+    {"text": "Uses skill frameworks (Three Questions, Red Flags)", "passed": false, "evidence": "Does not use the Three Questions or Red Flags framework. Uses generic principle-based reasoning."},
+    {"text": "Mentions addiction engine mechanics", "passed": false, "evidence": "No mention of loss aversion, identity attachment, variable reward, or any engine-layer concepts"}
+  ]
+}

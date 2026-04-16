@@ -1,0 +1,12 @@
+{
+  "eval_id": 4,
+  "eval_name": "meditation-timer",
+  "configuration": "with_skill",
+  "expectations": [
+    {"text": "Rejects as standalone feature", "passed": true, "evidence": "Opens with 'Verdict: NO. This feature does not belong in ShantiSangha.'"},
+    {"text": "Applies duplication filter or simplicity test", "passed": true, "evidence": "Full Steps 4 (Simplicity Test) and 5 (Duplication Check) applied. Notes it overlaps with Goals."},
+    {"text": "Suggests integration into existing flow", "passed": true, "evidence": "Three alternatives: quality-of-sit check-in tap, inline grounding via AI companion, meditation-aware reflections"},
+    {"text": "Uses Invisible Content Principle", "passed": true, "evidence": "Identifies guided sessions as 'a content library by definition' violating Invisible Content. Says 'browsing behavior, which is a feed, not an experience'"},
+    {"text": "Applies Retention Test", "passed": true, "evidence": "Explicit Retention Test section checking all four hooks — none strengthened"}
+  ]
+}

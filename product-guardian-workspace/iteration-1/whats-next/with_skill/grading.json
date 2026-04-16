@@ -1,0 +1,13 @@
+{
+  "eval_id": 1,
+  "eval_name": "whats-next",
+  "configuration": "with_skill",
+  "expectations": [
+    {"text": "References actual code/features from codebase", "passed": true, "evidence": "Names HomeView.swift, ReflectView.swift, MainTabView.swift, ReflectionCardView.swift, RecurringSummaryView, GoalsController.cs, GenerateDailyReflectionJob.cs"},
+    {"text": "Proposes 3+ concrete improvements", "passed": true, "evidence": "5 proposals with full detail: check-in on Home, reflection as doorway, remove 4th tab, journey cliffhangers, insight lifecycle"},
+    {"text": "Ranks by impact", "passed": true, "evidence": "Summary table with Impact/Effort ratings, explicit recommendation to do 1+2+3 together first"},
+    {"text": "Does not say wait and see", "passed": true, "evidence": "Immediately actionable proposals with specific files and changes listed"},
+    {"text": "Uses skill frameworks (hooks, cliffhanger engine)", "passed": true, "evidence": "Each proposal maps to specific hooks (Completion drive, Mirror, Unfinished Thread, Zeigarnik, Surprise, Cliffhanger Engine). Catches 4th tab violation from skill's 3-tab constraint."},
+    {"text": "Identifies something the baseline missed", "passed": true, "evidence": "Catches the 4th tab violation (Settings tab), proposes Journey cliffhangers and insight lifecycle with slow-reveal mechanics — all unique to the skill's frameworks"}
+  ]
+}

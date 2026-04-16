@@ -1,0 +1,12 @@
+{
+  "eval_id": 0,
+  "eval_name": "community-forum",
+  "configuration": "with_skill",
+  "expectations": [
+    {"text": "Rejects the feature clearly", "passed": true, "evidence": "Opens with 'Verdict: NO' and 'This feature contradicts ShantiSangha's identity at a foundational level'"},
+    {"text": "Cites privacy/sacred space principle", "passed": true, "evidence": "Calls it 'a mission reversal' and references 'private sacred space' throughout"},
+    {"text": "Offers specific alternative", "passed": true, "evidence": "Three ranked alternatives: milestone celebrations, social proof in reflections, identity-reinforcing language at streak milestones"},
+    {"text": "Uses skill frameworks (Three Questions, Red Flags)", "passed": true, "evidence": "Walks through all 6 evaluation steps, explicitly names 5 Red Flags triggered, applies Three Questions with clear No answers"},
+    {"text": "Mentions addiction engine mechanics", "passed": true, "evidence": "References identity attachment ('That is not a streak — that is who you are') and social proof without social features"}
+  ]
+}
