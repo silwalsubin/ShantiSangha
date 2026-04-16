@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using ShantiSangha.Shared.Interfaces;
+using ShantiSangha.Shared.Jyotish;
 using ShantiSangha.Wellness.Data;
 using ShantiSangha.Wellness.Models;
 
@@ -15,6 +16,7 @@ public class GenerateDailyReflectionJob(
     ISummaryQueryService summaryQuery,
     IInsightQueryService insightQuery,
     IProfileQueryService profileQuery,
+    JyotishContextService jyotishService,
     IPushNotificationService pushService,
     ILogger<GenerateDailyReflectionJob> logger)
 {
@@ -102,6 +104,18 @@ public class GenerateDailyReflectionJob(
                 var prevLines = previousReflections.Select(r =>
                     $"  - [{r.Date.ToString("yyyy-MM-dd")}] ({r.Type}) \"{r.Content}\"");
                 contextParts.Add($"Previous reflections (use for continuity, avoid repeating themes):\n{string.Join("\n", prevLines)}");
+            }
+
+            // Vedic astrology context (invisible — enriches the reflection voice)
+            try
+            {
+                var jyotish = await jyotishService.GetContextAsync(userId, today);
+                if (jyotish is not null)
+                    contextParts.Add(JyotishContextService.FormatForPrompt(jyotish));
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to load Jyotish context for user {UserId} — continuing without it", userId);
             }
 
             // Narrative threading instruction based on mode

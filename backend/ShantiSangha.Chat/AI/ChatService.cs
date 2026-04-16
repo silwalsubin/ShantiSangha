@@ -9,6 +9,7 @@ using ShantiSangha.Chat.Safety;
 using ShantiSangha.Chat.Services;
 using ShantiSangha.Shared.Events;
 using ShantiSangha.Shared.Interfaces;
+using ShantiSangha.Shared.Jyotish;
 using ShantiSangha.Shared.Models;
 
 namespace ShantiSangha.Chat.AI;
@@ -22,6 +23,7 @@ public class ChatService(
     IGoalQueryService goalQuery,
     IReflectionQueryService reflectionQuery,
     IProfileQueryService profileQuery,
+    JyotishContextService jyotishService,
     IEventBus eventBus,
     ILogger<ChatService> logger) : IChatService
 {
@@ -149,6 +151,7 @@ public class ChatService(
         IReadOnlyList<string> journalSummaries = [];
         IReadOnlyList<GoalSummaryDto> goalDtos = [];
         IReadOnlyList<string> insights = [];
+        JyotishContext? jyotish = null;
 
         try
         {
@@ -157,14 +160,16 @@ public class ChatService(
             var journalSummariesTask = summaryQuery.GetRecentJournalSummariesAsync(userId, SummaryCount, cancellationToken);
             var goalsTask = goalQuery.GetActiveGoalsForContextAsync(userId, ct: cancellationToken);
             var reflectionTask = reflectionQuery.GetRecentReflectionAsync(userId, cancellationToken);
+            var jyotishTask = jyotishService.GetContextAsync(userId, DateOnly.FromDateTime(DateTime.UtcNow), cancellationToken);
 
-            await Task.WhenAll(displayNameTask, summariesTask, journalSummariesTask, goalsTask, reflectionTask);
+            await Task.WhenAll(displayNameTask, summariesTask, journalSummariesTask, goalsTask, reflectionTask, jyotishTask);
 
             displayName = displayNameTask.Result;
             summaries = summariesTask.Result;
             journalSummaries = journalSummariesTask.Result;
             goalDtos = goalsTask.Result;
             todaysReflection = reflectionTask.Result;
+            jyotish = jyotishTask.Result;
         }
         catch (Exception ex)
         {
@@ -206,7 +211,8 @@ public class ChatService(
             savedInsights: insights,
             conversationSummaries: summaries,
             journalSummaries: journalSummaries,
-            goals: goalContexts);
+            goals: goalContexts,
+            jyotish: jyotish);
 
         var history = new ChatHistory(systemPrompt);
 

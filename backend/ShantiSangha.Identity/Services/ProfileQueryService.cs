@@ -14,6 +14,16 @@ public class ProfileQueryService(IdentityDbContext db) : IProfileQueryService
             .FirstOrDefaultAsync(ct);
     }
 
+    public async Task<UserBirthInfo> GetBirthInfoAsync(Guid userId, CancellationToken ct = default)
+    {
+        var profile = await db.Profiles
+            .Where(p => p.UserId == userId)
+            .Select(p => new { p.BirthDate, p.BirthTime, p.BirthPlace })
+            .FirstOrDefaultAsync(ct);
+
+        return new UserBirthInfo(profile?.BirthDate, profile?.BirthTime, profile?.BirthPlace);
+    }
+
     public async Task<IReadOnlyList<UserTimezoneInfo>> GetAllUserTimezonesAsync(CancellationToken ct = default)
     {
         return await db.Profiles

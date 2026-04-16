@@ -22,7 +22,10 @@ public class UserService(IdentityDbContext db) : IUserService
                 user.Profile.DisplayName,
                 user.Profile.Timezone,
                 user.Profile.ReminderHour,
-                user.Profile.OnboardingCompleted
+                user.Profile.OnboardingCompleted,
+                user.Profile.BirthDate,
+                user.Profile.BirthTime,
+                user.Profile.BirthPlace
             )
         );
     }
@@ -41,6 +44,15 @@ public class UserService(IdentityDbContext db) : IUserService
         if (request.ReminderHour is not null) user.Profile.ReminderHour = Math.Clamp(request.ReminderHour.Value, 0, 23);
         if (request.ClearReminderHour == true) user.Profile.ReminderHour = null;
         if (request.OnboardingCompleted is not null) user.Profile.OnboardingCompleted = request.OnboardingCompleted.Value;
+        if (request.BirthDate is not null) user.Profile.BirthDate = request.BirthDate;
+        if (request.BirthTime is not null) user.Profile.BirthTime = request.BirthTime;
+        if (request.BirthPlace is not null) user.Profile.BirthPlace = request.BirthPlace;
+        if (request.ClearBirthDetails == true)
+        {
+            user.Profile.BirthDate = null;
+            user.Profile.BirthTime = null;
+            user.Profile.BirthPlace = null;
+        }
 
         user.Profile.UpdatedAt = DateTime.UtcNow;
         user.UpdatedAt = DateTime.UtcNow;

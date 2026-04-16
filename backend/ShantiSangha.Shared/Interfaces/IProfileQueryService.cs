@@ -4,9 +4,17 @@ public record UserTimezoneInfo(Guid UserId, string? Timezone);
 
 public record UserReminderInfo(Guid UserId, string? Timezone, int? ReminderHour);
 
+public record UserBirthInfo(DateOnly? BirthDate, string? BirthTime, string? BirthPlace);
+
 public interface IProfileQueryService
 {
     Task<string?> GetDisplayNameAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns birth details for Jyotish context computation.
+    /// Returns null fields if the user hasn't provided birth data.
+    /// </summary>
+    Task<UserBirthInfo> GetBirthInfoAsync(Guid userId, CancellationToken ct = default);
 
     /// <summary>
     /// Returns all user profiles with their timezone (may be null).

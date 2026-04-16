@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ShantiSangha.Shared.Interfaces;
+using ShantiSangha.Shared.Jyotish;
 using ShantiSangha.Wellness.Data;
 using ShantiSangha.Wellness.Jobs;
 using ShantiSangha.Wellness.Services;
@@ -28,6 +29,7 @@ public static class DependencyInjection
 
         services.AddScoped<IVoiceService, VoiceService>();
         services.AddScoped<IReflectionQueryService, ReflectionQueryService>();
+        services.AddScoped<JyotishContextService>();
         services.AddScoped<GenerateDailyReflectionJob>();
         services.AddScoped<ScheduleDailyReflectionsJob>();
         services.AddScoped<SendMorningReflectionPushJob>();

@@ -1,3 +1,5 @@
+using ShantiSangha.Shared.Jyotish;
+
 namespace ShantiSangha.Chat.AI;
 
 public static class SystemPrompt
@@ -86,7 +88,8 @@ public static class SystemPrompt
         IEnumerable<string>? savedInsights,
         IEnumerable<string>? conversationSummaries,
         IEnumerable<string>? journalSummaries = null,
-        IEnumerable<GoalContext>? goals = null)
+        IEnumerable<GoalContext>? goals = null,
+        JyotishContext? jyotish = null)
     {
         var parts = new List<string> { Base };
 
@@ -197,6 +200,9 @@ public static class SystemPrompt
                 {string.Join("\n", goalLines)}
                 """);
         }
+
+        if (jyotish is not null)
+            parts.Add(JyotishContextService.FormatForPrompt(jyotish));
 
         return string.Join("\n\n---\n\n", parts);
     }
