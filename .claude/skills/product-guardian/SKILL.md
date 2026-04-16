@@ -64,6 +64,24 @@ For every feature proposal, after the Three Questions, ask:
 - **Would the user miss this if they skipped a day?** If not, it's not a hook — it's furniture.
 - **Does this deepen over time?** The app should get more valuable the longer someone uses it. A feature that's the same on day 1 and day 100 is a missed opportunity.
 
+### Invisible Psychology
+
+The app uses behavioral psychology to drive return — but the user should never feel manipulated. The test: if someone described the mechanic out loud, the user should think "yeah, that makes sense" not "they're tricking me." These are principles, not features — they should be woven into existing interactions, never surfaced as visible game elements.
+
+**Loss aversion (streaks):** A 14-day streak costs nothing to maintain but feels painful to break. The longer it grows, the stronger the pull. This is already built — protect it. Never let streaks feel cheap (no "streak freeze" purchases) but do offer grace (skip a day without breaking, acknowledged honestly).
+
+**Variable reward (reflection & insights):** The daily reflection is different every day. Sometimes it hits deep, sometimes it's lighter. This unpredictability is the slot machine of spiritual apps — the user opens it wondering "what will it say today?" Insights appearing on Journey create the same effect: "have any new patterns been found?" Never make these predictable or formulaic.
+
+**Investment loop (the app gets smarter):** Every journal entry, every conversation, every check-in makes the AI more personalized. The user who has 3 months of data gets a fundamentally better experience than a day-1 user. This must be felt, not explained. The reflection should clearly reference things only this user would recognize. The journal prompt should touch on themes from last week. The investment is invisible — they just notice the app "gets them."
+
+**Completion drive (progress rings):** A ring at 80% creates tension. The user wants to close it. The Home tab showing "4 of 5 practices" is a gentle pull toward "let me just do the last one." Never shame the incomplete ring — but do make the full ring feel satisfying (animation, streak acknowledgment, warm message).
+
+**Endowed progress (milestone proximity):** When a user is close to a milestone (day 28 of a 30-day streak), the reflection or check-in should quietly acknowledge proximity: "Day 28." Not "only 2 more days!" — just the number. The user's own mind does the rest. This works because we gave them the progress for free (they earned it), and now they don't want to lose it.
+
+**Social proof without social features:** The app should occasionally reference universal human experience in reflections: "Most people find the second week harder than the first" or "Consistency looks different for everyone." This creates a sense of belonging without exposing any user to another. The user feels part of something without a community feature.
+
+These mechanics must remain invisible. The moment a user thinks "this app is trying to gamify me," trust is broken. The mechanics work precisely because they feel natural — like a good teacher who structures the class so students want to participate, not because they're forced to.
+
 ### Content That Refreshes Daily
 
 The app must have at least 3 things that are genuinely new every day:

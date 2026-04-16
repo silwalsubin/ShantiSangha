@@ -279,21 +279,30 @@ Static screens kill retention. Every screen the user visits daily must have some
 
 If a screen looks identical to yesterday, it's a design failure. Even subtle changes (a different prompt, an updated streak dot) signal that the app is alive and paying attention.
 
-### Reward Patterns (Not Gamification)
+### Invisible Retention Through Design
 
-The line between reward and gamification: rewards acknowledge effort, gamification manufactures dopamine. We do the former, never the latter.
+The app uses behavioral design to pull users back — but it must feel natural, never manipulative. If the user noticed the mechanic, they should think "that's thoughtful" not "that's a trick." The design itself does the work; no visible game layer.
 
-- **Streak milestones** (7, 14, 30, 60, 100 days): Acknowledged in the reflection and check-in swipe. Not badges or pop-ups — just quiet recognition woven into existing UI.
-- **Completion state:** The "all done" message names specific practices. Not generic congratulations.
-- **Insight discovery:** New insights appear with a gentle fade-in, not a notification badge.
-- **Progress rings:** Animate on appear to give a sense of filling up. The animation itself is the reward.
+**Progress rings that create tension:** A ring at 4/5 is more powerful than any notification. The incomplete circle pulls the user toward finishing. Design the ring so the gap is visually prominent — not by making it red or alarming, but by making the filled portion satisfying enough that the gap feels like unfinished business. Animate the fill on appear (`.easeOut(duration: 0.8)`) so the user watches their progress materialize.
 
-What we never do:
+**Streak numbers that grow quietly:** The check-in swipe shows "Day 14" — not a celebration, just a fact. But facts compound. The user sees the number grow from 7 to 14 to 30 and feels ownership. At milestones, the swipe message adds a phrase ("Day 30 — a whole month") but never confetti or pop-ups. The number alone does the psychological work.
+
+**Variable reflection quality:** Some days the reflection hits perfectly. Some days it's gentler. This unpredictability is intentional — it creates the "what will it say today?" pull. Never template the reflections or make them formulaic. The slight randomness is the hook.
+
+**Insight discovery as surprise:** New insights on Journey appear with a gentle `.easeIn(duration: 0.3)` fade — never with a badge, counter, or "3 new insights!" banner. The user scrolls down and finds them. Discovery feels better than notification.
+
+**The incomplete journal:** A journal entry with a title but no content creates a gentle thread to return to. Show it in the Reflect timeline as-is — the user knows they started something. Don't prompt them to finish it. The unfinished entry does the work on its own.
+
+**Warm, not empty, completion states:** When all practices are done, don't show "nothing to do." Show what they accomplished with specific names and streak counts. The full state should feel like a destination worth reaching, not an empty room.
+
+What we never make visible:
 - Points, scores, levels, or ranks
-- Notification badges or red dots
+- Notification badges, red dots, or unread counters
 - Confetti, fireworks, or celebration animations
+- "X days until milestone" countdowns — just show the current number
 - Comparison to other users or to "ideal" behavior
-- Shame for missed days — only celebration for days completed
+- Shame for missed days — only acknowledgment of days completed
+- Any text that says "come back tomorrow" — the design should make them want to without being asked
 
 ## iOS Interaction Patterns
 
