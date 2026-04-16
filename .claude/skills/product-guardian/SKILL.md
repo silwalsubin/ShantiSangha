@@ -1,6 +1,6 @@
 ---
 name: product-guardian
-description: "Critical product gatekeeper for ShantiSangha — challenges every proposed feature, screen, flow, or change against the app's core mission: helping users build discipline, find inner peace, and see their own growth. Use this skill BEFORE building any new feature, when the user proposes adding something to the app, when discussing product direction, when reviewing whether a feature should exist, when simplifying the app, or when the user asks 'should we build this?' This skill says NO by default and requires justification to say yes."
+description: "Critical product gatekeeper and UX flow evaluator for ShantiSangha — challenges every proposed feature, screen, flow, or change against the app's core mission: helping users build discipline, find inner peace, and see their own growth. Use this skill BEFORE building any new feature, when the user proposes adding something to the app, when discussing product direction, when reviewing whether a feature should exist, when simplifying the app, when evaluating user flows or screen transitions, when asking 'should we build this?' or 'what's next?'. This skill says NO by default and requires justification to say yes. It also evaluates UX flows for dead ends, interaction complexity, and whether screens strengthen or break the daily practice circle."
 ---
 
 # Product Guardian — ShantiSangha
@@ -166,6 +166,67 @@ These are the approved features. Any addition must justify its existence against
 | AI insights | Patterns extracted from reflections | Journey |
 
 Before proposing a new row in this table, ask: which existing row could absorb this?
+
+## UX Flow Evaluation
+
+When reviewing any feature — new or existing — evaluate how it connects to the user's daily journey through the app. A feature can pass the Three Questions and still fail if its UX breaks the flow.
+
+### The Flow Circle Test
+
+Every screen the user visits must eventually lead back to the circle:
+
+```
+Open app → Home (ground) → Reflect (process) → Journey (see growth) → Close (feeling better)
+```
+
+For any proposed screen or interaction, trace the user's path:
+1. **How do they get here?** (Which tab? How many taps?)
+2. **What do they do here?** (One clear action, not a menu of choices)
+3. **Where do they go next?** (Back to the flow, not a dead end)
+
+If the answer to #3 is "nowhere" or "they have to figure it out," the UX is broken.
+
+### Dead End Detection
+
+A dead end is any screen where the user's only option is to tap "Back." These are the quiet killers of engagement. Watch for:
+
+- Detail views with no forward action (read-only screens that don't invite the next step)
+- Success states that just say "Done!" with no natural next destination
+- Error states that offer no recovery path
+- Empty states that explain what's missing but don't help fix it
+
+Every screen should either invite an action or gently return the user to the flow.
+
+### Screen Transition Philosophy
+
+The way a screen appears tells the user what kind of interaction this is:
+
+- **NavigationLink push** = "I'm going deeper into something I was already looking at." (Practice → Calendar, Conversation → Chat)
+- **Sheet** = "I'm doing a quick focused task and coming right back." (New goal, quick add)
+- **Inline expansion** = "I want more detail without leaving." (Progress slider, acknowledgment message)
+- **Tab switch** = "I'm moving to a different phase of my daily ritual." (Home → Reflect → Journey)
+
+Misusing these creates confusion. A new journal entry should be a push (you're entering a writing space), not a sheet (that implies it's quick and disposable). A confirmation ("Are you sure?") should be an alert, not a navigation push.
+
+### Interaction Complexity Budget
+
+Each screen gets a limited complexity budget. Count the number of distinct actions a user can take on a single screen:
+
+- **1-3 actions:** Peaceful. The screen has clarity.
+- **4-5 actions:** Acceptable if well-organized (e.g., Home with check-in, add goal, view practices).
+- **6+ actions:** Too busy. The screen needs simplification.
+
+This includes taps, swipes, menus, and buttons. A three-dot menu with 5 options counts as 5 actions, not 1. If a screen exceeds the budget, ask: which of these actions could live elsewhere, or be removed entirely?
+
+### Notification & Interruption Philosophy
+
+Notifications pull the user out of whatever they're doing. That's a cost. Every notification must justify that cost:
+
+- **Morning reflection push:** High value — delivers the reason to open the app, at a time the user chose.
+- **Streak protection reminder:** Moderate value — only for streaks of 2+ days, at the user's reminder time.
+- **"You haven't opened the app":** Never. This is guilt, not value.
+
+The test: would the user thank you for this interruption? If not, don't send it.
 
 ## Red Flags — Automatic Rejection
 

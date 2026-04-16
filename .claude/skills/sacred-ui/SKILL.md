@@ -1,6 +1,6 @@
 ---
 name: sacred-ui
-description: "Enforces the ShantiSangha sacred design system when creating or editing UI code — Vue/Tailwind and SwiftUI. Use this skill whenever the user asks to build, edit, style, or create any UI component, page, view, screen, button, card, form, modal, or layout in this project. Also trigger when the user mentions colors, fonts, spacing, icons, animations, or visual styling. Even if the user doesn't mention 'sacred' or 'design system', always apply these rules when touching UI code."
+description: "Enforces the ShantiSangha sacred design system and iOS UX patterns when creating or editing UI code — Vue/Tailwind and SwiftUI. Use this skill whenever the user asks to build, edit, style, or create any UI component, page, view, screen, button, card, form, modal, or layout in this project. Also trigger when the user mentions colors, fonts, spacing, icons, animations, visual styling, gestures, navigation, transitions, loading states, empty states, or interaction patterns. Even if the user doesn't mention 'sacred' or 'design system', always apply these rules when touching UI code. This skill covers both how things LOOK (colors, fonts, layout) and how things FEEL (gestures, transitions, loading behavior, navigation flow)."
 ---
 
 # Sacred UI — ShantiSangha Design System
@@ -245,6 +245,72 @@ Before writing any UI, verify:
 8. **Animations** — Subtle only? `duration-200` or `duration-300`?
 9. **Language** — Gentle, reflective tone? No clinical/corporate text?
 10. **Radius** — Using `rounded-sacred` / `rounded-sacred-lg` / `rounded-full`?
+
+## iOS Interaction Patterns
+
+This section governs how things *feel*, not just how they look. A button with the right color but the wrong gesture is still wrong.
+
+### Navigation Philosophy
+
+ShantiSangha uses 3 tabs wrapped in `NavigationStack`. Every screen must be reachable and returnable — no orphaned views.
+
+- **Tab switch** = context change (Home, Reflect, Journey). Never navigate *between* tabs programmatically.
+- **NavigationLink push** = drill deeper into the same context (practice → calendar, conversation → chat).
+- **Sheet / fullScreenCover** = temporary focused task that returns to the same place (new goal, new journal). Dismiss returns exactly where you were.
+- **Never use modals for content the user might want to keep visible.** If it's informational, it belongs inline. Modals are for input.
+
+### Gesture Vocabulary
+
+Every gesture in the app has a specific meaning. Do not mix them.
+
+| Gesture | Meaning | Example |
+|---------|---------|---------|
+| **Tap** | Navigate or toggle | Tap practice → GoalDetailView |
+| **Long press + drag** | Swipe action (commit/skip) | Hold practice → drag right = done |
+| **Pull down** | Refresh current data | Pull-to-refresh on any scrollable list |
+| **Swipe back** | iOS-native back navigation | Edge swipe to go back |
+| **Context menu (long press)** | Secondary actions | Long-press insight → dismiss/share |
+
+Rules:
+- Swipe-to-act requires long-press activation first (prevents accidental swipes while scrolling)
+- Every swipe action must have an equivalent menu option (accessibility)
+- Never hijack iOS-native gestures (edge swipe back, scroll bounce)
+
+### State & Loading Patterns
+
+The user should never see a blank screen and wonder if the app is broken.
+
+- **Loading:** Show the previous data while refreshing. Only show a spinner on first load when there's truly nothing to show.
+- **Empty state:** Always provide a warm message and a single clear action. "You haven't set any practices yet" + "Set your first practice" button.
+- **Failure:** Never show raw errors. If a fetch fails silently, keep showing cached/previous data. If there's nothing to show, use a gentle fallback message ("Check back in a few minutes").
+- **Cancellation:** SwiftUI tears down `.task` on view disappear. Always guard `catch` blocks with `error.isCancellation` — cancelled requests are not errors, never log or display them.
+- **Optimistic updates:** For user-initiated actions (check-in, delete), update the UI immediately and reconcile in the background. The user should never wait for a server round-trip to see their action reflected.
+
+### SwiftUI Patterns
+
+- **Data loading:** Use `.task { }` for initial load (fires once per view lifecycle). Use `.refreshable { }` for pull-to-refresh. Never use `.onAppear` for async work — it fires on every appearance including tab switches.
+- **Caching:** If data doesn't change within a session (e.g., today's reflection), cache it by date and skip refetch on tab switch. Always allow force-refresh via pull-to-refresh.
+- **Keyboard:** Use `.scrollDismissesKeyboard(.interactively)` on any ScrollView with text input. Never let the keyboard cover the active text field.
+- **Safe area:** Respect safe areas. Use `.ignoresSafeArea()` only on backgrounds, never on content.
+- **Haptics:** `.light` for taps and selections, `.medium` for confirmations and completions. Never use `.heavy` — this is a calm app.
+
+### Transition & Animation Behavior
+
+Animations must be functional (convey state change), not decorative.
+
+- **Check-in complete:** Row slides off-screen (0.2s ease-out), then reappears in "done" state
+- **Data appearing:** Fade in with `.easeIn(duration: 0.3)` — never pop
+- **Period/tab switching:** Immediate content swap, no crossfade (feels responsive)
+- **Progress rings:** Animate fill on appear with `.easeOut(duration: 0.8)` — gives a sense of achievement
+- **Dismissing items:** `withAnimation { items.removeAll { ... } }` — smooth removal
+- **Never animate:** Navigation pushes (iOS handles this), keyboard appearance, error states
+
+### Accessibility
+
+- **Dynamic Type:** All text must use the `.sacred*` font tokens which scale with system settings. Never hardcode font sizes except in the token definitions.
+- **VoiceOver:** Every interactive element needs an accessible label. Swipe actions must have menu alternatives.
+- **Contrast:** Sacred gold (#c4873b) on sacred bg (#faf5ed) meets AA contrast. Never go lighter than `.sacredMuted` for meaningful text.
+- **Touch targets:** 44pt minimum on everything tappable — this is both an Apple guideline and sacred-ui law.
 
 ## Reference Files
 
