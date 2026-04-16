@@ -9,11 +9,39 @@ struct JourneyView: View {
     @State private var reflectionTimedOut = false
     @State private var selectedPeriod: JourneyPeriod = .lastWeek
     @State private var insights: [InsightItem] = []
+    @State private var vedicIdentity: VedicIdentity?
     private let api = ApiService.shared
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                // Vedic identity — quiet, centered, above everything
+                if let vedic = vedicIdentity, vedic.available {
+                    VStack(spacing: 4) {
+                        Text("VEDIC")
+                            .font(.sacredSectionLabel)
+                            .tracking(3)
+                            .foregroundColor(.sacredLabel)
+
+                        HStack(spacing: 8) {
+                            Text(vedic.sunRashiShort)
+                                .font(.sacredTextMedium)
+                                .foregroundColor(.sacredGold)
+
+                            if let nakshatra = vedic.nakshatra {
+                                Text("·")
+                                    .font(.sacredText)
+                                    .foregroundColor(.sacredMuted)
+                                Text(nakshatra)
+                                    .font(.sacredTextMedium)
+                                    .foregroundColor(.sacredGold)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.bottom, 20)
+                }
+
                 // Period selector
                 HStack(spacing: 6) {
                     ForEach(JourneyPeriod.allCases, id: \.self) { period in
@@ -223,6 +251,7 @@ struct JourneyView: View {
         .navigationTitle("Journey")
         .navigationBarTitleDisplayMode(.inline)
         .task { await loadAll() }
+        .task { await loadVedicIdentity() }
     }
 
     // MARK: - Insight Card
@@ -310,6 +339,17 @@ struct JourneyView: View {
             if !error.isCancellation {
                 AppLogger.shared.error("Journey", "Failed to load insights: \(error)")
             }
+        }
+    }
+
+    private func loadVedicIdentity() async {
+        do {
+            let identity: VedicIdentity = try await api.get("/jyotish/identity")
+            if identity.available {
+                withAnimation(.easeIn(duration: 0.3)) { vedicIdentity = identity }
+            }
+        } catch {
+            // Silent — Vedic identity is optional enrichment
         }
     }
 }
@@ -431,4 +471,18 @@ struct InsightItem: Codable, Identifiable {
     let sourceConversationId: String?
     let sourceJournalId: String?
     let createdAt: String
+}
+
+struct VedicIdentity: Codable {
+    let available: Bool
+    let sunRashi: String?
+    let moonRashi: String?
+    let nakshatra: String?
+    let nakshatraQuality: String?
+
+    /// Extracts just the Sanskrit name from "Mithuna (Gemini)" format
+    var sunRashiShort: String {
+        guard let rashi = sunRashi else { return "" }
+        return rashi.components(separatedBy: " (").first ?? rashi
+    }
 }

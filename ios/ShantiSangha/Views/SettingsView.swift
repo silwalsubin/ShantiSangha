@@ -18,6 +18,7 @@ struct SettingsView: View {
     @State private var showBirthTimePicker = false
     @State private var birthDetailsLoaded = false
     @State private var savingBirth = false
+    @State private var showBirthPlacePicker = false
 
     private let api = ApiService.shared
 
@@ -144,7 +145,7 @@ struct SettingsView: View {
                                 .font(.sacredText)
                                 .foregroundColor(.sacredTextSecondary)
                             Spacer()
-                            Text(birthTime.map { formatBirthTime($0) } ?? "Optional")
+                            Text(birthTime.map { formatBirthTime($0) } ?? "Not set")
                                 .font(.sacredTextMedium)
                                 .foregroundColor(birthTime != nil ? .sacredGold : .sacredMuted)
                         }
@@ -152,20 +153,22 @@ struct SettingsView: View {
                     .buttonStyle(.plain)
 
                     // Birth place
-                    HStack(spacing: 10) {
-                        Image(systemName: "mappin")
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredMuted)
-                        TextField("Place of birth", text: $birthPlaceQuery)
-                            .font(.sacredText)
-                            .foregroundColor(.sacredText)
-                            .onSubmit { geocodeBirthPlace() }
-                        if !birthPlace.isEmpty {
-                            Image(systemName: "checkmark.circle.fill")
+                    Button { showBirthPlacePicker = true } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "mappin")
                                 .font(.sacredSmall)
-                                .foregroundColor(.sacredGold)
+                                .foregroundColor(.sacredMuted)
+                            Text("Place of birth")
+                                .font(.sacredText)
+                                .foregroundColor(.sacredTextSecondary)
+                            Spacer()
+                            Text(birthPlaceQuery.isEmpty ? "Not set" : birthPlaceQuery)
+                                .font(.sacredTextMedium)
+                                .foregroundColor(birthPlaceQuery.isEmpty ? .sacredMuted : .sacredGold)
+                                .lineLimit(1)
                         }
                     }
+                    .buttonStyle(.plain)
 
                     if birthDate != nil {
                         Text("This helps the app understand you more deeply.")
@@ -323,6 +326,11 @@ struct SettingsView: View {
                 .background(Color.sacredBg.ignoresSafeArea())
                 .navigationTitle("Date of birth")
                 .navigationBarTitleDisplayMode(.inline)
+                .onAppear {
+                    if birthDate == nil {
+                        birthDate = Calendar.current.date(byAdding: .year, value: -25, to: Date())
+                    }
+                }
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Done") {
@@ -351,6 +359,12 @@ struct SettingsView: View {
                 .background(Color.sacredBg.ignoresSafeArea())
                 .navigationTitle("Time of birth")
                 .navigationBarTitleDisplayMode(.inline)
+                .onAppear {
+                    // Ensure birthTime has a value so "Done" without spinning still saves
+                    if birthTime == nil {
+                        birthTime = Calendar.current.date(bySettingHour: 6, minute: 0, second: 0, of: Date())
+                    }
+                }
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Done") {
@@ -362,6 +376,17 @@ struct SettingsView: View {
                 }
             }
             .presentationDetents([.height(300)])
+        }
+        .sheet(isPresented: $showBirthPlacePicker) {
+            BirthPlacePickerView(
+                selectedPlace: birthPlaceQuery,
+                onSelect: { name, lat, lng in
+                    birthPlaceQuery = name
+                    birthPlace = "\(String(format: "%.4f", lat)),\(String(format: "%.4f", lng))"
+                    showBirthPlacePicker = false
+                    Task { await saveBirthDetails() }
+                }
+            )
         }
     }
 
@@ -426,29 +451,6 @@ struct SettingsView: View {
 
         guard !body.isEmpty, let data = try? JSONSerialization.data(withJSONObject: body) else { return }
         let _: EmptyResponse? = try? await api.patchRaw("/me", body: data)
-    }
-
-    private func geocodeBirthPlace() {
-        let query = birthPlaceQuery.trimmingCharacters(in: .whitespaces)
-        guard !query.isEmpty else { return }
-
-        Task {
-            do {
-                let placemarks = try await CLGeocoder().geocodeAddressString(query)
-                if let location = placemarks.first?.location {
-                    let lat = String(format: "%.4f", location.coordinate.latitude)
-                    let lng = String(format: "%.4f", location.coordinate.longitude)
-                    birthPlace = "\(lat),\(lng)"
-                    // Update display to resolved name
-                    if let placemark = placemarks.first {
-                        birthPlaceQuery = [placemark.locality, placemark.country].compactMap { $0 }.joined(separator: ", ")
-                    }
-                    await saveBirthDetails()
-                }
-            } catch {
-                await AppLogger.shared.error("Settings", "Geocode failed: \(error)")
-            }
-        }
     }
 
     private func formatBirthDate(_ date: Date) -> String {
