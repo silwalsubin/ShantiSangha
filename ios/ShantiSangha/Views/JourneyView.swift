@@ -349,7 +349,7 @@ struct JourneyView: View {
                 withAnimation(.easeIn(duration: 0.3)) { vedicIdentity = identity }
             }
         } catch {
-            // Silent — Vedic identity is optional enrichment
+            await AppLogger.shared.error("Journey", "Vedic identity failed: \(error)")
         }
     }
 }
