@@ -246,6 +246,55 @@ Before writing any UI, verify:
 9. **Language** — Gentle, reflective tone? No clinical/corporate text?
 10. **Radius** — Using `rounded-sacred` / `rounded-sacred-lg` / `rounded-full`?
 
+## Emotional Design — Making Users Want to Return
+
+The visual and interaction design is the primary tool for making the app feel rewarding. Users don't return to apps because of features — they return because of how the app makes them *feel*. Every interaction should create a micro-moment of satisfaction.
+
+### Moments That Matter
+
+These are the interactions that determine whether someone comes back tomorrow. They must feel exceptional, not utilitarian:
+
+**1. First open of the day**
+The daily reflection is waiting. It should feel like opening a letter written just for you — not like loading a screen. The card should be visible immediately (cached overnight), with warm serif italic text, breathing space around it. No spinner, no delay. The first thing the user reads should make them pause.
+
+**2. Checking in a practice**
+This is the core daily action. The swipe must feel *physical* — the long-press activation, the resistance, the green reveal, the streak acknowledgment ("Day 14"). The haptic feedback (`.medium`) is critical. This 2-second interaction is the difference between "I did a chore" and "I honored my commitment."
+
+**3. All practices done**
+The climax of the daily ritual. This should feel like a quiet accomplishment — not a party, but a deep breath. The completion state should name what they did specifically, acknowledge the streak, and feel *earned*. The user should want to reach this state every day.
+
+**4. Reading an insight**
+When the Journey tab shows an insight the user didn't expect — something extracted from their own journals or conversations — it should feel like discovering something about yourself. The flame icon, the first-person voice, the subtle gold border. This is the app saying "I've been listening."
+
+**5. The empty moment**
+When the user opens the app and has nothing to do (all practices done, no new reflection), the app should still feel welcoming. Not "there's nothing here" but "you're caught up — you showed up and that matters." This state should be warm, not empty.
+
+### Design for Daily Freshness
+
+Static screens kill retention. Every screen the user visits daily must have something different from yesterday:
+
+- **Home:** Reflection changes daily. Practice status resets. Streak counts increment.
+- **Reflect:** Journal prompt changes daily. New conversations appear at the top.
+- **Journey:** Insights accumulate. Completion rings update. Reflection changes with period.
+
+If a screen looks identical to yesterday, it's a design failure. Even subtle changes (a different prompt, an updated streak dot) signal that the app is alive and paying attention.
+
+### Reward Patterns (Not Gamification)
+
+The line between reward and gamification: rewards acknowledge effort, gamification manufactures dopamine. We do the former, never the latter.
+
+- **Streak milestones** (7, 14, 30, 60, 100 days): Acknowledged in the reflection and check-in swipe. Not badges or pop-ups — just quiet recognition woven into existing UI.
+- **Completion state:** The "all done" message names specific practices. Not generic congratulations.
+- **Insight discovery:** New insights appear with a gentle fade-in, not a notification badge.
+- **Progress rings:** Animate on appear to give a sense of filling up. The animation itself is the reward.
+
+What we never do:
+- Points, scores, levels, or ranks
+- Notification badges or red dots
+- Confetti, fireworks, or celebration animations
+- Comparison to other users or to "ideal" behavior
+- Shame for missed days — only celebration for days completed
+
 ## iOS Interaction Patterns
 
 This section governs how things *feel*, not just how they look. A button with the right color but the wrong gesture is still wrong.

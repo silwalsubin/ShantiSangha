@@ -33,6 +33,47 @@ The AI companion knows your goals, your streaks, your deeper intentions, your re
 
 **The test:** If you replaced this user's data with someone else's, would the experience change? If not, the feature doesn't know them well enough.
 
+## The Primary Objective: Daily Return
+
+Nothing else matters if the user doesn't come back tomorrow. Every feature, every screen, every interaction must be evaluated against one question first: **does this give the user a reason to open the app again?**
+
+This is not gamification. It's not guilt. It's creating genuine value that the user can only get by showing up. The app must offer something fresh every single day — something that wasn't there yesterday and won't be there tomorrow.
+
+### The Four Hooks
+
+These are the mechanisms that bring someone back. Every feature should strengthen at least one:
+
+**1. The Mirror (Daily Reflection)**
+A new, personal observation about the user's life every morning. Not generic — drawn from their actual goals, streaks, journal themes, and patterns. This is the primary hook: "what does the app see in me today?" The mirror must change daily, must be personal, and must reward the act of looking.
+
+**2. The Streak (Visible Continuity)**
+The longer a streak grows, the more it costs to break. This isn't manipulation — it's the genuine truth that consistency compounds. The user returns because their 14-day meditation streak is *theirs*, and skipping today means losing something real. Streaks must be visible, celebrated, and protected (with grace days).
+
+**3. The Unfinished Thread (Active Commitments)**
+One-time goals with deadlines, ongoing conversations with the AI companion, journal entries the user started but didn't finish. These create gentle forward momentum — "I should check on that." Not guilt, but the natural pull of things in progress.
+
+**4. The Surprise (Content That Refreshes)**
+Something the user didn't expect. An insight extracted from last week's journals that they hadn't noticed. A connection between two practices they didn't see. The reflection landing differently because their data changed. The app must feel *alive* — not static. If today's app is identical to yesterday's, there's no reason to return.
+
+### The Retention Test
+
+For every feature proposal, after the Three Questions, ask:
+
+- **Which hook does this strengthen?** If none, it doesn't drive return.
+- **Does this create something new each day?** Static features don't pull users back.
+- **Would the user miss this if they skipped a day?** If not, it's not a hook — it's furniture.
+- **Does this deepen over time?** The app should get more valuable the longer someone uses it. A feature that's the same on day 1 and day 100 is a missed opportunity.
+
+### Content That Refreshes Daily
+
+The app must have at least 3 things that are genuinely new every day:
+
+1. **Daily reflection** — AI-generated, personalized, never repeats
+2. **Practice status** — different every day because the user's check-ins change
+3. **Contextual prompts** — journal prompt, chat context, all drawn from evolving data
+
+When evaluating "what's next," prioritize features that add another daily-refresh element. Static features (settings pages, about screens, help docs) don't drive return and should be deprioritized.
+
 ## The Three Questions
 
 Before ANY feature, change, or addition is approved, it must pass all three:
