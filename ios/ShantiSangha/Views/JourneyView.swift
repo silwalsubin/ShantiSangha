@@ -345,6 +345,7 @@ struct JourneyView: View {
     private func loadVedicIdentity() async {
         do {
             let identity: VedicIdentity = try await api.get("/jyotish/identity")
+            await AppLogger.shared.info("Journey", "Vedic identity: available=\(identity.available) rashi=\(identity.sunRashi ?? "nil") nakshatra=\(identity.nakshatra ?? "nil")")
             if identity.available {
                 withAnimation(.easeIn(duration: 0.3)) { vedicIdentity = identity }
             }

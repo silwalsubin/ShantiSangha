@@ -449,8 +449,16 @@ struct SettingsView: View {
             body["birthPlace"] = birthPlace
         }
 
-        guard !body.isEmpty, let data = try? JSONSerialization.data(withJSONObject: body) else { return }
-        let _: EmptyResponse? = try? await api.patchRaw("/me", body: data)
+        guard !body.isEmpty, let data = try? JSONSerialization.data(withJSONObject: body) else {
+            await AppLogger.shared.error("Settings", "Birth save: body empty or serialization failed")
+            return
+        }
+        do {
+            let _: EmptyResponse = try await api.patchRaw("/me", body: data)
+            await AppLogger.shared.info("Settings", "Birth details saved: \(body.keys.joined(separator: ", "))")
+        } catch {
+            await AppLogger.shared.error("Settings", "Birth save failed: \(error)")
+        }
     }
 
     private func formatBirthDate(_ date: Date) -> String {
