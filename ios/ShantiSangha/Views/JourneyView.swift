@@ -8,6 +8,7 @@ struct JourneyView: View {
     @State private var reflectionLoading = false
     @State private var reflectionTimedOut = false
     @State private var selectedPeriod: JourneyPeriod = .lastWeek
+    @State private var insights: [InsightItem] = []
     private let api = ApiService.shared
 
     var body: some View {
@@ -184,6 +185,28 @@ struct JourneyView: View {
                             }
                         }
                     }
+
+                    // Saved insights
+                    if !insights.isEmpty {
+                        Rectangle()
+                            .fill(Color.sacredMuted.opacity(0.12))
+                            .frame(height: 1)
+                            .padding(.top, 8)
+                            .padding(.bottom, 20)
+
+                        VStack(alignment: .leading, spacing: 0) {
+                            Text("INSIGHTS")
+                                .font(.sacredSectionLabel)
+                                .tracking(3)
+                                .foregroundColor(.sacredLabel)
+                                .padding(.bottom, 16)
+
+                            ForEach(insights) { insight in
+                                insightCard(insight)
+                                    .padding(.bottom, 12)
+                            }
+                        }
+                    }
                 } else {
                     Text("Start your practices to see your journey unfold.")
                         .font(.sacredText)
@@ -202,6 +225,49 @@ struct JourneyView: View {
         .task { await loadAll() }
     }
 
+    // MARK: - Insight Card
+
+    private func insightCard(_ insight: InsightItem) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "flame")
+                .font(.system(size: 12))
+                .foregroundColor(.sacredGold)
+                .padding(.top, 3)
+
+            Text(insight.content)
+                .font(.sacredText)
+                .foregroundColor(.sacredText)
+                .lineSpacing(4)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.sacredGold.opacity(0.04))
+                .overlay(RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.sacredGold.opacity(0.08)))
+        )
+        .contextMenu {
+            Button {
+                Task { await dismissInsight(insight) }
+            } label: {
+                Label("Dismiss", systemImage: "xmark.circle")
+            }
+            ShareLink(item: insight.content) {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
+        }
+    }
+
+    private func dismissInsight(_ insight: InsightItem) async {
+        withAnimation { insights.removeAll { $0.id == insight.id } }
+        do { try await api.delete("/insights/\(insight.id)") } catch {}
+    }
+
+    // MARK: - Data Loading
+
     private func loadAll() async {
         loading = journey == nil
         reflection = nil
@@ -217,18 +283,34 @@ struct JourneyView: View {
         }
         loading = false
 
-        // Load reflection in background — timeout gracefully
+        // Load reflection and insights in parallel
         reflectionLoading = true
+        async let reflectionTask: () = loadReflectionData(from: from, to: to)
+        async let insightsTask: () = loadInsights()
+        _ = await (reflectionTask, insightsTask)
+    }
+
+    private func loadReflectionData(from: String, to: String) async {
         do {
             let result: ReflectionResponse = try await api.get("/goals/journey/reflection?from=\(from)&to=\(to)")
             withAnimation(.easeIn(duration: 0.3)) { reflection = result.reflection }
         } catch {
             if !error.isCancellation {
-                // Don't leave the user hanging — just hide the reflection area
                 AppLogger.shared.error("Journey", "Failed to load reflection: \(error)")
             }
         }
         reflectionLoading = false
+    }
+
+    private func loadInsights() async {
+        do {
+            let items: [InsightItem] = try await api.get("/insights?page=1&pageSize=10")
+            withAnimation(.easeIn(duration: 0.3)) { insights = items }
+        } catch {
+            if !error.isCancellation {
+                AppLogger.shared.error("Journey", "Failed to load insights: \(error)")
+            }
+        }
     }
 }
 
@@ -341,4 +423,12 @@ struct JourneyCommitment: Codable, Identifiable {
 
 struct ReflectionResponse: Codable {
     let reflection: String?
+}
+
+struct InsightItem: Codable, Identifiable {
+    let id: String
+    let content: String
+    let sourceConversationId: String?
+    let sourceJournalId: String?
+    let createdAt: String
 }
