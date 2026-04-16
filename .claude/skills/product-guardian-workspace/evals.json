@@ -1,0 +1,20 @@
+{
+  "skill_name": "product-guardian",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I want to add a weekly summary email that shows users their stats from the past week",
+      "expected_output": "Should reject the proposal (weekly not daily, consumption not discipline) but counter-propose something retention-driving that strengthens one of the Four Hooks"
+    },
+    {
+      "id": 2,
+      "prompt": "What should we build next to improve retention?",
+      "expected_output": "Should propose 3-5 concrete retention improvements ranked by impact, using the Four Hooks and Invisible Psychology frameworks. Should audit existing features and find gaps."
+    },
+    {
+      "id": 3,
+      "prompt": "I want to add a screen where users can see all their past reflections in a scrollable list",
+      "expected_output": "Nuanced evaluation — should see the variable reward hook (re-reading old reflections that hit differently now) but also flag content consumption risk. Should propose a version that passes."
+    }
+  ]
+}
