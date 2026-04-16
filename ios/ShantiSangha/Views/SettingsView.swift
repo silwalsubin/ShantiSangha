@@ -456,6 +456,9 @@ struct SettingsView: View {
         do {
             let _: EmptyResponse = try await api.patchRaw("/me", body: data)
             await AppLogger.shared.info("Settings", "Birth details saved: \(body.keys.joined(separator: ", "))")
+        } catch let ApiError.httpError(statusCode, responseData) {
+            let responseBody = String(data: responseData, encoding: .utf8) ?? "unreadable"
+            await AppLogger.shared.error("Settings", "Birth save \(statusCode): \(responseBody)")
         } catch {
             await AppLogger.shared.error("Settings", "Birth save failed: \(error)")
         }

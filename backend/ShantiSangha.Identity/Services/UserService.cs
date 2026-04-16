@@ -37,7 +37,19 @@ public class UserService(IdentityDbContext db) : IUserService
             .FirstOrDefaultAsync(u => u.Id == userId, ct);
 
         if (user is null) return false;
-        if (user.Profile is null) return false;
+
+        // Auto-create profile if it doesn't exist yet
+        if (user.Profile is null)
+        {
+            user.Profile = new Models.Profile
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            db.Profiles.Add(user.Profile);
+        }
 
         if (request.DisplayName is not null) user.Profile.DisplayName = request.DisplayName;
         if (request.Timezone is not null) user.Profile.Timezone = request.Timezone;
