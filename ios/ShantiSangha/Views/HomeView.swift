@@ -9,6 +9,7 @@ struct HomeView: View {
     @State private var showRecurringSummary = false
     @State private var showMilestoneSummary = false
     @State private var reflection: String?
+    @State private var reflectionDate: String?
     @State private var showFAB = true
 
     var body: some View {
@@ -86,6 +87,7 @@ struct HomeView: View {
             .background(Color.sacredBg.ignoresSafeArea())
             .refreshable {
                 await vm.load()
+                await loadReflection(force: true)
                 updateWidgetData()
             }
             .task {
@@ -98,7 +100,7 @@ struct HomeView: View {
             .onReceive(NotificationCenter.default.publisher(for: .silentPushReceived)) { notification in
                 let type = notification.userInfo?["type"] as? String
                 Task {
-                    if type == "reflection" { await loadReflection() }
+                    if type == "reflection" { await loadReflection(force: true) }
                 }
             }
             .onAppear { withAnimation(.easeOut(duration: 0.25)) { showFAB = true } }
@@ -273,15 +275,19 @@ struct HomeView: View {
 
     // MARK: - Reflection
 
-    private func loadReflection() async {
+    private func loadReflection(force: Bool = false) async {
         let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
         let dateStr = df.string(from: Date())
+
+        // Skip refetch on tab switch if we already have today's reflection
+        if !force, reflection != nil, reflectionDate == dateStr { return }
         do {
             await AppLogger.shared.info("Reflection", "Fetching /reflection/today?date=\(dateStr)")
             let response: DailyReflectionResponse = try await ApiService.shared.get("/reflection/today?date=\(dateStr)")
             await AppLogger.shared.info("Reflection", "Response: content=\(response.content?.prefix(40) ?? "nil")")
             if let content = response.content, !content.isEmpty {
                 reflection = content
+                reflectionDate = dateStr
                 return
             }
 
