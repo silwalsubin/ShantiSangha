@@ -57,5 +57,7 @@ struct MainTabView: View {
         .onChange(of: selectedTab) { _, _ in
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
+        .onAppear { MotionManager.shared.start() }
+        .onDisappear { MotionManager.shared.stop() }
     }
 }

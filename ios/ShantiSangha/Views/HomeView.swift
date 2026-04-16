@@ -12,6 +12,8 @@ struct HomeView: View {
     @State private var reflectionDate: String?
     @State private var reflectionLoading = true
     @State private var showFAB = true
+    @State private var practicesCompleted = false
+    @State private var ringPulse = false
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -52,7 +54,9 @@ struct HomeView: View {
                                         label: "Practices",
                                         done: vm.doneRecurring,
                                         total: vm.totalRecurring,
-                                        color: .sacredGold
+                                        color: .sacredGold,
+                                        isComplete: vm.allPracticesDone,
+                                        almostDone: vm.totalRecurring > 1 && vm.doneRecurring == vm.totalRecurring - 1
                                     )
                                 }
                                 .frame(maxWidth: .infinity)
@@ -76,12 +80,13 @@ struct HomeView: View {
                         .padding(.bottom, 20)
 
                         // All done message
-                        if vm.allPracticesDone {
+                        if practicesCompleted {
                             Text("All practices complete. You showed up today.")
                                 .font(.sacredText)
                                 .foregroundColor(.sacredTextSecondary)
                                 .multilineTextAlignment(.center)
                                 .padding(.top, 8)
+                                .transition(.opacity.combined(with: .move(edge: .bottom)))
                         }
                     }
                 }
@@ -98,9 +103,30 @@ struct HomeView: View {
                 await vm.load()
                 await loadReflection()
                 updateWidgetData()
+                // Sync completion state on initial load (no haptic)
+                practicesCompleted = vm.allPracticesDone
             }
             .onChange(of: vm.doneRecurring) { updateWidgetData() }
             .onChange(of: vm.doneMilestones) { updateWidgetData() }
+            .onChange(of: vm.allPracticesDone) { _, allDone in
+                if allDone {
+                    // Haptic + animate in the completion state
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    withAnimation(.easeOut(duration: 0.5)) {
+                        practicesCompleted = true
+                    }
+                    // Pulse the ring glow
+                    withAnimation(.easeInOut(duration: 0.8).repeatCount(2, autoreverses: true)) {
+                        ringPulse = true
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+                        ringPulse = false
+                    }
+                } else {
+                    withAnimation { practicesCompleted = false }
+                    ringPulse = false
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: .silentPushReceived)) { notification in
                 let type = notification.userInfo?["type"] as? String
                 Task {
@@ -120,7 +146,7 @@ struct HomeView: View {
                         .font(.sacredHeading)
                         .foregroundColor(.white)
                         .frame(width: 56, height: 56)
-                        .cymbalGold()
+                        .goldShine()
                         .clipShape(Circle())
                 }
                 .padding(.trailing, 20)
@@ -165,11 +191,21 @@ struct HomeView: View {
 
     // MARK: - Progress circle
 
-    private func progressCircle(label: String, done: Int, total: Int, color: Color, detail: String? = nil) -> some View {
+    private func progressCircle(label: String, done: Int, total: Int, color: Color, detail: String? = nil, isComplete: Bool = false, almostDone: Bool = false) -> some View {
         let progress = total > 0 ? Double(done) / Double(total) : 0
+        // Warm the stroke when one away from completion
+        let strokeColor = almostDone ? Color.sacredGold : color
 
         return VStack(spacing: 14) {
             ZStack {
+                // Completion glow — soft radial behind the ring
+                if isComplete && ringPulse {
+                    Circle()
+                        .fill(color.opacity(0.15))
+                        .frame(width: 150, height: 150)
+                        .blur(radius: 12)
+                }
+
                 // Track
                 Circle()
                     .stroke(Color.sacredMuted.opacity(0.12), lineWidth: 10)
@@ -180,7 +216,7 @@ struct HomeView: View {
                         .trim(from: 0, to: progress)
                         .stroke(
                             LinearGradient(
-                                colors: [color.opacity(0.7), color, color.opacity(0.8)],
+                                colors: [strokeColor.opacity(0.7), strokeColor, strokeColor.opacity(0.8)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
@@ -188,6 +224,11 @@ struct HomeView: View {
                         )
                         .rotationEffect(.degrees(-90))
                         .animation(.easeOut(duration: 0.6), value: progress)
+                }
+
+                // Motion-reactive gold shine — follows the filled arc
+                if done > 0 {
+                    GoldShineRing(size: 130, lineWidth: 10, progress: progress)
                 }
 
                 // Count
@@ -200,10 +241,16 @@ struct HomeView: View {
                     } else {
                         Text("\(done)")
                             .font(.system(size: 36, weight: .bold, design: .serif))
-                            .foregroundColor(done > 0 ? color : .sacredMuted)
-                        Text("of \(total)")
-                            .font(.sacredCaption)
-                            .foregroundColor(.sacredMuted)
+                            .foregroundColor(done > 0 ? strokeColor : .sacredMuted)
+                        if isComplete {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 13, weight: .semibold, design: .serif))
+                                .foregroundColor(color.opacity(0.7))
+                        } else {
+                            Text("of \(total)")
+                                .font(.sacredCaption)
+                                .foregroundColor(.sacredMuted)
+                        }
                     }
                 }
             }

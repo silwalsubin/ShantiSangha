@@ -251,7 +251,7 @@ struct ReflectView: View {
                     .font(.sacredHeading)
                     .foregroundColor(.white)
                     .frame(width: 56, height: 56)
-                    .cymbalGold()
+                    .goldShine()
                     .clipShape(Circle())
             }
         }
@@ -265,7 +265,7 @@ struct ReflectView: View {
                 .font(.sacredIcon)
                 .foregroundColor(.white)
                 .frame(width: 48, height: 48)
-                .cymbalGold()
+                .goldShine()
                 .clipShape(Circle())
         }
         .transition(.scale.combined(with: .opacity))

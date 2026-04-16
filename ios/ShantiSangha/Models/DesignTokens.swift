@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreMotion
 
 /// Sacred typography — all serif (New York), no sans-serif anywhere.
 /// All app text should use these tokens instead of raw .system() calls.
@@ -218,6 +219,43 @@ extension View {
     }
 }
 
+/// Simple gold background with a motion-reactive shine highlight.
+/// Clean and flat — no concentric rings or cymbal texture.
+struct GoldShineModifier: ViewModifier {
+    @ObservedObject private var motion = MotionManager.shared
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                ZStack {
+                    Color.sacredGold
+
+                    // Motion shine — follows device tilt
+                    GeometryReader { geo in
+                        let cx = (1 + motion.shineX) / 2 * geo.size.width
+                        let cy = (1 - motion.shineY) / 2 * geo.size.height
+                        RadialGradient(
+                            stops: [
+                                .init(color: .white.opacity(0.45), location: 0),
+                                .init(color: .sacredGoldShine.opacity(0.25), location: 0.35),
+                                .init(color: .clear, location: 0.7),
+                            ],
+                            center: UnitPoint(x: cx / geo.size.width, y: cy / geo.size.height),
+                            startRadius: 0,
+                            endRadius: max(geo.size.width, geo.size.height) * 0.6
+                        )
+                    }
+                }
+            )
+    }
+}
+
+extension View {
+    func goldShine() -> some View {
+        modifier(GoldShineModifier())
+    }
+}
+
 /// Reusable shiny gold gradients — metallic highlight for sacred elements.
 extension LinearGradient {
     /// Shiny gold — horizontal with center highlight band
@@ -245,4 +283,106 @@ extension LinearGradient {
         startPoint: .top,
         endPoint: .bottom
     )
+}
+
+// MARK: - Device motion for gold shine
+
+/// Tracks device tilt via CoreMotion and exposes a shine angle + offset.
+/// Shared singleton — starts/stops automatically based on observer count.
+@MainActor
+final class MotionManager: ObservableObject {
+    static let shared = MotionManager()
+
+    /// Angle in degrees where the shine highlight sits (0–360, clockwise from top).
+    @Published var shineAngle: Angle = .degrees(0)
+    /// Normalized X offset (-1...1) from device roll — for linear shine positioning.
+    @Published var shineX: CGFloat = 0
+    /// Normalized Y offset (-1...1) from device pitch.
+    @Published var shineY: CGFloat = 0
+
+    private let cm = CMMotionManager()
+    private var observerCount = 0
+
+    private init() {}
+
+    func start() {
+        observerCount += 1
+        guard observerCount == 1, cm.isDeviceMotionAvailable, !cm.isDeviceMotionActive else { return }
+        cm.deviceMotionUpdateInterval = 1.0 / 30 // 30 Hz — smooth but efficient
+        cm.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
+            guard let self, let m = motion else { return }
+            // roll = left/right tilt, pitch = forward/back tilt
+            let roll = m.attitude.roll   // radians, ±π
+            let pitch = m.attitude.pitch // radians, ±π/2
+
+            // Map to a shine angle — roll dominates the circular position
+            let angle = atan2(roll, -pitch)
+            self.shineAngle = .radians(angle)
+            self.shineX = max(-1, min(1, roll / .pi * 2))
+            self.shineY = max(-1, min(1, pitch / (.pi / 2)))
+        }
+    }
+
+    func stop() {
+        observerCount = max(0, observerCount - 1)
+        guard observerCount == 0 else { return }
+        cm.stopDeviceMotionUpdates()
+    }
+}
+
+/// A gold shine overlay for circular elements that follows device tilt.
+/// The highlight spot orbits the ring as you move the phone.
+struct GoldShineRing: View {
+    @ObservedObject private var motion = MotionManager.shared
+    let size: CGFloat
+    let lineWidth: CGFloat
+    /// How much of the ring is filled (0...1). Shine only appears on the filled portion.
+    var progress: CGFloat = 1
+
+    var body: some View {
+        Circle()
+            .trim(from: 0, to: progress)
+            .stroke(
+                AngularGradient(
+                    stops: shineStops,
+                    center: .center
+                ),
+                style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+            )
+            .frame(width: size, height: size)
+            .rotationEffect(.degrees(-90)) // match the ring's coordinate system
+    }
+
+    private var shineStops: [Gradient.Stop] {
+        let center = normalizedAngle
+        let spread: CGFloat = 0.12
+        let peak: CGFloat = 0.04
+
+        // Only show the shine if it falls within the filled portion
+        let visible = center <= progress + spread
+        guard visible else {
+            return [Gradient.Stop(color: .clear, location: 0), Gradient.Stop(color: .clear, location: 1)]
+        }
+
+        let raw: [(Color, CGFloat)] = [
+            (.clear, 0),
+            (.clear, center - spread),
+            (Color.sacredGoldShine.opacity(0.3), center - peak),
+            (Color.white.opacity(0.45), center),
+            (Color.sacredGoldShine.opacity(0.3), center + peak),
+            (.clear, center + spread),
+            (.clear, 1),
+        ]
+
+        return raw.map { color, loc in
+            Gradient.Stop(color: color, location: max(0, min(1, loc)))
+        }
+    }
+
+    /// Convert the motion angle to 0...1 range for AngularGradient
+    private var normalizedAngle: CGFloat {
+        let degrees = motion.shineAngle.degrees.truncatingRemainder(dividingBy: 360)
+        let positive = degrees < 0 ? degrees + 360 : degrees
+        return positive / 360
+    }
 }
