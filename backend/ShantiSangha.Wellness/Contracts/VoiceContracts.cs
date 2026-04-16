@@ -10,4 +10,4 @@ public record VoiceEntryCreatedResponse(Guid Id, string Status, DateTime Created
 
 public record VoiceEntryListItem(Guid Id, string Status, DateTime CreatedAt, DateTime UpdatedAt, bool HasTranscript, string? TranscriptPreview, Guid? DraftJournalId);
 
-public record VoiceEntryDetailResponse(Guid Id, string Status, string? Transcript, Guid? DraftJournalId, DateTime CreatedAt, DateTime UpdatedAt);
+public record VoiceEntryDetailResponse(Guid Id, string Status, string? Transcript, Guid? DraftJournalId, DateTime CreatedAt, DateTime UpdatedAt, string? AudioUrl);

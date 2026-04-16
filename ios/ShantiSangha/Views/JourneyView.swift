@@ -6,6 +6,7 @@ struct JourneyView: View {
     @State private var reflection: String?
     @State private var loading = true
     @State private var reflectionLoading = false
+    @State private var reflectionTimedOut = false
     @State private var selectedPeriod: JourneyPeriod = .lastWeek
     private let api = ApiService.shared
 
@@ -82,7 +83,7 @@ struct JourneyView: View {
                     .padding(.bottom, 28)
 
                     // AI Reflection
-                    if reflectionLoading {
+                    if reflectionLoading && !reflectionTimedOut {
                         HStack(spacing: 8) {
                             ProgressView()
                                 .scaleEffect(0.8)
@@ -92,6 +93,10 @@ struct JourneyView: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.bottom, 24)
+                        .task {
+                            try? await Task.sleep(nanoseconds: 10_000_000_000)
+                            if reflectionLoading { reflectionTimedOut = true }
+                        }
                     } else if let reflection = reflection {
                         Text(reflection)
                             .font(.sacredBody)
@@ -106,23 +111,35 @@ struct JourneyView: View {
                     if !journey.practices.isEmpty {
                         VStack(spacing: 0) {
                             ForEach(Array(journey.practices.enumerated()), id: \.element.id) { index, practice in
-                                HStack(spacing: 14) {
-                                    // Mini ring
-                                    PracticeRing(
-                                        done: practice.daysCompleted,
-                                        total: practice.totalDays
+                                NavigationLink {
+                                    GoalCalendarView(
+                                        goalId: practice.id,
+                                        goalTitle: practice.title,
+                                        goalCreatedAt: practice.days.first?.date ?? journey.from
                                     )
-                                    .frame(width: 40, height: 40)
+                                } label: {
+                                    HStack(spacing: 14) {
+                                        // Mini ring
+                                        PracticeRing(
+                                            done: practice.daysCompleted,
+                                            total: practice.totalDays
+                                        )
+                                        .frame(width: 40, height: 40)
 
-                                    Text(practice.title)
-                                        .font(.sacredTextMedium)
-                                        .foregroundColor(.sacredText)
+                                        Text(practice.title)
+                                            .font(.sacredTextMedium)
+                                            .foregroundColor(.sacredText)
 
-                                    Spacer()
+                                        Spacer()
 
-                                    Text("\(practice.daysCompleted)/\(practice.totalDays)")
-                                        .font(.sacredSmall)
-                                        .foregroundColor(.sacredMuted)
+                                        Text("\(practice.daysCompleted)/\(practice.totalDays)")
+                                            .font(.sacredSmall)
+                                            .foregroundColor(.sacredMuted)
+
+                                        Image(systemName: "chevron.right")
+                                            .font(.system(size: 12, weight: .medium))
+                                            .foregroundColor(.sacredMuted.opacity(0.5))
+                                    }
                                 }
                                 .padding(.vertical, 12)
 
@@ -188,6 +205,7 @@ struct JourneyView: View {
     private func loadAll() async {
         loading = journey == nil
         reflection = nil
+        reflectionTimedOut = false
         let (from, to) = selectedPeriod.dateRange
 
         do {
@@ -199,13 +217,14 @@ struct JourneyView: View {
         }
         loading = false
 
-        // Load reflection in background
+        // Load reflection in background — timeout gracefully
         reflectionLoading = true
         do {
             let result: ReflectionResponse = try await api.get("/goals/journey/reflection?from=\(from)&to=\(to)")
             withAnimation(.easeIn(duration: 0.3)) { reflection = result.reflection }
         } catch {
             if !error.isCancellation {
+                // Don't leave the user hanging — just hide the reflection area
                 AppLogger.shared.error("Journey", "Failed to load reflection: \(error)")
             }
         }

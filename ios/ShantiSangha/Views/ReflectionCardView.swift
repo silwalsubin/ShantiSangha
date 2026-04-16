@@ -4,12 +4,13 @@ import SwiftUI
 /// No title, no label — the card just speaks.
 struct ReflectionCardView: View {
     let content: String
+    var isLoading: Bool = false
 
     var body: some View {
         Text(content)
             .font(.system(size: 15, weight: .regular, design: .serif))
             .italic()
-            .foregroundColor(.sacredTextSecondary)
+            .foregroundColor(isLoading ? .sacredMuted : .sacredTextSecondary)
             .multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 20)
@@ -22,5 +23,6 @@ struct ReflectionCardView: View {
                         .stroke(Color.sacredGold.opacity(0.1)))
             )
             .padding(.horizontal, 16)
+            .opacity(isLoading ? 0.6 : 1)
     }
 }

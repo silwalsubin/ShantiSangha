@@ -22,6 +22,20 @@ struct TaskRow: View {
         task.type == .oneTime && (task.daysRemaining ?? 1) <= 0
     }
 
+    /// Message shown on swipe-right — acknowledges the streak for recurring tasks.
+    private var checkinMessage: String {
+        guard task.type == .recurring else { return "Done" }
+        let nextStreak = task.currentStreak + 1
+        if nextStreak == 7 { return "Day 7 — one full week" }
+        if nextStreak == 14 { return "Day 14 — two weeks strong" }
+        if nextStreak == 30 { return "Day 30 — a whole month" }
+        if nextStreak == 60 { return "Day 60 — remarkable" }
+        if nextStreak == 100 { return "Day 100" }
+        if nextStreak == 365 { return "Day 365 — one year" }
+        if nextStreak >= 3 { return "Day \(nextStreak)" }
+        return "Done"
+    }
+
     @State private var offset: CGFloat = 0
     @State private var activeSwipe: SwipeDirection? = nil
     @State private var navigateToDetail = false
@@ -43,7 +57,7 @@ struct TaskRow: View {
                     Image(systemName: "checkmark")
                         .font(.sacredTextSemibold)
                         .foregroundColor(.white)
-                    Text("Done")
+                    Text(checkinMessage)
                         .font(.sacredSmallSemibold)
                         .foregroundColor(.white)
                     Spacer()

@@ -71,16 +71,26 @@ public class VoiceService(WellnessDbContext db, StorageService storage) : IVoice
 
     public async Task<VoiceEntryDetailResponse?> GetEntryAsync(Guid userId, Guid entryId, CancellationToken ct = default)
     {
-        return await db.VoiceEntries
-            .Where(v => v.Id == entryId && v.UserId == userId)
-            .Select(v => new VoiceEntryDetailResponse(
-                v.Id,
-                v.Status.ToString(),
-                v.Transcript,
-                v.DraftJournalId,
-                v.CreatedAt,
-                v.UpdatedAt))
-            .FirstOrDefaultAsync(ct);
+        var entry = await db.VoiceEntries
+            .FirstOrDefaultAsync(v => v.Id == entryId && v.UserId == userId, ct);
+
+        if (entry is null) return null;
+
+        string? audioUrl = null;
+        if (!string.IsNullOrEmpty(entry.StorageKey))
+        {
+            try { audioUrl = await storage.GetPresignedDownloadUrlAsync(entry.StorageKey, TimeSpan.FromHours(1)); }
+            catch { /* Storage key may no longer exist — audio is optional */ }
+        }
+
+        return new VoiceEntryDetailResponse(
+            entry.Id,
+            entry.Status.ToString(),
+            entry.Transcript,
+            entry.DraftJournalId,
+            entry.CreatedAt,
+            entry.UpdatedAt,
+            audioUrl);
     }
 
     public async Task<bool> DeleteEntryAsync(Guid userId, Guid entryId, CancellationToken ct = default)

@@ -37,6 +37,22 @@ public class StorageService : IDisposable
         return url;
     }
 
+    /// <summary>Generate a presigned GET URL so the client can stream/play the audio.</summary>
+    public async Task<string> GetPresignedDownloadUrlAsync(string objectKey, TimeSpan expiry)
+    {
+        var request = new GetPreSignedUrlRequest
+        {
+            BucketName = _bucket,
+            Key = objectKey,
+            Verb = HttpVerb.GET,
+            Expires = DateTime.UtcNow.Add(expiry)
+        };
+
+        var url = await _client.GetPreSignedURLAsync(request);
+        _logger.LogDebug("Generated presigned download URL for {Key}", objectKey);
+        return url;
+    }
+
     /// <summary>Download an object into a stream for processing (e.g. transcription).</summary>
     public async Task<Stream> DownloadAsync(string objectKey)
     {

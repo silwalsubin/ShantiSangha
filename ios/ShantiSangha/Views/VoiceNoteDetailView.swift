@@ -1,11 +1,13 @@
 import SwiftUI
+import AVFoundation
 
-/// Shows a recorded voice note's transcript.
+/// Shows a recorded voice note's transcript with audio playback.
 struct VoiceNoteDetailView: View {
     let entryId: String
 
     @State private var entry: VoiceEntryDetail?
     @State private var loading = true
+    @StateObject private var player = AudioPlayerModel()
     private let api = ApiService.shared
 
     var body: some View {
@@ -27,6 +29,11 @@ struct VoiceNoteDetailView: View {
                         Text(formatDate(entry.createdAt))
                             .font(.sacredSmall)
                             .foregroundColor(.sacredMuted)
+                    }
+
+                    // Audio player
+                    if let audioUrl = entry.audioUrl, let url = URL(string: audioUrl) {
+                        audioPlayerBar(url: url)
                     }
 
                     Divider()
@@ -77,6 +84,48 @@ struct VoiceNoteDetailView: View {
             }
         }
         .task { await loadEntry() }
+        .onDisappear { player.stop() }
+    }
+
+    // MARK: - Audio Player Bar
+
+    private func audioPlayerBar(url: URL) -> some View {
+        HStack(spacing: 16) {
+            Button {
+                if player.isPlaying { player.pause() } else { player.play(url: url) }
+            } label: {
+                Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                    .font(.system(size: 20))
+                    .foregroundColor(.sacredGold)
+                    .frame(width: 44, height: 44)
+            }
+
+            // Progress bar
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.sacredMuted.opacity(0.15))
+                        .frame(height: 4)
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.sacredGold)
+                        .frame(width: geo.size.width * player.progress, height: 4)
+                }
+            }
+            .frame(height: 4)
+
+            Text(player.timeLabel)
+                .font(.sacredMicro)
+                .foregroundColor(.sacredMuted)
+                .monospacedDigit()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.sacredGold.opacity(0.06))
+                .overlay(RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.sacredGold.opacity(0.12)))
+        )
     }
 
     // MARK: - Helpers
@@ -113,17 +162,108 @@ struct VoiceNoteDetailView: View {
     }
 }
 
+// MARK: - Audio Player Model
+
+@MainActor
+class AudioPlayerModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
+    @Published var isPlaying = false
+    @Published var progress: CGFloat = 0
+    @Published var timeLabel = "0:00"
+
+    private var audioPlayer: AVPlayer?
+    private var timeObserver: Any?
+    private var currentUrl: URL?
+
+    func play(url: URL) {
+        // If same URL, just resume
+        if url == currentUrl, let player = audioPlayer {
+            player.play()
+            isPlaying = true
+            return
+        }
+
+        // New URL — set up player
+        stop()
+        currentUrl = url
+
+        let item = AVPlayerItem(url: url)
+        let player = AVPlayer(playerItem: item)
+        self.audioPlayer = player
+
+        // Observe time
+        timeObserver = player.addPeriodicTimeObserver(
+            forInterval: CMTime(seconds: 0.25, preferredTimescale: 600),
+            queue: .main
+        ) { [weak self] time in
+            guard let self,
+                  let duration = player.currentItem?.duration,
+                  duration.seconds.isFinite && duration.seconds > 0 else { return }
+            Task { @MainActor in
+                self.progress = CGFloat(time.seconds / duration.seconds)
+                self.timeLabel = self.formatTime(time.seconds)
+            }
+        }
+
+        // Observe end
+        NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: item,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.isPlaying = false
+                self?.progress = 0
+                self?.audioPlayer?.seek(to: .zero)
+                self?.timeLabel = "0:00"
+            }
+        }
+
+        // Configure audio session for playback
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+        try? AVAudioSession.sharedInstance().setActive(true)
+
+        player.play()
+        isPlaying = true
+    }
+
+    func pause() {
+        audioPlayer?.pause()
+        isPlaying = false
+    }
+
+    func stop() {
+        audioPlayer?.pause()
+        if let observer = timeObserver {
+            audioPlayer?.removeTimeObserver(observer)
+            timeObserver = nil
+        }
+        audioPlayer = nil
+        currentUrl = nil
+        isPlaying = false
+        progress = 0
+        timeLabel = "0:00"
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: nil)
+    }
+
+    private func formatTime(_ seconds: Double) -> String {
+        let mins = Int(seconds) / 60
+        let secs = Int(seconds) % 60
+        return String(format: "%d:%02d", mins, secs)
+    }
+}
+
 // MARK: - Model
 
 struct VoiceEntryDetail: Decodable {
     let id: String
     let status: String
     let transcript: String?
+    let audioUrl: String?
     let createdAt: Date
     let updatedAt: Date
 
     enum CodingKeys: String, CodingKey {
-        case id, status, transcript, createdAt, updatedAt
+        case id, status, transcript, audioUrl, createdAt, updatedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -131,6 +271,7 @@ struct VoiceEntryDetail: Decodable {
         id = try c.decode(String.self, forKey: .id)
         status = try c.decodeIfPresent(String.self, forKey: .status) ?? "Pending"
         transcript = try c.decodeIfPresent(String.self, forKey: .transcript)
+        audioUrl = try c.decodeIfPresent(String.self, forKey: .audioUrl)
 
         let iso = ISO8601DateFormatter()
         iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
