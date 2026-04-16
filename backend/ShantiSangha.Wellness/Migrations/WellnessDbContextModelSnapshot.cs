@@ -65,6 +65,11 @@ namespace ShantiSangha.Wellness.Migrations
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");
 
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasDefaultValue("Regular")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 

@@ -4,8 +4,10 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace ShantiSangha.Wellness.Migrations
 {
+    /// <inheritdoc />
     public partial class AddReflectionType : Migration
     {
+        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.AddColumn<string>(
@@ -16,6 +18,7 @@ namespace ShantiSangha.Wellness.Migrations
                 defaultValue: "Regular");
         }
 
+        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
