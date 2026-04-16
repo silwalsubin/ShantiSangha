@@ -114,21 +114,46 @@ public static class VedicCalendar
 
     /// <summary>
     /// Approximate tropical moon longitude for a given date.
-    /// Accurate to ~2-3 degrees — sufficient for nakshatra determination.
+    /// Uses major perturbation terms for ~1 degree accuracy.
     /// </summary>
     public static double GetTropicalMoonLongitude(DateTime date)
     {
         var daysSinceJ2000 = (date - new DateTime(2000, 1, 1, 12, 0, 0, DateTimeKind.Utc)).TotalDays;
-        // Simplified lunar longitude
-        var L = (218.3165 + 13.17639648 * daysSinceJ2000) % 360;
-        var M = (134.9634 + 13.06499295 * daysSinceJ2000) % 360;
+        var T = daysSinceJ2000 / 36525.0; // Julian centuries
+
+        // Mean elements
+        var Lp = Normalize(218.3165 + 481267.8813 * T); // Mean longitude
+        var D = Normalize(297.8502 + 445267.1115 * T);  // Mean elongation
+        var M = Normalize(357.5291 + 35999.0503 * T);   // Sun's mean anomaly
+        var Mp = Normalize(134.9634 + 477198.8676 * T);  // Moon's mean anomaly
+        var F = Normalize(93.2720 + 483202.0175 * T);   // Argument of latitude
+
+        var DRad = D * Math.PI / 180;
         var MRad = M * Math.PI / 180;
-        var F = (93.2720 + 13.22935024 * daysSinceJ2000) % 360;
+        var MpRad = Mp * Math.PI / 180;
         var FRad = F * Math.PI / 180;
-        // Perturbation (simplified)
-        var moonLong = L + 6.2894 * Math.Sin(MRad) + 1.274 * Math.Sin(2 * FRad - MRad);
-        moonLong %= 360;
-        return moonLong < 0 ? moonLong + 360 : moonLong;
+
+        // Major perturbation terms (Meeus, Astronomical Algorithms)
+        var moonLong = Lp
+            + 6.2894 * Math.Sin(MpRad)
+            + 1.2743 * Math.Sin(2 * DRad - MpRad)
+            + 0.6583 * Math.Sin(2 * DRad)
+            + 0.2136 * Math.Sin(2 * MpRad)
+            - 0.1856 * Math.Sin(MRad)
+            - 0.1143 * Math.Sin(2 * FRad)
+            + 0.0588 * Math.Sin(2 * DRad - 2 * MpRad)
+            + 0.0572 * Math.Sin(2 * DRad - MRad - MpRad)
+            + 0.0533 * Math.Sin(2 * DRad + MpRad)
+            - 0.0459 * Math.Sin(2 * DRad - MRad)
+            + 0.0410 * Math.Sin(MRad - MpRad);
+
+        return Normalize(moonLong);
+    }
+
+    private static double Normalize(double degrees)
+    {
+        var result = degrees % 360;
+        return result < 0 ? result + 360 : result;
     }
 
     /// <summary>

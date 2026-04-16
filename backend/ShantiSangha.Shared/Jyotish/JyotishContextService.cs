@@ -120,11 +120,10 @@ public class JyotishContextService(IProfileQueryService profileQuery)
 
         parts.Add(ctx.PanchangSummary);
 
-        if (ctx.SunRashi is not null)
-            parts.Add($"Their birth sun sign (rashi): {ctx.SunRashi}.");
-
         if (ctx.MoonRashi is not null)
-            parts.Add($"Their birth moon sign: {ctx.MoonRashi}.");
+            parts.Add($"Their Vedic rashi (moon sign — the primary identifier in Jyotish): {ctx.MoonRashi}.");
+        else if (ctx.SunRashi is not null)
+            parts.Add($"Their sun sign (approximate — birth time unknown): {ctx.SunRashi}.");
 
         if (ctx.BirthNakshatra is not null)
             parts.Add($"Their birth nakshatra: {ctx.BirthNakshatra}.");

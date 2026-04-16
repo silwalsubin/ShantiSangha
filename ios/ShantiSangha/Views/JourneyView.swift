@@ -24,7 +24,8 @@ struct JourneyView: View {
                             .foregroundColor(.sacredLabel)
 
                         HStack(spacing: 8) {
-                            Text(vedic.sunRashiShort)
+                            // Moon rashi is primary in Vedic astrology; fall back to Sun
+                            Text(vedic.primaryRashi)
                                 .font(.sacredTextMedium)
                                 .foregroundColor(.sacredGold)
 
@@ -485,5 +486,17 @@ struct VedicIdentity: Codable {
     var sunRashiShort: String {
         guard let rashi = sunRashi else { return "" }
         return rashi.components(separatedBy: " (").first ?? rashi
+    }
+
+    var moonRashiShort: String {
+        guard let rashi = moonRashi else { return "" }
+        return rashi.components(separatedBy: " (").first ?? rashi
+    }
+
+    /// In Vedic astrology, Moon rashi (Chandra rashi) is the primary identifier.
+    /// Falls back to Sun rashi only when birth time is unknown.
+    var primaryRashi: String {
+        if !moonRashiShort.isEmpty { return moonRashiShort }
+        return sunRashiShort
     }
 }
