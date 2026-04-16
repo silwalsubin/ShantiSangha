@@ -62,7 +62,10 @@ class AuthService: ObservableObject {
     }
 
     func signOut() {
-        Task { await PushTokenService.shared.unregisterToken() }
+        Task {
+            await PushTokenService.shared.unregisterToken()
+            await ApiService.shared.clearTokenCache()
+        }
         try? Auth.auth().signOut()
         GIDSignIn.sharedInstance.signOut()
     }
