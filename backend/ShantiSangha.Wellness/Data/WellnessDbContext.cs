@@ -19,6 +19,7 @@ public class WellnessDbContext(DbContextOptions<WellnessDbContext> options) : Db
         modelBuilder.Entity<DailyReflection>(e =>
         {
             e.HasIndex(r => new { r.UserId, r.Date }).IsUnique();
+            e.Property(r => r.Type).HasConversion<string>().HasDefaultValue(ReflectionType.Regular);
         });
 
         modelBuilder.Entity<DailyJournalPrompt>(e =>

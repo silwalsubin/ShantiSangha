@@ -30,7 +30,7 @@ public class ReflectionController(
 
         var reflection = await db.DailyReflections
             .Where(r => r.UserId == user.Id && r.Date == today)
-            .Select(r => new { r.Content, r.Date })
+            .Select(r => new { r.Content, r.Date, Type = r.Type.ToString() })
             .FirstOrDefaultAsync(ct);
 
         if (reflection is not null)
