@@ -6,7 +6,7 @@ public record UpdateMeRequest(
     int? ReminderHour,
     bool? OnboardingCompleted,
     bool? ClearReminderHour = null,
-    DateOnly? BirthDate = null,
+    string? BirthDate = null,
     string? BirthTime = null,
     string? BirthPlace = null,
     bool? ClearBirthDetails = null);
@@ -18,6 +18,6 @@ public record ProfileResponse(
     string? Timezone,
     int? ReminderHour,
     bool OnboardingCompleted,
-    DateOnly? BirthDate,
+    string? BirthDate,
     string? BirthTime,
     string? BirthPlace);

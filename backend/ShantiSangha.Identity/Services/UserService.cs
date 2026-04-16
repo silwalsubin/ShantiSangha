@@ -23,7 +23,7 @@ public class UserService(IdentityDbContext db) : IUserService
                 user.Profile.Timezone,
                 user.Profile.ReminderHour,
                 user.Profile.OnboardingCompleted,
-                user.Profile.BirthDate,
+                user.Profile.BirthDate?.ToString("yyyy-MM-dd"),
                 user.Profile.BirthTime,
                 user.Profile.BirthPlace
             )
@@ -44,7 +44,8 @@ public class UserService(IdentityDbContext db) : IUserService
         if (request.ReminderHour is not null) user.Profile.ReminderHour = Math.Clamp(request.ReminderHour.Value, 0, 23);
         if (request.ClearReminderHour == true) user.Profile.ReminderHour = null;
         if (request.OnboardingCompleted is not null) user.Profile.OnboardingCompleted = request.OnboardingCompleted.Value;
-        if (request.BirthDate is not null) user.Profile.BirthDate = request.BirthDate;
+        if (request.BirthDate is not null && DateOnly.TryParse(request.BirthDate, out var parsedBirthDate))
+            user.Profile.BirthDate = parsedBirthDate;
         if (request.BirthTime is not null) user.Profile.BirthTime = request.BirthTime;
         if (request.BirthPlace is not null) user.Profile.BirthPlace = request.BirthPlace;
         if (request.ClearBirthDetails == true)
