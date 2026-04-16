@@ -93,6 +93,18 @@ public class VoiceService(WellnessDbContext db, StorageService storage) : IVoice
             audioUrl);
     }
 
+    public async Task ResetStatusAsync(Guid userId, Guid entryId, CancellationToken ct = default)
+    {
+        var entry = await db.VoiceEntries
+            .FirstOrDefaultAsync(v => v.Id == entryId && v.UserId == userId, ct);
+        if (entry is null) return;
+
+        entry.Status = VoiceEntryStatus.Pending;
+        entry.Transcript = null;
+        entry.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+    }
+
     public async Task<bool> DeleteEntryAsync(Guid userId, Guid entryId, CancellationToken ct = default)
     {
         var entry = await db.VoiceEntries

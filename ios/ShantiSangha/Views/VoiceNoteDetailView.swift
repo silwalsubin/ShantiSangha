@@ -7,6 +7,7 @@ struct VoiceNoteDetailView: View {
 
     @State private var entry: VoiceEntryDetail?
     @State private var loading = true
+    @State private var retrying = false
     @StateObject private var player = AudioPlayerModel()
     private let api = ApiService.shared
 
@@ -48,6 +49,31 @@ struct VoiceNoteDetailView: View {
                         Text("No transcript available.")
                             .font(.sacredText)
                             .foregroundColor(.sacredMuted)
+                    } else if entry.status == "Failed" {
+                        VStack(spacing: 16) {
+                            Text("Transcription failed.")
+                                .font(.sacredText)
+                                .foregroundColor(.sacredMuted)
+                            Button {
+                                Task { await retryTranscription() }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "arrow.clockwise")
+                                    Text("Retry")
+                                }
+                                .font(.sacredSmallSemibold)
+                                .foregroundColor(.sacredGold)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 10)
+                                .background(
+                                    Capsule()
+                                        .stroke(Color.sacredGold.opacity(0.3), lineWidth: 1)
+                                )
+                            }
+                            .disabled(retrying)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
                     } else {
                         VStack(spacing: 12) {
                             ProgressView()
@@ -159,6 +185,20 @@ struct VoiceNoteDetailView: View {
             }
         }
         loading = false
+    }
+
+    private func retryTranscription() async {
+        retrying = true
+        do {
+            let _: EmptyResponse = try await api.post("/voice/entries/\(entryId)/retry")
+            // Reload to show the "Transcribing..." state
+            await loadEntry()
+        } catch {
+            if !error.isCancellation {
+                AppLogger.shared.error("VoiceDetail", "Failed to retry transcription: \(error)")
+            }
+        }
+        retrying = false
     }
 }
 

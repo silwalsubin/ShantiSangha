@@ -70,6 +70,24 @@ public class VoiceController(IVoiceService voiceService, ICurrentUser currentUse
         return Ok(result);
     }
 
+    [HttpPost("entries/{id:guid}/retry")]
+    public async Task<IActionResult> RetryTranscription(
+        Guid id,
+        [FromServices] IBackgroundJobClient jobs,
+        CancellationToken ct)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+
+        var entry = await voiceService.GetEntryAsync(user.Id, id, ct);
+        if (entry is null) return NotFound();
+
+        await voiceService.ResetStatusAsync(user.Id, id, ct);
+        jobs.Enqueue<TranscribeVoiceJob>(j => j.RunAsync(id));
+
+        return Ok(new { status = "Pending" });
+    }
+
     [HttpDelete("entries/{id:guid}")]
     public async Task<IActionResult> DeleteEntry(Guid id, CancellationToken ct)
     {
