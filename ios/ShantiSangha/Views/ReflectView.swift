@@ -108,8 +108,8 @@ struct ReflectView: View {
                                     }
                                 }
                             }
-                            .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBgCard))
-                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.1)))
+                            .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
+                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
                         }
                     }
                 }

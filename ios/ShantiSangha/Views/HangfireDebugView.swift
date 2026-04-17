@@ -227,8 +227,8 @@ struct HangfireDebugView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBgCard))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.08)))
+        .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
     }
 
     private func jobRow(type: String?, method: String?, detail: String, color: Color = .sacredText) -> some View {

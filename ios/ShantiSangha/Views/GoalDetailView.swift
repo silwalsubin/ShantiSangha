@@ -81,8 +81,8 @@ struct GoalDetailView: View {
                                         .foregroundColor(.sacredMuted)
                                 }
                                 .padding(14)
-                                .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBgCard))
-                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.08)))
+                                .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
+                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
                             }
                             .buttonStyle(.plain)
                         }
@@ -120,8 +120,8 @@ struct GoalDetailView: View {
                             }
                         }
                         .padding(16)
-                        .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
-                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.12)))
+                        .background(RoundedRectangle(cornerRadius: 20).fill(.ultraThinMaterial))
+                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredGold.opacity(0.08)))
                     }
                     .buttonStyle(.plain)
 
@@ -151,8 +151,8 @@ struct GoalDetailView: View {
                                     .foregroundColor(.sacredMuted)
                             }
                             .padding(16)
-                            .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
-                            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.12)))
+                            .background(RoundedRectangle(cornerRadius: 20).fill(.ultraThinMaterial))
+                            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredGold.opacity(0.08)))
                         }
                         .buttonStyle(.plain)
                     } else {
@@ -183,8 +183,8 @@ struct GoalDetailView: View {
                             }
                         }
                         .padding(16)
-                        .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBgCard))
-                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.12)))
+                        .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
                     }
 
                 }
@@ -306,8 +306,8 @@ struct GoalDetailView: View {
                         .scrollContentBackground(.hidden)
                         .frame(minHeight: 120)
                         .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBgCard))
-                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.12)))
+                        .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
 
                     Spacer()
                 }
@@ -567,8 +567,8 @@ struct GoalDetailView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBgCard))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.08)))
+        .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
     }
 
     private func formatDate(_ dateStr: String) -> String {

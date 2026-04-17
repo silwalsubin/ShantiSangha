@@ -18,8 +18,8 @@ struct GoalCalendarBrowseView: View {
             VStack(spacing: 0) {
                 fullMonthCalendar
                     .padding(16)
-                    .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBgCard))
-                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.08)))
+                    .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
+                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
             }

@@ -185,8 +185,8 @@ struct GoalCalendarView: View {
                     .padding(.top, 8)
                 }
                 .padding(16)
-                .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
-                .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.08)))
+                .background(RoundedRectangle(cornerRadius: 20).fill(.ultraThinMaterial))
+                .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredGold.opacity(0.08)))
             }
             .padding(16)
         }

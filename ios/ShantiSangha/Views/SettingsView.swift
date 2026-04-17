@@ -202,8 +202,8 @@ struct SettingsView: View {
                             .foregroundColor(.sacredMuted)
                     }
                     .padding(16)
-                    .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
-                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.1)))
+                    .background(RoundedRectangle(cornerRadius: 20).fill(.ultraThinMaterial))
+                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredGold.opacity(0.08)))
                 }
 
                 // Logs
@@ -229,8 +229,8 @@ struct SettingsView: View {
                             .foregroundColor(.sacredMuted)
                     }
                     .padding(16)
-                    .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
-                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.1)))
+                    .background(RoundedRectangle(cornerRadius: 20).fill(.ultraThinMaterial))
+                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredGold.opacity(0.08)))
                 }
 
                 // Sign out
@@ -523,8 +523,8 @@ struct SettingsView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.1)))
+        .background(RoundedRectangle(cornerRadius: 20).fill(.ultraThinMaterial))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredGold.opacity(0.08)))
     }
 
     @ViewBuilder
@@ -593,8 +593,8 @@ struct SettingsView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 20).fill(Color.sacredBgCard))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredMuted.opacity(0.1)))
+        .background(RoundedRectangle(cornerRadius: 20).fill(.ultraThinMaterial))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredGold.opacity(0.08)))
     }
 
     private func infoRow(icon: String, label: String, value: String) -> some View {
