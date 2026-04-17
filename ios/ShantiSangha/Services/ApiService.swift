@@ -115,6 +115,13 @@ actor ApiService {
         let isRetryable = method == "GET"
         do {
             return try await execute(req)
+        } catch let error as ApiError where isRetryable && error.is401 {
+            // 401 cleared the cached token — retry with a fresh one
+            if let token = await resolveToken() {
+                req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
+            await AppLogger.shared.info("API", "Retrying \(method) \(path) after 401")
+            return try await execute(req)
         } catch let error as URLError where isRetryable && error.code == .timedOut {
             await AppLogger.shared.info("API", "Retrying \(method) \(path) after timeout")
             return try await execute(req)
@@ -138,6 +145,12 @@ actor ApiService {
 
         let isRetryable = method == "GET"
         do {
+            return try await execute(req)
+        } catch let error as ApiError where isRetryable && error.is401 {
+            if let token = await resolveToken() {
+                req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
+            await AppLogger.shared.info("API", "Retrying \(req.httpMethod ?? "?") \(path) after 401")
             return try await execute(req)
         } catch let error as URLError where isRetryable && error.code == .timedOut {
             await AppLogger.shared.info("API", "Retrying \(req.httpMethod ?? "?") \(path) after timeout")
@@ -177,6 +190,11 @@ enum ApiError: LocalizedError {
     case invalidURL
     case invalidResponse
     case httpError(statusCode: Int, data: Data)
+
+    var is401: Bool {
+        if case .httpError(statusCode: 401, _) = self { return true }
+        return false
+    }
 
     var errorDescription: String? {
         switch self {

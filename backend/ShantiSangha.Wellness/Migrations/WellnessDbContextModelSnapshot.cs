@@ -81,6 +81,34 @@ namespace ShantiSangha.Wellness.Migrations
                     b.ToTable("DailyReflections");
                 });
 
+            modelBuilder.Entity("ShantiSangha.Wellness.Models.Portrait", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ContextHash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("Portraits");
+                });
+
             modelBuilder.Entity("ShantiSangha.Wellness.Models.VoiceEntry", b =>
                 {
                     b.Property<Guid>("Id")
