@@ -1,13 +1,20 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using ShantiSangha.Goals.Contracts;
 using ShantiSangha.Goals.Data;
 using ShantiSangha.Goals.Models;
+using ShantiSangha.Shared.Interfaces;
 
 namespace ShantiSangha.Goals.Services;
 
-public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
+public class GoalService(
+    GoalsDbContext db,
+    Kernel kernel,
+    IInsightQueryService insightQuery,
+    ISummaryQueryService summaryQuery,
+    ILogger<GoalService> logger) : IGoalService
 {
     private void LogActivity(Guid goalId, string action, string? detail = null)
     {
@@ -499,6 +506,35 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
         if (completedCommitments.Count > 0)
             lines.Add($"\nCommitments finished: {string.Join(", ", completedCommitments)}");
 
+        // RAG: search for thematically relevant journal/insight entries in this period
+        try
+        {
+            var goalTitles = goals.Select(g => g.Title);
+            var searchQuery = string.Join(", ", goalTitles);
+            if (!string.IsNullOrWhiteSpace(searchQuery))
+            {
+                var relatedEntries = await insightQuery.SearchAllAsync(userId, searchQuery, 3, ct);
+                if (relatedEntries.Count > 0)
+                {
+                    lines.Add("\nThematically relevant reflections from this period:");
+                    foreach (var e in relatedEntries)
+                        lines.Add($"  - [{e.Type}, {e.CreatedAt:MMM d}] \"{e.Content}\"");
+                }
+            }
+
+            var recentSummaries = await summaryQuery.GetRecentJournalSummariesAsync(userId, 3, ct);
+            if (recentSummaries.Count > 0)
+            {
+                lines.Add("\nRecent journal themes:");
+                foreach (var s in recentSummaries)
+                    lines.Add($"  - {s}");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "RAG search failed for Journey reflection — continuing without it");
+        }
+
         var context = string.Join("\n", lines);
 
         // Cache check — hash the input context so any data change invalidates
@@ -517,11 +553,21 @@ public class GoalService(GoalsDbContext db, Kernel kernel) : IGoalService
         {
             var chat = kernel.GetRequiredService<IChatCompletionService>();
             var history = new ChatHistory("""
-                You are a gentle spiritual companion. Given practice data, write exactly 2 short sentences.
-                First sentence: celebrate what was accomplished — be specific about which practices and numbers.
-                Second sentence: one warm forward-looking thought.
-                Keep it under 30 words total. No emojis, no exclamation marks, no filler words.
-                Never mention what was missed. Only speak to what was done.
+                You are a gentle spiritual companion narrating the user's journey.
+                Given practice data and thematic context from their reflections,
+                write 2-3 short sentences.
+
+                Rules:
+                - First: celebrate what was accomplished with specific numbers.
+                - Then: connect the practice data to their inner themes. If journal
+                  or insight entries are provided, weave them in — "you practiced
+                  5 days this week, and both journal entries touched on patience."
+                - End with a warm forward-looking thought.
+                - Keep it under 40 words total. No emojis, no exclamation marks.
+                - Never mention what was missed. Only speak to what was done.
+                - If thematic entries are provided, USE them — they make the
+                  reflection feel like a narrator who knows the user's story,
+                  not just their numbers.
                 """);
             history.AddUserMessage(context);
             var result = await chat.GetChatMessageContentAsync(history, cancellationToken: ct);

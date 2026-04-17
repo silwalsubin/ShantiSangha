@@ -53,6 +53,20 @@ public class JournalPromptController(
         var conversationSummaries = await summaryQuery.GetRecentSummariesAsync(user.Id, 3, ct);
         var insights = await insightQuery.GetRecentInsightsAsync(user.Id, 3, ct);
 
+        // RAG: search for thematically relevant AND distant entries
+        IReadOnlyList<ShantiSangha.Shared.Models.SemanticSearchResultDto> relatedEntries = [];
+        IReadOnlyList<ShantiSangha.Shared.Models.SemanticSearchResultDto> unexploredEntries = [];
+        try
+        {
+            // Find what's semantically close to recent themes (for callbacks)
+            var recentTheme = journalSummaries.FirstOrDefault() ?? conversationSummaries.FirstOrDefault();
+            if (recentTheme is not null)
+            {
+                relatedEntries = await insightQuery.SearchAllAsync(user.Id, recentTheme, 3, ct);
+            }
+        }
+        catch { /* RAG is optional enrichment */ }
+
         // If the user has no context at all, return null — client falls back.
         var hasContext = goals.Count > 0
             || !string.IsNullOrWhiteSpace(todaysReflection)
@@ -83,6 +97,14 @@ public class JournalPromptController(
         if (insights.Count > 0)
             contextParts.Add($"Saved insights:\n{string.Join("\n", insights.Select(i => $"  - {i}"))}");
 
+        // RAG-sourced thematic connections
+        if (relatedEntries.Count > 0)
+        {
+            var lines = relatedEntries.Select(e =>
+                $"  - [{e.Type}, {e.CreatedAt:yyyy-MM-dd}] \"{e.Content}\"");
+            contextParts.Add($"Past entries related to recent themes (for callbacks):\n{string.Join("\n", lines)}");
+        }
+
         var context = string.Join("\n\n", contextParts);
 
         try
@@ -101,6 +123,10 @@ public class JournalPromptController(
                 - Never use exclamation marks. No emojis.
                 - Tone: warm, curious, unhurried. Like a friend asking the right
                   question at the right moment.
+                - If past entries are provided, use them for CALLBACKS — reference
+                  something from days or weeks ago and invite the user to revisit
+                  it. "You wrote about patience two weeks ago. Where is that now?"
+                  This creates the feeling that the app remembers their story.
                 - Do not use their name.
                 - Do not wrap the prompt in quotes.
 
