@@ -9,7 +9,6 @@ using ShantiSangha.Chat.Safety;
 using ShantiSangha.Chat.Services;
 using ShantiSangha.Shared.Events;
 using ShantiSangha.Shared.Interfaces;
-using ShantiSangha.Shared.Jyotish;
 
 namespace ShantiSangha.Chat;
 
@@ -22,7 +21,6 @@ public static class DependencyInjection
         services.AddDbContext<ChatDbContext>(options =>
             options.UseNpgsql(dataSource, o => o.UseVector()));
 
-        services.AddScoped<JyotishContextService>();
         services.AddScoped<IChatService, ChatService>();
         services.AddScoped<ISafetyService, SafetyService>();
         services.AddScoped<ChatQueryService>();

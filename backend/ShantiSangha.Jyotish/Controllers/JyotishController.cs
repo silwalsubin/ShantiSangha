@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using ShantiSangha.Jyotish.Services;
 using ShantiSangha.Shared.Interfaces;
-using ShantiSangha.Shared.Jyotish;
 
-namespace ShantiSangha.Wellness.Controllers;
+namespace ShantiSangha.Jyotish.Controllers;
 
 [ApiController]
 [Authorize]
@@ -13,7 +13,7 @@ public class JyotishController(
     IProfileQueryService profileQuery) : ControllerBase
 {
     /// <summary>
-    /// Returns the user's Vedic identity — rashi (sun sign), moon rashi, and nakshatra.
+    /// Returns the user's Vedic identity — rashi (moon sign), nakshatra.
     /// Only available if the user has provided birth details.
     /// </summary>
     [HttpGet("identity")]
@@ -37,8 +37,7 @@ public class JyotishController(
         // Sun rashi
         var sunSidereal = VedicCalendar.ToSidereal(
             VedicCalendar.GetTropicalSunLongitude(birthDateTime), birthDateTime);
-        var sunRashiIndex = VedicCalendar.GetRashiIndex(sunSidereal);
-        var sunRashi = VedicCalendar.GetRashi(sunRashiIndex);
+        var sunRashi = VedicCalendar.GetRashi(VedicCalendar.GetRashiIndex(sunSidereal));
 
         // Moon rashi + nakshatra (only with birth time)
         string? moonRashi = null;

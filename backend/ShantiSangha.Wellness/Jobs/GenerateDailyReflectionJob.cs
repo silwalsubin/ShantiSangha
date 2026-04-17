@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using ShantiSangha.Shared.Interfaces;
-using ShantiSangha.Shared.Jyotish;
 using ShantiSangha.Wellness.Data;
 using ShantiSangha.Wellness.Models;
 
@@ -16,7 +15,7 @@ public class GenerateDailyReflectionJob(
     ISummaryQueryService summaryQuery,
     IInsightQueryService insightQuery,
     IProfileQueryService profileQuery,
-    JyotishContextService jyotishService,
+    IJyotishContextService jyotishService,
     IPushNotificationService pushService,
     ILogger<GenerateDailyReflectionJob> logger)
 {
@@ -111,7 +110,7 @@ public class GenerateDailyReflectionJob(
             {
                 var jyotish = await jyotishService.GetContextAsync(userId, today);
                 if (jyotish is not null)
-                    contextParts.Add(JyotishContextService.FormatForPrompt(jyotish));
+                    contextParts.Add(jyotish.FormatForPrompt());
             }
             catch (Exception ex)
             {

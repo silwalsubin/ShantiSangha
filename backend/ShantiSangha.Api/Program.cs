@@ -16,6 +16,7 @@ using ShantiSangha.Identity;
 using ShantiSangha.Goals;
 using ShantiSangha.Insights;
 using ShantiSangha.Journal;
+using ShantiSangha.Jyotish;
 using ShantiSangha.Shared;
 using ShantiSangha.Shared.Interfaces;
 using ShantiSangha.Wellness;
@@ -89,6 +90,7 @@ try
     builder.Services.AddJournalModule(vectorDataSource);
     builder.Services.AddWellnessModule(connStr, appConfig.VoiceBucketName);
     builder.Services.AddInsightsModule(vectorDataSource);
+    builder.Services.AddJyotishModule();
 
     // ── Controller discovery from domain assemblies ─────────────────────
     builder.Services.AddControllers()
@@ -98,6 +100,7 @@ try
         .AddApplicationPart(typeof(ShantiSangha.Journal.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Wellness.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Insights.DependencyInjection).Assembly)
+        .AddApplicationPart(typeof(ShantiSangha.Jyotish.DependencyInjection).Assembly)
         .AddJsonOptions(opts =>
         {
             opts.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());

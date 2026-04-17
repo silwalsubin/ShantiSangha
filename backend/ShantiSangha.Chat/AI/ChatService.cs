@@ -23,7 +23,7 @@ public class ChatService(
     IGoalQueryService goalQuery,
     IReflectionQueryService reflectionQuery,
     IProfileQueryService profileQuery,
-    JyotishContextService jyotishService,
+    IJyotishContextService jyotishService,
     IEventBus eventBus,
     ILogger<ChatService> logger) : IChatService
 {

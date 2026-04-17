@@ -34,6 +34,7 @@
     <ProjectReference Include="..\ShantiSangha.Journal\ShantiSangha.Journal.csproj" />
     <ProjectReference Include="..\ShantiSangha.Wellness\ShantiSangha.Wellness.csproj" />
     <ProjectReference Include="..\ShantiSangha.Insights\ShantiSangha.Insights.csproj" />
+    <ProjectReference Include="..\ShantiSangha.Jyotish\ShantiSangha.Jyotish.csproj" />
   </ItemGroup>
 
 </Project>

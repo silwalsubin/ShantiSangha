@@ -202,7 +202,7 @@ public static class SystemPrompt
         }
 
         if (jyotish is not null)
-            parts.Add(JyotishContextService.FormatForPrompt(jyotish));
+            parts.Add(jyotish.FormatForPrompt());
 
         return string.Join("\n\n---\n\n", parts);
     }
