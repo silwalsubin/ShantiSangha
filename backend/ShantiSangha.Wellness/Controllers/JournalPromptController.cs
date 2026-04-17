@@ -21,6 +21,7 @@ public class JournalPromptController(
     IReflectionQueryService reflectionQuery,
     ISummaryQueryService summaryQuery,
     IInsightQueryService insightQuery,
+    IJyotishContextService jyotishService,
     ILogger<JournalPromptController> logger) : ControllerBase
 {
     /// <summary>
@@ -97,6 +98,26 @@ public class JournalPromptController(
         if (insights.Count > 0)
             contextParts.Add($"Saved insights:\n{string.Join("\n", insights.Select(i => $"  - {i}"))}");
 
+        // Jyotish: today's moon nakshatra quality — invisible thematic influence
+        try
+        {
+            var jyotish = await jyotishService.GetContextAsync(user.Id, today, ct);
+            if (jyotish is not null)
+            {
+                contextParts.Add($"""
+                    Today's invisible quality (from the moon's position — NEVER name it
+                    as astrology, just let it shape the question you ask):
+                    The quality of today is "{jyotish.CurrentNakshatra}" — associated with
+                    {GetNakshatraPromptHint(jyotish.CurrentNakshatra)}.
+                    Let this quality influence the direction of your prompt. If the quality
+                    is "storms that clear the way," ask about what needed to break. If it's
+                    "growth and creativity," ask about what is forming. The user should feel
+                    the resonance without knowing its source.
+                    """);
+            }
+        }
+        catch { /* Jyotish is optional enrichment */ }
+
         // RAG-sourced thematic connections
         if (relatedEntries.Count > 0)
         {
@@ -135,11 +156,19 @@ public class JournalPromptController(
                 - "How are you feeling?"
                 - "Write about anything that comes to mind."
 
+                - If an "invisible quality" is provided, let it SHAPE your question.
+                  Don't name it. Don't explain it. Just let it tilt the direction.
+                  If the quality is about "storms that clear," ask about release.
+                  If it's about "roots," ask about foundation. The user won't know
+                  why the prompt feels right. That's the point.
+
                 Good examples:
                 - "Twelve days of meditation. What has changed in how you wake up?"
                 - "You wrote about feeling stuck last week. Where is that now?"
                 - "What would you say to the version of you from a month ago?"
                 - "The word 'tired' came up twice this week. What's underneath it?"
+                - "What needed to fall away before you could see clearly?" (Ardra day)
+                - "What is growing in you that you haven't named yet?" (Rohini day)
 
                 Respond with ONLY the prompt. Nothing else.
                 """);
@@ -169,4 +198,40 @@ public class JournalPromptController(
             return Ok(new { Prompt = (string?)null });
         }
     }
+
+    /// <summary>
+    /// Maps nakshatra names to prompt-worthy emotional/thematic hints.
+    /// These hints guide the AI without naming astrology.
+    /// </summary>
+    private static string GetNakshatraPromptHint(string nakshatra) => nakshatra switch
+    {
+        "Ashwini" => "fresh starts, courage, the energy of beginning something new",
+        "Bharani" => "transformation, endurance, carrying something heavy toward birth",
+        "Krittika" => "fire, purification, cutting away what doesn't serve",
+        "Rohini" => "growth, creativity, something tender taking root",
+        "Mrigashirsha" => "seeking, curiosity, following a thread you can't quite name",
+        "Ardra" => "storms that clear the way, necessary destruction, tears that heal",
+        "Punarvasu" => "return, renewal, coming back to something you left behind",
+        "Pushya" => "nourishment, devotion, being held by something larger",
+        "Ashlesha" => "intensity, depth, what lives beneath the surface",
+        "Magha" => "ancestry, authority, the weight and gift of where you come from",
+        "Purva Phalguni" => "rest, enjoyment, permission to receive",
+        "Uttara Phalguni" => "service, discernment, giving from fullness",
+        "Hasta" => "skill, craftsmanship, the intelligence of your hands",
+        "Chitra" => "brilliance, independence, creating something only you can make",
+        "Swati" => "flexibility, movement, being unattached enough to bend",
+        "Vishakha" => "determination, single-pointed purpose, the final stretch",
+        "Anuradha" => "devotion, friendship, loyalty to what matters",
+        "Jyeshtha" => "seniority, protection, the responsibility of knowing more",
+        "Mula" => "roots, foundation, digging down to what is true",
+        "Purva Ashadha" => "invincibility, courage before the battle, declaring what you stand for",
+        "Uttara Ashadha" => "unwavering commitment, the strength that comes after doubt",
+        "Shravana" => "listening, learning, hearing what has always been said",
+        "Dhanishta" => "rhythm, abundance, the music beneath discipline",
+        "Shatabhisha" => "healing, solitude, the medicine of being alone with truth",
+        "Purva Bhadrapada" => "fiery transformation, burning away the old self",
+        "Uttara Bhadrapada" => "depth, stability, the calm after the fire",
+        "Revati" => "completion, transcendence, the journey arriving at its destination",
+        _ => "presence and awareness"
+    };
 }
