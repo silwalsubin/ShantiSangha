@@ -84,6 +84,28 @@ public class GenerateDailyReflectionJob(
             if (insights.Count > 0)
                 contextParts.Add($"Patterns from their reflections:\n{string.Join("\n", insights.Select(i => $"  - {i}"))}");
 
+            // RAG: semantic search for thematically relevant past entries
+            // Build a search query from the user's current context (goals + recent themes)
+            try
+            {
+                var goalTitles = goals.Where(g => g.CurrentStreak > 0).Select(g => g.Title);
+                var searchQuery = string.Join(", ", goalTitles.Concat(summaries.Take(2)));
+                if (!string.IsNullOrWhiteSpace(searchQuery))
+                {
+                    var relatedEntries = await insightQuery.SearchAllAsync(userId, searchQuery, 3);
+                    if (relatedEntries.Count > 0)
+                    {
+                        var entryLines = relatedEntries.Select(e =>
+                            $"  - [{e.Type}, {e.CreatedAt:yyyy-MM-dd}] \"{e.Content}\"");
+                        contextParts.Add($"Semantically relevant past entries (for callbacks and depth):\n{string.Join("\n", entryLines)}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "RAG search failed for user {UserId} — continuing without it", userId);
+            }
+
             // Check days since last visit
             var lastReflection = previousReflections.FirstOrDefault();
             if (lastReflection is not null)

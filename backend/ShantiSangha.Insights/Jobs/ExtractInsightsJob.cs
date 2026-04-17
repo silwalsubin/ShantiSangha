@@ -5,13 +5,16 @@ using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using ShantiSangha.Insights.Data;
 using ShantiSangha.Insights.Models;
+using ShantiSangha.Insights.Services;
+using ShantiSangha.Shared.Interfaces;
 
 namespace ShantiSangha.Insights.Jobs;
 
 public class ExtractInsightsJob(
     InsightsDbContext db,
     Kernel kernel,
-    ShantiSangha.Shared.Interfaces.IPushNotificationService pushService,
+    IInsightQueryService insightQuery,
+    IPushNotificationService pushService,
     ILogger<ExtractInsightsJob> logger)
 {
     public async Task RunAsync(Guid sourceId, SummarySourceType sourceType, Guid userId)
@@ -49,16 +52,28 @@ public class ExtractInsightsJob(
         var insights = await ExtractInsightsFromAiAsync(prompt);
         if (insights.Count == 0) return;
 
-        var existingInsights = await db.SavedInsights
-            .Where(i => i.UserId == userId)
-            .Select(i => i.Content)
-            .ToListAsync();
-
-        var newInsights = insights
-            .Where(i => !string.IsNullOrWhiteSpace(i))
-            .Where(i => !existingInsights.Any(e =>
-                string.Equals(e.Trim(), i.Trim(), StringComparison.OrdinalIgnoreCase)))
-            .ToList();
+        // Semantic deduplication — check vector similarity, not just string equality.
+        // This catches "I tend to overthink" vs "I notice I overthink things."
+        var newInsights = new List<string>();
+        foreach (var insight in insights.Where(i => !string.IsNullOrWhiteSpace(i)))
+        {
+            try
+            {
+                var isDuplicate = await insightQuery.IsSimilarInsightExistsAsync(userId, insight);
+                if (!isDuplicate)
+                    newInsights.Add(insight);
+                else
+                    logger.LogDebug("Skipped semantically similar insight: {Insight}", insight);
+            }
+            catch
+            {
+                // If semantic check fails, fall back to exact match
+                var exists = await db.SavedInsights.AnyAsync(i =>
+                    i.UserId == userId && i.Content.Trim().ToLower() == insight.Trim().ToLower());
+                if (!exists)
+                    newInsights.Add(insight);
+            }
+        }
 
         foreach (var content in newInsights)
         {

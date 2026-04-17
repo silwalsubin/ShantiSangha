@@ -26,4 +26,18 @@ public class InsightQueryService(
         var results = await searchService.SearchInsightsAsync(userId, query, count, ct);
         return results.Select(r => r.Content).ToList();
     }
+
+    public async Task<IReadOnlyList<SemanticSearchResultDto>> SearchAllAsync(
+        Guid userId, string query, int topK = 5, CancellationToken ct = default)
+    {
+        return await searchService.SearchAllAsync(userId, query, topK, ct);
+    }
+
+    public async Task<bool> IsSimilarInsightExistsAsync(
+        Guid userId, string content, CancellationToken ct = default)
+    {
+        var results = await searchService.SearchInsightsAsync(userId, content, 1, ct);
+        // L2 distance threshold — below 0.3 means very similar content
+        return results.Count > 0 && results[0].Distance < 0.3;
+    }
 }
