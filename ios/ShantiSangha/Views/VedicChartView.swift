@@ -8,23 +8,37 @@ struct VedicChartView: View {
     @State private var chart: VedicChart?
     @State private var loading = true
     @State private var error: String?
-    @State private var placeName: String?
     /// Tracks which interpretation panels are currently expanded, keyed by
     /// section id (e.g. "nakshatra", "lagna", "dasha", "planet.sun").
     @State private var expanded: Set<String> = []
+
+    // Birth details — editable from this page; single source of truth for the chart.
+    @State private var birthDate: Date?
+    @State private var birthTime: Date?
+    @State private var birthPlace: String = ""
+    @State private var birthPlaceQuery: String = ""
+    @State private var birthDetailsLoaded = false
+    @State private var showBirthDatePicker = false
+    @State private var showBirthTimePicker = false
+    @State private var showBirthPlacePicker = false
+
     private let api = ApiService.shared
 
     var body: some View {
         ScrollView {
-            if loading {
-                ProgressView()
-                    .tint(.sacredGold)
-                    .frame(maxWidth: .infinity, minHeight: 300)
-            } else if let error {
-                errorView(error)
-            } else if let chart, chart.available {
-                VStack(alignment: .leading, spacing: 24) {
-                    birthSummary(chart)
+            VStack(alignment: .leading, spacing: 24) {
+                birthDetailsCard
+
+                if loading {
+                    ProgressView()
+                        .tint(.sacredGold)
+                        .frame(maxWidth: .infinity, minHeight: 200)
+                } else if let error {
+                    errorView(error)
+                } else if let chart, chart.available {
+                    if let planets = chart.planets, !planets.isEmpty {
+                        rashiSection(planets: planets)
+                    }
                     if let nakshatra = chart.nakshatra {
                         nakshatraSection(nakshatra)
                     }
@@ -38,16 +52,16 @@ struct VedicChartView: View {
                         planetsSection(planets, hasHouses: chart.lagna != nil)
                         legendSection()
                     }
+                } else if let chart, !chart.available {
+                    unavailablePrompt(reason: chart.reason)
                 }
-                .padding(16)
-                .padding(.bottom, 40)
-            } else if let chart, !chart.available {
-                unavailableView(reason: chart.reason)
             }
+            .padding(16)
+            .padding(.bottom, 40)
         }
         .background(Color.sacredBg.ignoresSafeArea())
         .refreshable { await load() }
-        .navigationTitle("Your Chart")
+        .navigationTitle("Your Birth Chart")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
@@ -61,45 +75,173 @@ struct VedicChartView: View {
                 }
             }
         }
+        .task { await loadBirthDetails() }
         .task { await load() }
+        .sheet(isPresented: $showBirthDatePicker) { birthDateSheet }
+        .sheet(isPresented: $showBirthTimePicker) { birthTimeSheet }
+        .sheet(isPresented: $showBirthPlacePicker) {
+            BirthPlacePickerView(
+                selectedPlace: birthPlaceQuery,
+                onSelect: { name, lat, lng in
+                    birthPlaceQuery = name
+                    birthPlace = "\(String(format: "%.4f", lat)),\(String(format: "%.4f", lng))"
+                    showBirthPlacePicker = false
+                    Task { await saveBirthDetails(); await load() }
+                }
+            )
+        }
     }
 
-    // MARK: - Sections
+    // MARK: - Birth details (editable)
 
-    private func birthSummary(_ chart: VedicChart) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+    private var birthDetailsCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
             Text("BIRTH")
                 .font(.sacredSectionLabel)
                 .tracking(3)
                 .foregroundColor(.sacredLabel)
-            if let date = chart.birth?.date {
-                Text(formatDate(date))
-                    .font(.sacredTextMedium)
-                    .foregroundColor(.sacredText)
+
+            birthRow(
+                icon: Ph.calendar.duotone,
+                label: birthDate.map { formatBirthDate($0) } ?? "Add birth date",
+                set: birthDate != nil
+            ) { showBirthDatePicker = true }
+
+            Divider()
+
+            birthRow(
+                icon: Ph.clock.duotone,
+                label: birthTime.map { formatBirthTime($0) } ?? "Add birth time",
+                set: birthTime != nil
+            ) { showBirthTimePicker = true }
+
+            Divider()
+
+            birthRow(
+                icon: Ph.mapPin.duotone,
+                label: birthPlaceQuery.isEmpty ? "Add birth place" : birthPlaceQuery,
+                set: !birthPlaceQuery.isEmpty
+            ) { showBirthPlacePicker = true }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
+    }
+
+    private func birthRow(icon: Image, label: String, set: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                icon
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 20, height: 20)
+                    .foregroundColor(.sacredGold.opacity(0.75))
+                    .frame(width: 22, alignment: .center)
+                Text(label)
+                    .font(.sacredText)
+                    .foregroundColor(set ? .sacredText : .sacredMuted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .lineLimit(1)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundColor(.sacredMuted.opacity(0.5))
             }
-            if let time = chart.birth?.time {
-                Text(formatTime(time))
-                    .font(.sacredSmall)
-                    .foregroundColor(.sacredTextSecondary)
-            }
-            if let place = placeName {
-                HStack(spacing: 4) {
-                    Image(systemName: "location")
-                        .font(.sacredMicro)
-                        .foregroundColor(.sacredGold.opacity(0.7))
-                    Text(place)
-                        .font(.sacredSmall)
-                        .foregroundColor(.sacredTextSecondary)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var birthDateSheet: some View {
+        NavigationStack {
+            DatePicker(
+                "Date of birth",
+                selection: Binding(
+                    get: { birthDate ?? Calendar.current.date(byAdding: .year, value: -25, to: Date())! },
+                    set: { birthDate = $0 }
+                ),
+                in: ...Date(),
+                displayedComponents: .date
+            )
+            .datePickerStyle(.wheel)
+            .labelsHidden()
+            .padding()
+            .background(Color.sacredBg.ignoresSafeArea())
+            .navigationTitle("Date of birth")
+            .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                if birthDate == nil {
+                    birthDate = Calendar.current.date(byAdding: .year, value: -25, to: Date())
                 }
-                .padding(.top, 2)
             }
-            if chart.birth?.hasCoordinates == false {
-                Text("Birth place is not set — add it in Settings to see your houses and ascendant.")
-                    .font(.sacredSmall)
-                    .foregroundColor(.sacredMuted)
-                    .padding(.top, 6)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        showBirthDatePicker = false
+                        Task { await saveBirthDetails(); await load() }
+                    }
+                    .foregroundColor(.sacredGold)
+                }
             }
         }
+        .presentationDetents([.height(300)])
+    }
+
+    private var birthTimeSheet: some View {
+        NavigationStack {
+            DatePicker(
+                "Time of birth",
+                selection: Binding(
+                    get: { birthTime ?? Calendar.current.date(bySettingHour: 6, minute: 0, second: 0, of: Date())! },
+                    set: { birthTime = $0 }
+                ),
+                displayedComponents: .hourAndMinute
+            )
+            .datePickerStyle(.wheel)
+            .labelsHidden()
+            .padding()
+            .background(Color.sacredBg.ignoresSafeArea())
+            .navigationTitle("Time of birth")
+            .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                if birthTime == nil {
+                    birthTime = Calendar.current.date(bySettingHour: 6, minute: 0, second: 0, of: Date())
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        showBirthTimePicker = false
+                        Task { await saveBirthDetails(); await load() }
+                    }
+                    .foregroundColor(.sacredGold)
+                }
+            }
+        }
+        .presentationDetents([.height(300)])
+    }
+
+    // MARK: - Sections
+
+    /// Rashi = Chandra Rashi = the Moon's sign at birth. Primary Jyotish
+    /// identifier — what people mean when they say "my rashi".
+    private func rashiSection(planets: [Planet]) -> some View {
+        guard let moon = planets.first(where: { $0.name == "Moon" }) else {
+            return AnyView(EmptyView())
+        }
+        return AnyView(
+            card(title: "RASHI") {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(shortRashi(moon.rashi))
+                        .font(.sacredHeading)
+                        .foregroundColor(.sacredGold)
+                    Text("moon sign · chandra rashi")
+                        .font(.sacredSmall)
+                        .italic()
+                        .foregroundColor(.sacredMuted)
+                }
+            }
+        )
     }
 
     private func nakshatraSection(_ n: NakshatraAttrs) -> some View {
@@ -361,33 +503,33 @@ struct VedicChartView: View {
                 legendGroup(
                     title: "Positive",
                     rows: [
-                        (Ph.starFour.fill, .sacredGreen, "Deep Exalted",
+                        (Ph.arrowCircleUp.fill, .sacredGreen, "Deep Exalted",
                          "At the very peak of its strength — a rare placement where the planet's best qualities shine most clearly."),
-                        (Ph.arrowUp.regular, .sacredGreen.opacity(0.85), "Exalted",
+                        (Ph.arrowCircleUp.duotone, .sacredGreen.opacity(0.85), "Exalted",
                          "In the sign that amplifies its natural qualities. The planet expresses itself with confidence and ease."),
-                        (Ph.crownSimple.regular, .sacredGreen.opacity(0.7), "Moolatrikona",
+                        (Ph.crownSimple.duotone, .sacredGreen.opacity(0.7), "Moolatrikona",
                          "In its honored seat — acts with authority and purpose, deeply connected to its role in the chart."),
-                        (Ph.houseSimple.regular, .sacredGreen.opacity(0.55), "Own Sign",
+                        (Ph.anchor.duotone, .sacredGreen.opacity(0.55), "Own Sign",
                          "The planet is at home. It expresses itself freely and without effort here."),
-                        (Ph.squaresFour.regular, .sacredGreen.opacity(0.9), "Vargottama",
+                        (Ph.squaresFour.duotone, .sacredGreen.opacity(0.9), "Vargottama",
                          "The planet occupies the same sign in two key charts — a sign of consistent, reinforced strength.")
                     ]
                 )
                 legendGroup(
                     title: "Challenging",
                     rows: [
-                        (Ph.arrowDown.regular, .sacredRed, "Debilitated",
+                        (Ph.arrowCircleDown.duotone, .sacredRed, "Debilitated",
                          "In a sign where it feels out of place. Not a fault — a quiet invitation to grow into this part of life."),
-                        (Ph.sunDim.regular, .sacredRed.opacity(0.75), "Combust",
+                        (Ph.sunDim.duotone, .sacredRed.opacity(0.75), "Combust",
                          "Sitting too close to the Sun. Its outward expression is quieter; its energy turns inward rather than broadcasting."),
-                        (Ph.circleHalf.regular, .sacredRed.opacity(0.55), "Sandhi",
+                        (Ph.circleHalf.duotone, .sacredRed.opacity(0.55), "Sandhi",
                          "Right at a sign boundary — between two worlds. Its character feels less settled, as if it's in transition.")
                     ]
                 )
                 legendGroup(
                     title: "Notable",
                     rows: [
-                        (Ph.arrowUUpLeft.regular, .sacredGold.opacity(0.75), "Retrograde",
+                        (Ph.arrowUUpLeft.duotone, .sacredGold.opacity(0.75), "Retrograde",
                          "Moving backward through the zodiac at birth. Classically a sign of intensified strength — its themes come through with extra depth.")
                     ]
                 )
@@ -530,11 +672,11 @@ struct VedicChartView: View {
     /// Phosphor icon for each dignity state, matching the legend.
     private func dignityIcon(_ dignity: String) -> Image? {
         switch dignity {
-        case "deep_exalted": return Ph.starFour.fill
-        case "exalted": return Ph.arrowUp.regular
-        case "moolatrikona": return Ph.crownSimple.regular
-        case "own_sign": return Ph.houseSimple.regular
-        case "debilitated": return Ph.arrowDown.regular
+        case "deep_exalted": return Ph.arrowCircleUp.fill
+        case "exalted": return Ph.arrowCircleUp.duotone
+        case "moolatrikona": return Ph.crownSimple.duotone
+        case "own_sign": return Ph.anchor.duotone
+        case "debilitated": return Ph.arrowCircleDown.duotone
         default: return nil
         }
     }
@@ -550,16 +692,16 @@ struct VedicChartView: View {
                 stateGlyph(icon, color: dignityColor(p.dignity), label: dignityLabel(p.dignity))
             }
             if p.vargottama == true {
-                stateGlyph(Ph.squaresFour.regular, color: .sacredGreen.opacity(0.9), label: "Vargottama")
+                stateGlyph(Ph.squaresFour.duotone, color: .sacredGreen.opacity(0.9), label: "Vargottama")
             }
             if p.retrograde == true {
-                stateGlyph(Ph.arrowUUpLeft.regular, color: .sacredGold.opacity(0.75), label: "Retrograde")
+                stateGlyph(Ph.arrowUUpLeft.duotone, color: .sacredGold.opacity(0.75), label: "Retrograde")
             }
             if p.combust == true {
-                stateGlyph(Ph.sunDim.regular, color: .sacredRed.opacity(0.75), label: "Combust")
+                stateGlyph(Ph.sunDim.duotone, color: .sacredRed.opacity(0.75), label: "Combust")
             }
             if p.sandhi == true {
-                stateGlyph(Ph.circleHalf.regular, color: .sacredRed.opacity(0.55), label: "Sandhi")
+                stateGlyph(Ph.circleHalf.duotone, color: .sacredRed.opacity(0.55), label: "Sandhi")
             }
         }
     }
@@ -618,29 +760,27 @@ struct VedicChartView: View {
         .padding(16)
     }
 
-    private func unavailableView(reason: String?) -> some View {
-        VStack(spacing: 12) {
-            Text("Your birth details are incomplete.")
-                .font(.sacredText)
-                .foregroundColor(.sacredTextSecondary)
-                .multilineTextAlignment(.center)
+    private func unavailablePrompt(reason: String?) -> some View {
+        VStack(spacing: 10) {
             Text(reasonMessage(reason))
                 .font(.sacredSmall)
+                .italic()
                 .foregroundColor(.sacredMuted)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity, minHeight: 200)
-        .padding(16)
+        .frame(maxWidth: .infinity)
+        .padding(.top, 20)
     }
 
     private func reasonMessage(_ reason: String?) -> String {
         switch reason {
         case "missing_birth_date_or_time":
-            return "Add your birth date and time in Settings to see your full chart."
+            return "Add your birth date and time above to see your full chart."
         case "invalid_birth_time":
-            return "Your birth time couldn't be parsed. Try re-entering it in Settings."
+            return "Your birth time couldn't be parsed. Try re-entering it above."
         default:
-            return "Complete your birth details in Settings to unlock your chart."
+            return "Complete your birth details above to unlock your chart."
         }
     }
 
@@ -652,7 +792,6 @@ struct VedicChartView: View {
         do {
             let result: VedicChart = try await api.get("/jyotish/chart")
             chart = result
-            await reverseGeocodeBirthPlace(result.birth?.place)
         } catch {
             if !error.isCancellation {
                 self.error = "Couldn't load your chart. \(error.localizedDescription)"
@@ -661,28 +800,89 @@ struct VedicChartView: View {
         loading = false
     }
 
-    /// BirthPlace is stored as "lat,lon" — reverse-geocode to a human name
-    /// for display on the chart view.
-    private func reverseGeocodeBirthPlace(_ place: String?) async {
-        guard let place else { return }
-        let parts = place.split(separator: ",")
-        guard parts.count == 2,
-              let lat = Double(parts[0].trimmingCharacters(in: .whitespaces)),
-              let lon = Double(parts[1].trimmingCharacters(in: .whitespaces)) else { return }
+    // MARK: - Birth details I/O
 
+    private func loadBirthDetails() async {
+        guard !birthDetailsLoaded else { return }
         do {
-            let placemarks = try await CLGeocoder().reverseGeocodeLocation(
-                CLLocation(latitude: lat, longitude: lon))
-            if let pm = placemarks.first {
-                let parts = [pm.locality, pm.administrativeArea, pm.country]
-                    .compactMap { $0 }
-                    .filter { !$0.isEmpty }
-                placeName = parts.joined(separator: ", ")
+            let response: MeResponse = try await api.get("/me")
+            if let profile = response.profile {
+                if let dateStr = profile.birthDate {
+                    let df = DateFormatter()
+                    df.dateFormat = "yyyy-MM-dd"
+                    birthDate = df.date(from: dateStr)
+                }
+                if let timeStr = profile.birthTime {
+                    let df = DateFormatter()
+                    df.dateFormat = "HH:mm"
+                    birthTime = df.date(from: timeStr)
+                }
+                if let place = profile.birthPlace, !place.isEmpty {
+                    birthPlace = place
+                    let parts = place.split(separator: ",")
+                    if parts.count == 2, let lat = Double(parts[0]), let lng = Double(parts[1]) {
+                        let location = CLLocation(latitude: lat, longitude: lng)
+                        if let placemark = try? await CLGeocoder().reverseGeocodeLocation(location).first {
+                            birthPlaceQuery = [placemark.locality, placemark.country]
+                                .compactMap { $0 }
+                                .joined(separator: ", ")
+                        }
+                    }
+                }
             }
         } catch {
-            // Non-fatal — just don't show a name.
+            if !error.isCancellation {
+                AppLogger.shared.error("Chart", "Failed to load birth details: \(error)")
+            }
+        }
+        birthDetailsLoaded = true
+    }
+
+    private func saveBirthDetails() async {
+        var body: [String: Any] = [:]
+        if let date = birthDate {
+            let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+            body["birthDate"] = df.string(from: date)
+        }
+        if let time = birthTime {
+            let df = DateFormatter(); df.dateFormat = "HH:mm"
+            body["birthTime"] = df.string(from: time)
+        }
+        if !birthPlace.isEmpty {
+            body["birthPlace"] = birthPlace
+        }
+        guard !body.isEmpty, let data = try? JSONSerialization.data(withJSONObject: body) else { return }
+        do {
+            let _: EmptyResponse = try await api.patchRaw("/me", body: data)
+            AppLogger.shared.info("Chart", "Birth details saved: \(body.keys.joined(separator: ", "))")
+        } catch {
+            AppLogger.shared.error("Chart", "Birth save failed: \(error)")
         }
     }
+
+    // MARK: - Formatting
+
+    private func formatBirthDate(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        return f.string(from: date)
+    }
+
+    private func formatBirthTime(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "h:mm a"
+        return f.string(from: date)
+    }
+}
+
+private struct MeResponse: Decodable {
+    let profile: MeProfileData?
+}
+
+private struct MeProfileData: Decodable {
+    let birthDate: String?
+    let birthTime: String?
+    let birthPlace: String?
 }
 
 // MARK: - Response models

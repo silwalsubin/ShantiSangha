@@ -1,5 +1,4 @@
 import SwiftUI
-import CoreLocation
 
 struct SettingsView: View {
     @EnvironmentObject var auth: AuthService
@@ -8,17 +7,6 @@ struct SettingsView: View {
     @State private var showErrorDetail = false
     @State private var showTimePicker = false
     @State private var serverStatus: ServerStatus = .loading
-
-    // Birth details
-    @State private var birthDate: Date?
-    @State private var birthTime: Date?
-    @State private var birthPlace: String = ""
-    @State private var birthPlaceQuery: String = ""
-    @State private var showBirthDatePicker = false
-    @State private var showBirthTimePicker = false
-    @State private var birthDetailsLoaded = false
-    @State private var savingBirth = false
-    @State private var showBirthPlacePicker = false
 
     private let api = ApiService.shared
 
@@ -116,68 +104,6 @@ struct SettingsView: View {
                     }
                 }
 
-                // Birth details — feeds invisible Vedic context into reflections
-                settingsCard(title: "YOUR DHARMA") {
-                    // Birth date
-                    Button { showBirthDatePicker = true } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "calendar")
-                                .font(.sacredSmall)
-                                .foregroundColor(.sacredMuted)
-                            Text("Date of birth")
-                                .font(.sacredText)
-                                .foregroundColor(.sacredTextSecondary)
-                            Spacer()
-                            Text(birthDate.map { formatBirthDate($0) } ?? "Not set")
-                                .font(.sacredTextMedium)
-                                .foregroundColor(birthDate != nil ? .sacredGold : .sacredMuted)
-                        }
-                    }
-                    .buttonStyle(.plain)
-
-                    // Birth time
-                    Button { showBirthTimePicker = true } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "clock")
-                                .font(.sacredSmall)
-                                .foregroundColor(.sacredMuted)
-                            Text("Time of birth")
-                                .font(.sacredText)
-                                .foregroundColor(.sacredTextSecondary)
-                            Spacer()
-                            Text(birthTime.map { formatBirthTime($0) } ?? "Not set")
-                                .font(.sacredTextMedium)
-                                .foregroundColor(birthTime != nil ? .sacredGold : .sacredMuted)
-                        }
-                    }
-                    .buttonStyle(.plain)
-
-                    // Birth place
-                    Button { showBirthPlacePicker = true } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "mappin")
-                                .font(.sacredSmall)
-                                .foregroundColor(.sacredMuted)
-                            Text("Place of birth")
-                                .font(.sacredText)
-                                .foregroundColor(.sacredTextSecondary)
-                            Spacer()
-                            Text(birthPlaceQuery.isEmpty ? "Not set" : birthPlaceQuery)
-                                .font(.sacredTextMedium)
-                                .foregroundColor(birthPlaceQuery.isEmpty ? .sacredMuted : .sacredGold)
-                                .lineLimit(1)
-                        }
-                    }
-                    .buttonStyle(.plain)
-
-                    if birthDate != nil {
-                        Text("This helps the app understand you more deeply.")
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredMuted)
-                            .padding(.top, 4)
-                    }
-                }
-
                 // iOS Client
                 settingsCard(title: "IOS CLIENT") {
                     infoRow(icon: "square.stack", label: "Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
@@ -261,7 +187,6 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .task { await fetchServerVersion() }
-        .task { await loadBirthDetails() }
         .alert("Server Error", isPresented: $showErrorDetail) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -309,171 +234,6 @@ struct SettingsView: View {
             }
             .presentationDetents([.height(300)])
         }
-        .sheet(isPresented: $showBirthDatePicker) {
-            NavigationStack {
-                DatePicker(
-                    "Date of birth",
-                    selection: Binding(
-                        get: { birthDate ?? Calendar.current.date(byAdding: .year, value: -25, to: Date())! },
-                        set: { birthDate = $0 }
-                    ),
-                    in: ...Date(),
-                    displayedComponents: .date
-                )
-                .datePickerStyle(.wheel)
-                .labelsHidden()
-                .padding()
-                .background(Color.sacredBg.ignoresSafeArea())
-                .navigationTitle("Date of birth")
-                .navigationBarTitleDisplayMode(.inline)
-                .onAppear {
-                    if birthDate == nil {
-                        birthDate = Calendar.current.date(byAdding: .year, value: -25, to: Date())
-                    }
-                }
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") {
-                            showBirthDatePicker = false
-                            Task { await saveBirthDetails() }
-                        }
-                        .foregroundColor(.sacredGold)
-                    }
-                }
-            }
-            .presentationDetents([.height(300)])
-        }
-        .sheet(isPresented: $showBirthTimePicker) {
-            NavigationStack {
-                DatePicker(
-                    "Time of birth",
-                    selection: Binding(
-                        get: { birthTime ?? Calendar.current.date(bySettingHour: 6, minute: 0, second: 0, of: Date())! },
-                        set: { birthTime = $0 }
-                    ),
-                    displayedComponents: .hourAndMinute
-                )
-                .datePickerStyle(.wheel)
-                .labelsHidden()
-                .padding()
-                .background(Color.sacredBg.ignoresSafeArea())
-                .navigationTitle("Time of birth")
-                .navigationBarTitleDisplayMode(.inline)
-                .onAppear {
-                    // Ensure birthTime has a value so "Done" without spinning still saves
-                    if birthTime == nil {
-                        birthTime = Calendar.current.date(bySettingHour: 6, minute: 0, second: 0, of: Date())
-                    }
-                }
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") {
-                            showBirthTimePicker = false
-                            Task { await saveBirthDetails() }
-                        }
-                        .foregroundColor(.sacredGold)
-                    }
-                }
-            }
-            .presentationDetents([.height(300)])
-        }
-        .sheet(isPresented: $showBirthPlacePicker) {
-            BirthPlacePickerView(
-                selectedPlace: birthPlaceQuery,
-                onSelect: { name, lat, lng in
-                    birthPlaceQuery = name
-                    birthPlace = "\(String(format: "%.4f", lat)),\(String(format: "%.4f", lng))"
-                    showBirthPlacePicker = false
-                    Task { await saveBirthDetails() }
-                }
-            )
-        }
-    }
-
-    // MARK: - Birth details
-
-    private func loadBirthDetails() async {
-        guard !birthDetailsLoaded else { return }
-        do {
-            let response: MeResponse = try await api.get("/me")
-            if let profile = response.profile {
-                if let dateStr = profile.birthDate {
-                    let df = DateFormatter()
-                    df.dateFormat = "yyyy-MM-dd"
-                    birthDate = df.date(from: dateStr)
-                }
-                if let timeStr = profile.birthTime {
-                    let df = DateFormatter()
-                    df.dateFormat = "HH:mm"
-                    birthTime = df.date(from: timeStr)
-                }
-                if let place = profile.birthPlace, !place.isEmpty {
-                    birthPlace = place
-                    // Reverse geocode to show city name
-                    let parts = place.split(separator: ",")
-                    if parts.count == 2, let lat = Double(parts[0]), let lng = Double(parts[1]) {
-                        let location = CLLocation(latitude: lat, longitude: lng)
-                        if let placemark = try? await CLGeocoder().reverseGeocodeLocation(location).first {
-                            birthPlaceQuery = [placemark.locality, placemark.country].compactMap { $0 }.joined(separator: ", ")
-                        }
-                    }
-                }
-            }
-        } catch {
-            if !error.isCancellation {
-                AppLogger.shared.error("Settings", "Failed to load birth details: \(error)")
-            }
-        }
-        birthDetailsLoaded = true
-    }
-
-    private func saveBirthDetails() async {
-        savingBirth = true
-        defer { savingBirth = false }
-
-        var body: [String: Any] = [:]
-
-        if let date = birthDate {
-            let df = DateFormatter()
-            df.dateFormat = "yyyy-MM-dd"
-            body["birthDate"] = df.string(from: date)
-        }
-
-        if let time = birthTime {
-            let df = DateFormatter()
-            df.dateFormat = "HH:mm"
-            body["birthTime"] = df.string(from: time)
-        }
-
-        if !birthPlace.isEmpty {
-            body["birthPlace"] = birthPlace
-        }
-
-        guard !body.isEmpty, let data = try? JSONSerialization.data(withJSONObject: body) else {
-            AppLogger.shared.error("Settings", "Birth save: body empty or serialization failed")
-            return
-        }
-        do {
-            let _: EmptyResponse = try await api.patchRaw("/me", body: data)
-            AppLogger.shared.info("Settings", "Birth details saved: \(body.keys.joined(separator: ", "))")
-        } catch let ApiError.httpError(statusCode, responseData) {
-            let responseBody = String(data: responseData, encoding: .utf8) ?? "unreadable"
-            AppLogger.shared.error("Settings", "Birth save \(statusCode): \(responseBody)")
-        } catch {
-            AppLogger.shared.error("Settings", "Birth save failed: \(error)")
-        }
-    }
-
-    private func formatBirthDate(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.dateStyle = .medium
-        return f.string(from: date)
-    }
-
-    private func formatBirthTime(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.dateFormat = "h:mm a"
-        return f.string(from: date)
     }
 
     // MARK: - Server card with status dot
@@ -611,18 +371,6 @@ struct SettingsView: View {
                 .foregroundColor(.sacredText)
         }
     }
-}
-
-// MARK: - Profile response model
-
-private struct MeResponse: Decodable {
-    let profile: MeProfileData?
-}
-
-private struct MeProfileData: Decodable {
-    let birthDate: String?
-    let birthTime: String?
-    let birthPlace: String?
 }
 
 // MARK: - Pulse animation for loading dot

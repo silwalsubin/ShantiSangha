@@ -101,19 +101,19 @@ struct PlanetDetailView: View {
             badges.append((icon, dignityColor(planet.dignity), dignityLabel(planet.dignity), dignityDescription(planet.dignity)))
         }
         if planet.vargottama == true {
-            badges.append((Ph.squaresFour.regular, .sacredGreen.opacity(0.9), "VARGOTTAMA",
+            badges.append((Ph.squaresFour.duotone, .sacredGreen.opacity(0.9), "VARGOTTAMA",
                            "same sign in D1 and D9 — classically very strong"))
         }
         if planet.retrograde == true {
-            badges.append((Ph.arrowUUpLeft.regular, .sacredGold.opacity(0.75), "RETROGRADE",
+            badges.append((Ph.arrowUUpLeft.duotone, .sacredGold.opacity(0.75), "RETROGRADE",
                            "moving backward along the ecliptic at birth"))
         }
         if planet.combust == true {
-            badges.append((Ph.sunDim.regular, .sacredRed.opacity(0.75), "COMBUST",
+            badges.append((Ph.sunDim.duotone, .sacredRed.opacity(0.75), "COMBUST",
                            "within the Sun's classical orb — natural strength muted"))
         }
         if planet.sandhi == true {
-            badges.append((Ph.circleHalf.regular, .sacredRed.opacity(0.55), "SANDHI",
+            badges.append((Ph.circleHalf.duotone, .sacredRed.opacity(0.55), "SANDHI",
                            "sits in the first or last 1° of its sign — cusp weakness"))
         }
         return badges
@@ -255,11 +255,11 @@ struct PlanetDetailView: View {
 
     private func dignityIcon(_ dignity: String) -> Image? {
         switch dignity {
-        case "deep_exalted": return Ph.starFour.fill
-        case "exalted": return Ph.arrowUp.regular
-        case "moolatrikona": return Ph.crownSimple.regular
-        case "own_sign": return Ph.houseSimple.regular
-        case "debilitated": return Ph.arrowDown.regular
+        case "deep_exalted": return Ph.arrowCircleUp.fill
+        case "exalted": return Ph.arrowCircleUp.duotone
+        case "moolatrikona": return Ph.crownSimple.duotone
+        case "own_sign": return Ph.anchor.duotone
+        case "debilitated": return Ph.arrowCircleDown.duotone
         default: return nil
         }
     }
