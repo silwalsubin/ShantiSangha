@@ -42,15 +42,47 @@ public static class PlanetaryPositions
     private static double GeocentricLongitude(Planet planet, double d)
     {
         var (xp, yp, zp) = HeliocentricEcliptic(planet, d);
-        var (xe, ye, ze) = HeliocentricEcliptic(Planet.Earth, d);
+        var (xeRaw, yeRaw, zeRaw) = HeliocentricEcliptic(Planet.Earth, d);
+
+        // Schlyter's "Sun elements" give the Sun's GEOCENTRIC position, not
+        // Earth's heliocentric position. The two are opposites across the
+        // Sun-Earth line, so we flip sign to get Earth's true heliocentric coords.
+        var xe = -xeRaw;
+        var ye = -yeRaw;
+        var ze = -zeRaw;
 
         var xg = xp - xe;
         var yg = yp - ye;
-        // zg not needed for longitude
         _ = zp - ze;
 
-        var lon = Math.Atan2(yg, xg) * RadToDeg;
-        return Normalize(lon);
+        var lonGeometric = Math.Atan2(yg, xg) * RadToDeg;
+
+        // Aberration of light — JPL Horizons "apparent" positions include this,
+        // so we apply it to match. For a body on the ecliptic:
+        //   δλ = -κ · cos(λ − λ_sun) / cos(β)  with β ≈ 0, κ = 20.4955"
+        // At opposition (λ-λ_sun=180°) the correction is +κ; at conjunction it's -κ.
+        var lonSun = SunGeocentricLongitude(d);
+        const double kappa = 0.0056932; // 20.4955 arcseconds, in degrees
+        var aberration = -kappa * Math.Cos((lonGeometric - lonSun) * DegToRad);
+
+        return Normalize(lonGeometric + aberration);
+    }
+
+    /// <summary>Sun's geocentric ecliptic longitude for aberration calculations —
+    /// derived from the same "Earth elements" table used above.</summary>
+    private static double SunGeocentricLongitude(double d)
+    {
+        // The Sun's geocentric longitude is opposite Earth's heliocentric longitude.
+        // The raw "Earth" elements in this file actually give Sun geocentric directly
+        // (Schlyter's formulation), so (v+w) is exactly what we need.
+        var (_, _, w, _, e, M) = OrbitalElements(Planet.Earth, d);
+        var MRad = M * DegToRad;
+        var E = M + RadToDeg * e * Math.Sin(MRad) * (1 + e * Math.Cos(MRad));
+        var ERad = E * DegToRad;
+        var xv = Math.Cos(ERad) - e;
+        var yv = Math.Sqrt(1 - e * e) * Math.Sin(ERad);
+        var v = Math.Atan2(yv, xv) * RadToDeg;
+        return Normalize(v + w);
     }
 
     private static (double X, double Y, double Z) HeliocentricEcliptic(Planet planet, double d)
@@ -77,18 +109,58 @@ public static class PlanetaryPositions
         var iRad = i * DegToRad;
         var wRad = w * DegToRad;
 
+        // Apply Schlyter's perturbation corrections to the heliocentric longitude
+        // for Jupiter and Saturn (mutual gravitational effects between the giants).
+        // These are added to the argument (v+w) before the rotation to rectangular coords.
+        var perturbRad = JupiterSaturnPerturbation(planet, d) * DegToRad;
+
         var cosN = Math.Cos(NRad);
         var sinN = Math.Sin(NRad);
         var cosI = Math.Cos(iRad);
         var sinI = Math.Sin(iRad);
-        var cosVW = Math.Cos(v + wRad);
-        var sinVW = Math.Sin(v + wRad);
+        var cosVW = Math.Cos(v + wRad + perturbRad);
+        var sinVW = Math.Sin(v + wRad + perturbRad);
 
         var x = r * (cosN * cosVW - sinN * sinVW * cosI);
         var y = r * (sinN * cosVW + cosN * sinVW * cosI);
         var z = r * (sinVW * sinI);
 
         return (x, y, z);
+    }
+
+    // Schlyter's published perturbation terms for the outer planets
+    // (https://stjarnhimlen.se/comp/ppcomp.html, section "Perturbations of Jupiter and Saturn").
+    // Reduces Saturn's error from ~0.075° to ~0.015° and Jupiter's from ~0.01° to ~0.003°.
+    // Returns the delta (in degrees) to add to the heliocentric longitude; zero for other planets.
+    private static double JupiterSaturnPerturbation(Planet planet, double d)
+    {
+        if (planet != Planet.Jupiter && planet != Planet.Saturn)
+            return 0.0;
+
+        // Jupiter and Saturn mean anomalies at time d (in degrees, reused from OrbitalElements).
+        var Mj = Normalize(19.8950 + 0.0830853001 * d);
+        var Ms = Normalize(316.9670 + 0.0334442282 * d);
+
+        var MjRad = Mj * DegToRad;
+        var MsRad = Ms * DegToRad;
+
+        if (planet == Planet.Jupiter)
+        {
+            return -0.332 * Math.Sin((2 * Mj - 5 * Ms - 67.6) * DegToRad)
+                   - 0.056 * Math.Sin((2 * Mj - 2 * Ms + 21.0) * DegToRad)
+                   + 0.042 * Math.Sin((3 * Mj - 5 * Ms + 21.0) * DegToRad)
+                   - 0.036 * Math.Sin(MjRad - 2 * MsRad)
+                   + 0.022 * Math.Cos(MjRad - MsRad)
+                   + 0.023 * Math.Sin((2 * Mj - 3 * Ms + 52.0) * DegToRad)
+                   - 0.016 * Math.Sin((Mj - 5 * Ms - 69.0) * DegToRad);
+        }
+
+        // Saturn
+        return 0.812 * Math.Sin((2 * Mj - 5 * Ms - 67.6) * DegToRad)
+               - 0.229 * Math.Cos((2 * Mj - 4 * Ms - 2.0) * DegToRad)
+               + 0.119 * Math.Sin((Mj - 2 * Ms - 3.0) * DegToRad)
+               + 0.046 * Math.Sin((2 * Mj - 6 * Ms - 69.0) * DegToRad)
+               + 0.014 * Math.Sin((Mj - 3 * Ms + 32.0) * DegToRad);
     }
 
     // Orbital elements from Schlyter (https://stjarnhimlen.se/comp/ppcomp.html)

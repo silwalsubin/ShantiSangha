@@ -173,14 +173,15 @@ public static class VedicCalendar
         };
     }
 
-    /// <summary>Compute the house number (1-12) a given longitude falls in, using Equal-house
-    /// system relative to the ascendant. Both longitudes must be in the same frame (sidereal
-    /// for Vedic charts).</summary>
+    /// <summary>Compute the house number (1-12) using the Whole-Sign system, the standard
+    /// approach in Vedic astrology. The entire sign containing the ascendant becomes H1,
+    /// the next sign H2, and so on — regardless of the ascendant's exact degree within
+    /// its sign. Both longitudes must be in sidereal frame.</summary>
     public static int GetHouse(double bodyLongitude, double ascendantLongitude)
     {
-        var diff = bodyLongitude - ascendantLongitude;
-        if (diff < 0) diff += 360;
-        return ((int)(diff / 30) % 12) + 1;
+        var ascRashi = GetRashiIndex(ascendantLongitude);
+        var bodyRashi = GetRashiIndex(bodyLongitude);
+        return ((bodyRashi - ascRashi + 12) % 12) + 1;
     }
 
     private static readonly string[] Tithis =

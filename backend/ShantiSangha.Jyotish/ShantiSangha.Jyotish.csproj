@@ -12,4 +12,8 @@
   <ItemGroup>
     <ProjectReference Include="..\ShantiSangha.Shared\ShantiSangha.Shared.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="GeoTimeZone" Version="6.1.0" />
+  </ItemGroup>
 </Project>

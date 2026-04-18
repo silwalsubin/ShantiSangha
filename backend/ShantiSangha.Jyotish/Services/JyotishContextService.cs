@@ -31,28 +31,26 @@ public class JyotishContextService(IProfileQueryService profileQuery) : IJyotish
         if (birth.BirthDate is not null)
         {
             var birthDate = birth.BirthDate.Value;
-            var birthHour = 12.0;
+            var birthTimeOnly = new TimeOnly(12, 0);
             if (birth.BirthTime is not null && TimeOnly.TryParse(birth.BirthTime, out var parsedTime))
-                birthHour = parsedTime.Hour + parsedTime.Minute / 60.0;
+                birthTimeOnly = parsedTime;
 
-            // Convert local birth time to UTC using longitude-derived offset.
-            // BirthPlace is "lat,lon" — parse lon to approximate the time offset
-            // (15° per hour of mean solar time).
-            var offsetHours = 0.0;
+            // Parse lat/lon from "lat,lon" birth place format
+            double? lat = null, lon = null;
             if (!string.IsNullOrWhiteSpace(birth.BirthPlace))
             {
                 var parts = birth.BirthPlace.Split(',');
                 if (parts.Length == 2
-                    && double.TryParse(parts[1].Trim(), System.Globalization.CultureInfo.InvariantCulture, out var lon))
+                    && double.TryParse(parts[0].Trim(), System.Globalization.CultureInfo.InvariantCulture, out var parsedLat)
+                    && double.TryParse(parts[1].Trim(), System.Globalization.CultureInfo.InvariantCulture, out var parsedLon))
                 {
-                    offsetHours = lon / 15.0;
+                    lat = parsedLat;
+                    lon = parsedLon;
                 }
             }
 
-            var birthLocal = birthDate.ToDateTime(
-                TimeOnly.FromTimeSpan(TimeSpan.FromHours(birthHour)), DateTimeKind.Unspecified);
-            var birthDateTime = DateTime.SpecifyKind(
-                birthLocal.AddHours(-offsetHours), DateTimeKind.Utc);
+            // Resolve local birth time → UTC via IANA timezone at birth location.
+            var birthDateTime = BirthTimeResolver.ResolveBirthUtc(birthDate, birthTimeOnly, lat, lon);
 
             var sunSidereal = VedicCalendar.ToSidereal(
                 VedicCalendar.GetTropicalSunLongitude(birthDateTime), birthDateTime);
