@@ -77,15 +77,6 @@ struct MainTabView: View {
                 Text("Journey")
             }
             .tag(2)
-
-            NavigationStack {
-                SettingsView()
-            }
-            .tabItem {
-                Image("tab.chakra")
-                Text("Settings")
-            }
-            .tag(3)
         }
         .tint(.sacredGold)
         .onChange(of: selectedTab) { _, _ in

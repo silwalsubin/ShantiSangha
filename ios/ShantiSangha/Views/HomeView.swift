@@ -4,6 +4,7 @@ import WidgetKit
 
 /// Home screen — daily dashboard with progress circles
 struct HomeView: View {
+    @EnvironmentObject var auth: AuthService
     @StateObject private var vm = HomeViewModel()
     @State private var showNewTask = false
     @State private var showRecurringSummary = false
@@ -17,6 +18,7 @@ struct HomeView: View {
     @State private var showFAB = true
     @State private var practicesCompleted = false
     @State private var ringPulse = false
+    @State private var showProfileMenu = false
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -125,6 +127,28 @@ struct HomeView: View {
                 .padding(.bottom, 100)
             }
             .background(Color.sacredBg.ignoresSafeArea())
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button { showProfileMenu = true } label: {
+                        Circle()
+                            .fill(RadialGradient.sacredGoldShiny)
+                            .frame(width: 30, height: 30)
+                            .overlay(
+                                Text(profileInitial)
+                                    .font(.system(size: 13, weight: .semibold, design: .serif))
+                                    .foregroundColor(.white)
+                            )
+                            .overlay(
+                                Circle().stroke(Color.sacredGold.opacity(0.3), lineWidth: 0.5)
+                            )
+                    }
+                    .accessibilityLabel("Profile menu")
+                }
+            }
+            .fullScreenCover(isPresented: $showProfileMenu) {
+                ProfileMenuSheet()
+                    .environmentObject(auth)
+            }
             .refreshable {
                 await vm.load()
                 await loadReflection(force: true)
@@ -502,6 +526,15 @@ struct HomeView: View {
         UserDefaults.standard.set(opened, forKey: Self.dailyReadingOpenedKeyPrefix + todayDateString)
     }
 
+    // MARK: - Profile
+
+    private var profileInitial: String {
+        let source = auth.user?.displayName?.trimmingCharacters(in: .whitespaces)
+            ?? auth.user?.email
+            ?? "?"
+        return String(source.prefix(1)).uppercased()
+    }
+
     // MARK: - Time greeting
 
     private var timeGreeting: String {
@@ -522,5 +555,131 @@ private struct DailyReflectionResponse: Decodable {
 private struct DailyReadingResponse: Decodable {
     let content: String?
     let date: String
+}
+
+// MARK: - Profile menu sheet
+
+/// Identity-scoped surface on Home: birth chart, settings, sign out.
+/// Owns its own NavigationStack so pushes stay inside the sheet.
+struct ProfileMenuSheet: View {
+    @EnvironmentObject var auth: AuthService
+    @Environment(\.dismiss) private var dismiss
+    @State private var showSignOutConfirmation = false
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 28) {
+                    header
+                    menuList
+                    signOutButton
+                }
+                .padding(20)
+                .padding(.bottom, 40)
+            }
+            .background(Color.sacredBg.ignoresSafeArea())
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .font(.sacredTextMedium)
+                        .foregroundColor(.sacredGold)
+                }
+            }
+            .confirmationDialog(
+                "Are you sure you want to sign out?",
+                isPresented: $showSignOutConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Sign Out", role: .destructive) { auth.signOut() }
+                Button("Cancel", role: .cancel) {}
+            }
+        }
+    }
+
+    private var header: some View {
+        VStack(spacing: 12) {
+            Circle()
+                .fill(RadialGradient.sacredGoldShiny)
+                .frame(width: 72, height: 72)
+                .overlay(
+                    Text(initial)
+                        .font(.system(size: 28, weight: .semibold, design: .serif))
+                        .foregroundColor(.white)
+                )
+                .overlay(Circle().stroke(Color.sacredGold.opacity(0.3), lineWidth: 0.5))
+            if let email = auth.user?.email {
+                Text(email)
+                    .font(.sacredSmall)
+                    .foregroundColor(.sacredMuted)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 16)
+    }
+
+    private var menuList: some View {
+        VStack(spacing: 0) {
+            NavigationLink(destination: VedicChartView()) {
+                menuRow(icon: "moon.stars", label: "Birth chart", subtitle: "Your cosmic context")
+            }
+            .buttonStyle(.plain)
+
+            Divider().padding(.leading, 52)
+
+            NavigationLink(destination: SettingsView()) {
+                menuRow(icon: "gearshape", label: "Settings", subtitle: "Your sacred space")
+            }
+            .buttonStyle(.plain)
+        }
+        .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
+    }
+
+    private func menuRow(icon: String, label: String, subtitle: String) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .regular))
+                .foregroundColor(.sacredGold.opacity(0.75))
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.sacredTextMedium)
+                    .foregroundColor(.sacredText)
+                Text(subtitle)
+                    .font(.sacredMicro)
+                    .foregroundColor(.sacredMuted)
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .regular))
+                .foregroundColor(.sacredMuted.opacity(0.5))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .contentShape(Rectangle())
+    }
+
+    private var signOutButton: some View {
+        Button { showSignOutConfirmation = true } label: {
+            HStack {
+                Spacer()
+                Text("Sign Out")
+                    .font(.sacredTextMedium)
+                    .foregroundColor(.sacredRed)
+                Spacer()
+            }
+            .padding(.vertical, 14)
+            .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredRed.opacity(0.06)))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredRed.opacity(0.15)))
+        }
+    }
+
+    private var initial: String {
+        let source = auth.user?.displayName?.trimmingCharacters(in: .whitespaces)
+            ?? auth.user?.email
+            ?? "?"
+        return String(source.prefix(1)).uppercased()
+    }
 }
 

@@ -11,10 +11,6 @@ struct PlanetDetailView: View {
             VStack(alignment: .leading, spacing: 20) {
                 header
                 positionsSection
-                let flags = statusRows
-                if !flags.isEmpty {
-                    statusSection(flags)
-                }
                 if let i = planet.interpretation {
                     traditionSection(i)
                 }
@@ -63,14 +59,60 @@ struct PlanetDetailView: View {
                         .foregroundColor(.sacredTextSecondary)
                 }
             }
-            if planet.dignity != "neutral" {
-                Text(dignityLabel(planet.dignity))
-                    .font(.sacredMicroBold)
-                    .tracking(2)
-                    .foregroundColor(dignityColor(planet.dignity))
-                    .padding(.top, 2)
+            let badges = stateBadges
+            if !badges.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(Array(badges.enumerated()), id: \.offset) { _, badge in
+                        HStack(alignment: .top, spacing: 10) {
+                            Text(badge.glyph)
+                                .font(.system(size: 20, weight: .regular, design: .serif))
+                                .foregroundColor(badge.color)
+                                .frame(width: 22, alignment: .center)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(badge.label)
+                                    .font(.sacredMicroBold)
+                                    .tracking(2)
+                                    .foregroundColor(badge.color)
+                                Text(badge.description)
+                                    .font(.sacredMicro)
+                                    .italic()
+                                    .foregroundColor(.sacredTextSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                    }
+                }
+                .padding(.top, 8)
             }
         }
+    }
+
+    /// Badges shown at the top of the detail page, in classical priority
+    /// order: dignity (primary state) → vargottama (strength reinforcement)
+    /// → combust (energy muted) → sandhi (cusp weakness). Mirrors the legend
+    /// on the chart view so colors and icons stay consistent.
+    private var stateBadges: [(glyph: String, color: Color, label: String, description: String)] {
+        var badges: [(glyph: String, color: Color, label: String, description: String)] = []
+        if planet.dignity != "neutral", let glyph = dignityGlyph(planet.dignity) {
+            badges.append((glyph, dignityColor(planet.dignity), dignityLabel(planet.dignity), dignityDescription(planet.dignity)))
+        }
+        if planet.vargottama == true {
+            badges.append(("◈", .sacredGreen.opacity(0.9), "VARGOTTAMA",
+                           "same sign in D1 and D9 — classically very strong"))
+        }
+        if planet.retrograde == true {
+            badges.append(("℞", .sacredGold.opacity(0.75), "RETROGRADE",
+                           "moving backward along the ecliptic at birth"))
+        }
+        if planet.combust == true {
+            badges.append(("◉", .sacredRed.opacity(0.75), "COMBUST",
+                           "within the Sun's classical orb — natural strength muted"))
+        }
+        if planet.sandhi == true {
+            badges.append(("◐", .sacredRed.opacity(0.55), "SANDHI",
+                           "sits in the first or last 1° of its sign — cusp weakness"))
+        }
+        return badges
     }
 
     // MARK: - Positions (divisional charts)
@@ -157,37 +199,6 @@ struct PlanetDetailView: View {
         }
     }
 
-    // MARK: - Status
-
-    private var statusRows: [(String, String)] {
-        var rows: [(String, String)] = []
-        if planet.retrograde == true { rows.append(("Retrograde", "moving backward along the ecliptic at birth")) }
-        if planet.combust == true { rows.append(("Combust", "within the Sun's classical orb — natural strength muted")) }
-        if planet.sandhi == true { rows.append(("Sandhi", "sits in the first or last 1° of its sign — cusp weakness")) }
-        if planet.vargottama == true { rows.append(("Vargottama", "same sign in D1 and D9 — classically very strong")) }
-        return rows
-    }
-
-    private func statusSection(_ rows: [(String, String)]) -> some View {
-        card(title: "STATUS") {
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(row.0.uppercased())
-                            .font(.system(size: 9, weight: .bold, design: .serif))
-                            .tracking(2)
-                            .foregroundColor(.sacredGold)
-                        Text(row.1)
-                            .font(.sacredSmall)
-                            .italic()
-                            .foregroundColor(.sacredTextSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-            }
-        }
-    }
-
     // MARK: - Tradition
 
     private func traditionSection(_ i: Interpretation) -> some View {
@@ -229,10 +240,23 @@ struct PlanetDetailView: View {
 
     private func dignityColor(_ dignity: String) -> Color {
         switch dignity {
-        case "deep_exalted", "exalted": return .sacredGreen
-        case "moolatrikona", "own_sign": return .sacredGold
+        case "deep_exalted": return .sacredGreen
+        case "exalted": return .sacredGreen.opacity(0.85)
+        case "moolatrikona": return .sacredGreen.opacity(0.7)
+        case "own_sign": return .sacredGreen.opacity(0.55)
         case "debilitated": return .sacredRed
         default: return .sacredMuted
+        }
+    }
+
+    private func dignityGlyph(_ dignity: String) -> String? {
+        switch dignity {
+        case "deep_exalted": return "✦"
+        case "exalted": return "↑"
+        case "moolatrikona": return "☆"
+        case "own_sign": return "⌂"
+        case "debilitated": return "↓"
+        default: return nil
         }
     }
 
@@ -243,6 +267,17 @@ struct PlanetDetailView: View {
         case "moolatrikona": return "MOOLATRIKONA"
         case "own_sign": return "OWN SIGN"
         case "debilitated": return "DEBILITATED"
+        default: return ""
+        }
+    }
+
+    private func dignityDescription(_ dignity: String) -> String {
+        switch dignity {
+        case "deep_exalted": return "at the classical peak degree of exaltation — maximum strength"
+        case "exalted": return "in its sign of exaltation — natural strength elevated"
+        case "moolatrikona": return "in its moolatrikona sign — strong, dignified placement"
+        case "own_sign": return "in its own sign — comfortable and steady"
+        case "debilitated": return "in its sign of debilitation — natural strength weakened"
         default: return ""
         }
     }

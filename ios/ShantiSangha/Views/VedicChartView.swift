@@ -35,6 +35,7 @@ struct VedicChartView: View {
                     }
                     if let planets = chart.planets, !planets.isEmpty {
                         planetsSection(planets, hasHouses: chart.lagna != nil)
+                        legendSection()
                     }
                 }
                 .padding(16)
@@ -196,36 +197,124 @@ struct VedicChartView: View {
 
     private func planetsSection(_ planets: [Planet], hasHouses: Bool) -> some View {
         card(title: "PLANETS") {
+            if hasHouses {
+                groupedByHouse(planets)
+            } else {
+                ungroupedPlanets(planets)
+            }
+        }
+    }
+
+    /// House-grouped view. Only occupied houses appear — empty houses matter
+    /// in Jyotish but belong in a deeper view; here we keep the chart dense
+    /// and let the structure of the chart show through the groupings.
+    private func groupedByHouse(_ planets: [Planet]) -> some View {
+        let grouped = Dictionary(grouping: planets.compactMap { p -> (Int, Planet)? in
+            guard let h = p.house else { return nil }
+            return (h, p)
+        }, by: { $0.0 })
+        let occupied = grouped.keys.sorted()
+
+        return VStack(alignment: .leading, spacing: 18) {
+            ForEach(occupied, id: \.self) { house in
+                let housePlanets = grouped[house]!.map { $0.1 }
+                houseGroup(house: house, planets: housePlanets)
+            }
+        }
+    }
+
+    private func houseGroup(house: Int, planets: [Planet]) -> some View {
+        // In whole-sign houses every planet in a house shares that house's sign.
+        let sign = planets.first?.rashi ?? ""
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text("HOUSE \(house)")
+                    .font(.sacredSectionLabel)
+                    .tracking(2)
+                    .foregroundColor(.sacredLabel)
+                Text("·")
+                    .font(.sacredMicro)
+                    .foregroundColor(.sacredMuted)
+                Text(shortRashi(sign).uppercased())
+                    .font(.sacredSectionLabel)
+                    .tracking(2)
+                    .foregroundColor(.sacredGold)
+                if house == 1 {
+                    Text("·")
+                        .font(.sacredMicro)
+                        .foregroundColor(.sacredMuted)
+                    Text("LAGNA")
+                        .font(.sacredSectionLabel)
+                        .tracking(2)
+                        .foregroundColor(.sacredGold.opacity(0.7))
+                }
+            }
             VStack(spacing: 0) {
-                ForEach(Array(planets.enumerated()), id: \.element.name) { index, planet in
+                ForEach(Array(planets.enumerated()), id: \.element.name) { idx, planet in
                     NavigationLink(destination: PlanetDetailView(planet: planet)) {
-                        planetRow(planet, hasHouses: hasHouses)
+                        housePlanetRow(planet)
                     }
                     .buttonStyle(.plain)
-                    if index < planets.count - 1 {
-                        Divider().padding(.vertical, 10)
+                    if idx < planets.count - 1 {
+                        Divider().padding(.vertical, 8)
                     }
                 }
             }
         }
     }
 
-    /// Compact planet row — just the essentials so the chart page stays
-    /// scannable. Divisional positions (D9/D10/D12), status flags, and the
-    /// tradition passage live on PlanetDetailView behind a tap.
-    private func planetRow(_ p: Planet, hasHouses: Bool) -> some View {
+    /// Planet row inside a house group. Sign is omitted (carried by the
+    /// header) — each row just carries what's unique to the planet.
+    private func housePlanetRow(_ p: Planet) -> some View {
         HStack(alignment: .firstTextBaseline) {
-            HStack(spacing: 3) {
-                Text(p.name)
+            Text(p.name)
+                .font(.sacredTextMedium)
+                .foregroundColor(.sacredText)
+                .frame(width: 80, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(String(format: "%.2f°", p.degree))
                     .font(.sacredTextMedium)
-                    .foregroundColor(.sacredText)
-                if p.retrograde == true {
-                    Text("℞")
-                        .font(.system(size: 11, weight: .regular, design: .serif))
-                        .foregroundColor(.sacredGold.opacity(0.8))
+                    .foregroundColor(.sacredGold)
+                Text("\(p.nakshatra) · Pada \(p.pada)")
+                    .font(.sacredMicro)
+                    .foregroundColor(.sacredTextSecondary)
+            }
+
+            Spacer()
+
+            stateIcons(p)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 10, weight: .regular, design: .serif))
+                .foregroundColor(.sacredMuted.opacity(0.5))
+                .padding(.leading, 4)
+        }
+        .contentShape(Rectangle())
+    }
+
+    /// Fallback for charts without an ascendant (no lat/lon): plain list,
+    /// no house grouping since we have nothing to group on.
+    private func ungroupedPlanets(_ planets: [Planet]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(planets.enumerated()), id: \.element.name) { index, planet in
+                NavigationLink(destination: PlanetDetailView(planet: planet)) {
+                    ungroupedPlanetRow(planet)
+                }
+                .buttonStyle(.plain)
+                if index < planets.count - 1 {
+                    Divider().padding(.vertical, 10)
                 }
             }
-            .frame(width: 70, alignment: .leading)
+        }
+    }
+
+    private func ungroupedPlanetRow(_ p: Planet) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(p.name)
+                .font(.sacredTextMedium)
+                .foregroundColor(.sacredText)
+                .frame(width: 70, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
@@ -243,19 +332,7 @@ struct VedicChartView: View {
 
             Spacer()
 
-            VStack(alignment: .trailing, spacing: 1) {
-                if hasHouses, let house = p.house {
-                    Text("H\(house)")
-                        .font(.sacredSmallSemibold)
-                        .foregroundColor(.sacredText)
-                }
-                if p.dignity != "neutral" {
-                    Text(dignityLabel(p.dignity))
-                        .font(.system(size: 8, weight: .bold, design: .serif))
-                        .tracking(1.5)
-                        .foregroundColor(dignityColor(p.dignity))
-                }
-            }
+            stateIcons(p)
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 10, weight: .regular, design: .serif))
@@ -263,6 +340,87 @@ struct VedicChartView: View {
                 .padding(.leading, 4)
         }
         .contentShape(Rectangle())
+    }
+
+    // MARK: - Legend
+
+    /// Explains every icon used in the planet rows. Language is written for
+    /// someone new to Vedic astrology — skip the jargon, focus on what each
+    /// state means for how the planet shows up in the person's life.
+    private func legendSection() -> some View {
+        card(title: "LEGEND") {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Each mark describes how a planet is showing up in this chart — whether it's strong, at home, or facing a quiet challenge.")
+                    .font(.sacredSmall)
+                    .italic()
+                    .foregroundColor(.sacredTextSecondary)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                legendGroup(
+                    title: "Positive",
+                    rows: [
+                        ("✦", .sacredGreen, "Deep Exalted",
+                         "At the very peak of its strength — a rare placement where the planet's best qualities shine most clearly."),
+                        ("↑", .sacredGreen.opacity(0.85), "Exalted",
+                         "In the sign that amplifies its natural qualities. The planet expresses itself with confidence and ease."),
+                        ("☆", .sacredGreen.opacity(0.7), "Moolatrikona",
+                         "In its honored seat — acts with authority and purpose, deeply connected to its role in the chart."),
+                        ("⌂", .sacredGreen.opacity(0.55), "Own Sign",
+                         "The planet is at home. It expresses itself freely and without effort here."),
+                        ("◈", .sacredGreen.opacity(0.9), "Vargottama",
+                         "The planet occupies the same sign in two key charts — a sign of consistent, reinforced strength.")
+                    ]
+                )
+                legendGroup(
+                    title: "Challenging",
+                    rows: [
+                        ("↓", .sacredRed, "Debilitated",
+                         "In a sign where it feels out of place. Not a fault — a quiet invitation to grow into this part of life."),
+                        ("◉", .sacredRed.opacity(0.75), "Combust",
+                         "Sitting too close to the Sun. Its outward expression is quieter; its energy turns inward rather than broadcasting."),
+                        ("◐", .sacredRed.opacity(0.55), "Sandhi",
+                         "Right at a sign boundary — between two worlds. Its character feels less settled, as if it's in transition.")
+                    ]
+                )
+                legendGroup(
+                    title: "Notable",
+                    rows: [
+                        ("℞", .sacredGold.opacity(0.75), "Retrograde",
+                         "Moving backward through the zodiac at birth. Classically a sign of intensified strength — its themes come through with extra depth.")
+                    ]
+                )
+            }
+        }
+    }
+
+    private func legendGroup(title: String,
+                             rows: [(String, Color, String, String)]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title.uppercased())
+                .font(.system(size: 9, weight: .bold, design: .serif))
+                .tracking(2)
+                .foregroundColor(.sacredLabel)
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Text(row.0)
+                            .font(.system(size: 17, weight: .regular, design: .serif))
+                            .foregroundColor(row.1)
+                            .frame(width: 20, alignment: .center)
+                        Text(row.2)
+                            .font(.sacredSmallSemibold)
+                            .foregroundColor(.sacredText)
+                            .frame(width: 110, alignment: .leading)
+                        Text(row.3)
+                            .font(.sacredMicro)
+                            .italic()
+                            .foregroundColor(.sacredTextSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - Interpretation panel
@@ -351,15 +509,63 @@ struct VedicChartView: View {
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
     }
 
+    /// Colors are tiered by classical strength. Opacity runs from 1.0
+    /// (strongest/rarest) down to 0.55 (most common/subtle) so a user scanning
+    /// the chart can weigh each mark's importance at a glance.
     private func dignityColor(_ dignity: String) -> Color {
         switch dignity {
         case "deep_exalted": return .sacredGreen
-        case "exalted": return .sacredGreen
-        case "moolatrikona": return .sacredGold
-        case "own_sign": return .sacredGold
+        case "exalted": return .sacredGreen.opacity(0.85)
+        case "moolatrikona": return .sacredGreen.opacity(0.7)
+        case "own_sign": return .sacredGreen.opacity(0.55)
         case "debilitated": return .sacredRed
         default: return .sacredMuted
         }
+    }
+
+    /// Classical chart glyph for each dignity state.
+    /// ✦ deep exalt · ↑ exalt · ☆ moolatrikona · ⌂ own sign · ↓ debilitated.
+    private func dignityGlyph(_ dignity: String) -> String? {
+        switch dignity {
+        case "deep_exalted": return "✦"
+        case "exalted": return "↑"
+        case "moolatrikona": return "☆"
+        case "own_sign": return "⌂"
+        case "debilitated": return "↓"
+        default: return nil
+        }
+    }
+
+    /// Horizontal stack of state indicators for a chart row. Positives first
+    /// (dignity, vargottama), challenges after (combust, sandhi). Retrograde
+    /// is shown separately next to the planet name. Full explanations live on
+    /// PlanetDetailView — icons here just signal "there's something to see."
+    @ViewBuilder
+    private func stateIcons(_ p: Planet) -> some View {
+        HStack(spacing: 8) {
+            if let glyph = dignityGlyph(p.dignity) {
+                stateGlyph(glyph, color: dignityColor(p.dignity), label: dignityLabel(p.dignity))
+            }
+            if p.vargottama == true {
+                stateGlyph("◈", color: .sacredGreen.opacity(0.9), label: "Vargottama")
+            }
+            if p.retrograde == true {
+                stateGlyph("℞", color: .sacredGold.opacity(0.75), label: "Retrograde")
+            }
+            if p.combust == true {
+                stateGlyph("◉", color: .sacredRed.opacity(0.75), label: "Combust")
+            }
+            if p.sandhi == true {
+                stateGlyph("◐", color: .sacredRed.opacity(0.55), label: "Sandhi")
+            }
+        }
+    }
+
+    private func stateGlyph(_ glyph: String, color: Color, label: String) -> some View {
+        Text(glyph)
+            .font(.system(size: 16, weight: .regular, design: .serif))
+            .foregroundColor(color)
+            .accessibilityLabel(label)
     }
 
     /// Map machine-readable dignity values to the UI label shown on the row.

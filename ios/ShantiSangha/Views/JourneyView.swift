@@ -9,7 +9,6 @@ struct JourneyView: View {
     @State private var reflectionTimedOut = false
     @State private var selectedPeriod: JourneyPeriod = .lastWeek
     @State private var insights: [InsightItem] = []
-    @State private var vedicIdentity: VedicIdentity?
     @State private var portrait: String?
     @State private var portraitLoading = false
     private let api = ApiService.shared
@@ -19,46 +18,16 @@ struct JourneyView: View {
             VStack(alignment: .leading, spacing: 0) {
                 // Portrait — who you are, seen through your practice
                 if let portrait = portrait {
-                    VStack(spacing: 12) {
-                        // Vedic identity subtitle — tappable, opens the full chart
-                        if let vedic = vedicIdentity, vedic.available {
-                            NavigationLink(destination: VedicChartView()) {
-                                HStack(spacing: 8) {
-                                    Text(vedic.primaryRashi)
-                                        .font(.sacredMicro)
-                                        .tracking(2)
-                                        .foregroundColor(.sacredGold.opacity(0.7))
-
-                                    if let nakshatra = vedic.nakshatra {
-                                        Text("·")
-                                            .font(.sacredMicro)
-                                            .foregroundColor(.sacredMuted.opacity(0.5))
-                                        Text(nakshatra)
-                                            .font(.sacredMicro)
-                                            .tracking(2)
-                                            .foregroundColor(.sacredGold.opacity(0.7))
-                                    }
-
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 7, weight: .regular, design: .serif))
-                                        .foregroundColor(.sacredGold.opacity(0.5))
-                                        .padding(.leading, 2)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
-
-                        Text(portrait)
-                            .font(.sacredText)
-                            .italic()
-                            .foregroundColor(.sacredText)
-                            .multilineTextAlignment(.center)
-                            .lineSpacing(6)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 24)
+                    Text(portrait)
+                        .font(.sacredText)
+                        .italic()
+                        .foregroundColor(.sacredText)
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(6)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 8)
+                        .padding(.bottom, 24)
                 } else if portraitLoading {
                     VStack(spacing: 8) {
                         ProgressView()
@@ -280,7 +249,6 @@ struct JourneyView: View {
         .navigationTitle("Journey")
         .navigationBarTitleDisplayMode(.inline)
         .task { await loadAll() }
-        .task { await loadVedicIdentity() }
         .task { await loadPortrait() }
     }
 
@@ -369,20 +337,6 @@ struct JourneyView: View {
             if !error.isCancellation {
                 AppLogger.shared.error("Journey", "Failed to load insights: \(error)")
             }
-        }
-    }
-
-    private func loadVedicIdentity() async {
-        // Birth chart is static — only fetch once per session
-        guard vedicIdentity == nil else { return }
-        do {
-            let identity: VedicIdentity = try await api.get("/jyotish/identity")
-            await AppLogger.shared.info("Journey", "Vedic identity: available=\(identity.available) rashi=\(identity.sunRashi ?? "nil") nakshatra=\(identity.nakshatra ?? "nil")")
-            if identity.available {
-                withAnimation(.easeIn(duration: 0.3)) { vedicIdentity = identity }
-            }
-        } catch {
-            await AppLogger.shared.error("Journey", "Vedic identity failed: \(error)")
         }
     }
 
@@ -536,30 +490,4 @@ struct InsightItem: Codable, Identifiable {
 struct PortraitResponse: Codable {
     let content: String?
     let generatedAt: String?
-}
-
-struct VedicIdentity: Codable {
-    let available: Bool
-    let sunRashi: String?
-    let moonRashi: String?
-    let nakshatra: String?
-    let nakshatraQuality: String?
-
-    /// Extracts just the Sanskrit name from "Mithuna (Gemini)" format
-    var sunRashiShort: String {
-        guard let rashi = sunRashi else { return "" }
-        return rashi.components(separatedBy: " (").first ?? rashi
-    }
-
-    var moonRashiShort: String {
-        guard let rashi = moonRashi else { return "" }
-        return rashi.components(separatedBy: " (").first ?? rashi
-    }
-
-    /// In Vedic astrology, Moon rashi (Chandra rashi) is the primary identifier.
-    /// Falls back to Sun rashi only when birth time is unknown.
-    var primaryRashi: String {
-        if !moonRashiShort.isEmpty { return moonRashiShort }
-        return sunRashiShort
-    }
 }
