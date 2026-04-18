@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreLocation
 
 /// Detailed Vedic birth chart — nakshatra attributes, lagna, 9 planets with
 /// rashi/degree/house/nakshatra/pada, current dasha. Reached from Journey tab.
@@ -6,6 +7,7 @@ struct VedicChartView: View {
     @State private var chart: VedicChart?
     @State private var loading = true
     @State private var error: String?
+    @State private var placeName: String?
     private let api = ApiService.shared
 
     var body: some View {
@@ -74,6 +76,17 @@ struct VedicChartView: View {
                 Text(formatTime(time))
                     .font(.sacredSmall)
                     .foregroundColor(.sacredTextSecondary)
+            }
+            if let place = placeName {
+                HStack(spacing: 4) {
+                    Image(systemName: "location")
+                        .font(.sacredMicro)
+                        .foregroundColor(.sacredGold.opacity(0.7))
+                    Text(place)
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredTextSecondary)
+                }
+                .padding(.top, 2)
             }
             if chart.birth?.hasCoordinates == false {
                 Text("Birth place is not set — add it in Settings to see your houses and ascendant.")
@@ -332,12 +345,36 @@ struct VedicChartView: View {
         do {
             let result: VedicChart = try await api.get("/jyotish/chart")
             chart = result
+            await reverseGeocodeBirthPlace(result.birth?.place)
         } catch {
             if !error.isCancellation {
                 self.error = "Couldn't load your chart. \(error.localizedDescription)"
             }
         }
         loading = false
+    }
+
+    /// BirthPlace is stored as "lat,lon" — reverse-geocode to a human name
+    /// for display on the chart view.
+    private func reverseGeocodeBirthPlace(_ place: String?) async {
+        guard let place else { return }
+        let parts = place.split(separator: ",")
+        guard parts.count == 2,
+              let lat = Double(parts[0].trimmingCharacters(in: .whitespaces)),
+              let lon = Double(parts[1].trimmingCharacters(in: .whitespaces)) else { return }
+
+        do {
+            let placemarks = try await CLGeocoder().reverseGeocodeLocation(
+                CLLocation(latitude: lat, longitude: lon))
+            if let pm = placemarks.first {
+                let parts = [pm.locality, pm.administrativeArea, pm.country]
+                    .compactMap { $0 }
+                    .filter { !$0.isEmpty }
+                placeName = parts.joined(separator: ", ")
+            }
+        } catch {
+            // Non-fatal — just don't show a name.
+        }
     }
 }
 
