@@ -20,6 +20,8 @@ public class GenerateDailyReadingJob(
     Kernel kernel,
     IGoalQueryService goalQuery,
     IJyotishContextService jyotishService,
+    IJyotishKnowledgeService jyotishKnowledge,
+    IProfileQueryService profileQuery,
     ILogger<GenerateDailyReadingJob> logger)
 {
     private enum Framing
@@ -70,6 +72,50 @@ public class GenerateDailyReadingJob(
                 contextParts.Add($"Their active practices:\n{string.Join("\n", goalLines)}");
             }
 
+            // Retrieve Jyotish wisdom passages matching the user's chart signatures
+            // and rotate deterministically on (userId, date) so the same chart
+            // surfaces a different angle each day rather than the same 2-3 forever.
+            try
+            {
+                var birth = await profileQuery.GetBirthInfoAsync(userId);
+                if (birth.BirthDate is not null && birth.BirthTime is not null
+                    && TimeOnly.TryParse(birth.BirthTime, out var birthTime))
+                {
+                    double? lat = null, lon = null;
+                    if (!string.IsNullOrWhiteSpace(birth.BirthPlace))
+                    {
+                        var parts = birth.BirthPlace.Split(',');
+                        if (parts.Length == 2
+                            && double.TryParse(parts[0].Trim(), System.Globalization.CultureInfo.InvariantCulture, out var parsedLat)
+                            && double.TryParse(parts[1].Trim(), System.Globalization.CultureInfo.InvariantCulture, out var parsedLon))
+                        {
+                            lat = parsedLat;
+                            lon = parsedLon;
+                        }
+                    }
+
+                    var nowUtc = DateTime.UtcNow;
+                    var signatures = jyotishKnowledge.ComputeSignaturesForBirth(
+                        birth.BirthDate.Value, birthTime, lat, lon, nowUtc);
+                    var allPassages = jyotishKnowledge.GetPassages(signatures);
+
+                    if (allPassages.Count > 0)
+                    {
+                        var chosen = RotatePassages(allPassages, userId, today, count: 2);
+                        var passageLines = chosen.Select(p =>
+                            $"  - [{p.Polarity}] {p.Content}");
+                        contextParts.Add(
+                            "Classical Vedic wisdom applicable to their chart (weave invisibly — " +
+                            "never quote, never name the source, never use Sanskrit terms from these):\n" +
+                            string.Join("\n", passageLines));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to retrieve Jyotish wisdom passages for user {UserId} — continuing without", userId);
+            }
+
             var chatCompletion = kernel.GetRequiredService<IChatCompletionService>();
             var history = new ChatHistory(BuildSystemPrompt(framing));
             history.AddUserMessage($"Context:\n{string.Join("\n\n", contextParts)}");
@@ -100,6 +146,31 @@ public class GenerateDailyReadingJob(
         {
             logger.LogError(ex, "Failed to generate daily reading for user {UserId}", userId);
         }
+    }
+
+    /// <summary>
+    /// Deterministically selects N passages from the pool, rotating based on
+    /// (userId, date) so each day surfaces a different subset. Different users
+    /// on the same day see different rotations; the same user sees a different
+    /// subset each day.
+    /// </summary>
+    private static IReadOnlyList<JyotishPassage> RotatePassages(
+        IReadOnlyList<JyotishPassage> pool, Guid userId, DateOnly date, int count)
+    {
+        if (pool.Count <= count) return pool;
+
+        // Seed: combine user GUID with day-of-year so rotation advances daily.
+        var seed = unchecked(userId.GetHashCode() ^ date.DayNumber.GetHashCode());
+        var rng = new Random(seed);
+        var indices = Enumerable.Range(0, pool.Count).ToList();
+        var chosen = new List<JyotishPassage>(count);
+        for (var i = 0; i < count; i++)
+        {
+            var idx = rng.Next(indices.Count);
+            chosen.Add(pool[indices[idx]]);
+            indices.RemoveAt(idx);
+        }
+        return chosen;
     }
 
     private static Framing DetermineFraming(JyotishContext jyotish, DateOnly today)

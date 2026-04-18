@@ -1,0 +1,2380 @@
+[
+  {
+    "id": "moon_in_mesha",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "moon_in_mesha",
+      "moon_in_aries"
+    ],
+    "title": "Moon in Mesha (Aries)",
+    "content": "An emotional body that moves quickly — anger flares and cools, enthusiasm builds in an instant. The heart wants to lead, to start, to go first. The practice that helps is any that teaches the feelings to wait one breath before acting.",
+    "themes": [
+      "emotional_impulsiveness",
+      "courage",
+      "quick_heart",
+      "leadership"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "moon_in_vrishabha",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "moon_in_vrishabha",
+      "moon_in_taurus"
+    ],
+    "title": "Moon in Vrishabha (Taurus) — exalted",
+    "content": "The emotional body is steady, sensuous, and calmed by beauty, texture, and the patient rhythms of the physical world. Moods change slowly, for better and for worse. This placement rewards environments that feel anchored — a room kept simple, a meal eaten without hurry, practices repeated until they become home.",
+    "themes": [
+      "stability",
+      "sensory_grounding",
+      "slow_moods",
+      "beauty_as_anchor"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "moon_in_mithuna",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "moon_in_mithuna",
+      "moon_in_gemini"
+    ],
+    "title": "Moon in Mithuna (Gemini)",
+    "content": "Feelings travel through the mind first and only reach the heart if words have had their chance. Conversation, writing, and reading regulate the mood the way food regulates the body. The practice that settles this nature is one that gives the talking mind something silent to witness.",
+    "themes": [
+      "mental_emotions",
+      "words_as_regulation",
+      "restless_mind",
+      "curious_heart"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "moon_in_karka",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "moon_in_karka",
+      "moon_in_cancer"
+    ],
+    "title": "Moon in Karka (Cancer) — own sign",
+    "content": "Moon at home in its own sign gives unusually deep emotional waters and a strong link to home, ancestry, and the mother archetype. Feelings run high but also run true — this is a heart that knows what it knows. The lifelong work is to let the sensitivity inform without overwhelming.",
+    "themes": [
+      "emotional_depth",
+      "home",
+      "ancestry",
+      "sensitive_knowing"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "moon_in_simha",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "moon_in_simha",
+      "moon_in_leo"
+    ],
+    "title": "Moon in Simha (Leo)",
+    "content": "A heart that wants to be seen and that gives warmth generously when it is. Moods track with whether or not the inner child feels witnessed. The practice is to become a warm witness to oneself — steady enough that external recognition becomes a gift, not a requirement.",
+    "themes": [
+      "heart_warmth",
+      "being_seen",
+      "inner_child",
+      "generous_spirit"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "moon_in_kanya",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "moon_in_kanya",
+      "moon_in_virgo"
+    ],
+    "title": "Moon in Kanya (Virgo)",
+    "content": "Feelings are processed through analysis — the heart wants to understand what it is feeling before trusting it. This nature serves healers, editors, and anyone whose work is precision. The shadow is a tendency toward self-criticism; the practice is to let some things be simply felt, not scrutinized.",
+    "themes": [
+      "analytical_feelings",
+      "precision",
+      "service",
+      "self_criticism"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "moon_in_tula",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "moon_in_tula",
+      "moon_in_libra"
+    ],
+    "title": "Moon in Tula (Libra)",
+    "content": "The emotional body is calibrated by relationships — harmony in the room settles the heart, and discord disturbs it more than it does others. The social grace is real, not performative. The work is to find an internal balance that doesn't depend on external harmony being perfect.",
+    "themes": [
+      "relational_feeling",
+      "harmony",
+      "social_grace",
+      "internal_balance"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "moon_in_vrischika",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "moon_in_vrischika",
+      "moon_in_scorpio"
+    ],
+    "title": "Moon in Vrischika (Scorpio) — debilitated",
+    "content": "Feelings run deep and transformative; nothing stays surface for long. The inner life has a secret chamber, and the work of a lifetime is learning when to open it and to whom. What looks like intensity to others is often the honest registration of what most people numb themselves to.",
+    "themes": [
+      "emotional_depth",
+      "transformation",
+      "secret_inner_life",
+      "honest_intensity"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "moon_in_dhanu",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "moon_in_dhanu",
+      "moon_in_sagittarius"
+    ],
+    "title": "Moon in Dhanu (Sagittarius)",
+    "content": "The heart seeks meaning the way other hearts seek safety. Moods lift with philosophy, travel, teachers, and the sense of a larger frame. The practice that nourishes this nature is any that keeps wonder alive without letting it become mere restlessness.",
+    "themes": [
+      "seeking_meaning",
+      "philosophy",
+      "wanderlust",
+      "wonder"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "moon_in_makara",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "moon_in_makara",
+      "moon_in_capricorn"
+    ],
+    "title": "Moon in Makara (Capricorn)",
+    "content": "Feelings are disciplined, often privately held, and expressed through what is built rather than what is said. Emotional maturity tends to arrive early — sometimes too early. The practice worth cultivating is the one that gives the heart permission to rest without having earned it.",
+    "themes": [
+      "emotional_discipline",
+      "maturity",
+      "private_feeling",
+      "deserving_rest"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "moon_in_kumbha",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "moon_in_kumbha",
+      "moon_in_aquarius"
+    ],
+    "title": "Moon in Kumbha (Aquarius)",
+    "content": "An emotional nature that stands a little apart — caring deeply about collective concerns while keeping its own feelings at a thoughtful distance. Friendship matters more than familial warmth; belonging to a cause can feel more settling than belonging to a person. The work is to let the personal in without losing the wider view.",
+    "themes": [
+      "emotional_detachment",
+      "friendship",
+      "collective_concern",
+      "unusual_heart"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "moon_in_meena",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "moon_in_meena",
+      "moon_in_pisces"
+    ],
+    "title": "Moon in Meena (Pisces)",
+    "content": "The emotional body is porous — it feels what the room feels, what the other person is not saying. Art, music, water, and prayer are not luxuries for this nature; they are how the overflow gets honored. The practice that protects this gift is one that gives the heart a daily container to come back to.",
+    "themes": [
+      "empathic_porosity",
+      "artistic_sensitivity",
+      "devotion",
+      "emotional_overflow"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "sun_in_mesha",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "sun_in_mesha",
+      "sun_in_aries"
+    ],
+    "title": "Sun in Mesha (Aries) — exalted",
+    "content": "A soul with fire at its core — identity expresses through action, initiative, and the willingness to go first into unknown terrain. Leadership arrives whether or not it is sought. The lifelong invitation is to lead without rushing, to burn brightly without burning through.",
+    "themes": [
+      "soul_fire",
+      "initiative",
+      "leadership",
+      "burning_clean"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "sun_in_vrishabha",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "sun_in_vrishabha",
+      "sun_in_taurus"
+    ],
+    "title": "Sun in Vrishabha (Taurus)",
+    "content": "Identity anchors in what is built, grown, or made tangible — the voice and the body find themselves through the physical world. Value systems run deep; what one stands for is rarely negotiable. The gift of this placement is endurance; the shadow is the struggle to let go.",
+    "themes": [
+      "tangible_identity",
+      "enduring_values",
+      "embodied_self",
+      "difficulty_releasing"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "sun_in_mithuna",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "sun_in_mithuna",
+      "sun_in_gemini"
+    ],
+    "title": "Sun in Mithuna (Gemini)",
+    "content": "The soul finds itself through language, exchange, and the connecting of ideas. Teaching, writing, and trade are natural terrain. The lifelong task is to let one voice emerge from the many interests — to choose depth in something without losing the breadth that is native here.",
+    "themes": [
+      "soul_through_words",
+      "breadth_vs_depth",
+      "curiosity",
+      "communication_as_identity"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "sun_in_karka",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "sun_in_karka",
+      "sun_in_cancer"
+    ],
+    "title": "Sun in Karka (Cancer)",
+    "content": "A soul that recognizes itself through care — of family, community, of whatever is tender enough to need protection. Identity is relational; selfhood unfolds most fully in service to something or someone else. The practice is to care for the caretaker first without losing the gift.",
+    "themes": [
+      "caring_identity",
+      "protective_soul",
+      "relational_self",
+      "caring_for_the_caregiver"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "sun_in_simha",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "sun_in_simha",
+      "sun_in_leo"
+    ],
+    "title": "Sun in Simha (Leo) — own sign",
+    "content": "The Sun rules here; identity shines openly and expects to be seen. Creative expression, leadership, and play with dignity all flow naturally. The mature version of this placement uses the stage for something worth saying; the unripe version confuses visibility with meaning.",
+    "themes": [
+      "strong_identity",
+      "creative_expression",
+      "dignified_leadership",
+      "visibility_vs_meaning"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "sun_in_kanya",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "sun_in_kanya",
+      "sun_in_virgo"
+    ],
+    "title": "Sun in Kanya (Virgo)",
+    "content": "The soul refines itself through craft and correction — identity forms in the careful making of something small done very well. The work lives in the details; so does the ego. The practice of a lifetime is precision without tyranny, toward oneself or others.",
+    "themes": [
+      "refined_identity",
+      "craft",
+      "attention_to_detail",
+      "kindness_in_precision"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "sun_in_tula",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "sun_in_tula",
+      "sun_in_libra"
+    ],
+    "title": "Sun in Tula (Libra) — debilitated",
+    "content": "The soul meets itself in relationship — identity sharpens against the whetstone of another. The work is harder than for souls born into easier self-definition: to know who one is apart from who one is to others. Partnership here is both the classroom and the curriculum.",
+    "themes": [
+      "relational_identity",
+      "partnership_as_mirror",
+      "self_apart_from_other",
+      "harmony"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "sun_in_vrischika",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "sun_in_vrischika",
+      "sun_in_scorpio"
+    ],
+    "title": "Sun in Vrischika (Scorpio)",
+    "content": "A soul that forms through transformation — each stage of life is a small death and a rebuilding. Research, healing, and the crossing of thresholds suit this nature. The gift is fearlessness in the presence of endings; the shadow is a tendency to find them even where they are not yet due.",
+    "themes": [
+      "transformative_soul",
+      "fearless_with_endings",
+      "depth_research",
+      "thresholds"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "sun_in_dhanu",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "sun_in_dhanu",
+      "sun_in_sagittarius"
+    ],
+    "title": "Sun in Dhanu (Sagittarius)",
+    "content": "The soul is oriented toward truth, wisdom, and the enlarging frame. Teaching, law, philosophy, and the mentoring of others come naturally. The long arc is to live what has been learned — to become a steward of the truths one speaks, not only a messenger.",
+    "themes": [
+      "truth_seeking",
+      "wisdom_soul",
+      "teaching",
+      "steward_of_what_is_spoken"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "sun_in_makara",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "sun_in_makara",
+      "sun_in_capricorn"
+    ],
+    "title": "Sun in Makara (Capricorn)",
+    "content": "A soul that proves itself through sustained effort — identity is built the way a house is built, over years. The authority that arrives late is earned authority, and it tends to last. The quiet work is to let the self be enjoyed along the way, not only rewarded at the end.",
+    "themes": [
+      "earned_authority",
+      "sustained_effort",
+      "patient_self_building",
+      "enjoying_the_way"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "sun_in_kumbha",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "sun_in_kumbha",
+      "sun_in_aquarius"
+    ],
+    "title": "Sun in Kumbha (Aquarius)",
+    "content": "The soul recognizes itself through the collective and the unusual — identity forms through what one contributes to the larger field rather than what one holds privately. Friendships and networks often teach more than family. The task is to belong to the wide world without disappearing into it.",
+    "themes": [
+      "collective_identity",
+      "unusual_self",
+      "friendship",
+      "belonging_without_dissolving"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "sun_in_meena",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "sun_in_meena",
+      "sun_in_pisces"
+    ],
+    "title": "Sun in Meena (Pisces)",
+    "content": "A soul that dissolves into what it loves — identity forms and reforms in service, devotion, or artistic expression. Ego is thinner than most; what feels like weakness in youth becomes spiritual capacity in later life. The practice is to have a boundary without losing the porousness.",
+    "themes": [
+      "devotional_soul",
+      "artistic_identity",
+      "spiritual_porousness",
+      "boundary_with_love"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "lagna_mesha",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "lagna_in_mesha",
+      "ascendant_in_aries"
+    ],
+    "title": "Mesha (Aries) Ascendant",
+    "content": "An outer self that arrives first — decisive, direct, physically present. Others register the energy before the words. The lifelong work is to match pace with place, to know when to lead and when the fastest thing is to listen.",
+    "themes": [
+      "direct_presence",
+      "decisive_action",
+      "leadership_default",
+      "pace_matching"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "lagna_vrishabha",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "lagna_in_vrishabha",
+      "ascendant_in_taurus"
+    ],
+    "title": "Vrishabha (Taurus) Ascendant",
+    "content": "A steady, embodied presence — the outer self is unhurried, grounded, warm. Others relax in this company. The gift is endurance; the shadow is a reluctance to begin. Starting something before it feels completely ready is the growth edge.",
+    "themes": [
+      "grounded_presence",
+      "endurance",
+      "reluctance_to_start",
+      "warmth"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "lagna_mithuna",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "lagna_in_mithuna",
+      "ascendant_in_gemini"
+    ],
+    "title": "Mithuna (Gemini) Ascendant",
+    "content": "The outer self speaks first and moves lightly — communication, networks, and quick adaptation are native. Others experience this as agility and wit. The deepening comes through choosing one well of attention to sit beside for years rather than sipping from all of them.",
+    "themes": [
+      "communicative_presence",
+      "agility",
+      "wit",
+      "choosing_depth"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "lagna_karka",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "lagna_in_karka",
+      "ascendant_in_cancer"
+    ],
+    "title": "Karka (Cancer) Ascendant",
+    "content": "A soft, receptive outer self — others often feel safer in this presence than they can explain. The body registers emotional weather, others' and one's own. The practice worth cultivating is the one that helps discern whose feelings are being carried in the room.",
+    "themes": [
+      "receptive_presence",
+      "safe_company",
+      "emotional_attunement",
+      "discerning_whose_feelings"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "lagna_simha",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "lagna_in_simha",
+      "ascendant_in_leo"
+    ],
+    "title": "Simha (Leo) Ascendant",
+    "content": "The outer self carries light — warmth, dignity, a natural occupation of space. Others often look here to see what is worth following. The ripe version uses the visibility in service; the unripe version confuses the stage with the self.",
+    "themes": [
+      "radiant_presence",
+      "dignity",
+      "natural_leadership",
+      "visibility_with_purpose"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "lagna_kanya",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "lagna_in_kanya",
+      "ascendant_in_virgo"
+    ],
+    "title": "Kanya (Virgo) Ascendant",
+    "content": "A precise, observational outer self — others sense the attention to detail before it is spoken. Work, craft, and service are where this presence feels most at home. The practice is to apply the same gentleness to oneself that the discernment can offer to the work.",
+    "themes": [
+      "precise_presence",
+      "observational",
+      "craft_at_home",
+      "gentleness_toward_self"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "lagna_tula",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "lagna_in_tula",
+      "ascendant_in_libra"
+    ],
+    "title": "Tula (Libra) Ascendant",
+    "content": "A graceful, diplomatic outer self — others register the balance-seeking quality and are often drawn to mediate their own tensions in this presence. The lifelong task is to let the need for harmony coexist with the capacity to say a hard and clear no.",
+    "themes": [
+      "graceful_presence",
+      "diplomacy",
+      "mediator_energy",
+      "clear_no"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "lagna_vrischika",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "lagna_in_vrischika",
+      "ascendant_in_scorpio"
+    ],
+    "title": "Vrischika (Scorpio) Ascendant",
+    "content": "An intense, private outer self — others sense the depth quickly but see only what is offered. Few people are let all the way in, and those few tend to stay. The work of a lifetime is to let the guarded nature coexist with the honest desire to be known.",
+    "themes": [
+      "intense_presence",
+      "private_self",
+      "selective_depth",
+      "honest_desire_to_be_known"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "lagna_dhanu",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "lagna_in_dhanu",
+      "ascendant_in_sagittarius"
+    ],
+    "title": "Dhanu (Sagittarius) Ascendant",
+    "content": "An optimistic, expansive outer self — others often experience this presence as a clearing, a bigger view opening up. Teachers, mentors, and seekers gather here. The growth is in finishing what the wide view reveals is worth staying with.",
+    "themes": [
+      "expansive_presence",
+      "optimism",
+      "teacher_energy",
+      "finishing_what_is_begun"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "lagna_makara",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "lagna_in_makara",
+      "ascendant_in_capricorn"
+    ],
+    "title": "Makara (Capricorn) Ascendant",
+    "content": "A serious, structured outer self — others often assume maturity before it has been lived. Responsibility arrives early and does not always leave. The practice worth cultivating is the one that gives the inner child room without requiring it to earn the right.",
+    "themes": [
+      "structured_presence",
+      "early_maturity",
+      "responsibility",
+      "inner_child_without_earning"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "lagna_kumbha",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "lagna_in_kumbha",
+      "ascendant_in_aquarius"
+    ],
+    "title": "Kumbha (Aquarius) Ascendant",
+    "content": "An original, slightly unusual outer self — others often sense the independent frame before anything is said. Friendship and collaboration come easily; conformity rarely does. The task is to stay connected while standing a little apart.",
+    "themes": [
+      "original_presence",
+      "independent_frame",
+      "friendship_as_medium",
+      "connected_apartness"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "lagna_meena",
+    "signature_type": "planet_in_sign",
+    "signatures": [
+      "lagna_in_meena",
+      "ascendant_in_pisces"
+    ],
+    "title": "Meena (Pisces) Ascendant",
+    "content": "A soft, dissolving outer self — others feel met in some quiet way before words are exchanged. The edges of this self are more porous than most. Practice that gives the presence a daily container — a time, a place, a routine — makes the porousness a gift rather than a leak.",
+    "themes": [
+      "porous_presence",
+      "quiet_meeting",
+      "soft_edges",
+      "daily_container"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_ashwini",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_ashwini"
+    ],
+    "title": "Moon in Ashwini",
+    "content": "A swift, healing spirit — this nature moves first, often before the self has caught up. There is an almost instinctive capacity to restore what has been broken. The task is to learn when stopping is the real healing.",
+    "themes": [
+      "swiftness",
+      "healing",
+      "first_impulse",
+      "knowing_when_to_stop"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_bharani",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_bharani"
+    ],
+    "title": "Moon in Bharani",
+    "content": "A nature that carries much — intensity, fertility, the willingness to bear what others will not. Transformation is not optional here; it is the curriculum. The practice is learning to hold without being consumed by what is held.",
+    "themes": [
+      "bearing_weight",
+      "transformation",
+      "fertility",
+      "holding_without_consumption"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_krittika",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_krittika"
+    ],
+    "title": "Moon in Krittika",
+    "content": "A sharp, purifying fire — this nature sees what is false and has the courage to cut through it. The sword can also wound; discernment with warmth is the lifelong refinement. Truth here is not opinion, it is vocation.",
+    "themes": [
+      "sharp_discernment",
+      "purification",
+      "courage_to_cut",
+      "truth_as_vocation"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_rohini",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_rohini"
+    ],
+    "title": "Moon in Rohini",
+    "content": "Fertility in every form — ideas, relationships, the body, the creative work. This nature attracts what it attends to. The task is to choose the few things worth truly watering, not scatter the gift across too many gardens.",
+    "themes": [
+      "fertile_nature",
+      "magnetic_attention",
+      "creative_abundance",
+      "choosing_few_to_water"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_mrigashirsha",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_mrigashirsha"
+    ],
+    "title": "Moon in Mrigashirsha",
+    "content": "A seeker's heart — the restlessness that others diagnose is this nature simply doing its work. Reading, traveling, asking the next question, looking for something to truly belong to. Stillness comes not from stopping the search but from finding a worthy thing to return to daily.",
+    "themes": [
+      "seeking",
+      "restlessness",
+      "curious_heart",
+      "worthy_return"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_ardra",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_ardra"
+    ],
+    "title": "Moon in Ardra",
+    "content": "Storms that clear the way — this nature feels things deeply and sometimes destructively, and out of the weather comes unusual clarity. Tears here are not weakness; they are a form of work. The practice is to honor the intensity without being ruled by it.",
+    "themes": [
+      "emotional_storms",
+      "clearing_tears",
+      "deep_feeling",
+      "intensity_as_labor"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_punarvasu",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_punarvasu"
+    ],
+    "title": "Moon in Punarvasu",
+    "content": "A nature that returns — to lessons, to homes, to people, to the self. Nothing is lost here that was not meant to come back changed. The gift is the long memory; the practice is noticing when the return has completed and a new first step can be taken.",
+    "themes": [
+      "returning_nature",
+      "long_memory",
+      "second_chances",
+      "completing_the_return"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_pushya",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_pushya"
+    ],
+    "title": "Moon in Pushya",
+    "content": "A nourishing, steadying nature — this moon feeds others in ways small and structural. Teachers, cooks, caretakers, and builders of safe places all can belong here. The lifelong task is to receive nourishment with the same openness offered to others.",
+    "themes": [
+      "nourishing_nature",
+      "steadiness",
+      "caretaker",
+      "receiving_as_practice"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_ashlesha",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_ashlesha"
+    ],
+    "title": "Moon in Ashlesha",
+    "content": "A knowing nature — perceptive, psychologically shrewd, able to see what is under the floorboards of a conversation. This is a gift and a weight. The work is to use the seeing for healing rather than for the keeping of secrets.",
+    "themes": [
+      "psychological_seeing",
+      "shrewd_perception",
+      "secret_knowing",
+      "seeing_for_healing"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_magha",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_magha"
+    ],
+    "title": "Moon in Magha",
+    "content": "A nature connected to ancestry and lineage — the past speaks through this moon in ways it does not speak through others. There is dignity here, sometimes inherited burden. The practice is to honor what came before while still writing one's own line.",
+    "themes": [
+      "ancestral_presence",
+      "inherited_dignity",
+      "lineage",
+      "writing_ones_own_line"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_purva_phalguni",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_purva_phalguni"
+    ],
+    "title": "Moon in Purva Phalguni",
+    "content": "A warm, pleasure-loving heart — creativity, play, and relationship matter here in ways that are not frivolous. The body is a teacher. The task is to let delight coexist with responsibility rather than choose between them.",
+    "themes": [
+      "pleasure_loving",
+      "creative_warmth",
+      "body_as_teacher",
+      "delight_with_responsibility"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_uttara_phalguni",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_uttara_phalguni"
+    ],
+    "title": "Moon in Uttara Phalguni",
+    "content": "A generous, service-oriented heart — what one has is meant to be shared, and the act of sharing itself is restorative. Partnership in work or life often figures significantly. The practice is to give from fullness rather than from fear of being taken from.",
+    "themes": [
+      "generous_service",
+      "partnership",
+      "sharing",
+      "giving_from_fullness"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_hasta",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_hasta"
+    ],
+    "title": "Moon in Hasta",
+    "content": "A skilled, capable nature — what is made by this hand carries something extra in it. Craft, healing, and the shaping of things are native. The deepening is learning to trust what the hands know even when the mind hasn't caught up yet.",
+    "themes": [
+      "skilled_hands",
+      "craft",
+      "healing_touch",
+      "trusting_somatic_knowing"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_chitra",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_chitra"
+    ],
+    "title": "Moon in Chitra",
+    "content": "A brilliant, independent brightness — this nature is drawn to beauty, design, and the well-made thing. Others often notice the shine before the substance. The practice is to make the substance worthy of the shine, so the gift becomes the gift rather than the wrapper.",
+    "themes": [
+      "brilliance",
+      "independence",
+      "aesthetic_eye",
+      "substance_under_shine"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_swati",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_swati"
+    ],
+    "title": "Moon in Swati",
+    "content": "A flexible, moving spirit — this nature adapts, negotiates, stays in motion. Independence comes naturally; so does the art of trade and exchange. The task is to distinguish between adapting from strength and accommodating from fear.",
+    "themes": [
+      "flexibility",
+      "independence",
+      "exchange",
+      "adapting_from_strength"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_vishakha",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_vishakha"
+    ],
+    "title": "Moon in Vishakha",
+    "content": "A determined, goal-oriented nature — this moon sees the tree and walks toward it. Achievement comes; so does the question of whether the tree was the right one. The midlife invitation is often a reassessment: not less effort, but a more essential object.",
+    "themes": [
+      "determined_focus",
+      "goal_orientation",
+      "achievement",
+      "reassessing_the_goal"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_anuradha",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_anuradha"
+    ],
+    "title": "Moon in Anuradha",
+    "content": "A devoted, friendship-oriented heart — the capacity to sustain loyalty across decades lives here. Belonging to something larger feels natural. The practice is to let the devotion be chosen freshly each day, not turned into mere obligation.",
+    "themes": [
+      "devotion",
+      "loyal_friendship",
+      "belonging",
+      "chosen_commitment"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_jyeshtha",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_jyeshtha"
+    ],
+    "title": "Moon in Jyeshtha",
+    "content": "An elder spirit — authority, responsibility, and the weight of protecting others often arrive earlier than feels fair. Pride and competence are real, and so is the loneliness that can come with them. The task is to let help in without mistaking that for weakness.",
+    "themes": [
+      "elder_energy",
+      "early_authority",
+      "protective",
+      "letting_help_in"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_mula",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_mula"
+    ],
+    "title": "Moon in Mula",
+    "content": "A nature that goes to the root — comfortable questions are restless here; the real ones are home. Investigation, philosophy, and the periodic clearing of what no longer serves are native work. The practice is to root in what cannot be uprooted by the searching.",
+    "themes": [
+      "root_seeking",
+      "investigation",
+      "periodic_clearing",
+      "rooted_in_the_unshakeable"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_purva_ashadha",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_purva_ashadha"
+    ],
+    "title": "Moon in Purva Ashadha",
+    "content": "An invincible, optimistic spirit — this nature does not yield easily, and the refusal to be defeated is sometimes the whole lesson of a life. Water imagery suits it: flowing, cleansing, unstoppable. The practice is to choose battles worth the energy they require.",
+    "themes": [
+      "invincible_spirit",
+      "optimism",
+      "unstoppable",
+      "choosing_battles"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_uttara_ashadha",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_uttara_ashadha"
+    ],
+    "title": "Moon in Uttara Ashadha",
+    "content": "A late-arriving, enduring victory — whatever is built here is built to last. Patience is not optional; it is the method. The mid-life arrival of what was worked toward earlier is often the signature. The practice is trust that the slow pace is the right one.",
+    "themes": [
+      "enduring_victory",
+      "late_arrival",
+      "patient_method",
+      "trust_in_slow"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_shravana",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_shravana"
+    ],
+    "title": "Moon in Shravana",
+    "content": "A listening nature — what others miss, this moon catches. Teachers, counselors, and those who hold space professionally or personally often belong here. The task is to listen inward with the same quality of attention brought to others.",
+    "themes": [
+      "listening",
+      "space_holder",
+      "inward_attention",
+      "counselor_energy"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_dhanishta",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_dhanishta"
+    ],
+    "title": "Moon in Dhanishta",
+    "content": "A rhythmic, abundant nature — music, timing, and the pulse of group work come naturally. Wealth of multiple kinds tends to accumulate. The practice is to keep the inner rhythm steady when the outer abundance is either fuller or thinner than expected.",
+    "themes": [
+      "rhythm",
+      "abundance",
+      "group_work",
+      "steady_inner_pulse"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_shatabhisha",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_shatabhisha"
+    ],
+    "title": "Moon in Shatabhisha",
+    "content": "A healer's solitude — this nature often does its real work alone, with research, medicine, or quiet investigation. Secrecy here is not about hiding; it is about the conditions in which the gift works best. The practice is to not confuse solitude with loneliness.",
+    "themes": [
+      "healing_solitude",
+      "research",
+      "quiet_gifts",
+      "solitude_not_loneliness"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_purva_bhadrapada",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_purva_bhadrapada"
+    ],
+    "title": "Moon in Purva Bhadrapada",
+    "content": "A transformative fire — extremes are the native weather of this nature, and the work of a lifetime is to channel the intensity toward a worthy end. Mysticism, the unconventional, and the long view come easily. The practice is the container for the fire.",
+    "themes": [
+      "transformative_fire",
+      "extremes",
+      "mysticism",
+      "container_for_intensity"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_uttara_bhadrapada",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_uttara_bhadrapada"
+    ],
+    "title": "Moon in Uttara Bhadrapada",
+    "content": "A deep, still water — this nature carries something ancient, a calm that others borrow without knowing. Wisdom arrives slowly and stays. The practice is to let the depth be known, at least to those few who can meet it.",
+    "themes": [
+      "deep_stillness",
+      "ancient_calm",
+      "slow_wisdom",
+      "depth_shared_selectively"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "nakshatra_revati",
+    "signature_type": "nakshatra",
+    "signatures": [
+      "moon_in_revati"
+    ],
+    "title": "Moon in Revati",
+    "content": "A completing, transcendent nature — endings are this moon's natural element, and the grace required to release is native. Tenderness runs through everything. The practice is to let the compassion extend inward as fully as it flows outward.",
+    "themes": [
+      "gentle_completion",
+      "release",
+      "tenderness",
+      "self_compassion"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "ketu_mahadasha",
+    "signature_type": "dasha",
+    "signatures": [
+      "ketu_mahadasha"
+    ],
+    "title": "Ketu Mahadasha (7 years)",
+    "content": "A seven-year season of release, refinement, and spiritual orientation. The things that have outlived their purpose tend to fall away without much struggle. Meditation, retreat, and contemplative work find unusual traction. The discomfort is sometimes nothing more than the ego losing what it no longer needs.",
+    "themes": [
+      "release",
+      "spiritual_orientation",
+      "refinement",
+      "ego_loss"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "period_specific"
+  },
+  {
+    "id": "venus_mahadasha",
+    "signature_type": "dasha",
+    "signatures": [
+      "venus_mahadasha"
+    ],
+    "title": "Venus Mahadasha (20 years)",
+    "content": "Two decades of relationship, art, beauty, and the cultivation of pleasure in its deepest sense. This is a period where comfort is not the enemy of the spiritual life — it is part of it. Partnerships, creative work, and the enjoyment of the body all carry weight. The mature use of this dasha is to let beauty become a door rather than a destination.",
+    "themes": [
+      "relationship",
+      "beauty",
+      "creative_flowering",
+      "pleasure_as_door"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "period_specific"
+  },
+  {
+    "id": "sun_mahadasha",
+    "signature_type": "dasha",
+    "signatures": [
+      "sun_mahadasha"
+    ],
+    "title": "Sun Mahadasha (6 years)",
+    "content": "A concentrated six-year season of identity, authority, and the question of one's life purpose. Recognition can come; so can the burden of being the one others look to. The essential work is to find the authority that is truly one's own — not inherited, not performed, but earned in the light of what matters.",
+    "themes": [
+      "identity",
+      "authority",
+      "purpose",
+      "earned_selfhood"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "period_specific"
+  },
+  {
+    "id": "moon_mahadasha",
+    "signature_type": "dasha",
+    "signatures": [
+      "moon_mahadasha"
+    ],
+    "title": "Moon Mahadasha (10 years)",
+    "content": "A decade of emotional depth, domestic life, and the relationship with the maternal — in others and in oneself. Sensitivity is high; what nourishes the inner life must be tended. This is a season for writing, for therapy, for cooking for people one loves, for returning home.",
+    "themes": [
+      "emotional_depth",
+      "domestic_life",
+      "maternal_themes",
+      "returning_home"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "period_specific"
+  },
+  {
+    "id": "mars_mahadasha",
+    "signature_type": "dasha",
+    "signatures": [
+      "mars_mahadasha"
+    ],
+    "title": "Mars Mahadasha (7 years)",
+    "content": "Seven years that demand action, decision, and the willingness to stand for something. Conflicts tend to surface — not to harm, but to reveal what is worth standing for. The mature use of this dasha is directed effort in service of something larger than victory.",
+    "themes": [
+      "action",
+      "decision",
+      "constructive_conflict",
+      "directed_effort"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "period_specific"
+  },
+  {
+    "id": "rahu_mahadasha",
+    "signature_type": "dasha",
+    "signatures": [
+      "rahu_mahadasha"
+    ],
+    "title": "Rahu Mahadasha (18 years)",
+    "content": "Eighteen years of obsession, ambition, and reaching for what seems just out of reach. Worldly success often arrives, sometimes unexpectedly. The shadow is that the reaching itself becomes the life. The deeper work is to let the ambition teach rather than consume — to ride it without being ridden.",
+    "themes": [
+      "obsessive_ambition",
+      "worldly_reach",
+      "riding_desire",
+      "mature_ambition"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "period_specific"
+  },
+  {
+    "id": "jupiter_mahadasha",
+    "signature_type": "dasha",
+    "signatures": [
+      "jupiter_mahadasha"
+    ],
+    "title": "Jupiter Mahadasha (16 years)",
+    "content": "Sixteen years of teachers, teaching, wisdom, and meaningful growth. This is often the season when a person's purpose becomes clearer, when beliefs are refined in the fire of experience. Children, students, and mentors figure prominently. The work is to receive what is offered with humility and to teach what has been truly learned.",
+    "themes": [
+      "wisdom_growth",
+      "teachers_and_teaching",
+      "purpose_clarifying",
+      "humble_receiving"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "period_specific"
+  },
+  {
+    "id": "saturn_mahadasha",
+    "signature_type": "dasha",
+    "signatures": [
+      "saturn_mahadasha"
+    ],
+    "title": "Saturn Mahadasha (19 years)",
+    "content": "Nineteen years of building, testing, and the slow distillation of what is truly one's own. Results arrive later than expected and cost more than planned — and last longer than either. The discipline asked for is not heroic; it is the small, daily kind, kept over decades.",
+    "themes": [
+      "patient_building",
+      "slow_distillation",
+      "quiet_discipline",
+      "enduring_results"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "period_specific"
+  },
+  {
+    "id": "mercury_mahadasha",
+    "signature_type": "dasha",
+    "signatures": [
+      "mercury_mahadasha"
+    ],
+    "title": "Mercury Mahadasha (17 years)",
+    "content": "Seventeen years of learning, speaking, writing, and the exchange of ideas. The mind is particularly active; so is the desire to understand. Business, language, teaching, and networks all carry weight. The invitation is to let intelligence serve something — not become the point in itself.",
+    "themes": [
+      "mental_activity",
+      "learning",
+      "exchange",
+      "intelligence_in_service"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "period_specific"
+  },
+  {
+    "id": "saturn_h1",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "saturn_in_h1"
+    ],
+    "title": "Saturn in the 1st House",
+    "content": "Saturn in the ascendant gives an early acquaintance with seriousness — childhood often felt older than it was, and self-discipline arrived before it was chosen. The body carries structure well but sometimes carries it stiffly. The lifelong invitation is to let lightness in without losing the backbone.",
+    "themes": [
+      "early_seriousness",
+      "self_discipline",
+      "structural_self",
+      "lightness_without_losing_spine"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "saturn_h2",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "saturn_in_h2"
+    ],
+    "title": "Saturn in the 2nd House",
+    "content": "Saturn here teaches through the channels of wealth, family, and speech — what one accumulates, whom one carries, what one is willing to say. Resources build slowly and durably. The practice is speaking with care and holding onto only what is actually wanted.",
+    "themes": [
+      "slow_resources",
+      "family_weight",
+      "careful_speech",
+      "holding_with_discernment"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "saturn_h3",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "saturn_in_h3"
+    ],
+    "title": "Saturn in the 3rd House",
+    "content": "Saturn's strength arrives here — effort in communication, siblings, and short travels bears real fruit over time. Natural courage is cultivated rather than inherited. The mature version of this placement makes the words count and keeps the promises given.",
+    "themes": [
+      "sustained_effort",
+      "cultivated_courage",
+      "reliable_speech",
+      "kept_promises"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "saturn_h4",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "saturn_in_h4"
+    ],
+    "title": "Saturn in the 4th House",
+    "content": "The 4th is the heart's home, and Saturn here often means the heart had to work for its rest. Parental relationships, houses, and the inner sense of safety may have been built under weather. What is built here, once built, holds. The practice is to give oneself the home the child inside needed.",
+    "themes": [
+      "home_built_through_weather",
+      "deserved_rest",
+      "parental_weight",
+      "self_given_home"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "saturn_h5",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "saturn_in_h5"
+    ],
+    "title": "Saturn in the 5th House",
+    "content": "Saturn in the 5th often delays the natural easy expressions — creative play, children, intuition in love. What arrives does so seriously and meaningfully. The practice is to let play be play — not an achievement, not a demonstration, just play.",
+    "themes": [
+      "delayed_expression",
+      "serious_creativity",
+      "letting_play_be_play",
+      "mature_devotion"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "saturn_h6",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "saturn_in_h6"
+    ],
+    "title": "Saturn in the 6th House — strong placement",
+    "content": "Saturn is at home in the 6th — obstacles, enemies, and illnesses ultimately yield to sustained effort. The capacity for service and for mastery of routine work is high. The practice is to choose disciplines worth this resilience.",
+    "themes": [
+      "overcoming_obstacles",
+      "sustained_effort",
+      "service",
+      "choosing_worthy_disciplines"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "saturn_h7",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "saturn_in_h7"
+    ],
+    "title": "Saturn in the 7th House",
+    "content": "Saturn's placement here makes relationships the primary classroom of a person's life. Partnerships may arrive later than expected, or carry more weight than expected — both are the same teaching: commitment, patience, and the slow work of being truly present with another. The connections that last are the ones built on structure, not sparks.",
+    "themes": [
+      "patience",
+      "partnership",
+      "commitment",
+      "slow_bonds"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "saturn_h8",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "saturn_in_h8"
+    ],
+    "title": "Saturn in the 8th House",
+    "content": "The 8th is the house of transformations and hidden things; Saturn here teaches slowly about loss, legacy, and the courage to meet what is below the surface. Longevity is often strong. The practice is not to avoid the deep waters but to learn the patience to swim them.",
+    "themes": [
+      "slow_transformation",
+      "meeting_the_hidden",
+      "longevity",
+      "patient_depth"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "saturn_h9",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "saturn_in_h9"
+    ],
+    "title": "Saturn in the 9th House",
+    "content": "Saturn in the 9th often tests the inherited beliefs — the religion one was given, the father's worldview, the easy philosophies of youth. What survives the testing becomes true wisdom. The practice is to keep questioning reverently, never casually.",
+    "themes": [
+      "testing_beliefs",
+      "earned_wisdom",
+      "reverent_questioning",
+      "father_themes"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "saturn_h10",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "saturn_in_h10"
+    ],
+    "title": "Saturn in the 10th House — directional strength",
+    "content": "Saturn at the top of the chart gives an extraordinary capacity for sustained public work — careers are built patiently and durably here. Authority arrives late and is earned. The shadow is workaholism; the practice is to remember why the building is being built.",
+    "themes": [
+      "career_patience",
+      "earned_authority",
+      "workaholism_shadow",
+      "remembering_the_why"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "saturn_h11",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "saturn_in_h11"
+    ],
+    "title": "Saturn in the 11th House",
+    "content": "Gains arrive slowly and surely; friendships are fewer but more enduring; goals completed here stay completed. This is a strong placement for long-term wealth and for the kind of community built over decades. The practice is to honor the slow yield and not despair when others seem to accumulate faster.",
+    "themes": [
+      "slow_gains",
+      "enduring_friendship",
+      "long_term_wealth",
+      "honoring_the_slow_yield"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "saturn_h12",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "saturn_in_h12"
+    ],
+    "title": "Saturn in the 12th House",
+    "content": "Saturn in the 12th asks for time alone, for retreat, for the building of an inner discipline that no one will applaud. Foreign places and spiritual practices often carry significance. The work is to make the solitude a classroom, not a hiding place.",
+    "themes": [
+      "solitude_as_practice",
+      "inner_discipline",
+      "retreat",
+      "foreign_significance"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "jupiter_h1",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "jupiter_in_h1"
+    ],
+    "title": "Jupiter in the 1st House",
+    "content": "Jupiter in the ascendant gives an expansive, optimistic temperament and a natural pull toward meaning, teaching, and wisdom traditions. Others often sense this presence before hearing a word. The lifelong work is not to seek knowledge but to honor what is already understood — and to share it without diminishing it.",
+    "themes": [
+      "wisdom",
+      "teaching",
+      "optimism",
+      "spiritual_presence"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "jupiter_h2",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "jupiter_in_h2"
+    ],
+    "title": "Jupiter in the 2nd House",
+    "content": "Jupiter in the 2nd blesses speech, family, and resources — money comes through ethical work, family connections carry real substance, and the word given tends to be kept. The invitation is to steward the abundance rather than simply enjoy it.",
+    "themes": [
+      "ethical_wealth",
+      "blessed_family",
+      "kept_word",
+      "stewarded_abundance"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "jupiter_h3",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "jupiter_in_h3"
+    ],
+    "title": "Jupiter in the 3rd House",
+    "content": "The 3rd is not Jupiter's favorite house — effort is asked for where wisdom usually flows easily. Siblings, short travels, and courage develop through deliberate practice rather than inheritance. The practice is to let learning be slower than the mind wants.",
+    "themes": [
+      "deliberate_courage",
+      "earned_communication",
+      "patient_learning",
+      "sibling_themes"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "jupiter_h4",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "jupiter_in_h4"
+    ],
+    "title": "Jupiter in the 4th House — directional strength",
+    "content": "Jupiter is powerful in the 4th — the home carries blessings, maternal figures often bring wisdom, the inner sanctuary is well-built. Education and property tend to be favorable themes. The practice is to let the inner peace be a source others can drink from.",
+    "themes": [
+      "blessed_home",
+      "maternal_wisdom",
+      "inner_sanctuary",
+      "shared_peace"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "jupiter_h5",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "jupiter_in_h5"
+    ],
+    "title": "Jupiter in the 5th House",
+    "content": "The 5th is a strong house for Jupiter — intelligence, creativity, children, and spiritual devotion all flourish. There is a natural ability to teach from wisdom rather than from books. The task is to put the gifts in service, not on display.",
+    "themes": [
+      "natural_teacher",
+      "creative_devotion",
+      "children",
+      "gifts_in_service"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "jupiter_h6",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "jupiter_in_h6"
+    ],
+    "title": "Jupiter in the 6th House",
+    "content": "Jupiter in the 6th gives the gift of overcoming adversity with grace — enemies soften, illnesses yield to faith and effort, service work carries meaning. The practice is to stay humble in difficulty rather than using Jupiter's optimism to avoid the actual work.",
+    "themes": [
+      "overcoming_adversity",
+      "graceful_service",
+      "humble_difficulty",
+      "faith_and_effort"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "jupiter_h7",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "jupiter_in_h7"
+    ],
+    "title": "Jupiter in the 7th House — directional strength",
+    "content": "Jupiter in the 7th gives a partner who is teacher, elder, or spiritual presence in one's life. Marriage tends to expand the self rather than constrain it. Business partnerships prosper through ethical conduct. The practice is to receive the partner as teacher.",
+    "themes": [
+      "partner_as_teacher",
+      "expanding_marriage",
+      "ethical_partnership",
+      "receptive_relationship"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "jupiter_h8",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "jupiter_in_h8"
+    ],
+    "title": "Jupiter in the 8th House",
+    "content": "Jupiter in the 8th gives grace in meeting transformations — longevity, research into the occult, and unexpected inheritances are themes. Difficulty is not absent, but it is accompanied. The practice is to meet the deep things with reverence rather than fear.",
+    "themes": [
+      "grace_in_transformation",
+      "occult_research",
+      "accompanied_difficulty",
+      "reverent_depth"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "jupiter_h9",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "jupiter_in_h9"
+    ],
+    "title": "Jupiter in the 9th House — own house",
+    "content": "Jupiter is in its own home here — one of the strongest placements for wisdom, higher learning, faith, and the father-archetype. Teachers and pilgrimages arrive at the right moments. The work is to let the blessings not become complacency, to keep seeking.",
+    "themes": [
+      "strong_wisdom",
+      "higher_learning",
+      "faith",
+      "continued_seeking"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "jupiter_h10",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "jupiter_in_h10"
+    ],
+    "title": "Jupiter in the 10th House",
+    "content": "Jupiter in the 10th gives a career with meaning — teaching, law, medicine, counsel, spiritual work. Others recognize the substance behind the role. The practice is to make the work an offering rather than a performance.",
+    "themes": [
+      "meaningful_career",
+      "recognized_substance",
+      "teaching_career",
+      "work_as_offering"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "jupiter_h11",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "jupiter_in_h11"
+    ],
+    "title": "Jupiter in the 11th House",
+    "content": "Jupiter in the 11th is excellent for gains, friendships with elder or wise figures, and the realization of long-held aspirations. Generosity comes back multiplied. The task is to keep the giving ethical even as the receiving grows.",
+    "themes": [
+      "multiplied_gains",
+      "wise_friendships",
+      "long_held_aspirations",
+      "ethical_giving"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "jupiter_h12",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "jupiter_in_h12"
+    ],
+    "title": "Jupiter in the 12th House",
+    "content": "Jupiter in the 12th gives grace in endings, solitude, and the hidden spiritual life. Charitable work and foreign places often carry significance. The practice is to build a private devotional life that needs no witness.",
+    "themes": [
+      "graceful_endings",
+      "hidden_spiritual_life",
+      "charity",
+      "private_devotion"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "rahu_h1",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "rahu_in_h1"
+    ],
+    "title": "Rahu in the 1st House",
+    "content": "Rahu in the ascendant drives an insatiable search for selfhood — identity feels urgent in a way that others' do not. The work is to let the reaching be directed toward something worth becoming, not simply toward being seen. Middle age often brings the first taste of a real self.",
+    "themes": [
+      "self_reaching",
+      "urgent_identity",
+      "directed_ambition",
+      "matured_self"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "rahu_h2",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "rahu_in_h2"
+    ],
+    "title": "Rahu in the 2nd House",
+    "content": "Obsession orients around wealth, family, and speech. Money accumulation can be a strong drive; so can the desire to be heard. The practice is to discern when the hunger is teaching and when it is consuming, and to steward what is gathered.",
+    "themes": [
+      "wealth_drive",
+      "speech_intensity",
+      "teaching_vs_consuming_hunger",
+      "stewardship"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "rahu_h3",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "rahu_in_h3"
+    ],
+    "title": "Rahu in the 3rd House — favorable placement",
+    "content": "Rahu does well in the 3rd — courage, effort, and communication amplify productively. Writers, marketers, and networkers benefit from this drive. The shadow is restlessness; the practice is to finish what is begun.",
+    "themes": [
+      "amplified_courage",
+      "communication_drive",
+      "productive_restlessness",
+      "finishing_what_is_begun"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "rahu_h4",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "rahu_in_h4"
+    ],
+    "title": "Rahu in the 4th House",
+    "content": "The inner sanctuary is restless — home, mother, and peace are sought obsessively or at length. Foreign homes, unusual living situations, and a search for belonging mark the journey. The task is to build an inner home that is not dependent on outer stability.",
+    "themes": [
+      "restless_inner_sanctuary",
+      "search_for_belonging",
+      "foreign_homes",
+      "inner_home"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "rahu_h5",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "rahu_in_h5"
+    ],
+    "title": "Rahu in the 5th House",
+    "content": "Creativity, children, and romance all carry unusual intensity. Speculation, ambition in expression, and an unconventional love life are themes. The work is to channel the fire into something made, rather than something merely chased.",
+    "themes": [
+      "intense_creativity",
+      "unconventional_love",
+      "speculative_drive",
+      "channeled_fire"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "rahu_h6",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "rahu_in_h6"
+    ],
+    "title": "Rahu in the 6th House — favorable placement",
+    "content": "Rahu is strong in the 6th — the capacity to defeat enemies, overcome illness, and master the unusual disciplines is high. Service work in unconventional fields suits this placement. The shadow is constant fighting; the practice is to choose worthy opponents.",
+    "themes": [
+      "defeating_obstacles",
+      "unusual_service",
+      "unconventional_discipline",
+      "worthy_opponents"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "rahu_h7",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "rahu_in_h7"
+    ],
+    "title": "Rahu in the 7th House",
+    "content": "Partnerships carry unusual intensity — foreigners, significant age gaps, or unconventional arrangements are common themes. The lifetime teaching is commitment with eyes wide open: no illusion, no idealization, real presence.",
+    "themes": [
+      "intense_partnerships",
+      "unconventional_unions",
+      "commitment_without_illusion",
+      "real_presence"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "rahu_h8",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "rahu_in_h8"
+    ],
+    "title": "Rahu in the 8th House",
+    "content": "Rahu here drives a fascination with what is hidden — the occult, the psychological underground, the places most people avoid. Life tends to deliver transformations by surprise, and the task is not to escape them but to let them actually change you. Research, healing work, and contemplative practice all serve well.",
+    "themes": [
+      "transformation",
+      "the_hidden",
+      "psychological_depth",
+      "surprise_initiations"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "rahu_h9",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "rahu_in_h9"
+    ],
+    "title": "Rahu in the 9th House",
+    "content": "Beliefs, teachers, and higher learning carry unusual shape — orthodoxy rarely fits, and the path is often assembled from many traditions. Foreign travel and unconventional mentors shape the worldview. The practice is to keep questioning even the teachers one has chosen.",
+    "themes": [
+      "unconventional_beliefs",
+      "assembled_path",
+      "foreign_mentors",
+      "continued_questioning"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "rahu_h10",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "rahu_in_h10"
+    ],
+    "title": "Rahu in the 10th House — favorable placement",
+    "content": "Rahu in the 10th is one of its strongest placements — career ambition is high, worldly recognition often arrives, and the work itself may be unusual or innovative. The shadow is that the career consumes the self. The practice is to know why the climbing is being done.",
+    "themes": [
+      "strong_ambition",
+      "worldly_recognition",
+      "innovative_work",
+      "knowing_the_why"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "rahu_h11",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "rahu_in_h11"
+    ],
+    "title": "Rahu in the 11th House — favorable placement",
+    "content": "Unusual gains, unconventional networks, and ambitious long-term goals all serve this placement well. Communities formed here are often international or cross-disciplinary. The practice is to use the gains for something, not merely accumulate.",
+    "themes": [
+      "unusual_gains",
+      "international_networks",
+      "ambitious_goals",
+      "purposeful_accumulation"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "rahu_h12",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "rahu_in_h12"
+    ],
+    "title": "Rahu in the 12th House",
+    "content": "The spiritual and the hidden life carry unusual intensity — dreams, retreats, foreign lands, and meditative practice are all drawn toward, sometimes compulsively. The task is to let the hunger for transcendence mature into actual practice, not mere longing.",
+    "themes": [
+      "spiritual_intensity",
+      "dream_life",
+      "foreign_draw",
+      "transcendence_as_practice"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "ketu_h1",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "ketu_in_h1"
+    ],
+    "title": "Ketu in the 1st House",
+    "content": "Ketu in the ascendant gives a detached, sometimes self-doubting sense of self — identity never quite feels solid. This is a gift wearing the mask of a wound. The practice is to let the instability of the self become a doorway to something beyond it.",
+    "themes": [
+      "detached_self",
+      "identity_instability",
+      "gift_as_wound",
+      "doorway_beyond_self"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "ketu_h2",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "ketu_in_h2"
+    ],
+    "title": "Ketu in the 2nd House",
+    "content": "Detachment from family, wealth, and speech — what is accumulated tends to leave, and what is said tends to be said sparingly. This is not loss but a loosening of grip. The practice is to speak only what matters and hold only what is actually needed.",
+    "themes": [
+      "loose_grip",
+      "sparse_speech",
+      "detached_wealth",
+      "speaking_only_what_matters"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "ketu_h3",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "ketu_in_h3"
+    ],
+    "title": "Ketu in the 3rd House",
+    "content": "Effort flows naturally when done for its own sake; communication lands when detached from the need to be heard. Siblings may be distant, or the sibling relationship uniquely spiritual. The practice is to act without over-identification with outcome.",
+    "themes": [
+      "detached_effort",
+      "communication_without_attachment",
+      "distant_siblings",
+      "action_without_ego"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "ketu_h4",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "ketu_in_h4"
+    ],
+    "title": "Ketu in the 4th House",
+    "content": "The heart's home carries something elusive — the sense of belonging is not easily found in conventional homes, mothers, or countries. What is sought is an inner sanctuary. The practice is to build the home that cannot be taken away: the one inside.",
+    "themes": [
+      "elusive_belonging",
+      "inner_sanctuary",
+      "unconventional_home",
+      "home_inside"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "ketu_h5",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "ketu_in_h5"
+    ],
+    "title": "Ketu in the 5th House",
+    "content": "Creativity and children are both marked by something uniquely spiritual or unconventional. Devotion runs deep but privately. The practice is to let the gifts of imagination serve something beyond personal expression — toward a quieter kind of making.",
+    "themes": [
+      "spiritual_creativity",
+      "unconventional_children",
+      "private_devotion",
+      "quieter_making"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "ketu_h6",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "ketu_in_h6"
+    ],
+    "title": "Ketu in the 6th House",
+    "content": "Enemies and obstacles dissolve unexpectedly; illnesses that come tend to teach rather than merely harm. Service work has a contemplative quality. The practice is to meet difficulty with the long view — this obstacle is here for a reason that may only become clear later.",
+    "themes": [
+      "dissolving_enemies",
+      "teaching_illness",
+      "contemplative_service",
+      "long_view_on_difficulty"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "ketu_h7",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "ketu_in_h7"
+    ],
+    "title": "Ketu in the 7th House",
+    "content": "Partnerships carry a quality of spiritual contract — they arrive to teach and sometimes to complete old cycles. Traditional marriage may feel incomplete; unusual or late unions are common. The practice is to love without grasping.",
+    "themes": [
+      "spiritual_partnerships",
+      "teaching_unions",
+      "late_marriages",
+      "love_without_grasping"
+    ],
+    "polarity": "challenging_with_depth",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "ketu_h8",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "ketu_in_h8"
+    ],
+    "title": "Ketu in the 8th House",
+    "content": "Ketu is considered strong in the 8th — deep intuition about the occult and the hidden, interest in research and healing, and a natural relationship with endings. The practice is to let the insight into impermanence sharpen appreciation for what is present now.",
+    "themes": [
+      "deep_intuition",
+      "occult_interest",
+      "natural_with_endings",
+      "present_appreciation"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "ketu_h9",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "ketu_in_h9"
+    ],
+    "title": "Ketu in the 9th House",
+    "content": "Beliefs are held lightly — dogma rarely fits, and the spiritual path is often solitary or eclectic. Teachers may come and go, but the deepest learning is self-taught. The practice is to keep faith without needing the forms of religion, and to keep seeking without needing certainty.",
+    "themes": [
+      "eclectic_beliefs",
+      "solitary_path",
+      "self_taught_wisdom",
+      "faith_without_form"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "ketu_h10",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "ketu_in_h10"
+    ],
+    "title": "Ketu in the 10th House",
+    "content": "Career paths tend to defy convention, pivot, or deepen spiritually over time. Recognition comes but is not the motivator. The practice is to let the work serve something sacred — the recognition, when it comes, is a byproduct, not the aim.",
+    "themes": [
+      "unconventional_career",
+      "spiritual_deepening_of_work",
+      "recognition_as_byproduct",
+      "sacred_service"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "ketu_h11",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "ketu_in_h11"
+    ],
+    "title": "Ketu in the 11th House",
+    "content": "Gains come from unusual places; friendships tend to be few but spiritually meaningful. The usual drive to accumulate is reduced; what matters is not what is gathered but what is offered. The practice is to let generosity be the natural output of the fewer friendships.",
+    "themes": [
+      "unusual_gains",
+      "few_deep_friendships",
+      "reduced_accumulation",
+      "natural_generosity"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "ketu_h12",
+    "signature_type": "planet_in_house",
+    "signatures": [
+      "ketu_in_h12"
+    ],
+    "title": "Ketu in the 12th House — favorable placement",
+    "content": "Ketu is considered strong in the 12th — the tendency toward retreat, contemplative practice, and moksha-oriented pursuits is high. Foreign lands, monasteries, and solitary study suit this placement. The practice is to use the detachment for liberation rather than avoidance.",
+    "themes": [
+      "spiritual_retreat",
+      "moksha_orientation",
+      "contemplative_life",
+      "detachment_for_liberation"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "gaja_kesari_yoga",
+    "signature_type": "yoga",
+    "signatures": [
+      "jupiter_aspects_moon_natally",
+      "jupiter_conjunct_moon",
+      "jupiter_trine_moon"
+    ],
+    "title": "Gaja Kesari Yoga — Jupiter-Moon configuration",
+    "content": "When wisdom and emotional intelligence travel together in the chart, life tends to produce moments where instinct and insight arrive at the same conclusion. Trust of the inner voice grows with age. The challenge is to act from both heart and understanding at once — not to choose between them.",
+    "themes": [
+      "wisdom_and_feeling",
+      "inner_voice",
+      "integrated_intuition",
+      "trusted_knowing"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "budha_aditya_yoga",
+    "signature_type": "yoga",
+    "signatures": [
+      "sun_conjunct_mercury"
+    ],
+    "title": "Budha-Aditya Yoga — Sun-Mercury configuration",
+    "content": "When solar identity and the intellect align, clarity of communication becomes one of the distinguishing gifts. Writers, teachers, and analysts often carry this pattern. The shadow is the temptation to identify with the clarity rather than use it; the practice is to speak what serves, not what shines.",
+    "themes": [
+      "clear_communication",
+      "analytical_gift",
+      "teacher_writer",
+      "speaking_to_serve"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "chandra_mangala_yoga",
+    "signature_type": "yoga",
+    "signatures": [
+      "moon_conjunct_mars"
+    ],
+    "title": "Chandra-Mangala Yoga — Moon-Mars configuration",
+    "content": "Feelings and action travel together — when this nature wants something emotionally, it moves. Entrepreneurs, athletes, and those in independent trades often carry this pattern. The practice is to let the heart lead without letting anger drive.",
+    "themes": [
+      "feelings_and_action",
+      "entrepreneurial_drive",
+      "independent_trade",
+      "heart_over_anger"
+    ],
+    "polarity": "mixed",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "ruchaka_yoga",
+    "signature_type": "yoga",
+    "signatures": [
+      "mars_own_or_exalted_in_kendra"
+    ],
+    "title": "Ruchaka Yoga — Mars in strength in a kendra",
+    "content": "One of the five Maha Purusha yogas — Mars at its best, angular, gives a commanding presence, unusual courage, and physical vitality. Military, athletic, or directly action-oriented paths often suit. The practice is to keep the power in service of something larger than ego.",
+    "themes": [
+      "commanding_presence",
+      "courage_and_vitality",
+      "action_oriented_path",
+      "power_in_service"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "bhadra_yoga",
+    "signature_type": "yoga",
+    "signatures": [
+      "mercury_own_or_exalted_in_kendra"
+    ],
+    "title": "Bhadra Yoga — Mercury in strength in a kendra",
+    "content": "A Maha Purusha yoga centered on intellect, speech, and commerce — Mercury strong and angular produces writers, merchants, scholars, and diplomats of distinction. The practice is to let the mind's fluency serve truth, not merely persuasion.",
+    "themes": [
+      "intellectual_distinction",
+      "fluent_speech",
+      "commerce",
+      "truth_over_persuasion"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "hamsa_yoga",
+    "signature_type": "yoga",
+    "signatures": [
+      "jupiter_own_or_exalted_in_kendra"
+    ],
+    "title": "Hamsa Yoga — Jupiter in strength in a kendra",
+    "content": "A Maha Purusha yoga of wisdom, teaching, and grace — Jupiter in its own sign or exaltation in an angular house produces those who guide others without needing to. Teachers, counselors, and elders. The practice is to let the wisdom be a gift offered, not a position claimed.",
+    "themes": [
+      "wisdom_and_grace",
+      "natural_guidance",
+      "elder_presence",
+      "gift_over_position"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "malavya_yoga",
+    "signature_type": "yoga",
+    "signatures": [
+      "venus_own_or_exalted_in_kendra"
+    ],
+    "title": "Malavya Yoga — Venus in strength in a kendra",
+    "content": "A Maha Purusha yoga of beauty, art, and relational grace — Venus at its best in an angular house produces artists, creators, and those whose presence refines the room they are in. The practice is to let beauty deepen rather than distract.",
+    "themes": [
+      "artistic_gift",
+      "relational_grace",
+      "refining_presence",
+      "beauty_that_deepens"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "shasha_yoga",
+    "signature_type": "yoga",
+    "signatures": [
+      "saturn_own_or_exalted_in_kendra"
+    ],
+    "title": "Shasha Yoga — Saturn in strength in a kendra",
+    "content": "A Maha Purusha yoga of discipline, endurance, and quiet authority — Saturn at its best in an angular house produces those who build lasting structures, often in public service. Slow success that stays. The practice is to keep integrity through long stretches of unglamorous work.",
+    "themes": [
+      "quiet_authority",
+      "lasting_structure",
+      "public_service",
+      "integrity_through_long_work"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "saraswati_yoga",
+    "signature_type": "yoga",
+    "signatures": [
+      "jupiter_venus_mercury_all_in_kendra_or_trikona"
+    ],
+    "title": "Saraswati Yoga — Jupiter, Venus, Mercury in angles or trines",
+    "content": "When the three benefics all occupy strong houses, the arts, sciences, and teaching all flourish in one life. Writers, teachers, and cultivated thinkers often carry this pattern. The task is to honor the gift by continuing to learn — the pattern does not exempt from effort.",
+    "themes": [
+      "artistic_scientific_gift",
+      "teacher_thinker",
+      "honoring_the_gift",
+      "continued_learning"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  },
+  {
+    "id": "neecha_bhanga_raja_yoga",
+    "signature_type": "yoga",
+    "signatures": [
+      "neecha_bhanga"
+    ],
+    "title": "Neecha Bhanga — Cancellation of Debilitation",
+    "content": "When a planet begins debilitated but finds rescue — often through the exaltation lord being strong — the weakness of the placement becomes the very ground of later success. What begins as difficulty turns into unusual accomplishment. The practice is to trust that early limitations may be the soil of later growth.",
+    "themes": [
+      "rescued_weakness",
+      "difficulty_becomes_ground",
+      "late_flowering",
+      "trust_in_soil"
+    ],
+    "polarity": "nourishing",
+    "source": "placeholder — AI-synthesized, pending replacement with source-verified content",
+    "scope": "lifetime"
+  }
+]
