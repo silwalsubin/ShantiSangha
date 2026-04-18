@@ -12,11 +12,6 @@ struct TaskRow: View {
     var hideDueDate: Bool = false
     var activeSwipeId: Binding<String?>?
 
-    @State private var showMenu = false
-    @State private var showProgress = false
-    @State private var navigateToDueDate = false
-    @State private var progressValue: Double = 0
-    @State private var navigateToDelete = false
 
     var isOverdue: Bool {
         task.type == .oneTime && (task.daysRemaining ?? 1) <= 0
@@ -65,7 +60,7 @@ struct TaskRow: View {
                 .padding(.leading, 20)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredGreen))
-            } else if offset < 0 {
+            } else if offset < 0 && task.type == .recurring {
                 HStack {
                     Spacer()
                     Text("Skip")
@@ -99,6 +94,12 @@ struct TaskRow: View {
                             DragGesture(minimumDistance: 0)
                                 .onChanged { value in
                                     guard swipeActive else { return }
+                                    // Block left-swipe for one-time goals — skip only applies to recurring practices
+                                    if value.translation.width < 0 && task.type == .oneTime {
+                                        offset = 0
+                                        activeSwipe = nil
+                                        return
+                                    }
                                     offset = value.translation.width
                                     if offset > swipeThreshold {
                                         activeSwipe = .right
@@ -131,16 +132,8 @@ struct TaskRow: View {
                 )
         }
         .background(
-            Group {
-                NavigationLink(destination: GoalDetailView(goalId: task.id), isActive: $navigateToDetail) {
-                    EmptyView()
-                }
-                NavigationLink(destination: DeleteTaskView(task: task, onDelete: onDelete), isActive: $navigateToDelete) {
-                    EmptyView()
-                }
-                NavigationLink(destination: ChangeDueDateView(task: task, onSave: { date in onDueDateUpdate?(date) }), isActive: $navigateToDueDate) {
-                    EmptyView()
-                }
+            NavigationLink(destination: GoalDetailView(goalId: task.id), isActive: $navigateToDetail) {
+                EmptyView()
             }
             .hidden()
         )
@@ -173,53 +166,10 @@ struct TaskRow: View {
                         .font(days <= 0 ? .sacredSmallSemibold : .sacredSmall)
                         .foregroundColor(days < 0 ? .sacredRed : days == 0 ? .sacredGold : .sacredMuted)
                 }
-
-                // Three-dot menu
-                if !task.saving {
-                    Menu {
-                        if !task.checkedIn {
-                            Button { onDone() } label: {
-                                Label("Mark complete", systemImage: "checkmark.circle")
-                            }
-                            if task.type == .oneTime {
-                                Button { showProgress = true; progressValue = Double(task.progress) } label: {
-                                    Label("Update progress", systemImage: "chart.bar.fill")
-                                }
-                                Button {
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                        navigateToDueDate = true
-                                    }
-                                } label: {
-                                    Label("Change due date", systemImage: "calendar")
-                                }
-                            }
-                            Button { onSkip() } label: {
-                                Label("Skip for today", systemImage: "moon.fill")
-                            }
-                        } else {
-                            Button { onUndo() } label: {
-                                Label("Move to pending", systemImage: "arrow.uturn.backward")
-                            }
-                        }
-
-                        Button {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                navigateToDelete = true
-                            }
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.sacredText)
-                            .foregroundColor(.sacredMuted)
-                            .frame(width: 28, height: 28)
-                    }
-                }
             }
 
             // Progress bar for milestones (only show when progress > 0)
-            if task.type == .oneTime && !showProgress && task.progress > 0 {
+            if task.type == .oneTime && task.progress > 0 {
                 VStack(alignment: .leading, spacing: 4) {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
@@ -240,33 +190,6 @@ struct TaskRow: View {
                         .padding(.leading, 36)
                 }
             }
-
-            // Progress slider
-            if showProgress {
-                VStack(spacing: 8) {
-                    Slider(value: $progressValue, in: 0...100, step: 5)
-                        .tint(.sacredGold)
-
-                    HStack {
-                        Text("\(Int(progressValue))%")
-                            .font(.sacredSmallMedium)
-                            .foregroundColor(.sacredGold)
-                        Spacer()
-                        Button("Cancel") { showProgress = false }
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredMuted)
-                        Button("Save") {
-                            showProgress = false
-                            onProgressUpdate(Int(progressValue))
-                        }
-                        .font(.sacredSmallSemibold)
-                        .foregroundColor(.sacredGold)
-                    }
-                }
-                .padding(.leading, 36)
-            }
-
-
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)

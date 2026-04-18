@@ -79,6 +79,13 @@ struct HomeView: View {
                         .padding(.top, 40)
                         .padding(.bottom, 20)
 
+                        // Inline practice list — swipe to check in without leaving Home
+                        if !vm.pendingRecurring.isEmpty {
+                            inlinePractices
+                                .padding(.horizontal, 16)
+                                .padding(.top, 8)
+                        }
+
                         // All done message
                         if practicesCompleted {
                             Text("All practices complete. You showed up today.")
@@ -165,6 +172,39 @@ struct HomeView: View {
         .navigationDestination(isPresented: $showMilestoneSummary) {
             MilestoneSummaryView(vm: vm)
         }
+    }
+
+    // MARK: - Inline practice list
+
+    private var inlinePractices: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(vm.pendingRecurring.enumerated()), id: \.element.id) { index, task in
+                TaskRow(
+                    task: task,
+                    onDone: {
+                        Task {
+                            UINotificationFeedbackGenerator().notificationOccurred(.success)
+                            await vm.checkIn(id: task.id, completed: true)
+                        }
+                    },
+                    onSkip: { Task { await vm.checkIn(id: task.id, completed: false) } },
+                    onUndo: { Task { await vm.undoCheckIn(id: task.id) } },
+                    onDelete: { Task { await vm.deleteTask(id: task.id) } },
+                    onProgressUpdate: { _ in },
+                    activeSwipeId: Binding(
+                        get: { vm.activeSwipeId },
+                        set: { vm.activeSwipeId = $0 }
+                    )
+                )
+                .transition(.opacity.combined(with: .move(edge: .trailing)))
+
+                if index < vm.pendingRecurring.count - 1 {
+                    Divider()
+                        .padding(.leading, 52)
+                }
+            }
+        }
+        .animation(.easeOut(duration: 0.3), value: vm.pendingRecurring.map(\.id))
     }
 
     // MARK: - Empty state

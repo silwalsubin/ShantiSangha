@@ -187,6 +187,24 @@ struct GoalDetailView: View {
                         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
                     }
 
+                    // Delete button — bottom, quiet, destructive
+                    Button {
+                        Task { await deleteGoal() }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "trash")
+                                .font(.sacredSmall)
+                            Text("Delete this task")
+                                .font(.sacredTextMedium)
+                        }
+                        .foregroundColor(.sacredRed)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredRed.opacity(0.08)))
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredRed.opacity(0.2)))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 24)
                 }
                 .padding(16)
             } else {
@@ -213,46 +231,40 @@ struct GoalDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                if let goal = goal {
+                if let goal = goal, goal.completedAt == nil {
                     Menu {
-                        if goal.completedAt == nil {
-                            Button {
-                                Task { await markComplete() }
-                            } label: {
-                                Label(
-                                    goal.type == .recurring ? "Complete for today" : "Complete",
-                                    systemImage: "checkmark.circle"
-                                )
-                            }
+                        Button {
+                            Task { await markComplete() }
+                        } label: {
+                            Label(
+                                goal.type == .recurring ? "Complete for today" : "Complete",
+                                systemImage: "checkmark.circle"
+                            )
+                        }
 
+                        if goal.type == .recurring {
                             Button {
                                 Task { await skipForToday() }
                             } label: {
                                 Label("Skip for today", systemImage: "moon.fill")
                             }
-
-                            if goal.type == .oneTime {
-                                Button {
-                                    progressValue = Double(goal.progress ?? 0)
-                                    showProgress = true
-                                } label: {
-                                    Label("Update progress", systemImage: "chart.bar.fill")
-                                }
-
-                                Button {
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                        navigateToDueDate = true
-                                    }
-                                } label: {
-                                    Label("Change due date", systemImage: "calendar")
-                                }
-                            }
                         }
 
-                        Button(role: .destructive) {
-                            Task { await deleteGoal() }
-                        } label: {
-                            Label("Delete", systemImage: "trash")
+                        if goal.type == .oneTime {
+                            Button {
+                                progressValue = Double(goal.progress ?? 0)
+                                showProgress = true
+                            } label: {
+                                Label("Update progress", systemImage: "chart.bar.fill")
+                            }
+
+                            Button {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    navigateToDueDate = true
+                                }
+                            } label: {
+                                Label("Change due date", systemImage: "calendar")
+                            }
                         }
                     } label: {
                         Image(systemName: "ellipsis")
