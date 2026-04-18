@@ -487,49 +487,41 @@ struct VedicChartView: View {
 
     // MARK: - Legend
 
-    /// Explains every icon used in the planet rows. Language is written for
-    /// someone new to Vedic astrology — skip the jargon, focus on what each
-    /// state means for how the planet shows up in the person's life.
+    /// Explains every icon used in the planet rows. Each row is a single line
+    /// by default — tap to expand and read the plain-language description.
     private func legendSection() -> some View {
         card(title: "LEGEND") {
             VStack(alignment: .leading, spacing: 14) {
-                Text("Each mark describes how a planet is showing up in this chart — whether it's strong, at home, or facing a quiet challenge.")
-                    .font(.sacredSmall)
-                    .italic()
-                    .foregroundColor(.sacredTextSecondary)
-                    .lineSpacing(3)
-                    .fixedSize(horizontal: false, vertical: true)
-
                 legendGroup(
                     title: "Positive",
                     rows: [
-                        (Ph.arrowCircleUp.fill, .sacredGreen, "Deep Exalted",
+                        ("legend.deep_exalted", Ph.arrowCircleUp.fill, .sacredGreen, "Deep Exalted",
                          "At the very peak of its strength — a rare placement where the planet's best qualities shine most clearly."),
-                        (Ph.arrowCircleUp.duotone, .sacredGreen.opacity(0.85), "Exalted",
+                        ("legend.exalted", Ph.arrowCircleUp.duotone, .sacredGreen.opacity(0.85), "Exalted",
                          "In the sign that amplifies its natural qualities. The planet expresses itself with confidence and ease."),
-                        (Ph.crownSimple.duotone, .sacredGreen.opacity(0.7), "Moolatrikona",
+                        ("legend.moolatrikona", Ph.crownSimple.duotone, .sacredGreen.opacity(0.7), "Moolatrikona",
                          "In its honored seat — acts with authority and purpose, deeply connected to its role in the chart."),
-                        (Ph.anchor.duotone, .sacredGreen.opacity(0.55), "Own Sign",
+                        ("legend.own_sign", Ph.anchor.duotone, .sacredGreen.opacity(0.55), "Own Sign",
                          "The planet is at home. It expresses itself freely and without effort here."),
-                        (Ph.squaresFour.duotone, .sacredGreen.opacity(0.9), "Vargottama",
+                        ("legend.vargottama", Ph.squaresFour.duotone, .sacredGreen.opacity(0.9), "Vargottama",
                          "The planet occupies the same sign in two key charts — a sign of consistent, reinforced strength.")
                     ]
                 )
                 legendGroup(
                     title: "Challenging",
                     rows: [
-                        (Ph.arrowCircleDown.duotone, .sacredRed, "Debilitated",
+                        ("legend.debilitated", Ph.arrowCircleDown.duotone, .sacredRed, "Debilitated",
                          "In a sign where it feels out of place. Not a fault — a quiet invitation to grow into this part of life."),
-                        (Ph.sunDim.duotone, .sacredRed.opacity(0.75), "Combust",
+                        ("legend.combust", Ph.sunDim.duotone, .sacredRed.opacity(0.75), "Combust",
                          "Sitting too close to the Sun. Its outward expression is quieter; its energy turns inward rather than broadcasting."),
-                        (Ph.circleHalf.duotone, .sacredRed.opacity(0.55), "Sandhi",
+                        ("legend.sandhi", Ph.circleHalf.duotone, .sacredRed.opacity(0.55), "Sandhi",
                          "Right at a sign boundary — between two worlds. Its character feels less settled, as if it's in transition.")
                     ]
                 )
                 legendGroup(
                     title: "Notable",
                     rows: [
-                        (Ph.arrowUUpLeft.duotone, .sacredGold.opacity(0.75), "Retrograde",
+                        ("legend.retrograde", Ph.arrowUUpLeft.duotone, .sacredGold.opacity(0.75), "Retrograde",
                          "Moving backward through the zodiac at birth. Classically a sign of intensified strength — its themes come through with extra depth.")
                     ]
                 )
@@ -538,33 +530,61 @@ struct VedicChartView: View {
     }
 
     private func legendGroup(title: String,
-                             rows: [(Image, Color, String, String)]) -> some View {
+                             rows: [(String, Image, Color, String, String)]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title.uppercased())
                 .font(.system(size: 9, weight: .bold, design: .serif))
                 .tracking(2)
                 .foregroundColor(.sacredLabel)
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
                 ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                    HStack(alignment: .top, spacing: 10) {
-                        row.0
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 18, height: 18)
-                            .foregroundColor(row.1)
-                            .frame(width: 20, alignment: .center)
-                            .padding(.top, 1)
-                        Text(row.2)
-                            .font(.sacredSmallSemibold)
-                            .foregroundColor(.sacredText)
-                            .frame(width: 110, alignment: .leading)
-                        Text(row.3)
-                            .font(.sacredMicro)
-                            .italic()
-                            .foregroundColor(.sacredTextSecondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                    legendRow(key: row.0, icon: row.1, color: row.2, title: row.3, description: row.4)
                 }
+            }
+        }
+    }
+
+    /// Single legend entry. Collapsed: icon + name + chevron. Expanded also
+    /// shows the plain-language description below.
+    private func legendRow(key: String, icon: Image, color: Color,
+                           title: String, description: String) -> some View {
+        let isOpen = expanded.contains(key)
+        return VStack(alignment: .leading, spacing: 6) {
+            Button {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    if isOpen { expanded.remove(key) } else { expanded.insert(key) }
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    icon
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 18, height: 18)
+                        .foregroundColor(color)
+                        .frame(width: 20, alignment: .center)
+                    Text(title)
+                        .font(.sacredSmallSemibold)
+                        .foregroundColor(.sacredText)
+                    Spacer(minLength: 0)
+                    Image(systemName: isOpen ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 9, weight: .bold, design: .serif))
+                        .foregroundColor(.sacredMuted.opacity(0.6))
+                }
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isOpen {
+                Text(description)
+                    .font(.sacredMicro)
+                    .italic()
+                    .foregroundColor(.sacredTextSecondary)
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 30)
+                    .padding(.bottom, 4)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
     }
