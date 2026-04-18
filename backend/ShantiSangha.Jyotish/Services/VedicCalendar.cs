@@ -138,9 +138,11 @@ public static class VedicCalendar
         const double obliquityDeg = 23.4367; // mean obliquity of ecliptic, good enough here
         var eps = obliquityDeg * Math.PI / 180.0;
 
-        // Standard ascendant formula
-        var y = -Math.Cos(lstRad);
-        var x = Math.Sin(lstRad) * Math.Cos(eps) + Math.Tan(latRad) * Math.Sin(eps);
+        // Ascendant formula (Meeus ch. 12). The raw atan2 can land on the
+        // descendant (west) instead of the ascendant (east); flipping both
+        // components puts us on the rising side.
+        var y = Math.Cos(lstRad);
+        var x = -(Math.Sin(lstRad) * Math.Cos(eps) + Math.Tan(latRad) * Math.Sin(eps));
         var asc = Math.Atan2(y, x) * 180.0 / Math.PI;
         return Normalize(asc);
     }

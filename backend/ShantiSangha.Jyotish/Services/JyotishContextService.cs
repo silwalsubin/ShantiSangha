@@ -35,8 +35,24 @@ public class JyotishContextService(IProfileQueryService profileQuery) : IJyotish
             if (birth.BirthTime is not null && TimeOnly.TryParse(birth.BirthTime, out var parsedTime))
                 birthHour = parsedTime.Hour + parsedTime.Minute / 60.0;
 
-            var birthDateTime = birthDate.ToDateTime(
-                TimeOnly.FromTimeSpan(TimeSpan.FromHours(birthHour)), DateTimeKind.Utc);
+            // Convert local birth time to UTC using longitude-derived offset.
+            // BirthPlace is "lat,lon" — parse lon to approximate the time offset
+            // (15° per hour of mean solar time).
+            var offsetHours = 0.0;
+            if (!string.IsNullOrWhiteSpace(birth.BirthPlace))
+            {
+                var parts = birth.BirthPlace.Split(',');
+                if (parts.Length == 2
+                    && double.TryParse(parts[1].Trim(), System.Globalization.CultureInfo.InvariantCulture, out var lon))
+                {
+                    offsetHours = lon / 15.0;
+                }
+            }
+
+            var birthLocal = birthDate.ToDateTime(
+                TimeOnly.FromTimeSpan(TimeSpan.FromHours(birthHour)), DateTimeKind.Unspecified);
+            var birthDateTime = DateTime.SpecifyKind(
+                birthLocal.AddHours(-offsetHours), DateTimeKind.Utc);
 
             var sunSidereal = VedicCalendar.ToSidereal(
                 VedicCalendar.GetTropicalSunLongitude(birthDateTime), birthDateTime);

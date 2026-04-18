@@ -39,9 +39,21 @@ struct VedicChartView: View {
             }
         }
         .background(Color.sacredBg.ignoresSafeArea())
+        .refreshable { await load() }
         .navigationTitle("Your Chart")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Task { await load() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredGold)
+                }
+            }
+        }
         .task { await load() }
     }
 

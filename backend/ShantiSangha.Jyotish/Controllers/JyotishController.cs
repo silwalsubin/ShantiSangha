@@ -85,7 +85,6 @@ public class JyotishController(
             return Ok(new { Available = false, Reason = "invalid_birth_time" });
 
         var birthDate = birth.BirthDate.Value;
-        var birthDateTime = birthDate.ToDateTime(parsedTime, DateTimeKind.Utc);
 
         // BirthPlace is stored as "lat,lon" — try to parse for ascendant + houses
         double? latitude = null, longitude = null;
@@ -100,6 +99,16 @@ public class JyotishController(
                 longitude = lon;
             }
         }
+
+        // Birth time is entered in the user's LOCAL time at the birth place. We must
+        // convert to UTC for astronomical calculations. Without a timezone database,
+        // we approximate the local offset from the birth longitude (15° per hour).
+        // This gives mean solar time — not political TZ — but within ~30 min of
+        // actual offset, which is enough for rashi-level accuracy.
+        var approxOffsetHours = longitude.HasValue ? longitude.Value / 15.0 : 0.0;
+        var birthLocal = birthDate.ToDateTime(parsedTime, DateTimeKind.Unspecified);
+        var birthDateTime = DateTime.SpecifyKind(
+            birthLocal.AddHours(-approxOffsetHours), DateTimeKind.Utc);
 
         // Nakshatra attributes (from moon's sidereal position at birth)
         var moonTropical = VedicCalendar.GetTropicalMoonLongitude(birthDateTime);
