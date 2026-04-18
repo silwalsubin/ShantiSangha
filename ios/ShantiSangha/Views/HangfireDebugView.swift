@@ -11,6 +11,7 @@ struct HangfireDebugView: View {
     @State private var processing: [JobEntry] = []
     @State private var queues: [QueueEntry] = []
     @State private var triggeringReflection = false
+    @State private var triggeringReading = false
     @State private var triggerResult: String?
 
     private let api = ApiService.shared
@@ -206,6 +207,25 @@ struct HangfireDebugView: View {
             }
             .disabled(triggeringReflection)
 
+            Divider().padding(.vertical, 2)
+
+            Button {
+                Task { await triggerDailyReadingJob() }
+            } label: {
+                HStack {
+                    Image(systemName: "envelope")
+                        .font(.sacredSmall)
+                    Text("Trigger Daily Reading Generation")
+                        .font(.sacredSmallMedium)
+                    Spacer()
+                    if triggeringReading {
+                        ProgressView().tint(.sacredGold)
+                    }
+                }
+                .foregroundColor(.sacredGold)
+            }
+            .disabled(triggeringReading)
+
             if let result = triggerResult {
                 Text(result)
                     .font(.system(size: 10, design: .serif))
@@ -295,6 +315,26 @@ struct HangfireDebugView: View {
             triggerResult = "Error: \(error.localizedDescription)"
         }
         triggeringReflection = false
+    }
+
+    private func triggerDailyReadingJob() async {
+        triggeringReading = true
+        triggerResult = nil
+        do {
+            let result: TriggerResult = try await api.post("/debug/hangfire/test-daily-reading")
+            triggerResult = "Triggered \(result.triggered)"
+
+            // Clear the "opened" flag so the new reading appears sealed again.
+            let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+            let today = df.string(from: Date())
+            UserDefaults.standard.removeObject(forKey: "home.daily_reading.opened.\(today)")
+
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            await fetchStatus()
+        } catch {
+            triggerResult = "Error: \(error.localizedDescription)"
+        }
+        triggeringReading = false
     }
 
 }

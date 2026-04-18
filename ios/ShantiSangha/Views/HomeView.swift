@@ -12,6 +12,8 @@ struct HomeView: View {
     @State private var reflectionDate: String?
     @State private var reflectionLoading = true
     @State private var reflectionFallback = false
+    @State private var dailyReadingContent: String?
+    @State private var dailyReadingOpened: Bool = false
     @State private var showFAB = true
     @State private var practicesCompleted = false
     @State private var ringPulse = false
@@ -38,6 +40,21 @@ struct HomeView: View {
                             isLoading: true
                         )
                         .padding(.top, 16)
+                    }
+
+                    // Daily Vedic reading — sealed note; user taps to open.
+                    if let dailyReadingContent {
+                        DailyReadingCardView(
+                            content: dailyReadingContent,
+                            isOpened: Binding(
+                                get: { dailyReadingOpened },
+                                set: { newValue in
+                                    dailyReadingOpened = newValue
+                                    persistDailyReadingOpened(newValue)
+                                }
+                            )
+                        )
+                        .padding(.top, 20)
                     }
 
                     // Evening nudge
@@ -111,11 +128,13 @@ struct HomeView: View {
             .refreshable {
                 await vm.load()
                 await loadReflection(force: true)
+                await loadDailyReading()
                 updateWidgetData()
             }
             .task {
                 await vm.load()
                 await loadReflection()
+                await loadDailyReading()
                 updateWidgetData()
                 // Sync completion state on initial load (no haptic)
                 practicesCompleted = vm.allPracticesDone
@@ -438,6 +457,51 @@ struct HomeView: View {
         defaults.set(date, forKey: Self.cachedReflectionDateKey)
     }
 
+    // MARK: - Daily Reading
+
+    private static let dailyReadingOpenedKeyPrefix = "home.daily_reading.opened."
+
+    private var todayDateString: String {
+        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+        return df.string(from: Date())
+    }
+
+    private func loadDailyReading() async {
+        let dateStr = todayDateString
+
+        do {
+            let response: DailyReadingResponse = try await ApiService.shared.get("/daily-reading/today?date=\(dateStr)")
+            if let content = response.content, !content.isEmpty {
+                dailyReadingContent = content
+                dailyReadingOpened = UserDefaults.standard.bool(forKey: Self.dailyReadingOpenedKeyPrefix + dateStr)
+                return
+            }
+
+            // Null — job may still be running. Poll a few times.
+            for _ in 1...3 {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                let retry: DailyReadingResponse = try await ApiService.shared.get("/daily-reading/today?date=\(dateStr)")
+                if let content = retry.content, !content.isEmpty {
+                    dailyReadingContent = content
+                    dailyReadingOpened = UserDefaults.standard.bool(forKey: Self.dailyReadingOpenedKeyPrefix + dateStr)
+                    return
+                }
+            }
+
+            // Still null (no birth data, or generation failed) — don't show the card.
+            dailyReadingContent = nil
+        } catch {
+            if !error.isCancellation {
+                await AppLogger.shared.error("DailyReading", "Failed: \(error.localizedDescription)")
+            }
+            dailyReadingContent = nil
+        }
+    }
+
+    private func persistDailyReadingOpened(_ opened: Bool) {
+        UserDefaults.standard.set(opened, forKey: Self.dailyReadingOpenedKeyPrefix + todayDateString)
+    }
+
     // MARK: - Time greeting
 
     private var timeGreeting: String {
@@ -453,5 +517,10 @@ struct HomeView: View {
 
 private struct DailyReflectionResponse: Decodable {
     let content: String?
+}
+
+private struct DailyReadingResponse: Decodable {
+    let content: String?
+    let date: String
 }
 

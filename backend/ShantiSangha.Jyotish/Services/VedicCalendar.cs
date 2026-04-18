@@ -154,6 +154,92 @@ public static class VedicCalendar
 
     public static (string Name, string Quality) GetNakshatra(int index) => (Nakshatras[index], NakshatraQualities[index]);
 
+    // Vimshottari Dasha — the 120-year planetary period system.
+    // Sequence and durations (years): Ketu 7, Venus 20, Sun 6, Moon 10, Mars 7,
+    // Rahu 18, Jupiter 16, Saturn 19, Mercury 17. The lord of your birth nakshatra
+    // rules the first Mahadasha; the cycle proceeds from there.
+    private static readonly (string Name, int Years)[] DashaSequence =
+    [
+        ("Ketu", 7),
+        ("Venus", 20),
+        ("Sun", 6),
+        ("Moon", 10),
+        ("Mars", 7),
+        ("Rahu", 18),
+        ("Jupiter", 16),
+        ("Saturn", 19),
+        ("Mercury", 17)
+    ];
+
+    public record DashaInfo(
+        string Mahadasha,
+        string Antardasha,
+        DateTime MahadashaStart,
+        DateTime MahadashaEnd,
+        DateTime AntardashaStart,
+        DateTime AntardashaEnd);
+
+    /// <summary>
+    /// Computes the user's current Mahadasha and Antardasha based on birth moon
+    /// position (Vimshottari system). Requires birth date AND time.
+    /// </summary>
+    public static DashaInfo GetCurrentDasha(DateTime birthDateTime, DateTime now)
+    {
+        var moonSidereal = ToSidereal(GetTropicalMoonLongitude(birthDateTime), birthDateTime);
+        var nakshatraIndex = GetNakshatraIndex(moonSidereal);
+        var lordIndex = nakshatraIndex % 9;
+
+        // Fraction of birth nakshatra already traversed at birth
+        var nakshatraStart = nakshatraIndex * (360.0 / 27);
+        var elapsedFraction = (moonSidereal - nakshatraStart) / (360.0 / 27);
+        elapsedFraction = Math.Clamp(elapsedFraction, 0, 1);
+
+        // Walk through mahadashas until we find the one containing `now`
+        var currentIdx = lordIndex;
+        var mahadashaYears = DashaSequence[currentIdx].Years;
+        var mahadashaStart = birthDateTime;
+        var mahadashaEnd = birthDateTime.AddDays(mahadashaYears * (1 - elapsedFraction) * 365.25);
+
+        while (now >= mahadashaEnd)
+        {
+            mahadashaStart = mahadashaEnd;
+            currentIdx = (currentIdx + 1) % 9;
+            mahadashaYears = DashaSequence[currentIdx].Years;
+            mahadashaEnd = mahadashaStart.AddDays(mahadashaYears * 365.25);
+        }
+
+        var mahadashaName = DashaSequence[currentIdx].Name;
+
+        // Find antardasha within the mahadasha. The antardasha sequence begins
+        // with the mahadasha lord itself, then cycles through the standard order.
+        // Each antardasha's duration is proportional: mahaYears * subYears / 120.
+        var subStart = mahadashaStart;
+        var subEnd = subStart;
+        var subName = mahadashaName;
+
+        for (var i = 0; i < 9; i++)
+        {
+            var subIdx = (currentIdx + i) % 9;
+            var subYears = DashaSequence[subIdx].Years;
+            var subDays = mahadashaYears * subYears / 120.0 * 365.25;
+            subEnd = subStart.AddDays(subDays);
+            if (now < subEnd)
+            {
+                subName = DashaSequence[subIdx].Name;
+                break;
+            }
+            subStart = subEnd;
+        }
+
+        return new DashaInfo(
+            Mahadasha: mahadashaName,
+            Antardasha: subName,
+            MahadashaStart: mahadashaStart,
+            MahadashaEnd: mahadashaEnd,
+            AntardashaStart: subStart,
+            AntardashaEnd: subEnd);
+    }
+
     public static (string Tithi, string TithiQuality, string Vara, string VaraDeity, string Yoga, string Nakshatra, string NakshatraQuality) GetPanchang(DateTime date)
     {
         var sunSidereal = ToSidereal(GetTropicalSunLongitude(date), date);

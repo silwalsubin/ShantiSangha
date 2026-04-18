@@ -30,7 +30,9 @@ public static class DependencyInjection
         services.AddScoped<IReflectionQueryService, ReflectionQueryService>();
         services.AddScoped<GenerateDailyReflectionJob>();
         services.AddScoped<GeneratePortraitJob>();
+        services.AddScoped<GenerateDailyReadingJob>();
         services.AddScoped<ScheduleDailyReflectionsJob>();
+        services.AddScoped<ScheduleDailyReadingsJob>();
         services.AddScoped<SendMorningReflectionPushJob>();
 
         return services;

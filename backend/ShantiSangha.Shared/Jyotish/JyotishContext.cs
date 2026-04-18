@@ -22,7 +22,15 @@ public record JyotishContext(
     /// <summary>Brief panchang note for AI context</summary>
     string PanchangSummary,
     /// <summary>Any notable transit or period context</summary>
-    string? TransitNote)
+    string? TransitNote,
+    /// <summary>Current Mahadasha (planetary period) — requires birth date + time</summary>
+    string? Mahadasha = null,
+    /// <summary>Current Antardasha (sub-period within Mahadasha)</summary>
+    string? Antardasha = null,
+    /// <summary>When the current Antardasha started — used to detect recent shifts</summary>
+    DateTime? AntardashaStart = null,
+    /// <summary>Raw birth nakshatra name (for matching against current day's nakshatra)</summary>
+    string? BirthNakshatraName = null)
 {
     /// <summary>
     /// Formats this context as a text block for AI prompt injection.
@@ -43,6 +51,9 @@ public record JyotishContext(
 
         if (BirthNakshatra is not null)
             parts.Add($"Their birth nakshatra: {BirthNakshatra}.");
+
+        if (Mahadasha is not null && Antardasha is not null)
+            parts.Add($"They are currently in {Mahadasha} Mahadasha / {Antardasha} Antardasha — the planetary season shaping this chapter of their life.");
 
         if (TransitNote is not null)
             parts.Add(TransitNote);

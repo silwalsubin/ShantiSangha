@@ -231,6 +231,13 @@ try
             job => job.RunAsync(),
             "0 * * * *");
 
+        // Runs hourly; at midnight in each user's local timezone, generates
+        // today's Vedic daily reading so it's ready when they open the app.
+        recurring.AddOrUpdate<ShantiSangha.Wellness.Jobs.ScheduleDailyReadingsJob>(
+            "pregenerate-daily-readings",
+            job => job.RunAsync(),
+            "0 * * * *");
+
         // Runs hourly; sends today's reflection to each user's lock screen at
         // their configured reminder hour (local time).
         recurring.AddOrUpdate<ShantiSangha.Wellness.Jobs.SendMorningReflectionPushJob>(
@@ -387,6 +394,30 @@ try
 
         jobs.Enqueue<ShantiSangha.Wellness.Jobs.GenerateDailyReflectionJob>(j => j.RunAsync(userId, (DateOnly?)null));
         return Results.Ok(new { triggered = "GenerateDailyReflectionJob", userId, deleted = existing.Count });
+    }).RequireAuthorization();
+
+    // Debug: Force-regenerate today's daily reading (deletes existing, re-enqueues job)
+    app.MapPost("/api/debug/hangfire/test-daily-reading", async (HttpContext ctx, IBackgroundJobClient jobs) =>
+    {
+        var currentUser = ctx.RequestServices.GetRequiredService<ShantiSangha.Shared.Interfaces.ICurrentUser>();
+        var user = await currentUser.GetAsync();
+        var userId = user!.Id;
+        var utcToday = DateOnly.FromDateTime(DateTime.UtcNow);
+        var yesterday = utcToday.AddDays(-1);
+        var tomorrow = utcToday.AddDays(1);
+
+        var wellnessDb = ctx.RequestServices.GetRequiredService<ShantiSangha.Wellness.Data.WellnessDbContext>();
+        var existing = await wellnessDb.DailyReadings
+            .Where(r => r.UserId == userId && r.Date >= yesterday && r.Date <= tomorrow)
+            .ToListAsync();
+        if (existing.Count > 0)
+        {
+            wellnessDb.DailyReadings.RemoveRange(existing);
+            await wellnessDb.SaveChangesAsync();
+        }
+
+        jobs.Enqueue<ShantiSangha.Wellness.Jobs.GenerateDailyReadingJob>(j => j.RunAsync(userId, (DateOnly?)null));
+        return Results.Ok(new { triggered = "GenerateDailyReadingJob", userId, deleted = existing.Count });
     }).RequireAuthorization();
 
     // Health check at root (no /api prefix)

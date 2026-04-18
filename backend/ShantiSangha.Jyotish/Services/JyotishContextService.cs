@@ -22,7 +22,11 @@ public class JyotishContextService(IProfileQueryService profileQuery) : IJyotish
         string? sunRashi = null;
         string? moonRashi = null;
         string? birthNakshatra = null;
+        string? birthNakshatraName = null;
         string? transitNote = null;
+        string? mahadasha = null;
+        string? antardasha = null;
+        DateTime? antardashaStart = null;
 
         if (birth.BirthDate is not null)
         {
@@ -46,7 +50,14 @@ public class JyotishContextService(IProfileQueryService profileQuery) : IJyotish
 
                 var nakshatraIndex = VedicCalendar.GetNakshatraIndex(moonSidereal);
                 var (name, quality) = VedicCalendar.GetNakshatra(nakshatraIndex);
+                birthNakshatraName = name;
                 birthNakshatra = $"{name} — associated with {quality}";
+
+                // Vimshottari dasha requires birth time
+                var dasha = VedicCalendar.GetCurrentDasha(birthDateTime, today);
+                mahadasha = dasha.Mahadasha;
+                antardasha = dasha.Antardasha;
+                antardashaStart = dasha.AntardashaStart;
             }
 
             transitNote = GenerateTransitNote(sunRashi, todayNakshatra, todayNakshatraQuality, tithi);
@@ -70,7 +81,11 @@ public class JyotishContextService(IProfileQueryService profileQuery) : IJyotish
             Vara: vara,
             Yoga: yoga,
             PanchangSummary: panchangSummary,
-            TransitNote: transitNote);
+            TransitNote: transitNote,
+            Mahadasha: mahadasha,
+            Antardasha: antardasha,
+            AntardashaStart: antardashaStart,
+            BirthNakshatraName: birthNakshatraName);
     }
 
     private static string? GenerateTransitNote(
