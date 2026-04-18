@@ -262,9 +262,9 @@ struct ReflectView: View {
     private func reflectMenuIcon(icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.sacredIcon)
+                .font(.sacredHeading)
                 .foregroundColor(.white)
-                .frame(width: 48, height: 48)
+                .frame(width: 56, height: 56)
                 .goldShine()
                 .clipShape(Circle())
         }

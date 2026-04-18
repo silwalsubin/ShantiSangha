@@ -7,12 +7,46 @@ struct MainTabView: View {
     @State private var selectedTab = 0
 
     init() {
-        let appearance = UITabBarAppearance()
-        appearance.configureWithDefaultBackground()
-        appearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
-        appearance.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.5)
-        UITabBar.appearance().standardAppearance = appearance
-        UITabBar.appearance().scrollEdgeAppearance = appearance
+        // Tab bar appearance — blur background + serif labels
+        let tabAppearance = UITabBarAppearance()
+        tabAppearance.configureWithDefaultBackground()
+        tabAppearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
+        tabAppearance.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.5)
+
+        let tabFont = Self.serifFont(ofSize: 10, weight: .medium)
+        let tabLabelAttrs: [NSAttributedString.Key: Any] = [.font: tabFont]
+        tabAppearance.stackedLayoutAppearance.normal.titleTextAttributes = tabLabelAttrs
+        tabAppearance.stackedLayoutAppearance.selected.titleTextAttributes = tabLabelAttrs
+        tabAppearance.inlineLayoutAppearance.normal.titleTextAttributes = tabLabelAttrs
+        tabAppearance.inlineLayoutAppearance.selected.titleTextAttributes = tabLabelAttrs
+        tabAppearance.compactInlineLayoutAppearance.normal.titleTextAttributes = tabLabelAttrs
+        tabAppearance.compactInlineLayoutAppearance.selected.titleTextAttributes = tabLabelAttrs
+
+        UITabBar.appearance().standardAppearance = tabAppearance
+        UITabBar.appearance().scrollEdgeAppearance = tabAppearance
+
+        // Navigation bar appearance — serif inline + large titles everywhere
+        let navAppearance = UINavigationBarAppearance()
+        navAppearance.configureWithDefaultBackground()
+        navAppearance.titleTextAttributes = [
+            .font: Self.serifFont(ofSize: 17, weight: .semibold)
+        ]
+        navAppearance.largeTitleTextAttributes = [
+            .font: Self.serifFont(ofSize: 34, weight: .bold)
+        ]
+
+        UINavigationBar.appearance().standardAppearance = navAppearance
+        UINavigationBar.appearance().compactAppearance = navAppearance
+        UINavigationBar.appearance().scrollEdgeAppearance = navAppearance
+    }
+
+    /// Builds a New-York-serif UIFont matching the SwiftUI `design: .serif` tokens.
+    private static func serifFont(ofSize size: CGFloat, weight: UIFont.Weight) -> UIFont {
+        let base = UIFont.systemFont(ofSize: size, weight: weight)
+        if let descriptor = base.fontDescriptor.withDesign(.serif) {
+            return UIFont(descriptor: descriptor, size: size)
+        }
+        return base
     }
 
     var body: some View {

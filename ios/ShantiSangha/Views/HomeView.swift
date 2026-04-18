@@ -11,6 +11,7 @@ struct HomeView: View {
     @State private var reflection: String?
     @State private var reflectionDate: String?
     @State private var reflectionLoading = true
+    @State private var reflectionFallback = false
     @State private var showFAB = true
     @State private var practicesCompleted = false
     @State private var ringPulse = false
@@ -31,6 +32,12 @@ struct HomeView: View {
                     } else if reflectionLoading {
                         ReflectionCardView(content: "Preparing your reflection...", isLoading: true)
                             .padding(.top, 16)
+                    } else if reflectionFallback {
+                        ReflectionCardView(
+                            content: "Your reflection is still arriving. Pull down to refresh in a moment.",
+                            isLoading: true
+                        )
+                        .padding(.top, 16)
                     }
 
                     // Evening nudge
@@ -366,39 +373,69 @@ struct HomeView: View {
 
     // MARK: - Reflection
 
+    private static let cachedReflectionKey = "home.reflection.content"
+    private static let cachedReflectionDateKey = "home.reflection.date"
+
     private func loadReflection(force: Bool = false) async {
         let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
         let dateStr = df.string(from: Date())
 
-        // Skip refetch on tab switch if we already have today's reflection
+        // Hydrate from persistent cache first so Home is never empty on tab switch/relaunch
+        if !force, reflection == nil {
+            let defaults = UserDefaults.standard
+            if let cachedDate = defaults.string(forKey: Self.cachedReflectionDateKey),
+               cachedDate == dateStr,
+               let cachedContent = defaults.string(forKey: Self.cachedReflectionKey),
+               !cachedContent.isEmpty {
+                reflection = cachedContent
+                reflectionDate = cachedDate
+                reflectionLoading = false
+                reflectionFallback = false
+                return
+            }
+        }
+
+        // In-memory fast path — already have today's reflection
         if !force, reflection != nil, reflectionDate == dateStr { return }
 
         reflectionLoading = true
+        reflectionFallback = false
         defer { reflectionLoading = false }
 
         do {
             let response: DailyReflectionResponse = try await ApiService.shared.get("/reflection/today?date=\(dateStr)")
             if let content = response.content, !content.isEmpty {
-                reflection = content
-                reflectionDate = dateStr
+                persistReflection(content, date: dateStr)
                 return
             }
 
             // Generation triggered — poll for result
-            for i in 1...5 {
+            for _ in 1...5 {
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
                 let retry: DailyReflectionResponse = try await ApiService.shared.get("/reflection/today?date=\(dateStr)")
                 if let content = retry.content, !content.isEmpty {
-                    reflection = content
-                    reflectionDate = dateStr
+                    persistReflection(content, date: dateStr)
                     return
                 }
             }
+
+            // Timed out — show a warm fallback so Home is never empty
+            reflectionFallback = true
         } catch {
             if !error.isCancellation {
                 await AppLogger.shared.error("Reflection", "Failed: \(error.localizedDescription)")
             }
+            reflectionFallback = true
         }
+    }
+
+    private func persistReflection(_ content: String, date: String) {
+        reflection = content
+        reflectionDate = date
+        reflectionFallback = false
+        let defaults = UserDefaults.standard
+        defaults.set(content, forKey: Self.cachedReflectionKey)
+        defaults.set(date, forKey: Self.cachedReflectionDateKey)
     }
 
     // MARK: - Time greeting
