@@ -179,6 +179,104 @@ public static class VedicCalendar
         return (rashiIdx + segment) % 12;
     }
 
+    /// <summary>
+    /// Drekkana (D3) — siblings, courage, temperament. 3 sections of 10°
+    /// per sign. 1st decan starts from the sign itself, 2nd from the 5th,
+    /// 3rd from the 9th (kendras/trikonas pattern).
+    /// </summary>
+    public static int GetDrekkanaRashi(double siderealLongitude)
+    {
+        var rashiIdx = GetRashiIndex(siderealLongitude);
+        var degInRashi = siderealLongitude % 30;
+        var segment = (int)(degInRashi / 10.0); // 0..2
+        var offset = segment * 4; // 0, 4, 8 — same / 5th / 9th from sign
+        return (rashiIdx + offset) % 12;
+    }
+
+    /// <summary>
+    /// Chaturthamsa (D4) — home, property, fortune. 4 sections of 7.5°
+    /// per sign. Each quarter starts from the 1st, 4th, 7th, and 10th
+    /// sign from itself (the kendras).
+    /// </summary>
+    public static int GetChaturthamsaRashi(double siderealLongitude)
+    {
+        var rashiIdx = GetRashiIndex(siderealLongitude);
+        var degInRashi = siderealLongitude % 30;
+        var segment = (int)(degInRashi / 7.5); // 0..3
+        var offset = segment * 3; // 0, 3, 6, 9 — the four kendras
+        return (rashiIdx + offset) % 12;
+    }
+
+    /// <summary>
+    /// Saptamsa (D7) — children, creative progeny. 7 sections of ~4.286°
+    /// per sign. Odd signs start the 7 from themselves; even signs start
+    /// from the 7th sign (opposite).
+    /// </summary>
+    public static int GetSaptamsaRashi(double siderealLongitude)
+    {
+        var rashiIdx = GetRashiIndex(siderealLongitude);
+        var degInRashi = siderealLongitude % 30;
+        var segment = (int)(degInRashi * 7.0 / 30.0); // 0..6
+        var startingSign = rashiIdx % 2 == 0
+            ? rashiIdx                  // odd sign (by Jyotish polarity) → start from self
+            : (rashiIdx + 6) % 12;      // even sign → start from 7th (opposite)
+        return (startingSign + segment) % 12;
+    }
+
+    /// <summary>
+    /// Shodasamsa (D16, Kalamsha) — vehicles, comforts, conveyances.
+    /// 16 sections of 1.875° per sign. Starting sign depends on sign modality:
+    /// Movable → Mesha (0), Fixed → Simha (4), Dual → Dhanu (8).
+    /// </summary>
+    public static int GetShodasamsaRashi(double siderealLongitude)
+    {
+        var rashiIdx = GetRashiIndex(siderealLongitude);
+        var degInRashi = siderealLongitude % 30;
+        var segment = (int)(degInRashi / 1.875); // 0..15
+        var startingSign = (rashiIdx % 3) switch
+        {
+            0 => 0,   // movable → Mesha
+            1 => 4,   // fixed → Simha
+            _ => 8    // dual → Dhanu
+        };
+        return (startingSign + segment) % 12;
+    }
+
+    /// <summary>
+    /// Vimsamsa (D20) — spiritual progress, devotion, inner practice.
+    /// 20 sections of 1.5° per sign. Starting sign depends on modality:
+    /// Movable → Mesha (0), Fixed → Dhanu (8), Dual → Simha (4).
+    /// </summary>
+    public static int GetVimsamsaRashi(double siderealLongitude)
+    {
+        var rashiIdx = GetRashiIndex(siderealLongitude);
+        var degInRashi = siderealLongitude % 30;
+        var segment = (int)(degInRashi / 1.5); // 0..19
+        var startingSign = (rashiIdx % 3) switch
+        {
+            0 => 0,   // movable → Mesha
+            1 => 8,   // fixed → Dhanu
+            _ => 4    // dual → Simha
+        };
+        return (startingSign + segment) % 12;
+    }
+
+    /// <summary>
+    /// Chaturvimsamsa (D24, Siddhamsa) — education, learning, knowledge.
+    /// 24 sections of 1.25° per sign. Odd signs start from Simha (Sun's sign),
+    /// even signs start from Karka (Moon's sign).
+    /// </summary>
+    public static int GetChaturvimsamsaRashi(double siderealLongitude)
+    {
+        var rashiIdx = GetRashiIndex(siderealLongitude);
+        var degInRashi = siderealLongitude % 30;
+        var segment = (int)(degInRashi / 1.25); // 0..23
+        var startingSign = rashiIdx % 2 == 0
+            ? 4     // odd sign → Simha
+            : 3;    // even sign → Karka
+        return (startingSign + segment) % 12;
+    }
+
     // Deep-exaltation peak degrees (parama uccha) per planet, in the degree
     // within the exaltation sign. Moon peaks at Taurus 3°, Sun at Aries 10°, etc.
     // Within ±3° of the peak → "deep_exalted"; otherwise just "exalted".

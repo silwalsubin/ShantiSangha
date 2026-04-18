@@ -205,12 +205,18 @@ public class JyotishController(
                 ? VedicCalendar.GetHouse(sidereal, ascendantSidereal.Value)
                 : (int?)null;
 
-            // Divisional charts
+            // Divisional charts — we compute the major 10 classical D-charts.
             var navamsaIdx = VedicCalendar.GetNavamsaRashi(sidereal);
             var navamsaRashi = VedicCalendar.GetRashi(navamsaIdx);
             var vargottama = navamsaIdx == rashiIdx;
+            var drekkanaRashi = VedicCalendar.GetRashi(VedicCalendar.GetDrekkanaRashi(sidereal));
+            var chaturthamsaRashi = VedicCalendar.GetRashi(VedicCalendar.GetChaturthamsaRashi(sidereal));
+            var saptamsaRashi = VedicCalendar.GetRashi(VedicCalendar.GetSaptamsaRashi(sidereal));
             var dasamsaRashi = VedicCalendar.GetRashi(VedicCalendar.GetDasamsaRashi(sidereal));
             var dvadasamsaRashi = VedicCalendar.GetRashi(VedicCalendar.GetDvadasamsaRashi(sidereal));
+            var shodasamsaRashi = VedicCalendar.GetRashi(VedicCalendar.GetShodasamsaRashi(sidereal));
+            var vimsamsaRashi = VedicCalendar.GetRashi(VedicCalendar.GetVimsamsaRashi(sidereal));
+            var chaturvimsamsaRashi = VedicCalendar.GetRashi(VedicCalendar.GetChaturvimsamsaRashi(sidereal));
 
             // Degree-level flags
             var dignity = VedicCalendar.GetDignity(p.Name, rashiIdx, degInRashi);
@@ -238,8 +244,14 @@ public class JyotishController(
                 House = house,
                 Dignity = dignity,
                 NavamsaRashi = navamsaRashi,
+                DrekkanaRashi = drekkanaRashi,
+                ChaturthamsaRashi = chaturthamsaRashi,
+                SaptamsaRashi = saptamsaRashi,
                 DasamsaRashi = dasamsaRashi,
                 DvadasamsaRashi = dvadasamsaRashi,
+                ShodasamsaRashi = shodasamsaRashi,
+                VimsamsaRashi = vimsamsaRashi,
+                ChaturvimsamsaRashi = chaturvimsamsaRashi,
                 Vargottama = vargottama,
                 Retrograde = retrograde,
                 Combust = combust,

@@ -390,4 +390,109 @@ public class VedicCalendarTests
     {
         Assert.Equal(expectedIdx, VedicCalendar.GetDvadasamsaRashi(siderealLongitude));
     }
+
+    // ------------------------------------------------------------------
+    // Drekkana (D3) — 3 sections × 10°, offsets 0/4/8 from the sign
+    // ------------------------------------------------------------------
+
+    [Theory]
+    [InlineData(0.0, 0)]            // Mesha 0° → Mesha (1st decan, same sign)
+    [InlineData(9.99, 0)]           // Mesha 9.99° → still Mesha
+    [InlineData(10.0, 4)]           // Mesha 10° → Simha (2nd decan = 5th from sign)
+    [InlineData(20.0, 8)]           // Mesha 20° → Dhanu (3rd decan = 9th from sign)
+    [InlineData(30.0, 1)]           // Vrishabha 0° → Vrishabha
+    [InlineData(45.0, 5)]           // Vrishabha 15° → 2nd decan = 5th from Vrishabha → Kanya
+    [InlineData(55.70, 9)]          // Vrishabha 25.70° → 3rd decan = 9th from Vrishabha → Makara
+    public void GetDrekkanaRashi_ReturnsCorrectD3(double siderealLongitude, int expectedIdx)
+    {
+        Assert.Equal(expectedIdx, VedicCalendar.GetDrekkanaRashi(siderealLongitude));
+    }
+
+    // ------------------------------------------------------------------
+    // Chaturthamsa (D4) — 4 sections × 7.5°, kendras (0/3/6/9 offsets)
+    // ------------------------------------------------------------------
+
+    [Theory]
+    [InlineData(0.0, 0)]            // Mesha 0° → Mesha (1st quarter, same sign)
+    [InlineData(7.49, 0)]           // still in 1st quarter → Mesha
+    [InlineData(7.5, 3)]            // Mesha 7.5° → 2nd quarter = 4th from sign → Karka
+    [InlineData(15.0, 6)]           // Mesha 15° → 3rd quarter = 7th from sign → Tula
+    [InlineData(22.5, 9)]           // Mesha 22.5° → 4th quarter = 10th from sign → Makara
+    [InlineData(30.0, 1)]           // Vrishabha 0° → Vrishabha
+    public void GetChaturthamsaRashi_ReturnsCorrectD4(double siderealLongitude, int expectedIdx)
+    {
+        Assert.Equal(expectedIdx, VedicCalendar.GetChaturthamsaRashi(siderealLongitude));
+    }
+
+    // ------------------------------------------------------------------
+    // Saptamsa (D7) — 7 × ~4.286°, odd signs start from self, even from 7th
+    // ------------------------------------------------------------------
+
+    [Theory]
+    // Odd sign (Mesha=0) — starts from self
+    [InlineData(0.0, 0)]            // Mesha 0° → seg 0 → Mesha
+    [InlineData(4.29, 1)]           // ~30/7 boundary → seg 1 → Vrishabha
+    [InlineData(29.99, 6)]          // Mesha 29.99° → seg 6 → Tula
+    // Even sign (Vrishabha=1) — starts from the 7th (Vrischika=7)
+    [InlineData(30.0, 7)]           // Vrishabha 0° → seg 0 → Vrischika
+    [InlineData(59.99, 1)]          // Vrishabha 29.99° → seg 6 → (7+6)%12 = Vrishabha
+    public void GetSaptamsaRashi_ReturnsCorrectD7(double siderealLongitude, int expectedIdx)
+    {
+        Assert.Equal(expectedIdx, VedicCalendar.GetSaptamsaRashi(siderealLongitude));
+    }
+
+    // ------------------------------------------------------------------
+    // Shodasamsa (D16) — 16 × 1.875°, movable/fixed/dual → Mesha/Simha/Dhanu
+    // ------------------------------------------------------------------
+
+    [Theory]
+    // Movable (Mesha=0) → start Mesha
+    [InlineData(0.0, 0)]            // Mesha 0° → Mesha
+    [InlineData(29.99, 3)]          // Mesha 29.99° → seg 15 → (0+15)%12 = Karka
+    // Fixed (Vrishabha=1) → start Simha (4)
+    [InlineData(30.0, 4)]           // Vrishabha 0° → Simha
+    [InlineData(31.875, 5)]         // Vrishabha 1.875° → seg 1 → (4+1)%12 = Kanya
+    // Dual (Mithuna=2) → start Dhanu (8)
+    [InlineData(60.0, 8)]           // Mithuna 0° → Dhanu
+    [InlineData(75.0, 4)]           // Mithuna 15° → seg 8 → (8+8)%12 = Simha
+    public void GetShodasamsaRashi_ReturnsCorrectD16(double siderealLongitude, int expectedIdx)
+    {
+        Assert.Equal(expectedIdx, VedicCalendar.GetShodasamsaRashi(siderealLongitude));
+    }
+
+    // ------------------------------------------------------------------
+    // Vimsamsa (D20) — 20 × 1.5°, movable/fixed/dual → Mesha/Dhanu/Simha
+    // ------------------------------------------------------------------
+
+    [Theory]
+    // Movable (Mesha=0) → start Mesha
+    [InlineData(0.0, 0)]
+    [InlineData(1.5, 1)]            // Mesha 1.5° → seg 1 → (0+1)%12 = Vrishabha
+    [InlineData(29.99, 7)]          // Mesha 29.99° → seg 19 → (0+19)%12 = Vrischika
+    // Fixed (Vrishabha=1) → start Dhanu (8)
+    [InlineData(30.0, 8)]           // Vrishabha 0° → Dhanu
+    [InlineData(31.5, 9)]           // Vrishabha 1.5° → (8+1)%12 = Makara
+    // Dual (Mithuna=2) → start Simha (4)
+    [InlineData(60.0, 4)]           // Mithuna 0° → Simha
+    public void GetVimsamsaRashi_ReturnsCorrectD20(double siderealLongitude, int expectedIdx)
+    {
+        Assert.Equal(expectedIdx, VedicCalendar.GetVimsamsaRashi(siderealLongitude));
+    }
+
+    // ------------------------------------------------------------------
+    // Chaturvimsamsa (D24) — 24 × 1.25°, odd signs start Simha, even start Karka
+    // ------------------------------------------------------------------
+
+    [Theory]
+    // Odd sign (Mesha=0) → start Simha (4)
+    [InlineData(0.0, 4)]            // Mesha 0° → Simha
+    [InlineData(1.25, 5)]           // Mesha 1.25° → seg 1 → (4+1)%12 = Kanya
+    [InlineData(29.99, 3)]          // Mesha 29.99° → seg 23 → (4+23)%12 = Karka
+    // Even sign (Vrishabha=1) → start Karka (3)
+    [InlineData(30.0, 3)]           // Vrishabha 0° → Karka
+    [InlineData(31.25, 4)]          // Vrishabha 1.25° → (3+1)%12 = Simha
+    public void GetChaturvimsamsaRashi_ReturnsCorrectD24(double siderealLongitude, int expectedIdx)
+    {
+        Assert.Equal(expectedIdx, VedicCalendar.GetChaturvimsamsaRashi(siderealLongitude));
+    }
 }

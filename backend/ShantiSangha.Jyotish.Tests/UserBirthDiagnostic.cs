@@ -68,8 +68,14 @@ public class UserBirthDiagnostic(ITestOutputHelper output)
             var dignity = VedicCalendar.GetDignity(p.Name, rashiIdx, degInRashi);
             var navamsaIdx = VedicCalendar.GetNavamsaRashi(sidereal);
             var navamsa = VedicCalendar.GetRashi(navamsaIdx);
+            var drekkana = VedicCalendar.GetRashi(VedicCalendar.GetDrekkanaRashi(sidereal));
+            var chaturthamsa = VedicCalendar.GetRashi(VedicCalendar.GetChaturthamsaRashi(sidereal));
+            var saptamsa = VedicCalendar.GetRashi(VedicCalendar.GetSaptamsaRashi(sidereal));
             var dasamsa = VedicCalendar.GetRashi(VedicCalendar.GetDasamsaRashi(sidereal));
             var dvadasamsa = VedicCalendar.GetRashi(VedicCalendar.GetDvadasamsaRashi(sidereal));
+            var shodasamsa = VedicCalendar.GetRashi(VedicCalendar.GetShodasamsaRashi(sidereal));
+            var vimsamsa = VedicCalendar.GetRashi(VedicCalendar.GetVimsamsaRashi(sidereal));
+            var chaturvimsamsa = VedicCalendar.GetRashi(VedicCalendar.GetChaturvimsamsaRashi(sidereal));
             var vargottama = navamsaIdx == rashiIdx;
             var retro = PlanetaryPositions.IsRetrograde(p.Name, birthUtc);
             var combust = PlanetaryPositions.IsCombust(p.Name, p.Tropical, sunTrop, retro);
@@ -88,9 +94,14 @@ public class UserBirthDiagnostic(ITestOutputHelper output)
 
             output.WriteLine(
                 $"  {p.Name,-7}  {VedicCalendar.GetRashi(rashiIdx),-23} {degInRashi,5:F2}°  " +
-                $"H{house,-2}  " +
-                $"D9 {Short(navamsa),-11} D10 {Short(dasamsa),-11} D12 {Short(dvadasamsa),-11}" +
-                $"{flagLabel}");
+                $"H{house,-2}{flagLabel}");
+            output.WriteLine(
+                $"           D3 {Short(drekkana),-11} D4 {Short(chaturthamsa),-11} " +
+                $"D7 {Short(saptamsa),-11} D9 {Short(navamsa),-11} D10 {Short(dasamsa),-11}");
+            output.WriteLine(
+                $"           D12 {Short(dvadasamsa),-10} D16 {Short(shodasamsa),-10} " +
+                $"D20 {Short(vimsamsa),-10} D24 {Short(chaturvimsamsa),-10}");
+            output.WriteLine("");
         }
 
         output.WriteLine("");

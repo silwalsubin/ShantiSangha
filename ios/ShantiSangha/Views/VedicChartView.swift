@@ -532,12 +532,15 @@ struct Planet: Decodable, Identifiable {
     let house: Int?
     /// deep_exalted | exalted | moolatrikona | own_sign | debilitated | neutral
     let dignity: String
-    /// Navamsa (D9) sign — "Simha (Leo)" format
+    let drekkanaRashi: String?
+    let chaturthamsaRashi: String?
+    let saptamsaRashi: String?
     let navamsaRashi: String?
-    /// Dasamsa (D10) sign — career, public life
     let dasamsaRashi: String?
-    /// Dvadasamsa (D12) sign — parents, lineage
     let dvadasamsaRashi: String?
+    let shodasamsaRashi: String?
+    let vimsamsaRashi: String?
+    let chaturvimsamsaRashi: String?
     /// True when the planet's D1 sign == D9 sign — classically very strong
     let vargottama: Bool?
     let retrograde: Bool?

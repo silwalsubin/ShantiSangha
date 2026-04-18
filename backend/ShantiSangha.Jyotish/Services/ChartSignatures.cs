@@ -92,11 +92,29 @@ public static class ChartSignatures
             if (navamsaIdx == sidRashiIdx)
                 signatures.Add($"{lower}_vargottama");
 
+            var drekkanaIdx = VedicCalendar.GetDrekkanaRashi(sid);
+            signatures.Add($"{lower}_d3_in_{RashiSanskrit[drekkanaIdx]}");
+
+            var chaturthamsaIdx = VedicCalendar.GetChaturthamsaRashi(sid);
+            signatures.Add($"{lower}_d4_in_{RashiSanskrit[chaturthamsaIdx]}");
+
+            var saptamsaIdx = VedicCalendar.GetSaptamsaRashi(sid);
+            signatures.Add($"{lower}_d7_in_{RashiSanskrit[saptamsaIdx]}");
+
             var dasamsaIdx = VedicCalendar.GetDasamsaRashi(sid);
             signatures.Add($"{lower}_d10_in_{RashiSanskrit[dasamsaIdx]}");
 
             var dvadasamsaIdx = VedicCalendar.GetDvadasamsaRashi(sid);
             signatures.Add($"{lower}_d12_in_{RashiSanskrit[dvadasamsaIdx]}");
+
+            var shodasamsaIdx = VedicCalendar.GetShodasamsaRashi(sid);
+            signatures.Add($"{lower}_d16_in_{RashiSanskrit[shodasamsaIdx]}");
+
+            var vimsamsaIdx = VedicCalendar.GetVimsamsaRashi(sid);
+            signatures.Add($"{lower}_d20_in_{RashiSanskrit[vimsamsaIdx]}");
+
+            var chaturvimsamsaIdx = VedicCalendar.GetChaturvimsamsaRashi(sid);
+            signatures.Add($"{lower}_d24_in_{RashiSanskrit[chaturvimsamsaIdx]}");
 
             // Dignity-based signatures
             var dignity = VedicCalendar.GetDignity(cap, sidRashiIdx, sidDeg);
