@@ -131,12 +131,9 @@ struct TaskRow: View {
                     : nil
                 )
         }
-        .background(
-            NavigationLink(destination: GoalDetailView(goalId: task.id), isActive: $navigateToDetail) {
-                EmptyView()
-            }
-            .hidden()
-        )
+        .navigationDestination(isPresented: $navigateToDetail) {
+            GoalDetailView(goalId: task.id)
+        }
     }
 
     private var taskContent: some View {

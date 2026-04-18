@@ -421,7 +421,7 @@ struct SettingsView: View {
             }
         } catch {
             if !error.isCancellation {
-                await AppLogger.shared.error("Settings", "Failed to load birth details: \(error)")
+                AppLogger.shared.error("Settings", "Failed to load birth details: \(error)")
             }
         }
         birthDetailsLoaded = true
@@ -450,17 +450,17 @@ struct SettingsView: View {
         }
 
         guard !body.isEmpty, let data = try? JSONSerialization.data(withJSONObject: body) else {
-            await AppLogger.shared.error("Settings", "Birth save: body empty or serialization failed")
+            AppLogger.shared.error("Settings", "Birth save: body empty or serialization failed")
             return
         }
         do {
             let _: EmptyResponse = try await api.patchRaw("/me", body: data)
-            await AppLogger.shared.info("Settings", "Birth details saved: \(body.keys.joined(separator: ", "))")
+            AppLogger.shared.info("Settings", "Birth details saved: \(body.keys.joined(separator: ", "))")
         } catch let ApiError.httpError(statusCode, responseData) {
             let responseBody = String(data: responseData, encoding: .utf8) ?? "unreadable"
-            await AppLogger.shared.error("Settings", "Birth save \(statusCode): \(responseBody)")
+            AppLogger.shared.error("Settings", "Birth save \(statusCode): \(responseBody)")
         } catch {
-            await AppLogger.shared.error("Settings", "Birth save failed: \(error)")
+            AppLogger.shared.error("Settings", "Birth save failed: \(error)")
         }
     }
 

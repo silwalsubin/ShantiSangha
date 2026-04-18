@@ -213,21 +213,15 @@ struct GoalDetailView: View {
                     .frame(maxWidth: .infinity, minHeight: 200)
             }
         }
-        .background(
-            Group {
-                if let goal = goal, goal.type == .oneTime {
-                    NavigationLink(
-                        destination: ChangeDueDateView(
-                            task: AppTask(id: goal.id, title: goal.title, type: .oneTime, daysRemaining: goal.daysRemaining, progress: goal.progress ?? 0),
-                            onSave: { date in Task { await updateDueDate(date) } }
-                        ),
-                        isActive: $navigateToDueDate
-                    ) { EmptyView() }
-                    .hidden()
-                }
-            }
-        )
         .background(Color.sacredBg.ignoresSafeArea())
+        .navigationDestination(isPresented: $navigateToDueDate) {
+            if let goal = goal, goal.type == .oneTime {
+                ChangeDueDateView(
+                    task: AppTask(id: goal.id, title: goal.title, type: .oneTime, daysRemaining: goal.daysRemaining, progress: goal.progress ?? 0),
+                    onSave: { date in Task { await updateDueDate(date) } }
+                )
+            }
+        }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {

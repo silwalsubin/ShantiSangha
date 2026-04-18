@@ -98,9 +98,9 @@ class AuthService: ObservableObject {
 
         // Also sync the reminder hour on first login so server-side morning
         // pushes know when to fire for this user.
-        let notif = await NotificationService.shared
-        let enabled = await notif.isEnabled
-        let hour = await notif.reminderHour
+        let notif = NotificationService.shared
+        let enabled = notif.isEnabled
+        let hour = notif.reminderHour
         if enabled {
             body["reminderHour"] = hour
         } else {
@@ -109,7 +109,7 @@ class AuthService: ObservableObject {
 
         guard let data = try? JSONSerialization.data(withJSONObject: body) else { return }
         let _: TimezoneSyncResponse? = try? await ApiService.shared.patchRaw("/me", body: data)
-        await AppLogger.shared.info("Auth", "Profile synced: tz=\(tz) reminderEnabled=\(enabled) hour=\(hour)")
+        AppLogger.shared.info("Auth", "Profile synced: tz=\(tz) reminderEnabled=\(enabled) hour=\(hour)")
     }
 }
 

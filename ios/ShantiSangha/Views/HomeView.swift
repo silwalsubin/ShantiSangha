@@ -466,7 +466,7 @@ struct HomeView: View {
             reflectionFallback = true
         } catch {
             if !error.isCancellation {
-                await AppLogger.shared.error("Reflection", "Failed: \(error.localizedDescription)")
+                AppLogger.shared.error("Reflection", "Failed: \(error.localizedDescription)")
             }
             reflectionFallback = true
         }
@@ -516,7 +516,7 @@ struct HomeView: View {
             dailyReadingContent = nil
         } catch {
             if !error.isCancellation {
-                await AppLogger.shared.error("DailyReading", "Failed: \(error.localizedDescription)")
+                AppLogger.shared.error("DailyReading", "Failed: \(error.localizedDescription)")
             }
             dailyReadingContent = nil
         }

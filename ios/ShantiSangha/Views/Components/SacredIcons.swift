@@ -207,7 +207,6 @@ private struct DiyaShape: Shape {
 private struct DiyaFill: View {
     var body: some View {
         GeometryReader { geo in
-            let s = min(geo.size.width, geo.size.height) / 24.0
             // Flame glow fill
             FlameFillShape()
                 .fill(Color.current.opacity(0.15))

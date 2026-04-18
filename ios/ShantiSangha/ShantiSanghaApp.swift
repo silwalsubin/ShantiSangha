@@ -191,7 +191,7 @@ struct ShantiSanghaApp: App {
                 // Request notification permission on first launch
                 if !UserDefaults.standard.bool(forKey: "notificationPermissionAsked") {
                     UserDefaults.standard.set(true, forKey: "notificationPermissionAsked")
-                    await notifications.requestPermission()
+                    _ = await notifications.requestPermission()
                 }
             }
             .onChange(of: repo.tasks) {

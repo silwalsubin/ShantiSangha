@@ -309,9 +309,11 @@ class AudioPlayerModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         currentUrl = url
 
         // Extract waveform in background
-        Task.detached { [weak self] in
+        Task.detached {
             let samples = await WaveformExtractor.extract(from: url, barCount: 80)
-            await MainActor.run { self?.waveformSamples = samples }
+            await MainActor.run { [weak self] in
+                self?.waveformSamples = samples
+            }
         }
 
         let item = AVPlayerItem(url: url)
@@ -408,8 +410,7 @@ enum WaveformExtractor {
             guard let desc = formatDescriptions.first else {
                 return placeholderSamples(barCount)
             }
-            let audioDesc = CMAudioFormatDescriptionGetStreamBasicDescription(desc)
-            let sampleRate = audioDesc?.pointee.mSampleRate ?? 44100
+            _ = CMAudioFormatDescriptionGetStreamBasicDescription(desc)
 
             let reader = try AVAssetReader(asset: asset)
             let settings: [String: Any] = [
@@ -430,7 +431,7 @@ enum WaveformExtractor {
                 let length = CMBlockBufferGetDataLength(blockBuffer)
                 var data = Data(count: length)
                 data.withUnsafeMutableBytes { ptr in
-                    CMBlockBufferCopyDataBytes(blockBuffer, atOffset: 0, dataLength: length, destination: ptr.baseAddress!)
+                    _ = CMBlockBufferCopyDataBytes(blockBuffer, atOffset: 0, dataLength: length, destination: ptr.baseAddress!)
                 }
                 let int16Samples = data.withUnsafeBytes { buf in
                     Array(buf.bindMemory(to: Int16.self))

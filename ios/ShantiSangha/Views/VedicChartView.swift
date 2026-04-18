@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreLocation
+import PhosphorSwift
 
 /// Detailed Vedic birth chart — nakshatra attributes, lagna, 9 planets with
 /// rashi/degree/house/nakshatra/pada, current dasha. Reached from Journey tab.
@@ -360,33 +361,33 @@ struct VedicChartView: View {
                 legendGroup(
                     title: "Positive",
                     rows: [
-                        ("✦", .sacredGreen, "Deep Exalted",
+                        (Ph.starFour.fill, .sacredGreen, "Deep Exalted",
                          "At the very peak of its strength — a rare placement where the planet's best qualities shine most clearly."),
-                        ("↑", .sacredGreen.opacity(0.85), "Exalted",
+                        (Ph.arrowUp.regular, .sacredGreen.opacity(0.85), "Exalted",
                          "In the sign that amplifies its natural qualities. The planet expresses itself with confidence and ease."),
-                        ("☆", .sacredGreen.opacity(0.7), "Moolatrikona",
+                        (Ph.crownSimple.regular, .sacredGreen.opacity(0.7), "Moolatrikona",
                          "In its honored seat — acts with authority and purpose, deeply connected to its role in the chart."),
-                        ("⌂", .sacredGreen.opacity(0.55), "Own Sign",
+                        (Ph.houseSimple.regular, .sacredGreen.opacity(0.55), "Own Sign",
                          "The planet is at home. It expresses itself freely and without effort here."),
-                        ("◈", .sacredGreen.opacity(0.9), "Vargottama",
+                        (Ph.squaresFour.regular, .sacredGreen.opacity(0.9), "Vargottama",
                          "The planet occupies the same sign in two key charts — a sign of consistent, reinforced strength.")
                     ]
                 )
                 legendGroup(
                     title: "Challenging",
                     rows: [
-                        ("↓", .sacredRed, "Debilitated",
+                        (Ph.arrowDown.regular, .sacredRed, "Debilitated",
                          "In a sign where it feels out of place. Not a fault — a quiet invitation to grow into this part of life."),
-                        ("◉", .sacredRed.opacity(0.75), "Combust",
+                        (Ph.sunDim.regular, .sacredRed.opacity(0.75), "Combust",
                          "Sitting too close to the Sun. Its outward expression is quieter; its energy turns inward rather than broadcasting."),
-                        ("◐", .sacredRed.opacity(0.55), "Sandhi",
+                        (Ph.circleHalf.regular, .sacredRed.opacity(0.55), "Sandhi",
                          "Right at a sign boundary — between two worlds. Its character feels less settled, as if it's in transition.")
                     ]
                 )
                 legendGroup(
                     title: "Notable",
                     rows: [
-                        ("℞", .sacredGold.opacity(0.75), "Retrograde",
+                        (Ph.arrowUUpLeft.regular, .sacredGold.opacity(0.75), "Retrograde",
                          "Moving backward through the zodiac at birth. Classically a sign of intensified strength — its themes come through with extra depth.")
                     ]
                 )
@@ -395,19 +396,22 @@ struct VedicChartView: View {
     }
 
     private func legendGroup(title: String,
-                             rows: [(String, Color, String, String)]) -> some View {
+                             rows: [(Image, Color, String, String)]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title.uppercased())
                 .font(.system(size: 9, weight: .bold, design: .serif))
                 .tracking(2)
                 .foregroundColor(.sacredLabel)
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 10) {
                 ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                    HStack(alignment: .firstTextBaseline, spacing: 10) {
-                        Text(row.0)
-                            .font(.system(size: 17, weight: .regular, design: .serif))
+                    HStack(alignment: .top, spacing: 10) {
+                        row.0
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 18, height: 18)
                             .foregroundColor(row.1)
                             .frame(width: 20, alignment: .center)
+                            .padding(.top, 1)
                         Text(row.2)
                             .font(.sacredSmallSemibold)
                             .foregroundColor(.sacredText)
@@ -523,15 +527,14 @@ struct VedicChartView: View {
         }
     }
 
-    /// Classical chart glyph for each dignity state.
-    /// ✦ deep exalt · ↑ exalt · ☆ moolatrikona · ⌂ own sign · ↓ debilitated.
-    private func dignityGlyph(_ dignity: String) -> String? {
+    /// Phosphor icon for each dignity state, matching the legend.
+    private func dignityIcon(_ dignity: String) -> Image? {
         switch dignity {
-        case "deep_exalted": return "✦"
-        case "exalted": return "↑"
-        case "moolatrikona": return "☆"
-        case "own_sign": return "⌂"
-        case "debilitated": return "↓"
+        case "deep_exalted": return Ph.starFour.fill
+        case "exalted": return Ph.arrowUp.regular
+        case "moolatrikona": return Ph.crownSimple.regular
+        case "own_sign": return Ph.houseSimple.regular
+        case "debilitated": return Ph.arrowDown.regular
         default: return nil
         }
     }
@@ -543,27 +546,29 @@ struct VedicChartView: View {
     @ViewBuilder
     private func stateIcons(_ p: Planet) -> some View {
         HStack(spacing: 8) {
-            if let glyph = dignityGlyph(p.dignity) {
-                stateGlyph(glyph, color: dignityColor(p.dignity), label: dignityLabel(p.dignity))
+            if let icon = dignityIcon(p.dignity) {
+                stateGlyph(icon, color: dignityColor(p.dignity), label: dignityLabel(p.dignity))
             }
             if p.vargottama == true {
-                stateGlyph("◈", color: .sacredGreen.opacity(0.9), label: "Vargottama")
+                stateGlyph(Ph.squaresFour.regular, color: .sacredGreen.opacity(0.9), label: "Vargottama")
             }
             if p.retrograde == true {
-                stateGlyph("℞", color: .sacredGold.opacity(0.75), label: "Retrograde")
+                stateGlyph(Ph.arrowUUpLeft.regular, color: .sacredGold.opacity(0.75), label: "Retrograde")
             }
             if p.combust == true {
-                stateGlyph("◉", color: .sacredRed.opacity(0.75), label: "Combust")
+                stateGlyph(Ph.sunDim.regular, color: .sacredRed.opacity(0.75), label: "Combust")
             }
             if p.sandhi == true {
-                stateGlyph("◐", color: .sacredRed.opacity(0.55), label: "Sandhi")
+                stateGlyph(Ph.circleHalf.regular, color: .sacredRed.opacity(0.55), label: "Sandhi")
             }
         }
     }
 
-    private func stateGlyph(_ glyph: String, color: Color, label: String) -> some View {
-        Text(glyph)
-            .font(.system(size: 16, weight: .regular, design: .serif))
+    private func stateGlyph(_ image: Image, color: Color, label: String) -> some View {
+        image
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .frame(width: 15, height: 15)
             .foregroundColor(color)
             .accessibilityLabel(label)
     }

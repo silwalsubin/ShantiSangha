@@ -139,9 +139,7 @@ struct VoiceNoteView: View {
     // MARK: - Recording
 
     private func startRecording() {
-        let session = AVAudioSession.sharedInstance()
-
-        session.requestRecordPermission { granted in
+        AVAudioApplication.requestRecordPermission { granted in
             DispatchQueue.main.async {
                 if granted {
                     beginRecording()

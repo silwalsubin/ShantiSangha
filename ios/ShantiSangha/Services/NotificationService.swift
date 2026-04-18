@@ -38,7 +38,7 @@ class NotificationService: ObservableObject {
         guard let data = try? JSONSerialization.data(withJSONObject: body) else { return }
         struct Empty: Decodable {}
         let _: Empty? = try? await ApiService.shared.patchRaw("/me", body: data)
-        await AppLogger.shared.info("Notifications", "Reminder synced: enabled=\(isEnabled) hour=\(reminderHour)")
+        AppLogger.shared.info("Notifications", "Reminder synced: enabled=\(isEnabled) hour=\(reminderHour)")
     }
 
     private let center = UNUserNotificationCenter.current()
@@ -191,7 +191,9 @@ class NotificationService: ObservableObject {
 
         center.add(request) { error in
             if let error = error {
-                AppLogger.shared.error("Notifications", "Failed to schedule: \(error)")
+                Task { @MainActor in
+                    AppLogger.shared.error("Notifications", "Failed to schedule: \(error)")
+                }
             }
         }
     }

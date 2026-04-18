@@ -1,4 +1,5 @@
 import SwiftUI
+import PhosphorSwift
 
 /// Full depth on a single planet — opens from a row tap on VedicChartView.
 /// Carries the classical detail (divisional positions, dignity, status flags,
@@ -64,10 +65,13 @@ struct PlanetDetailView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     ForEach(Array(badges.enumerated()), id: \.offset) { _, badge in
                         HStack(alignment: .top, spacing: 10) {
-                            Text(badge.glyph)
-                                .font(.system(size: 20, weight: .regular, design: .serif))
+                            badge.icon
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 20, height: 20)
                                 .foregroundColor(badge.color)
                                 .frame(width: 22, alignment: .center)
+                                .padding(.top, 1)
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(badge.label)
                                     .font(.sacredMicroBold)
@@ -91,25 +95,25 @@ struct PlanetDetailView: View {
     /// order: dignity (primary state) → vargottama (strength reinforcement)
     /// → combust (energy muted) → sandhi (cusp weakness). Mirrors the legend
     /// on the chart view so colors and icons stay consistent.
-    private var stateBadges: [(glyph: String, color: Color, label: String, description: String)] {
-        var badges: [(glyph: String, color: Color, label: String, description: String)] = []
-        if planet.dignity != "neutral", let glyph = dignityGlyph(planet.dignity) {
-            badges.append((glyph, dignityColor(planet.dignity), dignityLabel(planet.dignity), dignityDescription(planet.dignity)))
+    private var stateBadges: [(icon: Image, color: Color, label: String, description: String)] {
+        var badges: [(icon: Image, color: Color, label: String, description: String)] = []
+        if planet.dignity != "neutral", let icon = dignityIcon(planet.dignity) {
+            badges.append((icon, dignityColor(planet.dignity), dignityLabel(planet.dignity), dignityDescription(planet.dignity)))
         }
         if planet.vargottama == true {
-            badges.append(("◈", .sacredGreen.opacity(0.9), "VARGOTTAMA",
+            badges.append((Ph.squaresFour.regular, .sacredGreen.opacity(0.9), "VARGOTTAMA",
                            "same sign in D1 and D9 — classically very strong"))
         }
         if planet.retrograde == true {
-            badges.append(("℞", .sacredGold.opacity(0.75), "RETROGRADE",
+            badges.append((Ph.arrowUUpLeft.regular, .sacredGold.opacity(0.75), "RETROGRADE",
                            "moving backward along the ecliptic at birth"))
         }
         if planet.combust == true {
-            badges.append(("◉", .sacredRed.opacity(0.75), "COMBUST",
+            badges.append((Ph.sunDim.regular, .sacredRed.opacity(0.75), "COMBUST",
                            "within the Sun's classical orb — natural strength muted"))
         }
         if planet.sandhi == true {
-            badges.append(("◐", .sacredRed.opacity(0.55), "SANDHI",
+            badges.append((Ph.circleHalf.regular, .sacredRed.opacity(0.55), "SANDHI",
                            "sits in the first or last 1° of its sign — cusp weakness"))
         }
         return badges
@@ -249,13 +253,13 @@ struct PlanetDetailView: View {
         }
     }
 
-    private func dignityGlyph(_ dignity: String) -> String? {
+    private func dignityIcon(_ dignity: String) -> Image? {
         switch dignity {
-        case "deep_exalted": return "✦"
-        case "exalted": return "↑"
-        case "moolatrikona": return "☆"
-        case "own_sign": return "⌂"
-        case "debilitated": return "↓"
+        case "deep_exalted": return Ph.starFour.fill
+        case "exalted": return Ph.arrowUp.regular
+        case "moolatrikona": return Ph.crownSimple.regular
+        case "own_sign": return Ph.houseSimple.regular
+        case "debilitated": return Ph.arrowDown.regular
         default: return nil
         }
     }
