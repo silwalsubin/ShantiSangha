@@ -13,12 +13,15 @@ COPY ShantiSangha.Wellness/ShantiSangha.Wellness.csproj ShantiSangha.Wellness/
 COPY ShantiSangha.Insights/ShantiSangha.Insights.csproj ShantiSangha.Insights/
 COPY ShantiSangha.Jyotish/ShantiSangha.Jyotish.csproj ShantiSangha.Jyotish/
 
-RUN dotnet restore
+# Restore only the API project (transitively restores all referenced projects).
+# This avoids needing to copy the test project's csproj into the build stage.
+RUN dotnet restore ShantiSangha.Api/ShantiSangha.Api.csproj
 
 COPY . .
 RUN dotnet publish ShantiSangha.Api/ShantiSangha.Api.csproj \
     -c Release \
-    -o /app/publish
+    -o /app/publish \
+    --no-restore
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
