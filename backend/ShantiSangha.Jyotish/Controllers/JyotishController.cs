@@ -10,8 +10,37 @@ namespace ShantiSangha.Jyotish.Controllers;
 [Route("api/jyotish")]
 public class JyotishController(
     ICurrentUser currentUser,
-    IProfileQueryService profileQuery) : ControllerBase
+    IProfileQueryService profileQuery,
+    IJyotishKnowledgeService knowledge) : ControllerBase
 {
+    /// <summary>
+    /// Looks up the first passage matching a signature, returns null if none.
+    /// Used to attach interpretive wisdom to chart elements in the GetChart response.
+    /// </summary>
+    private object? InterpretationFor(string signature)
+    {
+        var passages = knowledge.GetPassages(new[] { signature });
+        var first = passages.FirstOrDefault();
+        if (first is null) return null;
+        return new
+        {
+            Content = first.Content,
+            Source = first.Source,
+            Polarity = first.Polarity,
+            Themes = first.Themes
+        };
+    }
+
+    /// <summary>Normalize "Mithuna (Gemini)" → "mithuna" for signature lookup.</summary>
+    private static string NormalizeRashi(string rashiLabel)
+    {
+        var sanskrit = rashiLabel.Split(' ')[0];
+        return sanskrit.Trim().ToLowerInvariant();
+    }
+
+    /// <summary>Normalize "Purva Phalguni" → "purva_phalguni" for signature lookup.</summary>
+    private static string NormalizeNakshatra(string nakshatraName)
+        => nakshatraName.Trim().ToLowerInvariant().Replace(' ', '_');
     /// <summary>
     /// Returns the user's Vedic identity — rashi (moon sign), nakshatra.
     /// Only available if the user has provided birth details.
@@ -121,7 +150,8 @@ public class JyotishController(
             Nadi = VedicCalendar.GetNakshatraNadi(moonNakshatraIdx),
             Gana = VedicCalendar.GetNakshatraGana(moonNakshatraIdx),
             Deity = VedicCalendar.GetNakshatraDeity(moonNakshatraIdx),
-            Lord = VedicCalendar.GetNakshatraLord(moonNakshatraIdx)
+            Lord = VedicCalendar.GetNakshatraLord(moonNakshatraIdx),
+            Interpretation = InterpretationFor($"moon_in_{NormalizeNakshatra(moonNakshatraName)}")
         };
 
         // Compute tropical longitudes for all 9 planets
@@ -148,13 +178,15 @@ public class JyotishController(
             var ascRashiIdx = VedicCalendar.GetRashiIndex(ascendantSidereal.Value);
             var ascNakIdx = VedicCalendar.GetNakshatraIndex(ascendantSidereal.Value);
             var (ascNakName, ascNakQuality) = VedicCalendar.GetNakshatra(ascNakIdx);
+            var ascRashiLabel = VedicCalendar.GetRashi(ascRashiIdx);
             lagna = new
             {
-                Rashi = VedicCalendar.GetRashi(ascRashiIdx),
+                Rashi = ascRashiLabel,
                 Degree = Math.Round(VedicCalendar.GetDegreeInRashi(ascendantSidereal.Value), 2),
                 Nakshatra = ascNakName,
                 NakshatraQuality = ascNakQuality,
-                Pada = VedicCalendar.GetPada(ascendantSidereal.Value)
+                Pada = VedicCalendar.GetPada(ascendantSidereal.Value),
+                Interpretation = InterpretationFor($"lagna_in_{NormalizeRashi(ascRashiLabel)}")
             };
         }
 
@@ -169,6 +201,15 @@ public class JyotishController(
                 ? VedicCalendar.GetHouse(sidereal, ascendantSidereal.Value)
                 : (int?)null;
 
+            var planetKey = p.Name.ToLowerInvariant();
+            // Planet-in-house is the most specific interpretation; fall back to
+            // planet-in-sign if the house version isn't in the corpus.
+            object? interpretation = null;
+            if (house.HasValue)
+                interpretation = InterpretationFor($"{planetKey}_in_h{house.Value}");
+            interpretation ??= InterpretationFor(
+                $"{planetKey}_in_{NormalizeRashi(VedicCalendar.GetRashi(rashiIdx))}");
+
             return new
             {
                 Name = p.Name,
@@ -178,7 +219,8 @@ public class JyotishController(
                 NakshatraQuality = nakQuality,
                 Pada = VedicCalendar.GetPada(sidereal),
                 House = house,
-                Nature = VedicCalendar.ClassifyPlanet(p.Name)
+                Nature = VedicCalendar.ClassifyPlanet(p.Name),
+                Interpretation = interpretation
             };
         }).ToList();
 
@@ -205,7 +247,8 @@ public class JyotishController(
                 AntardashaStart = dasha.AntardashaStart.ToString("yyyy-MM-dd"),
                 AntardashaEnd = dasha.AntardashaEnd.ToString("yyyy-MM-dd"),
                 MahadashaStart = dasha.MahadashaStart.ToString("yyyy-MM-dd"),
-                MahadashaEnd = dasha.MahadashaEnd.ToString("yyyy-MM-dd")
+                MahadashaEnd = dasha.MahadashaEnd.ToString("yyyy-MM-dd"),
+                Interpretation = InterpretationFor($"{dasha.Mahadasha.ToLowerInvariant()}_mahadasha")
             }
         });
     }

@@ -8,6 +8,9 @@ struct VedicChartView: View {
     @State private var loading = true
     @State private var error: String?
     @State private var placeName: String?
+    /// Tracks which interpretation panels are currently expanded, keyed by
+    /// section id (e.g. "nakshatra", "lagna", "dasha", "planet.sun").
+    @State private var expanded: Set<String> = []
     private let api = ApiService.shared
 
     var body: some View {
@@ -118,6 +121,8 @@ struct VedicChartView: View {
                     ("DEITY", n.deity),
                     ("LORD", n.lord)
                 ])
+
+                interpretationPanel(key: "nakshatra", interpretation: n.interpretation)
             }
         }
     }
@@ -149,6 +154,8 @@ struct VedicChartView: View {
                     .italic()
                     .foregroundColor(.sacredTextSecondary)
                     .padding(.top, 2)
+
+                interpretationPanel(key: "lagna", interpretation: l.interpretation)
             }
         }
     }
@@ -181,6 +188,8 @@ struct VedicChartView: View {
                 Text("\(formatDate(d.antardashaStart)) → \(formatDate(d.antardashaEnd))")
                     .font(.sacredMicro)
                     .foregroundColor(.sacredMuted)
+
+                interpretationPanel(key: "dasha", interpretation: d.interpretation)
             }
         }
     }
@@ -232,6 +241,62 @@ struct VedicChartView: View {
                         .font(.system(size: 8, weight: .bold, design: .serif))
                         .tracking(1.5)
                         .foregroundColor(natureColor(p.nature))
+                }
+            }
+
+            interpretationPanel(key: "planet.\(p.name.lowercased())",
+                                 interpretation: p.interpretation)
+        }
+    }
+
+    // MARK: - Interpretation panel
+
+    /// Expandable disclosure that reveals a tradition-sourced passage for the
+    /// given chart element. Hidden entirely if the backend has no passage
+    /// matching this element's signature.
+    @ViewBuilder
+    private func interpretationPanel(key: String, interpretation: Interpretation?) -> some View {
+        if let interpretation {
+            let isOpen = expanded.contains(key)
+            VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        if isOpen { expanded.remove(key) } else { expanded.insert(key) }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "book")
+                            .font(.sacredMicro)
+                            .foregroundColor(.sacredGold.opacity(0.7))
+                        Text(isOpen ? "Hide tradition" : "Tradition speaks")
+                            .font(.sacredMicro)
+                            .tracking(1.5)
+                            .foregroundColor(.sacredLabel)
+                        Image(systemName: isOpen ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 8, weight: .bold, design: .serif))
+                            .foregroundColor(.sacredMuted)
+                        Spacer()
+                    }
+                    .padding(.top, 8)
+                }
+                .buttonStyle(.plain)
+
+                if isOpen {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(interpretation.content)
+                            .font(.sacredSmall)
+                            .italic()
+                            .foregroundColor(.sacredTextSecondary)
+                            .lineSpacing(3)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Text(interpretation.source)
+                            .font(.system(size: 9, weight: .regular, design: .serif))
+                            .foregroundColor(.sacredMuted.opacity(0.7))
+                            .padding(.top, 2)
+                    }
+                    .padding(.top, 8)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
         }
@@ -397,6 +462,13 @@ struct VedicChart: Decodable {
     }
 }
 
+struct Interpretation: Decodable {
+    let content: String
+    let source: String
+    let polarity: String
+    let themes: [String]
+}
+
 struct NakshatraAttrs: Decodable {
     let name: String
     let quality: String
@@ -406,6 +478,7 @@ struct NakshatraAttrs: Decodable {
     let gana: String
     let deity: String
     let lord: String
+    let interpretation: Interpretation?
 }
 
 struct Lagna: Decodable {
@@ -414,6 +487,7 @@ struct Lagna: Decodable {
     let nakshatra: String
     let nakshatraQuality: String
     let pada: Int
+    let interpretation: Interpretation?
 }
 
 struct Planet: Decodable {
@@ -425,6 +499,7 @@ struct Planet: Decodable {
     let pada: Int
     let house: Int?
     let nature: String
+    let interpretation: Interpretation?
 }
 
 struct DashaInfo: Decodable {
@@ -434,4 +509,5 @@ struct DashaInfo: Decodable {
     let antardashaEnd: String
     let mahadashaStart: String
     let mahadashaEnd: String
+    let interpretation: Interpretation?
 }
