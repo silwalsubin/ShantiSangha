@@ -205,10 +205,12 @@ public class JyotishController(
                 ? VedicCalendar.GetHouse(sidereal, ascendantSidereal.Value)
                 : (int?)null;
 
-            // Navamsa (D9) sign and vargottama check
+            // Divisional charts
             var navamsaIdx = VedicCalendar.GetNavamsaRashi(sidereal);
             var navamsaRashi = VedicCalendar.GetRashi(navamsaIdx);
             var vargottama = navamsaIdx == rashiIdx;
+            var dasamsaRashi = VedicCalendar.GetRashi(VedicCalendar.GetDasamsaRashi(sidereal));
+            var dvadasamsaRashi = VedicCalendar.GetRashi(VedicCalendar.GetDvadasamsaRashi(sidereal));
 
             // Degree-level flags
             var dignity = VedicCalendar.GetDignity(p.Name, rashiIdx, degInRashi);
@@ -236,6 +238,8 @@ public class JyotishController(
                 House = house,
                 Dignity = dignity,
                 NavamsaRashi = navamsaRashi,
+                DasamsaRashi = dasamsaRashi,
+                DvadasamsaRashi = dvadasamsaRashi,
                 Vargottama = vargottama,
                 Retrograde = retrograde,
                 Combust = combust,

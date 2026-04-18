@@ -145,6 +145,40 @@ public static class VedicCalendar
     public static bool IsInSandhi(double degreeInRashi)
         => degreeInRashi < 1.0 || degreeInRashi >= 29.0;
 
+    /// <summary>
+    /// Dasamsa (D10) sign index — career, reputation, public life. Each 30°
+    /// sign is divided into 10 sections of 3° each. Starting-sign rule:
+    /// - Odd signs (Mesha, Mithuna, Simha, Tula, Dhanu, Kumbha): start from
+    ///   the sign itself.
+    /// - Even signs (Vrishabha, Karka, Kanya, Vrischika, Makara, Meena): start
+    ///   from the 9th from the sign.
+    /// Returns a rashi index 0-11.
+    /// </summary>
+    public static int GetDasamsaRashi(double siderealLongitude)
+    {
+        var rashiIdx = GetRashiIndex(siderealLongitude);
+        var degInRashi = siderealLongitude % 30;
+        var segment = (int)(degInRashi / 3.0); // 0..9
+        var startingSign = rashiIdx % 2 == 0
+            ? rashiIdx                 // odd sign (by Jyotish polarity) — start from itself
+            : (rashiIdx + 8) % 12;     // even sign — start from 9th
+        return (startingSign + segment) % 12;
+    }
+
+    /// <summary>
+    /// Dvadasamsa (D12) sign index — parents, ancestry, family of origin.
+    /// Each 30° sign is divided into 12 sections of 2.5° each. Starting sign
+    /// is always the sign itself, regardless of polarity.
+    /// Returns a rashi index 0-11.
+    /// </summary>
+    public static int GetDvadasamsaRashi(double siderealLongitude)
+    {
+        var rashiIdx = GetRashiIndex(siderealLongitude);
+        var degInRashi = siderealLongitude % 30;
+        var segment = (int)(degInRashi / 2.5); // 0..11
+        return (rashiIdx + segment) % 12;
+    }
+
     // Deep-exaltation peak degrees (parama uccha) per planet, in the degree
     // within the exaltation sign. Moon peaks at Taurus 3°, Sun at Aries 10°, etc.
     // Within ±3° of the peak → "deep_exalted"; otherwise just "exalted".

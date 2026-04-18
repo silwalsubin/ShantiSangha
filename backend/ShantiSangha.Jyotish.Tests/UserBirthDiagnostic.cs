@@ -68,6 +68,8 @@ public class UserBirthDiagnostic(ITestOutputHelper output)
             var dignity = VedicCalendar.GetDignity(p.Name, rashiIdx, degInRashi);
             var navamsaIdx = VedicCalendar.GetNavamsaRashi(sidereal);
             var navamsa = VedicCalendar.GetRashi(navamsaIdx);
+            var dasamsa = VedicCalendar.GetRashi(VedicCalendar.GetDasamsaRashi(sidereal));
+            var dvadasamsa = VedicCalendar.GetRashi(VedicCalendar.GetDvadasamsaRashi(sidereal));
             var vargottama = navamsaIdx == rashiIdx;
             var retro = PlanetaryPositions.IsRetrograde(p.Name, birthUtc);
             var combust = PlanetaryPositions.IsCombust(p.Name, p.Tropical, sunTrop, retro);
@@ -81,9 +83,14 @@ public class UserBirthDiagnostic(ITestOutputHelper output)
             if (sandhi) flags.Add("SANDHI");
             var flagLabel = flags.Count > 0 ? $"  [{string.Join(", ", flags)}]" : "";
 
+            // Strip English-in-parens for compactness here
+            string Short(string s) => s.Split(' ')[0];
+
             output.WriteLine(
-                $"  {p.Name,-7}  {VedicCalendar.GetRashi(rashiIdx),-25} {degInRashi,5:F2}°  " +
-                $"{nakName,-18} P{pada}  H{house,-2}  D9 {navamsa}{flagLabel}");
+                $"  {p.Name,-7}  {VedicCalendar.GetRashi(rashiIdx),-23} {degInRashi,5:F2}°  " +
+                $"H{house,-2}  " +
+                $"D9 {Short(navamsa),-11} D10 {Short(dasamsa),-11} D12 {Short(dvadasamsa),-11}" +
+                $"{flagLabel}");
         }
 
         output.WriteLine("");

@@ -350,4 +350,44 @@ public class VedicCalendarTests
     {
         Assert.Equal(expected, VedicCalendar.IsInSandhi(degreeInRashi));
     }
+
+    // ------------------------------------------------------------------
+    // Dasamsa (D10) — 10 sections per sign, odd start from self, even start from 9th
+    // ------------------------------------------------------------------
+
+    [Theory]
+    // Odd signs (Mesha=0, Mithuna=2, Simha=4, Tula=6, Dhanu=8, Kumbha=10) — start from self
+    [InlineData(0.0, 0)]            // Mesha 0° → D10 Mesha
+    [InlineData(2.99, 0)]           // Mesha <3° → still first segment (Mesha)
+    [InlineData(3.0, 1)]            // Mesha 3° → Vrishabha (2nd segment from Mesha)
+    [InlineData(29.99, 9)]          // Mesha 29.99° → 10th segment → Makara
+    [InlineData(66.63, 4)]          // Mithuna 6.63° → seg 2 → Simha (user's Sun)
+    [InlineData(269.89, 5)]         // Dhanu 29.89° → seg 9 → Kanya (user's Saturn)
+    // Even signs (Vrishabha=1, Karka=3, Kanya=5, Vrischika=7, Makara=9, Meena=11) — start from 9th
+    [InlineData(30.0, 9)]           // Vrishabha 0° → start from Makara (9) + seg 0 → Makara
+    [InlineData(55.70, 5)]          // Vrishabha 25.70° → seg 8 → (9+8)%12 = Kanya (user's Moon)
+    [InlineData(90.0, 11)]          // Karka 0° → start from Meena (11) + seg 0 → Meena
+    [InlineData(105.63, 4)]         // Karka 15.63° → seg 5 → (11+5)%12 = Simha (user's Ketu)
+    public void GetDasamsaRashi_ReturnsCorrectD10(double siderealLongitude, int expectedIdx)
+    {
+        Assert.Equal(expectedIdx, VedicCalendar.GetDasamsaRashi(siderealLongitude));
+    }
+
+    // ------------------------------------------------------------------
+    // Dvadasamsa (D12) — 12 sections per sign, always start from the sign itself
+    // ------------------------------------------------------------------
+
+    [Theory]
+    [InlineData(0.0, 0)]            // Mesha 0° → Mesha
+    [InlineData(2.49, 0)]           // still in first 2.5° → Mesha
+    [InlineData(2.5, 1)]            // past 2.5° → Vrishabha
+    [InlineData(29.99, 11)]         // Mesha 29.99° → 12th segment → Meena
+    [InlineData(30.0, 1)]           // Vrishabha 0° → Vrishabha (same sign start)
+    [InlineData(55.70, 11)]         // Vrishabha 25.70° → seg 10 → (1+10)%12 = Meena (user's Moon)
+    [InlineData(66.63, 4)]          // Mithuna 6.63° → seg 2 → (2+2)%12 = Simha (user's Sun)
+    [InlineData(269.89, 7)]         // Dhanu 29.89° → seg 11 → (8+11)%12 = Vrischika (user's Saturn)
+    public void GetDvadasamsaRashi_ReturnsCorrectD12(double siderealLongitude, int expectedIdx)
+    {
+        Assert.Equal(expectedIdx, VedicCalendar.GetDvadasamsaRashi(siderealLongitude));
+    }
 }

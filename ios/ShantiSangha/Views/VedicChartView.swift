@@ -198,7 +198,10 @@ struct VedicChartView: View {
         card(title: "PLANETS") {
             VStack(spacing: 0) {
                 ForEach(Array(planets.enumerated()), id: \.element.name) { index, planet in
-                    planetRow(planet, hasHouses: hasHouses)
+                    NavigationLink(destination: PlanetDetailView(planet: planet)) {
+                        planetRow(planet, hasHouses: hasHouses)
+                    }
+                    .buttonStyle(.plain)
                     if index < planets.count - 1 {
                         Divider().padding(.vertical, 10)
                     }
@@ -207,84 +210,59 @@ struct VedicChartView: View {
         }
     }
 
+    /// Compact planet row — just the essentials so the chart page stays
+    /// scannable. Divisional positions (D9/D10/D12), status flags, and the
+    /// tradition passage live on PlanetDetailView behind a tap.
     private func planetRow(_ p: Planet, hasHouses: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
-                HStack(spacing: 3) {
-                    Text(p.name)
+        HStack(alignment: .firstTextBaseline) {
+            HStack(spacing: 3) {
+                Text(p.name)
+                    .font(.sacredTextMedium)
+                    .foregroundColor(.sacredText)
+                if p.retrograde == true {
+                    Text("℞")
+                        .font(.system(size: 11, weight: .regular, design: .serif))
+                        .foregroundColor(.sacredGold.opacity(0.8))
+                }
+            }
+            .frame(width: 70, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 6) {
+                    Text(shortRashi(p.rashi))
                         .font(.sacredTextMedium)
+                        .foregroundColor(.sacredGold)
+                    Text(String(format: "%.2f°", p.degree))
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredMuted)
+                }
+                Text("\(p.nakshatra) · Pada \(p.pada)")
+                    .font(.sacredMicro)
+                    .foregroundColor(.sacredTextSecondary)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 1) {
+                if hasHouses, let house = p.house {
+                    Text("H\(house)")
+                        .font(.sacredSmallSemibold)
                         .foregroundColor(.sacredText)
-                    if p.retrograde == true {
-                        Text("℞")
-                            .font(.system(size: 11, weight: .regular, design: .serif))
-                            .foregroundColor(.sacredGold.opacity(0.8))
-                    }
                 }
-                .frame(width: 70, alignment: .leading)
-
-                VStack(alignment: .leading, spacing: 1) {
-                    HStack(spacing: 6) {
-                        Text(shortRashi(p.rashi))
-                            .font(.sacredTextMedium)
-                            .foregroundColor(.sacredGold)
-                        Text(String(format: "%.2f°", p.degree))
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredMuted)
-                    }
-                    Text("\(p.nakshatra) · Pada \(p.pada)")
-                        .font(.sacredMicro)
-                        .foregroundColor(.sacredTextSecondary)
-                    if let d9 = p.navamsaRashi {
-                        HStack(spacing: 4) {
-                            Text("D9 \(shortRashi(d9))")
-                                .font(.sacredMicro)
-                                .foregroundColor(.sacredMuted)
-                            if p.vargottama == true {
-                                Text("★")
-                                    .font(.system(size: 8, weight: .bold, design: .serif))
-                                    .foregroundColor(.sacredGold)
-                            }
-                        }
-                    }
-                    let flags = statusFlags(p)
-                    if !flags.isEmpty {
-                        Text(flags)
-                            .font(.system(size: 8, weight: .regular, design: .serif))
-                            .tracking(1)
-                            .foregroundColor(.sacredMuted.opacity(0.8))
-                    }
-                }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 1) {
-                    if hasHouses, let house = p.house {
-                        Text("H\(house)")
-                            .font(.sacredSmallSemibold)
-                            .foregroundColor(.sacredText)
-                    }
-                    if p.dignity != "neutral" {
-                        Text(dignityLabel(p.dignity))
-                            .font(.system(size: 8, weight: .bold, design: .serif))
-                            .tracking(1.5)
-                            .foregroundColor(dignityColor(p.dignity))
-                    }
+                if p.dignity != "neutral" {
+                    Text(dignityLabel(p.dignity))
+                        .font(.system(size: 8, weight: .bold, design: .serif))
+                        .tracking(1.5)
+                        .foregroundColor(dignityColor(p.dignity))
                 }
             }
 
-            interpretationPanel(key: "planet.\(p.name.lowercased())",
-                                 interpretation: p.interpretation)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 10, weight: .regular, design: .serif))
+                .foregroundColor(.sacredMuted.opacity(0.5))
+                .padding(.leading, 4)
         }
-    }
-
-    /// Small lowercased status line — combust / sandhi / vargottama hint — for
-    /// things we don't surface as the primary right-side badge. Kept muted and
-    /// small so the row stays scannable.
-    private func statusFlags(_ p: Planet) -> String {
-        var parts: [String] = []
-        if p.combust == true { parts.append("combust") }
-        if p.sandhi == true { parts.append("sandhi") }
-        return parts.joined(separator: " · ")
+        .contentShape(Rectangle())
     }
 
     // MARK: - Interpretation panel
@@ -543,7 +521,8 @@ struct Lagna: Decodable {
     let interpretation: Interpretation?
 }
 
-struct Planet: Decodable {
+struct Planet: Decodable, Identifiable {
+    var id: String { name }
     let name: String
     let rashi: String
     let degree: Double
@@ -555,6 +534,10 @@ struct Planet: Decodable {
     let dignity: String
     /// Navamsa (D9) sign — "Simha (Leo)" format
     let navamsaRashi: String?
+    /// Dasamsa (D10) sign — career, public life
+    let dasamsaRashi: String?
+    /// Dvadasamsa (D12) sign — parents, lineage
+    let dvadasamsaRashi: String?
     /// True when the planet's D1 sign == D9 sign — classically very strong
     let vargottama: Bool?
     let retrograde: Bool?

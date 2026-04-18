@@ -86,11 +86,17 @@ public static class ChartSignatures
             var sidRashiIdx = VedicCalendar.GetRashiIndex(sid);
             var sidDeg = VedicCalendar.GetDegreeInRashi(sid);
 
-            // Navamsa signature — degree-dependent, lets corpus grow per-D9 passages
+            // Divisional chart signatures — each opens a dimension for corpus retrieval
             var navamsaIdx = VedicCalendar.GetNavamsaRashi(sid);
             signatures.Add($"{lower}_d9_in_{RashiSanskrit[navamsaIdx]}");
             if (navamsaIdx == sidRashiIdx)
                 signatures.Add($"{lower}_vargottama");
+
+            var dasamsaIdx = VedicCalendar.GetDasamsaRashi(sid);
+            signatures.Add($"{lower}_d10_in_{RashiSanskrit[dasamsaIdx]}");
+
+            var dvadasamsaIdx = VedicCalendar.GetDvadasamsaRashi(sid);
+            signatures.Add($"{lower}_d12_in_{RashiSanskrit[dvadasamsaIdx]}");
 
             // Dignity-based signatures
             var dignity = VedicCalendar.GetDignity(cap, sidRashiIdx, sidDeg);
