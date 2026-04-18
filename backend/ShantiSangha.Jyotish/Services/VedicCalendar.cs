@@ -49,6 +49,138 @@ public static class VedicCalendar
         "fiery transformation", "depth and stability", "completion and transcendence"
     ];
 
+    /// <summary>Yoni (animal energy) for each of the 27 nakshatras — traditional Jyotish attribute.</summary>
+    private static readonly string[] NakshatraYonis =
+    [
+        "Horse (Ashwa)", "Elephant (Gaja)", "Sheep (Mesha)", "Serpent (Sarpa)",
+        "Serpent (Sarpa)", "Dog (Shvana)", "Cat (Marjara)", "Sheep (Mesha)",
+        "Cat (Marjara)", "Rat (Akhu)", "Rat (Akhu)", "Cow (Gau)",
+        "Buffalo (Mahisha)", "Tiger (Vyaghra)", "Buffalo (Mahisha)", "Tiger (Vyaghra)",
+        "Deer (Mriga)", "Deer (Mriga)", "Dog (Shvana)", "Monkey (Vanara)",
+        "Mongoose (Nakula)", "Monkey (Vanara)", "Lion (Simha)", "Horse (Ashwa)",
+        "Lion (Simha)", "Cow (Gau)", "Elephant (Gaja)"
+    ];
+
+    /// <summary>Nadi — the Ayurvedic pulse/constitution each nakshatra carries.</summary>
+    private static readonly string[] NakshatraNadis =
+    [
+        "Vata", "Pitta", "Kapha", "Kapha", "Pitta", "Vata", "Vata", "Pitta",
+        "Kapha", "Kapha", "Pitta", "Vata", "Vata", "Pitta", "Kapha", "Kapha",
+        "Pitta", "Vata", "Vata", "Pitta", "Kapha", "Kapha", "Pitta", "Vata",
+        "Vata", "Pitta", "Kapha"
+    ];
+
+    /// <summary>Gana — temperament category (Deva/Manushya/Rakshasa).</summary>
+    private static readonly string[] NakshatraGanas =
+    [
+        "Deva", "Manushya", "Rakshasa", "Manushya", "Deva", "Manushya", "Deva", "Deva",
+        "Rakshasa", "Rakshasa", "Manushya", "Manushya", "Deva", "Rakshasa", "Deva", "Rakshasa",
+        "Deva", "Rakshasa", "Rakshasa", "Manushya", "Manushya", "Deva", "Rakshasa", "Rakshasa",
+        "Manushya", "Manushya", "Deva"
+    ];
+
+    /// <summary>Ruling deity of each nakshatra — central to Vedic symbolism.</summary>
+    private static readonly string[] NakshatraDeities =
+    [
+        "Ashwini Kumaras", "Yama", "Agni", "Brahma",
+        "Soma (Moon)", "Rudra", "Aditi", "Brihaspati",
+        "Sarpa (Nagas)", "Pitris (Ancestors)", "Bhaga", "Aryaman",
+        "Savitr", "Vishwakarma", "Vayu", "Indra-Agni",
+        "Mitra", "Indra", "Nirriti", "Apas (Waters)",
+        "Vishvedevas", "Vishnu", "Vasus", "Varuna",
+        "Aja Ekapada", "Ahir Budhnya", "Pushan"
+    ];
+
+    /// <summary>Ruling planet (dasha lord) of each nakshatra — standard Vimshottari order.</summary>
+    private static readonly string[] NakshatraLords =
+    [
+        "Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury",
+        "Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury",
+        "Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"
+    ];
+
+    public static string GetNakshatraYoni(int index) => NakshatraYonis[index];
+    public static string GetNakshatraNadi(int index) => NakshatraNadis[index];
+    public static string GetNakshatraGana(int index) => NakshatraGanas[index];
+    public static string GetNakshatraDeity(int index) => NakshatraDeities[index];
+    public static string GetNakshatraLord(int index) => NakshatraLords[index];
+
+    /// <summary>Which of the 4 padas (quarters) of a nakshatra the longitude falls in. 1-indexed.</summary>
+    public static int GetPada(double siderealLongitude)
+    {
+        var withinNakshatra = siderealLongitude % (360.0 / 27);
+        return (int)(withinNakshatra / ((360.0 / 27) / 4)) + 1;
+    }
+
+    /// <summary>Degree within the current rashi (0-29.99).</summary>
+    public static double GetDegreeInRashi(double siderealLongitude) => siderealLongitude % 30;
+
+    /// <summary>
+    /// Computes the tropical ecliptic longitude of the Ascendant (Lagna) — the point of
+    /// the ecliptic rising on the eastern horizon at birth. Requires birth time and
+    /// geographic coordinates. Convert to sidereal with ToSidereal for the rashi.
+    /// </summary>
+    public static double GetTropicalAscendant(DateTime birthUtc, double latitudeDeg, double longitudeDeg)
+    {
+        // Greenwich Mean Sidereal Time in hours, from the standard formula
+        // (Meeus, Astronomical Algorithms, ch. 12)
+        var jd = ToJulianDay(birthUtc);
+        var T = (jd - 2451545.0) / 36525.0;
+        var gmstDeg = 280.46061837
+                      + 360.98564736629 * (jd - 2451545.0)
+                      + 0.000387933 * T * T
+                      - T * T * T / 38710000.0;
+        gmstDeg = Normalize(gmstDeg);
+
+        var lstDeg = Normalize(gmstDeg + longitudeDeg);
+        var lstRad = lstDeg * Math.PI / 180.0;
+        var latRad = latitudeDeg * Math.PI / 180.0;
+        const double obliquityDeg = 23.4367; // mean obliquity of ecliptic, good enough here
+        var eps = obliquityDeg * Math.PI / 180.0;
+
+        // Standard ascendant formula
+        var y = -Math.Cos(lstRad);
+        var x = Math.Sin(lstRad) * Math.Cos(eps) + Math.Tan(latRad) * Math.Sin(eps);
+        var asc = Math.Atan2(y, x) * 180.0 / Math.PI;
+        return Normalize(asc);
+    }
+
+    private static double ToJulianDay(DateTime utc)
+    {
+        // Meeus formula for Julian Day Number from Gregorian UTC
+        int y = utc.Year, m = utc.Month;
+        if (m <= 2) { y -= 1; m += 12; }
+        var a = y / 100;
+        var b = 2 - a + a / 4;
+        var dayFrac = utc.Day + (utc.Hour + utc.Minute / 60.0 + utc.Second / 3600.0) / 24.0;
+        return Math.Floor(365.25 * (y + 4716)) + Math.Floor(30.6001 * (m + 1)) + dayFrac + b - 1524.5;
+    }
+
+    /// <summary>
+    /// Standard Jyotish natural benefic/malefic classification.
+    /// Returns one of "benefic", "malefic", or "neutral".
+    /// </summary>
+    public static string ClassifyPlanet(string planet)
+    {
+        return planet switch
+        {
+            "Jupiter" or "Venus" => "benefic",
+            "Mercury" or "Moon" => "neutral",
+            "Sun" or "Mars" or "Saturn" or "Rahu" or "Ketu" => "malefic",
+            _ => "neutral"
+        };
+    }
+
+    /// <summary>Compute the house number (1-12) a given longitude falls in, using Equal-house
+    /// system relative to the ascendant. Both longitudes must be in the same frame (sidereal
+    /// for Vedic charts).</summary>
+    public static int GetHouse(double bodyLongitude, double ascendantLongitude)
+    {
+        var diff = bodyLongitude - ascendantLongitude;
+        if (diff < 0) diff += 360;
+        return ((int)(diff / 30) % 12) + 1;
+    }
+
     private static readonly string[] Tithis =
     [
         "Pratipada", "Dwitiya", "Tritiya", "Chaturthi", "Panchami",

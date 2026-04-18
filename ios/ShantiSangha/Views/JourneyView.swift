@@ -20,24 +20,32 @@ struct JourneyView: View {
                 // Portrait — who you are, seen through your practice
                 if let portrait = portrait {
                     VStack(spacing: 12) {
-                        // Vedic identity subtitle (if available)
+                        // Vedic identity subtitle — tappable, opens the full chart
                         if let vedic = vedicIdentity, vedic.available {
-                            HStack(spacing: 8) {
-                                Text(vedic.primaryRashi)
-                                    .font(.sacredMicro)
-                                    .tracking(2)
-                                    .foregroundColor(.sacredGold.opacity(0.7))
-
-                                if let nakshatra = vedic.nakshatra {
-                                    Text("·")
-                                        .font(.sacredMicro)
-                                        .foregroundColor(.sacredMuted.opacity(0.5))
-                                    Text(nakshatra)
+                            NavigationLink(destination: VedicChartView()) {
+                                HStack(spacing: 8) {
+                                    Text(vedic.primaryRashi)
                                         .font(.sacredMicro)
                                         .tracking(2)
                                         .foregroundColor(.sacredGold.opacity(0.7))
+
+                                    if let nakshatra = vedic.nakshatra {
+                                        Text("·")
+                                            .font(.sacredMicro)
+                                            .foregroundColor(.sacredMuted.opacity(0.5))
+                                        Text(nakshatra)
+                                            .font(.sacredMicro)
+                                            .tracking(2)
+                                            .foregroundColor(.sacredGold.opacity(0.7))
+                                    }
+
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 7, weight: .regular, design: .serif))
+                                        .foregroundColor(.sacredGold.opacity(0.5))
+                                        .padding(.leading, 2)
                                 }
                             }
+                            .buttonStyle(.plain)
                         }
 
                         Text(portrait)
