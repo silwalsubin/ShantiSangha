@@ -64,9 +64,12 @@ public class UserBirthDiagnostic(ITestOutputHelper output)
             var pada = VedicCalendar.GetPada(sidereal);
             var house = VedicCalendar.GetHouse(sidereal, ascSidereal);
 
+            var dignity = VedicCalendar.GetDignity(p.Name, rashiIdx);
+            var dignityLabel = dignity == "neutral" ? "" : $"  [{dignity.ToUpperInvariant()}]";
+
             output.WriteLine(
                 $"  {p.Name,-7}  Tropical {p.Tropical,7:F2}°  |  Sid {sidereal,7:F2}°  →  " +
-                $"{VedicCalendar.GetRashi(rashiIdx)} {degInRashi:F2}°, {nakName} Pada {pada}, House {house}");
+                $"{VedicCalendar.GetRashi(rashiIdx)} {degInRashi:F2}°, {nakName} Pada {pada}, House {house}{dignityLabel}");
         }
 
         output.WriteLine("");

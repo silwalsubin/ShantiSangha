@@ -219,7 +219,7 @@ public class JyotishController(
                 NakshatraQuality = nakQuality,
                 Pada = VedicCalendar.GetPada(sidereal),
                 House = house,
-                Nature = VedicCalendar.ClassifyPlanet(p.Name),
+                Dignity = VedicCalendar.GetDignity(p.Name, rashiIdx),
                 Interpretation = interpretation
             };
         }).ToList();

@@ -235,21 +235,71 @@ public class VedicCalendarTests
     }
 
     // ------------------------------------------------------------------
-    // Benefic / malefic classification — standard Jyotish
+    // Dignity (uccha / swakshetra / neecha) — chart-specific classification
+    // Rashi index reminder: 0=Mesha, 1=Vrishabha, 2=Mithuna, 3=Karka,
+    // 4=Simha, 5=Kanya, 6=Tula, 7=Vrischika, 8=Dhanu, 9=Makara,
+    // 10=Kumbha, 11=Meena.
     // ------------------------------------------------------------------
 
     [Theory]
-    [InlineData("Jupiter", "benefic")]
-    [InlineData("Venus", "benefic")]
-    [InlineData("Mercury", "neutral")]
-    [InlineData("Moon", "neutral")]
-    [InlineData("Sun", "malefic")]
-    [InlineData("Mars", "malefic")]
-    [InlineData("Saturn", "malefic")]
-    [InlineData("Rahu", "malefic")]
-    [InlineData("Ketu", "malefic")]
-    public void ClassifyPlanet_ReturnsStandardClassification(string planet, string expected)
+    // Sun: exalted in Mesha, own Simha, debilitated in Tula.
+    [InlineData("Sun", 0, "exalted")]
+    [InlineData("Sun", 4, "own_sign")]
+    [InlineData("Sun", 6, "debilitated")]
+    [InlineData("Sun", 2, "neutral")]
+    // Moon: exalted in Vrishabha, own Karka, debilitated in Vrischika.
+    [InlineData("Moon", 1, "exalted")]
+    [InlineData("Moon", 3, "own_sign")]
+    [InlineData("Moon", 7, "debilitated")]
+    [InlineData("Moon", 0, "neutral")]
+    // Mars: exalted in Makara, own Mesha and Vrischika, debilitated in Karka.
+    [InlineData("Mars", 9, "exalted")]
+    [InlineData("Mars", 0, "own_sign")]
+    [InlineData("Mars", 7, "own_sign")]
+    [InlineData("Mars", 3, "debilitated")]
+    [InlineData("Mars", 5, "neutral")]
+    // Mercury: exalted in Kanya (priority over own_sign), own Mithuna, debilitated in Meena.
+    [InlineData("Mercury", 5, "exalted")]
+    [InlineData("Mercury", 2, "own_sign")]
+    [InlineData("Mercury", 11, "debilitated")]
+    [InlineData("Mercury", 4, "neutral")]
+    // Jupiter: exalted in Karka, own Dhanu and Meena, debilitated in Makara.
+    [InlineData("Jupiter", 3, "exalted")]
+    [InlineData("Jupiter", 8, "own_sign")]
+    [InlineData("Jupiter", 11, "own_sign")]
+    [InlineData("Jupiter", 9, "debilitated")]
+    [InlineData("Jupiter", 2, "neutral")]
+    // Venus: exalted in Meena, own Vrishabha and Tula, debilitated in Kanya.
+    [InlineData("Venus", 11, "exalted")]
+    [InlineData("Venus", 1, "own_sign")]
+    [InlineData("Venus", 6, "own_sign")]
+    [InlineData("Venus", 5, "debilitated")]
+    [InlineData("Venus", 0, "neutral")]
+    // Saturn: exalted in Tula, own Makara and Kumbha, debilitated in Mesha.
+    [InlineData("Saturn", 6, "exalted")]
+    [InlineData("Saturn", 9, "own_sign")]
+    [InlineData("Saturn", 10, "own_sign")]
+    [InlineData("Saturn", 0, "debilitated")]
+    [InlineData("Saturn", 3, "neutral")]
+    // Rahu: Parashara tradition — exalted in Vrishabha, debilitated in Vrischika.
+    [InlineData("Rahu", 1, "exalted")]
+    [InlineData("Rahu", 7, "debilitated")]
+    [InlineData("Rahu", 4, "neutral")]
+    // Ketu: opposite of Rahu — exalted in Vrischika, debilitated in Vrishabha.
+    [InlineData("Ketu", 7, "exalted")]
+    [InlineData("Ketu", 1, "debilitated")]
+    [InlineData("Ketu", 4, "neutral")]
+    public void GetDignity_ReturnsCorrectDignityForPlanetAndSign(
+        string planet, int rashiIndex, string expected)
     {
-        Assert.Equal(expected, VedicCalendar.ClassifyPlanet(planet));
+        Assert.Equal(expected, VedicCalendar.GetDignity(planet, rashiIndex));
+    }
+
+    [Fact]
+    public void GetDignity_MercuryInVirgo_PrefersExaltedOverOwnSign()
+    {
+        // Mercury in Kanya (5) is technically both exalted AND own sign.
+        // We prioritize "exalted" as the more notable classification.
+        Assert.Equal("exalted", VedicCalendar.GetDignity("Mercury", 5));
     }
 }

@@ -237,10 +237,12 @@ struct VedicChartView: View {
                             .font(.sacredSmallSemibold)
                             .foregroundColor(.sacredText)
                     }
-                    Text(p.nature.uppercased())
-                        .font(.system(size: 8, weight: .bold, design: .serif))
-                        .tracking(1.5)
-                        .foregroundColor(natureColor(p.nature))
+                    if p.dignity != "neutral" {
+                        Text(dignityLabel(p.dignity))
+                            .font(.system(size: 8, weight: .bold, design: .serif))
+                            .tracking(1.5)
+                            .foregroundColor(dignityColor(p.dignity))
+                    }
                 }
             }
 
@@ -335,11 +337,22 @@ struct VedicChartView: View {
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
     }
 
-    private func natureColor(_ nature: String) -> Color {
-        switch nature {
-        case "benefic": return .sacredGreen
-        case "malefic": return .sacredRed
+    private func dignityColor(_ dignity: String) -> Color {
+        switch dignity {
+        case "exalted": return .sacredGreen
+        case "own_sign": return .sacredGold
+        case "debilitated": return .sacredRed
         default: return .sacredMuted
+        }
+    }
+
+    /// Map machine-readable dignity values to the UI label shown on the row.
+    private func dignityLabel(_ dignity: String) -> String {
+        switch dignity {
+        case "exalted": return "EXALTED"
+        case "own_sign": return "OWN SIGN"
+        case "debilitated": return "DEBILITATED"
+        default: return ""
         }
     }
 
@@ -498,7 +511,8 @@ struct Planet: Decodable {
     let nakshatraQuality: String
     let pada: Int
     let house: Int?
-    let nature: String
+    /// exalted | own_sign | debilitated | neutral
+    let dignity: String
     let interpretation: Interpretation?
 }
 

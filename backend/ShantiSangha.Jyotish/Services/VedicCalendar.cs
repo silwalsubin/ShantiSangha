@@ -159,16 +159,86 @@ public static class VedicCalendar
     }
 
     /// <summary>
-    /// Standard Jyotish natural benefic/malefic classification.
-    /// Returns one of "benefic", "malefic", or "neutral".
+    /// Returns the planet's dignity in the given sign — the Jyotish
+    /// classification that actually varies by chart. One of:
+    /// "exalted" (uccha), "own_sign" (swakshetra), "debilitated" (neecha),
+    /// or "neutral" (none of the above).
+    ///
+    /// Rashi indices use the same 0-11 ordering as GetRashiIndex:
+    /// 0=Mesha, 1=Vrishabha, 2=Mithuna, 3=Karka, 4=Simha, 5=Kanya,
+    /// 6=Tula, 7=Vrischika, 8=Dhanu, 9=Makara, 10=Kumbha, 11=Meena.
+    ///
+    /// Edge case: Mercury in Kanya (Virgo, idx 5) is both its exaltation
+    /// AND its own sign. "exalted" wins — it's the more notable classification.
+    ///
+    /// Rahu/Ketu exaltation follows the Parashara tradition also used
+    /// elsewhere in this project: Rahu exalted in Vrishabha, Ketu in Vrischika.
     /// </summary>
-    public static string ClassifyPlanet(string planet)
+    public static string GetDignity(string planet, int rashiIndex)
     {
         return planet switch
         {
-            "Jupiter" or "Venus" => "benefic",
-            "Mercury" or "Moon" => "neutral",
-            "Sun" or "Mars" or "Saturn" or "Rahu" or "Ketu" => "malefic",
+            "Sun" => rashiIndex switch
+            {
+                0 => "exalted",      // Mesha
+                4 => "own_sign",     // Simha
+                6 => "debilitated",  // Tula
+                _ => "neutral"
+            },
+            "Moon" => rashiIndex switch
+            {
+                1 => "exalted",      // Vrishabha
+                3 => "own_sign",     // Karka
+                7 => "debilitated",  // Vrischika
+                _ => "neutral"
+            },
+            "Mars" => rashiIndex switch
+            {
+                9 => "exalted",              // Makara
+                0 or 7 => "own_sign",        // Mesha, Vrischika
+                3 => "debilitated",          // Karka
+                _ => "neutral"
+            },
+            "Mercury" => rashiIndex switch
+            {
+                5 => "exalted",              // Kanya (priority over own_sign)
+                2 => "own_sign",             // Mithuna
+                11 => "debilitated",         // Meena
+                _ => "neutral"
+            },
+            "Jupiter" => rashiIndex switch
+            {
+                3 => "exalted",              // Karka
+                8 or 11 => "own_sign",       // Dhanu, Meena
+                9 => "debilitated",          // Makara
+                _ => "neutral"
+            },
+            "Venus" => rashiIndex switch
+            {
+                11 => "exalted",             // Meena
+                1 or 6 => "own_sign",        // Vrishabha, Tula
+                5 => "debilitated",          // Kanya
+                _ => "neutral"
+            },
+            "Saturn" => rashiIndex switch
+            {
+                6 => "exalted",              // Tula
+                9 or 10 => "own_sign",       // Makara, Kumbha
+                0 => "debilitated",          // Mesha
+                _ => "neutral"
+            },
+            "Rahu" => rashiIndex switch
+            {
+                1 => "exalted",              // Vrishabha
+                7 => "debilitated",          // Vrischika
+                _ => "neutral"
+            },
+            "Ketu" => rashiIndex switch
+            {
+                7 => "exalted",              // Vrischika
+                1 => "debilitated",          // Vrishabha
+                _ => "neutral"
+            },
             _ => "neutral"
         };
     }
