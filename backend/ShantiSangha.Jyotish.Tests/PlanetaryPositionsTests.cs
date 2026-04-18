@@ -209,4 +209,91 @@ public class PlanetaryPositionsTests
             Assert.NotEqual(360, lon);
         }
     }
+
+    // ------------------------------------------------------------------
+    // Retrograde detection — Sun/Moon never, Rahu/Ketu not flagged
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void IsRetrograde_SunAndMoon_AlwaysFalse()
+    {
+        // Sample several dates to confirm Sun and Moon are never flagged.
+        foreach (var d in new[]
+        {
+            new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2024, 6, 15, 12, 0, 0, DateTimeKind.Utc),
+            new DateTime(1990, 6, 22, 0, 15, 0, DateTimeKind.Utc)
+        })
+        {
+            Assert.False(PlanetaryPositions.IsRetrograde("Sun", d));
+            Assert.False(PlanetaryPositions.IsRetrograde("Moon", d));
+        }
+    }
+
+    [Fact]
+    public void IsRetrograde_RahuAndKetu_ReturnFalse()
+    {
+        // Nodes move retrograde by nature but we don't flag — it's their default state.
+        var d = new DateTime(2024, 6, 15, 12, 0, 0, DateTimeKind.Utc);
+        Assert.False(PlanetaryPositions.IsRetrograde("Rahu", d));
+        Assert.False(PlanetaryPositions.IsRetrograde("Ketu", d));
+    }
+
+    [Fact]
+    public void IsRetrograde_MercuryRetrograde_2024Apr15()
+    {
+        // Mercury was retrograde during the well-known period April 1 – April 25, 2024.
+        var inRetro = new DateTime(2024, 4, 15, 12, 0, 0, DateTimeKind.Utc);
+        Assert.True(PlanetaryPositions.IsRetrograde("Mercury", inRetro));
+
+        // March 1, 2024 — before the retro period — should be direct.
+        var direct = new DateTime(2024, 3, 1, 12, 0, 0, DateTimeKind.Utc);
+        Assert.False(PlanetaryPositions.IsRetrograde("Mercury", direct));
+    }
+
+    [Fact]
+    public void IsRetrograde_SaturnRetrograde_2024Aug()
+    {
+        // Saturn retrogrades annually for ~4.5 months. 2024 retro was roughly
+        // June 29 – November 15. Mid-August falls squarely inside.
+        var inRetro = new DateTime(2024, 8, 15, 12, 0, 0, DateTimeKind.Utc);
+        Assert.True(PlanetaryPositions.IsRetrograde("Saturn", inRetro));
+    }
+
+    // ------------------------------------------------------------------
+    // Combustion — planet within Parashara orb of Sun
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void IsCombust_MercuryClose_FlaggedWithinOrb()
+    {
+        // Mercury 10° from Sun, direct → within 14° orb → combust.
+        Assert.True(PlanetaryPositions.IsCombust("Mercury", 100, 90, retrograde: false));
+        // 20° away → outside orb.
+        Assert.False(PlanetaryPositions.IsCombust("Mercury", 110, 90, retrograde: false));
+    }
+
+    [Fact]
+    public void IsCombust_RespectsRetrogradeTightening()
+    {
+        // Venus 9° from Sun, direct (10° orb) → combust.
+        Assert.True(PlanetaryPositions.IsCombust("Venus", 99, 90, retrograde: false));
+        // Same 9° separation but retrograde (8° orb) → NOT combust.
+        Assert.False(PlanetaryPositions.IsCombust("Venus", 99, 90, retrograde: true));
+    }
+
+    [Fact]
+    public void IsCombust_SunAndNodes_NeverCombust()
+    {
+        Assert.False(PlanetaryPositions.IsCombust("Sun", 90, 90, false));
+        Assert.False(PlanetaryPositions.IsCombust("Rahu", 95, 90, false));
+        Assert.False(PlanetaryPositions.IsCombust("Ketu", 95, 90, false));
+    }
+
+    [Fact]
+    public void IsCombust_HandlesWrapAroundOrb()
+    {
+        // Planet at 355°, Sun at 5° — true separation is 10°, not 350°.
+        Assert.True(PlanetaryPositions.IsCombust("Mercury", 355, 5, retrograde: false));
+    }
 }

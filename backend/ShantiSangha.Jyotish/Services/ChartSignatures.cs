@@ -67,27 +67,48 @@ public static class ChartSignatures
             signatures.Add($"lagna_in_{RashiSanskrit[VedicCalendar.GetRashiIndex(ascSidereal.Value)]}");
         }
 
-        // Planet-in-house placements — requires ascendant
-        if (ascSidereal.HasValue)
+        var planetLongitudes = new (string Lower, string Cap, double Tropical)[]
         {
-            var planetLongitudes = new (string Name, double Tropical)[]
-            {
-                ("sun", sunTropical),
-                ("moon", moonTropical),
-                ("mercury", PlanetaryPositions.GetTropicalMercuryLongitude(birthUtc)),
-                ("venus", PlanetaryPositions.GetTropicalVenusLongitude(birthUtc)),
-                ("mars", PlanetaryPositions.GetTropicalMarsLongitude(birthUtc)),
-                ("jupiter", PlanetaryPositions.GetTropicalJupiterLongitude(birthUtc)),
-                ("saturn", PlanetaryPositions.GetTropicalSaturnLongitude(birthUtc)),
-                ("rahu", PlanetaryPositions.GetTropicalRahuLongitude(birthUtc)),
-                ("ketu", PlanetaryPositions.GetTropicalKetuLongitude(birthUtc))
-            };
+            ("sun", "Sun", sunTropical),
+            ("moon", "Moon", moonTropical),
+            ("mercury", "Mercury", PlanetaryPositions.GetTropicalMercuryLongitude(birthUtc)),
+            ("venus", "Venus", PlanetaryPositions.GetTropicalVenusLongitude(birthUtc)),
+            ("mars", "Mars", PlanetaryPositions.GetTropicalMarsLongitude(birthUtc)),
+            ("jupiter", "Jupiter", PlanetaryPositions.GetTropicalJupiterLongitude(birthUtc)),
+            ("saturn", "Saturn", PlanetaryPositions.GetTropicalSaturnLongitude(birthUtc)),
+            ("rahu", "Rahu", PlanetaryPositions.GetTropicalRahuLongitude(birthUtc)),
+            ("ketu", "Ketu", PlanetaryPositions.GetTropicalKetuLongitude(birthUtc))
+        };
 
-            foreach (var (name, trop) in planetLongitudes)
+        foreach (var (lower, cap, trop) in planetLongitudes)
+        {
+            var sid = VedicCalendar.ToSidereal(trop, birthUtc);
+            var sidRashiIdx = VedicCalendar.GetRashiIndex(sid);
+            var sidDeg = VedicCalendar.GetDegreeInRashi(sid);
+
+            // Navamsa signature — degree-dependent, lets corpus grow per-D9 passages
+            var navamsaIdx = VedicCalendar.GetNavamsaRashi(sid);
+            signatures.Add($"{lower}_d9_in_{RashiSanskrit[navamsaIdx]}");
+            if (navamsaIdx == sidRashiIdx)
+                signatures.Add($"{lower}_vargottama");
+
+            // Dignity-based signatures
+            var dignity = VedicCalendar.GetDignity(cap, sidRashiIdx, sidDeg);
+            if (dignity == "deep_exalted" || dignity == "moolatrikona")
+                signatures.Add($"{lower}_{dignity}");
+
+            // Retrograde and combust flags
+            if (PlanetaryPositions.IsRetrograde(cap, birthUtc))
+                signatures.Add($"{lower}_retrograde");
+            if (PlanetaryPositions.IsCombust(cap, trop, sunTropical,
+                PlanetaryPositions.IsRetrograde(cap, birthUtc)))
+                signatures.Add($"{lower}_combust");
+
+            // Planet-in-house placements — requires ascendant
+            if (ascSidereal.HasValue)
             {
-                var sid = VedicCalendar.ToSidereal(trop, birthUtc);
                 var house = VedicCalendar.GetHouse(sid, ascSidereal.Value);
-                signatures.Add($"{name}_in_h{house}");
+                signatures.Add($"{lower}_in_h{house}");
             }
         }
 

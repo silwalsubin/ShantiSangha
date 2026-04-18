@@ -31,6 +31,62 @@ public static class PlanetaryPositions
 
     public static double GetTropicalKetuLongitude(DateTime date) => Normalize(GetTropicalRahuLongitude(date) + 180.0);
 
+    /// <summary>
+    /// Returns true when the planet is moving retrograde (backward along the
+    /// ecliptic) at the given date. Sun and Moon are never retrograde.
+    /// Rahu and Ketu move retrograde by nature; we return false for them
+    /// since it's their default state and not classically flagged.
+    ///
+    /// Detection: compute geocentric longitude at date and date + 1 day,
+    /// and see whether the advancement is negative (modulo 360°).
+    /// </summary>
+    public static bool IsRetrograde(string planet, DateTime date)
+    {
+        var longitude = planet switch
+        {
+            "Mercury" => (Func<DateTime, double>)GetTropicalMercuryLongitude,
+            "Venus" => GetTropicalVenusLongitude,
+            "Mars" => GetTropicalMarsLongitude,
+            "Jupiter" => GetTropicalJupiterLongitude,
+            "Saturn" => GetTropicalSaturnLongitude,
+            _ => null!
+        };
+        if (longitude is null) return false; // Sun, Moon, Rahu, Ketu
+
+        var now = longitude(date);
+        var tomorrow = longitude(date.AddDays(1));
+        var delta = tomorrow - now;
+        // Normalize into [-180, 180] so we catch the sign of motion correctly
+        if (delta > 180) delta -= 360;
+        else if (delta < -180) delta += 360;
+        return delta < 0;
+    }
+
+    /// <summary>
+    /// Classical combustion (asta) check — planet is "burnt" when too close
+    /// to the Sun's geocentric longitude. Orbs per planet follow Parashara
+    /// tradition. Sun itself, Moon, and Rahu/Ketu are not evaluated for
+    /// combustion. Retrograde status tightens Mercury and Venus orbs.
+    /// </summary>
+    public static bool IsCombust(string planet, double planetTropical, double sunTropical, bool retrograde)
+    {
+        var orb = planet switch
+        {
+            "Moon" => 12.0,
+            "Mars" => 17.0,
+            "Mercury" => retrograde ? 12.0 : 14.0,
+            "Jupiter" => 11.0,
+            "Venus" => retrograde ? 8.0 : 10.0,
+            "Saturn" => 15.0,
+            _ => -1.0
+        };
+        if (orb < 0) return false;
+
+        var distance = Math.Abs(planetTropical - sunTropical) % 360;
+        if (distance > 180) distance = 360 - distance;
+        return distance <= orb;
+    }
+
     private enum Planet { Mercury, Venus, Earth, Mars, Jupiter, Saturn }
 
     private static double DaysSinceEpoch(DateTime date)

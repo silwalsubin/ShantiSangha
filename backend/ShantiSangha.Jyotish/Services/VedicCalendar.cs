@@ -116,6 +116,65 @@ public static class VedicCalendar
     public static double GetDegreeInRashi(double siderealLongitude) => siderealLongitude % 30;
 
     /// <summary>
+    /// Navamsa (D9) sign index for a given sidereal longitude. Each 30° sign is
+    /// divided into 9 navamsas of 3°20' each. The starting navamsa sign follows
+    /// the classical rule based on sign modality:
+    /// - Movable signs (Mesha, Karka, Tula, Makara): start from the sign itself
+    /// - Fixed signs (Vrishabha, Simha, Vrischika, Kumbha): start from the 9th
+    /// - Dual signs (Mithuna, Kanya, Dhanu, Meena): start from the 5th
+    /// Returns a rashi index 0-11.
+    /// </summary>
+    public static int GetNavamsaRashi(double siderealLongitude)
+    {
+        var rashiIdx = GetRashiIndex(siderealLongitude);
+        var degInRashi = siderealLongitude % 30;
+        var segment = (int)(degInRashi * 9 / 30); // 0..8 — which navamsa within the sign
+        var startingSign = (rashiIdx % 3) switch
+        {
+            0 => rashiIdx,                     // movable — start from itself
+            1 => (rashiIdx + 8) % 12,          // fixed — 9th from itself
+            _ => (rashiIdx + 4) % 12           // dual — 5th from itself
+        };
+        return (startingSign + segment) % 12;
+    }
+
+    /// <summary>
+    /// True when a planet sits in the cusp zone — last 1° or first 1° of its sign.
+    /// Classically treated as a weak position (sandhi dosha).
+    /// </summary>
+    public static bool IsInSandhi(double degreeInRashi)
+        => degreeInRashi < 1.0 || degreeInRashi >= 29.0;
+
+    // Deep-exaltation peak degrees (parama uccha) per planet, in the degree
+    // within the exaltation sign. Moon peaks at Taurus 3°, Sun at Aries 10°, etc.
+    // Within ±3° of the peak → "deep_exalted"; otherwise just "exalted".
+    private const double DeepExaltationTolerance = 3.0;
+    private static readonly Dictionary<string, double> DeepExaltationDegree = new()
+    {
+        ["Sun"] = 10.0,      // Mesha 10°
+        ["Moon"] = 3.0,      // Vrishabha 3°
+        ["Mars"] = 28.0,     // Makara 28°
+        ["Mercury"] = 15.0,  // Kanya 15°
+        ["Jupiter"] = 5.0,   // Karka 5°
+        ["Venus"] = 27.0,    // Meena 27°
+        ["Saturn"] = 20.0    // Tula 20°
+    };
+
+    // Moolatrikona ranges — (rashiIndex, startDeg, endDeg). Within this range
+    // the planet has a dignity tier between "own_sign" and "exalted".
+    // Classical ranges from Phaladeepika / BPHS.
+    private static readonly Dictionary<string, (int Rashi, double Start, double End)> MoolatrikonaRange = new()
+    {
+        ["Sun"] = (4, 0, 20),        // Simha 0–20°
+        ["Moon"] = (1, 4, 30),       // Vrishabha 4–30° (Moon's moolatrikona is NOT in its own sign Karka)
+        ["Mars"] = (0, 0, 12),       // Mesha 0–12°
+        ["Mercury"] = (5, 16, 20),   // Kanya 16–20° (a narrow strip within its exaltation sign)
+        ["Jupiter"] = (8, 0, 10),    // Dhanu 0–10°
+        ["Venus"] = (6, 0, 15),      // Tula 0–15°
+        ["Saturn"] = (10, 0, 20)     // Kumbha 0–20°
+    };
+
+    /// <summary>
     /// Computes the tropical ecliptic longitude of the Ascendant (Lagna) — the point of
     /// the ecliptic rising on the eastern horizon at birth. Requires birth time and
     /// geographic coordinates. Convert to sidereal with ToSidereal for the rashi.
@@ -159,88 +218,101 @@ public static class VedicCalendar
     }
 
     /// <summary>
-    /// Returns the planet's dignity in the given sign — the Jyotish
-    /// classification that actually varies by chart. One of:
-    /// "exalted" (uccha), "own_sign" (swakshetra), "debilitated" (neecha),
-    /// or "neutral" (none of the above).
+    /// Returns the planet's dignity given its sign AND degree in that sign.
+    /// Degree-aware so that within the exaltation sign we distinguish
+    /// "deep_exalted" (within ±3° of peak) from ordinary "exalted", and
+    /// within the own/moolatrikona sign we surface the moolatrikona tier.
     ///
-    /// Rashi indices use the same 0-11 ordering as GetRashiIndex:
-    /// 0=Mesha, 1=Vrishabha, 2=Mithuna, 3=Karka, 4=Simha, 5=Kanya,
-    /// 6=Tula, 7=Vrischika, 8=Dhanu, 9=Makara, 10=Kumbha, 11=Meena.
+    /// Priority order (strongest first): deep_exalted → exalted →
+    /// moolatrikona → own_sign → debilitated → neutral.
     ///
-    /// Edge case: Mercury in Kanya (Virgo, idx 5) is both its exaltation
-    /// AND its own sign. "exalted" wins — it's the more notable classification.
+    /// Edge case (Mercury): Kanya 0–15° is Mercury's exaltation zone (with
+    /// peak at 15°), 16–20° is moolatrikona, 20–30° is own_sign. This
+    /// overlapping-sign case is handled explicitly.
     ///
-    /// Rahu/Ketu exaltation follows the Parashara tradition also used
-    /// elsewhere in this project: Rahu exalted in Vrishabha, Ketu in Vrischika.
+    /// Rahu/Ketu exaltation follows the Parashara tradition used elsewhere
+    /// (Rahu exalted in Vrishabha, Ketu in Vrischika). Rahu/Ketu do not have
+    /// deep-exalt / moolatrikona definitions in this tradition.
     /// </summary>
-    public static string GetDignity(string planet, int rashiIndex)
+    public static string GetDignity(string planet, int rashiIndex, double degreeInRashi)
     {
-        return planet switch
+        // Check exaltation first (with deep-exalt refinement)
+        var exaltSign = planet switch
         {
-            "Sun" => rashiIndex switch
-            {
-                0 => "exalted",      // Mesha
-                4 => "own_sign",     // Simha
-                6 => "debilitated",  // Tula
-                _ => "neutral"
-            },
-            "Moon" => rashiIndex switch
-            {
-                1 => "exalted",      // Vrishabha
-                3 => "own_sign",     // Karka
-                7 => "debilitated",  // Vrischika
-                _ => "neutral"
-            },
-            "Mars" => rashiIndex switch
-            {
-                9 => "exalted",              // Makara
-                0 or 7 => "own_sign",        // Mesha, Vrischika
-                3 => "debilitated",          // Karka
-                _ => "neutral"
-            },
-            "Mercury" => rashiIndex switch
-            {
-                5 => "exalted",              // Kanya (priority over own_sign)
-                2 => "own_sign",             // Mithuna
-                11 => "debilitated",         // Meena
-                _ => "neutral"
-            },
-            "Jupiter" => rashiIndex switch
-            {
-                3 => "exalted",              // Karka
-                8 or 11 => "own_sign",       // Dhanu, Meena
-                9 => "debilitated",          // Makara
-                _ => "neutral"
-            },
-            "Venus" => rashiIndex switch
-            {
-                11 => "exalted",             // Meena
-                1 or 6 => "own_sign",        // Vrishabha, Tula
-                5 => "debilitated",          // Kanya
-                _ => "neutral"
-            },
-            "Saturn" => rashiIndex switch
-            {
-                6 => "exalted",              // Tula
-                9 or 10 => "own_sign",       // Makara, Kumbha
-                0 => "debilitated",          // Mesha
-                _ => "neutral"
-            },
-            "Rahu" => rashiIndex switch
-            {
-                1 => "exalted",              // Vrishabha
-                7 => "debilitated",          // Vrischika
-                _ => "neutral"
-            },
-            "Ketu" => rashiIndex switch
-            {
-                7 => "exalted",              // Vrischika
-                1 => "debilitated",          // Vrishabha
-                _ => "neutral"
-            },
-            _ => "neutral"
+            "Sun" => 0, "Moon" => 1, "Mars" => 9, "Mercury" => 5,
+            "Jupiter" => 3, "Venus" => 11, "Saturn" => 6,
+            "Rahu" => 1, "Ketu" => 7,
+            _ => -1
         };
+        if (exaltSign == rashiIndex)
+        {
+            // Mercury's Kanya has well-documented overlapping zones with own_sign
+            // — handle specifically because the classical sources are explicit:
+            // 0–15° exalted (peak at 15°), 16–20° moolatrikona, 20–30° own_sign.
+            if (planet == "Mercury")
+            {
+                if (degreeInRashi >= 16 && degreeInRashi < 20) return "moolatrikona";
+                if (degreeInRashi >= 20) return "own_sign";
+            }
+
+            // Deep exaltation — narrow peak takes highest priority
+            if (DeepExaltationDegree.TryGetValue(planet, out var peak)
+                && Math.Abs(degreeInRashi - peak) <= DeepExaltationTolerance)
+            {
+                return "deep_exalted";
+            }
+
+            // For other planets (notably Moon whose moolatrikona overlaps with
+            // its exaltation sign) we let exaltation win in the exaltation sign.
+            // This matches the most common teaching and keeps the label users expect.
+            return "exalted";
+        }
+
+        // Check debilitation
+        var debilSign = planet switch
+        {
+            "Sun" => 6, "Moon" => 7, "Mars" => 3, "Mercury" => 11,
+            "Jupiter" => 9, "Venus" => 5, "Saturn" => 0,
+            "Rahu" => 7, "Ketu" => 1,
+            _ => -1
+        };
+        if (debilSign == rashiIndex) return "debilitated";
+
+        // Check own sign — and within that, moolatrikona sub-range
+        var ownSigns = planet switch
+        {
+            "Sun" => new[] { 4 },
+            "Moon" => new[] { 3 },
+            "Mars" => new[] { 0, 7 },
+            "Mercury" => new[] { 2, 5 },    // Kanya handled above since it's also exalt
+            "Jupiter" => new[] { 8, 11 },
+            "Venus" => new[] { 1, 6 },
+            "Saturn" => new[] { 9, 10 },
+            _ => Array.Empty<int>()
+        };
+        if (ownSigns.Contains(rashiIndex))
+        {
+            if (MoolatrikonaRange.TryGetValue(planet, out var mt)
+                && mt.Rashi == rashiIndex
+                && degreeInRashi >= mt.Start && degreeInRashi < mt.End)
+            {
+                return "moolatrikona";
+            }
+            return "own_sign";
+        }
+
+        // Moolatrikona can live in a non-own-sign (Moon's moolatrikona is in
+        // Vrishabha, which is not Moon's own sign). Check that case too.
+        if (MoolatrikonaRange.TryGetValue(planet, out var mtRange)
+            && mtRange.Rashi == rashiIndex
+            && degreeInRashi >= mtRange.Start && degreeInRashi < mtRange.End)
+        {
+            // But only if we haven't already classified this sign as exalted above.
+            // (If rashiIndex == exaltSign, we returned earlier.)
+            return "moolatrikona";
+        }
+
+        return "neutral";
     }
 
     /// <summary>Compute the house number (1-12) using the Whole-Sign system, the standard

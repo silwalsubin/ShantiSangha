@@ -54,6 +54,7 @@ public class UserBirthDiagnostic(ITestOutputHelper output)
 
         output.WriteLine("PLANETS (Sidereal = Tropical − Ayanamsa)");
         output.WriteLine("-------");
+        var sunTrop = VedicCalendar.GetTropicalSunLongitude(birthUtc);
         foreach (var p in planets)
         {
             var sidereal = VedicCalendar.ToSidereal(p.Tropical, birthUtc);
@@ -64,12 +65,25 @@ public class UserBirthDiagnostic(ITestOutputHelper output)
             var pada = VedicCalendar.GetPada(sidereal);
             var house = VedicCalendar.GetHouse(sidereal, ascSidereal);
 
-            var dignity = VedicCalendar.GetDignity(p.Name, rashiIdx);
-            var dignityLabel = dignity == "neutral" ? "" : $"  [{dignity.ToUpperInvariant()}]";
+            var dignity = VedicCalendar.GetDignity(p.Name, rashiIdx, degInRashi);
+            var navamsaIdx = VedicCalendar.GetNavamsaRashi(sidereal);
+            var navamsa = VedicCalendar.GetRashi(navamsaIdx);
+            var vargottama = navamsaIdx == rashiIdx;
+            var retro = PlanetaryPositions.IsRetrograde(p.Name, birthUtc);
+            var combust = PlanetaryPositions.IsCombust(p.Name, p.Tropical, sunTrop, retro);
+            var sandhi = VedicCalendar.IsInSandhi(degInRashi);
+
+            var flags = new List<string>();
+            if (dignity != "neutral") flags.Add(dignity.ToUpperInvariant());
+            if (vargottama) flags.Add("VARGOTTAMA");
+            if (retro) flags.Add("R");
+            if (combust) flags.Add("COMBUST");
+            if (sandhi) flags.Add("SANDHI");
+            var flagLabel = flags.Count > 0 ? $"  [{string.Join(", ", flags)}]" : "";
 
             output.WriteLine(
-                $"  {p.Name,-7}  Tropical {p.Tropical,7:F2}°  |  Sid {sidereal,7:F2}°  →  " +
-                $"{VedicCalendar.GetRashi(rashiIdx)} {degInRashi:F2}°, {nakName} Pada {pada}, House {house}{dignityLabel}");
+                $"  {p.Name,-7}  {VedicCalendar.GetRashi(rashiIdx),-25} {degInRashi,5:F2}°  " +
+                $"{nakName,-18} P{pada}  H{house,-2}  D9 {navamsa}{flagLabel}");
         }
 
         output.WriteLine("");

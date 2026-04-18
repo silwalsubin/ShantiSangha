@@ -210,10 +210,17 @@ struct VedicChartView: View {
     private func planetRow(_ p: Planet, hasHouses: Bool) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline) {
-                Text(p.name)
-                    .font(.sacredTextMedium)
-                    .foregroundColor(.sacredText)
-                    .frame(width: 70, alignment: .leading)
+                HStack(spacing: 3) {
+                    Text(p.name)
+                        .font(.sacredTextMedium)
+                        .foregroundColor(.sacredText)
+                    if p.retrograde == true {
+                        Text("℞")
+                            .font(.system(size: 11, weight: .regular, design: .serif))
+                            .foregroundColor(.sacredGold.opacity(0.8))
+                    }
+                }
+                .frame(width: 70, alignment: .leading)
 
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 6) {
@@ -227,6 +234,25 @@ struct VedicChartView: View {
                     Text("\(p.nakshatra) · Pada \(p.pada)")
                         .font(.sacredMicro)
                         .foregroundColor(.sacredTextSecondary)
+                    if let d9 = p.navamsaRashi {
+                        HStack(spacing: 4) {
+                            Text("D9 \(shortRashi(d9))")
+                                .font(.sacredMicro)
+                                .foregroundColor(.sacredMuted)
+                            if p.vargottama == true {
+                                Text("★")
+                                    .font(.system(size: 8, weight: .bold, design: .serif))
+                                    .foregroundColor(.sacredGold)
+                            }
+                        }
+                    }
+                    let flags = statusFlags(p)
+                    if !flags.isEmpty {
+                        Text(flags)
+                            .font(.system(size: 8, weight: .regular, design: .serif))
+                            .tracking(1)
+                            .foregroundColor(.sacredMuted.opacity(0.8))
+                    }
                 }
 
                 Spacer()
@@ -249,6 +275,16 @@ struct VedicChartView: View {
             interpretationPanel(key: "planet.\(p.name.lowercased())",
                                  interpretation: p.interpretation)
         }
+    }
+
+    /// Small lowercased status line — combust / sandhi / vargottama hint — for
+    /// things we don't surface as the primary right-side badge. Kept muted and
+    /// small so the row stays scannable.
+    private func statusFlags(_ p: Planet) -> String {
+        var parts: [String] = []
+        if p.combust == true { parts.append("combust") }
+        if p.sandhi == true { parts.append("sandhi") }
+        return parts.joined(separator: " · ")
     }
 
     // MARK: - Interpretation panel
@@ -339,7 +375,9 @@ struct VedicChartView: View {
 
     private func dignityColor(_ dignity: String) -> Color {
         switch dignity {
+        case "deep_exalted": return .sacredGreen
         case "exalted": return .sacredGreen
+        case "moolatrikona": return .sacredGold
         case "own_sign": return .sacredGold
         case "debilitated": return .sacredRed
         default: return .sacredMuted
@@ -349,7 +387,9 @@ struct VedicChartView: View {
     /// Map machine-readable dignity values to the UI label shown on the row.
     private func dignityLabel(_ dignity: String) -> String {
         switch dignity {
+        case "deep_exalted": return "DEEP EXALT"
         case "exalted": return "EXALTED"
+        case "moolatrikona": return "MOOLATRIKONA"
         case "own_sign": return "OWN SIGN"
         case "debilitated": return "DEBILITATED"
         default: return ""
@@ -511,8 +551,15 @@ struct Planet: Decodable {
     let nakshatraQuality: String
     let pada: Int
     let house: Int?
-    /// exalted | own_sign | debilitated | neutral
+    /// deep_exalted | exalted | moolatrikona | own_sign | debilitated | neutral
     let dignity: String
+    /// Navamsa (D9) sign — "Simha (Leo)" format
+    let navamsaRashi: String?
+    /// True when the planet's D1 sign == D9 sign — classically very strong
+    let vargottama: Bool?
+    let retrograde: Bool?
+    let combust: Bool?
+    let sandhi: Bool?
     let interpretation: Interpretation?
 }
 

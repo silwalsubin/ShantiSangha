@@ -242,64 +242,112 @@ public class VedicCalendarTests
     // ------------------------------------------------------------------
 
     [Theory]
-    // Sun: exalted in Mesha, own Simha, debilitated in Tula.
-    [InlineData("Sun", 0, "exalted")]
-    [InlineData("Sun", 4, "own_sign")]
-    [InlineData("Sun", 6, "debilitated")]
-    [InlineData("Sun", 2, "neutral")]
-    // Moon: exalted in Vrishabha, own Karka, debilitated in Vrischika.
-    [InlineData("Moon", 1, "exalted")]
-    [InlineData("Moon", 3, "own_sign")]
-    [InlineData("Moon", 7, "debilitated")]
-    [InlineData("Moon", 0, "neutral")]
-    // Mars: exalted in Makara, own Mesha and Vrischika, debilitated in Karka.
-    [InlineData("Mars", 9, "exalted")]
-    [InlineData("Mars", 0, "own_sign")]
-    [InlineData("Mars", 7, "own_sign")]
-    [InlineData("Mars", 3, "debilitated")]
-    [InlineData("Mars", 5, "neutral")]
-    // Mercury: exalted in Kanya (priority over own_sign), own Mithuna, debilitated in Meena.
-    [InlineData("Mercury", 5, "exalted")]
-    [InlineData("Mercury", 2, "own_sign")]
-    [InlineData("Mercury", 11, "debilitated")]
-    [InlineData("Mercury", 4, "neutral")]
-    // Jupiter: exalted in Karka, own Dhanu and Meena, debilitated in Makara.
-    [InlineData("Jupiter", 3, "exalted")]
-    [InlineData("Jupiter", 8, "own_sign")]
-    [InlineData("Jupiter", 11, "own_sign")]
-    [InlineData("Jupiter", 9, "debilitated")]
-    [InlineData("Jupiter", 2, "neutral")]
-    // Venus: exalted in Meena, own Vrishabha and Tula, debilitated in Kanya.
-    [InlineData("Venus", 11, "exalted")]
-    [InlineData("Venus", 1, "own_sign")]
-    [InlineData("Venus", 6, "own_sign")]
-    [InlineData("Venus", 5, "debilitated")]
-    [InlineData("Venus", 0, "neutral")]
-    // Saturn: exalted in Tula, own Makara and Kumbha, debilitated in Mesha.
-    [InlineData("Saturn", 6, "exalted")]
-    [InlineData("Saturn", 9, "own_sign")]
-    [InlineData("Saturn", 10, "own_sign")]
-    [InlineData("Saturn", 0, "debilitated")]
-    [InlineData("Saturn", 3, "neutral")]
-    // Rahu: Parashara tradition — exalted in Vrishabha, debilitated in Vrischika.
-    [InlineData("Rahu", 1, "exalted")]
-    [InlineData("Rahu", 7, "debilitated")]
-    [InlineData("Rahu", 4, "neutral")]
-    // Ketu: opposite of Rahu — exalted in Vrischika, debilitated in Vrishabha.
-    [InlineData("Ketu", 7, "exalted")]
-    [InlineData("Ketu", 1, "debilitated")]
-    [InlineData("Ketu", 4, "neutral")]
-    public void GetDignity_ReturnsCorrectDignityForPlanetAndSign(
-        string planet, int rashiIndex, string expected)
+    // Sun: exalted Mesha (peak 10°), own Simha, debilitated Tula.
+    // Mid-sign degree (15°) is outside deep-exalt tolerance → plain "exalted".
+    [InlineData("Sun", 0, 15.0, "exalted")]
+    [InlineData("Sun", 0, 10.0, "deep_exalted")]     // exact peak
+    [InlineData("Sun", 4, 5.0, "moolatrikona")]      // Simha 0–20° is moolatrikona
+    [InlineData("Sun", 4, 25.0, "own_sign")]         // Simha 20–30° is own_sign
+    [InlineData("Sun", 6, 15.0, "debilitated")]
+    [InlineData("Sun", 2, 15.0, "neutral")]
+    // Moon: exalted Vrishabha (peak 3°), own Karka, debilitated Vrischika.
+    // Classical Moon moolatrikona is Vrishabha 4–30° but that overlaps with
+    // the exaltation sign. We let exaltation win across the whole sign to
+    // match the more common teaching and keep labels users recognize.
+    [InlineData("Moon", 1, 3.0, "deep_exalted")]     // exact peak
+    [InlineData("Moon", 1, 1.0, "deep_exalted")]     // within ±3° of peak
+    [InlineData("Moon", 1, 15.0, "exalted")]         // exaltation wins in exalt sign
+    [InlineData("Moon", 3, 15.0, "own_sign")]        // Karka
+    [InlineData("Moon", 7, 15.0, "debilitated")]
+    [InlineData("Moon", 0, 15.0, "neutral")]
+    // Mars: exalted Makara (peak 28°), moolatrikona Mesha 0–12°, own Mesha/Vrischika,
+    // debilitated Karka.
+    [InlineData("Mars", 9, 28.0, "deep_exalted")]
+    [InlineData("Mars", 9, 15.0, "exalted")]
+    [InlineData("Mars", 0, 5.0, "moolatrikona")]     // Mesha 0–12° is moolatrikona
+    [InlineData("Mars", 0, 20.0, "own_sign")]        // Mesha 12–30° is own_sign
+    [InlineData("Mars", 7, 15.0, "own_sign")]
+    [InlineData("Mars", 3, 15.0, "debilitated")]
+    [InlineData("Mars", 5, 15.0, "neutral")]
+    // Mercury edge case: Kanya 0–15° = exalted, 16–20° = moolatrikona, 20–30° = own_sign.
+    [InlineData("Mercury", 5, 10.0, "exalted")]
+    [InlineData("Mercury", 5, 15.0, "deep_exalted")] // peak
+    [InlineData("Mercury", 5, 18.0, "moolatrikona")]
+    [InlineData("Mercury", 5, 25.0, "own_sign")]
+    [InlineData("Mercury", 2, 15.0, "own_sign")]     // Mithuna
+    [InlineData("Mercury", 11, 15.0, "debilitated")]
+    [InlineData("Mercury", 4, 15.0, "neutral")]
+    // Jupiter: exalted Karka (peak 5°), moolatrikona Dhanu 0–10°, own Dhanu/Meena.
+    [InlineData("Jupiter", 3, 5.0, "deep_exalted")]
+    [InlineData("Jupiter", 3, 15.0, "exalted")]
+    [InlineData("Jupiter", 8, 5.0, "moolatrikona")]
+    [InlineData("Jupiter", 8, 20.0, "own_sign")]
+    [InlineData("Jupiter", 11, 15.0, "own_sign")]
+    [InlineData("Jupiter", 9, 15.0, "debilitated")]
+    // Venus: exalted Meena (peak 27°), moolatrikona Tula 0–15°, own Vrishabha/Tula.
+    [InlineData("Venus", 11, 27.0, "deep_exalted")]
+    [InlineData("Venus", 11, 10.0, "exalted")]
+    [InlineData("Venus", 6, 5.0, "moolatrikona")]
+    [InlineData("Venus", 6, 25.0, "own_sign")]
+    [InlineData("Venus", 1, 15.0, "own_sign")]
+    [InlineData("Venus", 5, 15.0, "debilitated")]
+    // Saturn: exalted Tula (peak 20°), moolatrikona Kumbha 0–20°, own Makara/Kumbha.
+    [InlineData("Saturn", 6, 20.0, "deep_exalted")]
+    [InlineData("Saturn", 6, 5.0, "exalted")]
+    [InlineData("Saturn", 10, 10.0, "moolatrikona")]
+    [InlineData("Saturn", 10, 25.0, "own_sign")]
+    [InlineData("Saturn", 9, 15.0, "own_sign")]
+    [InlineData("Saturn", 0, 15.0, "debilitated")]
+    // Rahu/Ketu — no deep-exalt or moolatrikona tradition here.
+    [InlineData("Rahu", 1, 15.0, "exalted")]
+    [InlineData("Rahu", 7, 15.0, "debilitated")]
+    [InlineData("Rahu", 4, 15.0, "neutral")]
+    [InlineData("Ketu", 7, 15.0, "exalted")]
+    [InlineData("Ketu", 1, 15.0, "debilitated")]
+    [InlineData("Ketu", 4, 15.0, "neutral")]
+    public void GetDignity_ReturnsCorrectDignityForPlanetSignDegree(
+        string planet, int rashiIndex, double degreeInRashi, string expected)
     {
-        Assert.Equal(expected, VedicCalendar.GetDignity(planet, rashiIndex));
+        Assert.Equal(expected, VedicCalendar.GetDignity(planet, rashiIndex, degreeInRashi));
     }
 
-    [Fact]
-    public void GetDignity_MercuryInVirgo_PrefersExaltedOverOwnSign()
+    // ------------------------------------------------------------------
+    // Navamsa (D9) — 9 sections per sign, movable/fixed/dual starting rules
+    // ------------------------------------------------------------------
+
+    [Theory]
+    // Movable signs (Mesha=0, Karka=3, Tula=6, Makara=9) — start from themselves.
+    [InlineData(0.0, 0)]         // Mesha 0° → D9 Mesha
+    [InlineData(3.5, 1)]         // Mesha ~3.5° → D9 Vrishabha (2nd section)
+    [InlineData(29.99, 8)]       // Mesha 29.99° → D9 Dhanu (9th section)
+    [InlineData(90.0, 3)]        // Karka 0° → D9 Karka (movable)
+    // Fixed signs (Vrishabha=1, Simha=4, Vrischika=7, Kumbha=10) — start from 9th.
+    [InlineData(30.0, 9)]        // Vrishabha 0° → start=9 (Makara), +0 = Makara
+    [InlineData(55.74, 4)]       // Vrishabha 25.74° → D9 Simha (the user's Moon)
+    [InlineData(59.99, 5)]       // Vrishabha 29.99° → D9 Kanya (8th section from Makara)
+    // Dual signs (Mithuna=2, Kanya=5, Dhanu=8, Meena=11) — start from 5th.
+    [InlineData(60.0, 6)]        // Mithuna 0° → start=6 (Tula), +0 = Tula
+    [InlineData(66.63, 7)]       // Mithuna 6.63° → D9 Vrischika (the user's Sun)
+    [InlineData(269.89, 8)]      // Dhanu 29.89° → start=0 (Mesha), +8 = Dhanu (vargottama for user's Saturn)
+    public void GetNavamsaRashi_ReturnsCorrectNavamsa(double siderealLongitude, int expectedIdx)
     {
-        // Mercury in Kanya (5) is technically both exalted AND own sign.
-        // We prioritize "exalted" as the more notable classification.
-        Assert.Equal("exalted", VedicCalendar.GetDignity("Mercury", 5));
+        Assert.Equal(expectedIdx, VedicCalendar.GetNavamsaRashi(siderealLongitude));
+    }
+
+    // ------------------------------------------------------------------
+    // Sandhi (cusp zones) — first/last 1° of any sign
+    // ------------------------------------------------------------------
+
+    [Theory]
+    [InlineData(0.0, true)]
+    [InlineData(0.5, true)]
+    [InlineData(1.0, false)]
+    [InlineData(15.0, false)]
+    [InlineData(28.9, false)]
+    [InlineData(29.0, true)]
+    [InlineData(29.99, true)]
+    public void IsInSandhi_FlagsFirstAndLastDegree(double degreeInRashi, bool expected)
+    {
+        Assert.Equal(expected, VedicCalendar.IsInSandhi(degreeInRashi));
     }
 }

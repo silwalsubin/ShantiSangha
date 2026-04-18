@@ -190,16 +190,31 @@ public class JyotishController(
             };
         }
 
+        // Sun's tropical longitude is needed for combustion checks below.
+        var sunTropicalForCombustion = VedicCalendar.GetTropicalSunLongitude(birthDateTime);
+
         // Build planet rows
         var planets = planetLongitudes.Select(p =>
         {
             var sidereal = VedicCalendar.ToSidereal(p.Tropical, birthDateTime);
             var rashiIdx = VedicCalendar.GetRashiIndex(sidereal);
+            var degInRashi = VedicCalendar.GetDegreeInRashi(sidereal);
             var nakIdx = VedicCalendar.GetNakshatraIndex(sidereal);
             var (nakName, nakQuality) = VedicCalendar.GetNakshatra(nakIdx);
             int? house = ascendantSidereal.HasValue
                 ? VedicCalendar.GetHouse(sidereal, ascendantSidereal.Value)
                 : (int?)null;
+
+            // Navamsa (D9) sign and vargottama check
+            var navamsaIdx = VedicCalendar.GetNavamsaRashi(sidereal);
+            var navamsaRashi = VedicCalendar.GetRashi(navamsaIdx);
+            var vargottama = navamsaIdx == rashiIdx;
+
+            // Degree-level flags
+            var dignity = VedicCalendar.GetDignity(p.Name, rashiIdx, degInRashi);
+            var sandhi = VedicCalendar.IsInSandhi(degInRashi);
+            var retrograde = PlanetaryPositions.IsRetrograde(p.Name, birthDateTime);
+            var combust = PlanetaryPositions.IsCombust(p.Name, p.Tropical, sunTropicalForCombustion, retrograde);
 
             var planetKey = p.Name.ToLowerInvariant();
             // Planet-in-house is the most specific interpretation; fall back to
@@ -214,12 +229,17 @@ public class JyotishController(
             {
                 Name = p.Name,
                 Rashi = VedicCalendar.GetRashi(rashiIdx),
-                Degree = Math.Round(VedicCalendar.GetDegreeInRashi(sidereal), 2),
+                Degree = Math.Round(degInRashi, 2),
                 Nakshatra = nakName,
                 NakshatraQuality = nakQuality,
                 Pada = VedicCalendar.GetPada(sidereal),
                 House = house,
-                Dignity = VedicCalendar.GetDignity(p.Name, rashiIdx),
+                Dignity = dignity,
+                NavamsaRashi = navamsaRashi,
+                Vargottama = vargottama,
+                Retrograde = retrograde,
+                Combust = combust,
+                Sandhi = sandhi,
                 Interpretation = interpretation
             };
         }).ToList();
