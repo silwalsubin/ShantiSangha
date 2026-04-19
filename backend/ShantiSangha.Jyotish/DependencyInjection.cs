@@ -1,4 +1,7 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
+using ShantiSangha.Jyotish.Data;
 using ShantiSangha.Jyotish.Services;
 using ShantiSangha.Shared.Interfaces;
 
@@ -6,11 +9,17 @@ namespace ShantiSangha.Jyotish;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddJyotishModule(this IServiceCollection services)
+    public static IServiceCollection AddJyotishModule(
+        this IServiceCollection services,
+        NpgsqlDataSource dataSource)
     {
+        services.AddDbContext<JyotishDbContext>(options =>
+            options.UseNpgsql(dataSource, o => o.UseVector()));
+
         services.AddScoped<IJyotishContextService, JyotishContextService>();
-        // Knowledge corpus is stateless — singleton so JSON loads once per process.
-        services.AddSingleton<IJyotishKnowledgeService, JyotishKnowledgeService>();
+        services.AddScoped<JyotishKnowledgeService>();
+        services.AddScoped<IJyotishKnowledgeService>(sp =>
+            sp.GetRequiredService<JyotishKnowledgeService>());
         return services;
     }
 }

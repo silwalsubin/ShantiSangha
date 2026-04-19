@@ -97,7 +97,7 @@ public class GenerateDailyReadingJob(
                     var nowUtc = DateTime.UtcNow;
                     var signatures = jyotishKnowledge.ComputeSignaturesForBirth(
                         birth.BirthDate.Value, birthTime, lat, lon, nowUtc);
-                    var allPassages = jyotishKnowledge.GetPassages(signatures);
+                    var allPassages = await jyotishKnowledge.GetPassagesAsync(signatures);
 
                     if (allPassages.Count > 0)
                     {

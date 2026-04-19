@@ -1,54 +1,73 @@
-using System.Collections.Concurrent;
-using System.Reflection;
-using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.AI;
+using Pgvector;
+using Pgvector.EntityFrameworkCore;
+using ShantiSangha.Jyotish.Data;
+using ShantiSangha.Jyotish.Models;
 using ShantiSangha.Shared.Interfaces;
 using ShantiSangha.Shared.Jyotish;
 
 namespace ShantiSangha.Jyotish.Services;
 
 /// <summary>
-/// Loads the Jyotish corpus once (from embedded JSON resource) and serves
-/// passage lookups by signature. Indexed at construction for O(1) retrieval.
+/// Postgres-backed Jyotish corpus, with pgvector for semantic retrieval.
+/// Exact-match signature lookup uses the GIN-indexed signatures[] column;
+/// thematic queries use L2 distance on the 1536-dim embedding.
 /// </summary>
-public class JyotishKnowledgeService : IJyotishKnowledgeService
+public class JyotishKnowledgeService(
+    JyotishDbContext db,
+    IEmbeddingGenerator<string, Embedding<float>> embedder) : IJyotishKnowledgeService
 {
-    private readonly List<JyotishPassage> _allPassages;
-    private readonly ConcurrentDictionary<string, List<JyotishPassage>> _bySignature;
-
-    public int TotalPassages => _allPassages.Count;
-
-    public JyotishKnowledgeService()
+    public async Task<IReadOnlyList<JyotishPassage>> GetPassagesAsync(
+        IEnumerable<string> signatures,
+        CancellationToken ct = default)
     {
-        _allPassages = LoadCorpus();
-        _bySignature = new ConcurrentDictionary<string, List<JyotishPassage>>();
+        var normalized = signatures
+            .Select(Normalize)
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .Distinct()
+            .ToArray();
 
-        foreach (var p in _allPassages)
-        {
-            foreach (var sig in p.Signatures)
-            {
-                var key = Normalize(sig);
-                var list = _bySignature.GetOrAdd(key, _ => new List<JyotishPassage>());
-                list.Add(p);
-            }
-        }
+        if (normalized.Length == 0) return Array.Empty<JyotishPassage>();
+
+        // Postgres array overlap — matches any row whose signatures[] intersects input.
+        var entities = await db.Passages
+            .Where(p => p.Signatures.Any(s => normalized.Contains(s)))
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        return entities.Select(ToDto).ToList();
     }
 
-    public IReadOnlyList<JyotishPassage> GetPassages(IEnumerable<string> signatures)
+    public async Task<IReadOnlyList<JyotishPassage>> SearchSemanticAsync(
+        string query,
+        string? signatureType = null,
+        int topK = 10,
+        CancellationToken ct = default)
     {
-        var results = new List<JyotishPassage>();
-        var seen = new HashSet<string>();
-        foreach (var sig in signatures)
+        if (string.IsNullOrWhiteSpace(query)) return Array.Empty<JyotishPassage>();
+
+        var queryVector = await GenerateEmbeddingAsync(query, ct);
+        if (queryVector is null) return Array.Empty<JyotishPassage>();
+
+        var q = db.Passages.Where(p => p.Embedding != null);
+        if (!string.IsNullOrWhiteSpace(signatureType))
         {
-            if (_bySignature.TryGetValue(Normalize(sig), out var matches))
-            {
-                foreach (var m in matches)
-                {
-                    if (seen.Add(m.Id)) results.Add(m);
-                }
-            }
+            var st = signatureType.Trim();
+            q = q.Where(p => p.SignatureType == st);
         }
-        return results;
+
+        var entities = await q
+            .OrderBy(p => p.Embedding!.L2Distance(queryVector))
+            .Take(topK)
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        return entities.Select(ToDto).ToList();
     }
+
+    public Task<int> CountAsync(CancellationToken ct = default)
+        => db.Passages.CountAsync(ct);
 
     public IReadOnlyList<string> ComputeSignaturesForBirth(
         DateOnly birthDate,
@@ -58,26 +77,31 @@ public class JyotishKnowledgeService : IJyotishKnowledgeService
         DateTime? now = null)
         => ChartSignatures.ComputeNatalSignatures(birthDate, birthTime, latitude, longitude, now);
 
-    private static string Normalize(string s) => s.Trim().ToLowerInvariant();
-
-    private static List<JyotishPassage> LoadCorpus()
+    /// <summary>
+    /// Generates the 1536-dim embedding for the text used to index a passage.
+    /// Internal helper exposed for the ingestion endpoint to reuse.
+    /// </summary>
+    public async Task<Vector?> GenerateEmbeddingAsync(string text, CancellationToken ct = default)
     {
-        var asm = Assembly.GetExecutingAssembly();
-        var resourceName = asm.GetManifestResourceNames()
-            .FirstOrDefault(n => n.EndsWith("JyotishCorpus.json", StringComparison.OrdinalIgnoreCase));
-
-        if (resourceName is null)
-            throw new InvalidOperationException(
-                "JyotishCorpus.json not found as embedded resource. " +
-                "Confirm the .csproj includes <EmbeddedResource Include=\"Data\\JyotishCorpus.json\" />.");
-
-        using var stream = asm.GetManifestResourceStream(resourceName)
-            ?? throw new InvalidOperationException("Failed to open JyotishCorpus.json stream.");
-        using var reader = new StreamReader(stream);
-        var json = reader.ReadToEnd();
-
-        var passages = JsonSerializer.Deserialize<List<JyotishPassage>>(json)
-            ?? throw new InvalidOperationException("JyotishCorpus.json deserialized to null.");
-        return passages;
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var result = await embedder.GenerateAsync([text], cancellationToken: ct);
+        if (result.Count == 0) return null;
+        var floats = result[0].Vector.ToArray();
+        return new Vector(floats);
     }
+
+    private static string Normalize(string s) => s?.Trim().ToLowerInvariant() ?? string.Empty;
+
+    private static JyotishPassage ToDto(JyotishPassageEntity e) => new()
+    {
+        Id = e.PassageId,
+        SignatureType = e.SignatureType,
+        Signatures = e.Signatures,
+        Title = e.Title,
+        Content = e.Content,
+        Themes = e.Themes,
+        Polarity = e.Polarity,
+        Source = e.Source,
+        Scope = e.Scope,
+    };
 }

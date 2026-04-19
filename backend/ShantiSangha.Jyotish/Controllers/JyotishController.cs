@@ -14,20 +14,22 @@ public class JyotishController(
     IJyotishKnowledgeService knowledge) : ControllerBase
 {
     /// <summary>
-    /// Looks up the first passage matching a signature, returns null if none.
-    /// Used to attach interpretive wisdom to chart elements in the GetChart response.
+    /// Looks up the first passage matching a signature in a pre-fetched dictionary.
+    /// GetChart fetches all candidate signatures in one DB round-trip, builds this
+    /// dict, then calls this per chart element. Avoids N+1 queries on the corpus.
     /// </summary>
-    private object? InterpretationFor(string signature)
+    private static object? InterpretationFor(
+        string signature,
+        IReadOnlyDictionary<string, ShantiSangha.Shared.Jyotish.JyotishPassage> bySignature)
     {
-        var passages = knowledge.GetPassages(new[] { signature });
-        var first = passages.FirstOrDefault();
-        if (first is null) return null;
+        if (!bySignature.TryGetValue(signature.Trim().ToLowerInvariant(), out var p))
+            return null;
         return new
         {
-            Content = first.Content,
-            Source = first.Source,
-            Polarity = first.Polarity,
-            Themes = first.Themes
+            Content = p.Content,
+            Source = p.Source,
+            Polarity = p.Polarity,
+            Themes = p.Themes
         };
     }
 
@@ -141,6 +143,7 @@ public class JyotishController(
         var (moonNakshatraName, moonNakshatraQuality) = VedicCalendar.GetNakshatra(moonNakshatraIdx);
         var moonPada = VedicCalendar.GetPada(moonSidereal);
 
+        // Nakshatra attrs — Interpretation attached later after the batch passage fetch.
         var nakshatraAttrs = new
         {
             Name = moonNakshatraName,
@@ -150,8 +153,7 @@ public class JyotishController(
             Nadi = VedicCalendar.GetNakshatraNadi(moonNakshatraIdx),
             Gana = VedicCalendar.GetNakshatraGana(moonNakshatraIdx),
             Deity = VedicCalendar.GetNakshatraDeity(moonNakshatraIdx),
-            Lord = VedicCalendar.GetNakshatraLord(moonNakshatraIdx),
-            Interpretation = InterpretationFor($"moon_in_{NormalizeNakshatra(moonNakshatraName)}")
+            Lord = VedicCalendar.GetNakshatraLord(moonNakshatraIdx)
         };
 
         // Compute tropical longitudes for all 9 planets
@@ -185,16 +187,17 @@ public class JyotishController(
                 Degree = Math.Round(VedicCalendar.GetDegreeInRashi(ascendantSidereal.Value), 2),
                 Nakshatra = ascNakName,
                 NakshatraQuality = ascNakQuality,
-                Pada = VedicCalendar.GetPada(ascendantSidereal.Value),
-                Interpretation = InterpretationFor($"lagna_in_{NormalizeRashi(ascRashiLabel)}")
+                Pada = VedicCalendar.GetPada(ascendantSidereal.Value)
+                // Interpretation attached later after the batch passage fetch.
             };
         }
 
         // Sun's tropical longitude is needed for combustion checks below.
         var sunTropicalForCombustion = VedicCalendar.GetTropicalSunLongitude(birthDateTime);
 
-        // Build planet rows
-        var planets = planetLongitudes.Select(p =>
+        // Pass 1: compute planet data WITHOUT interpretations (so we can collect
+        // all candidate signatures first and batch-fetch passages in one DB call).
+        var planetRows = planetLongitudes.Select(p =>
         {
             var sidereal = VedicCalendar.ToSidereal(p.Tropical, birthDateTime);
             var rashiIdx = VedicCalendar.GetRashiIndex(sidereal);
@@ -205,63 +208,146 @@ public class JyotishController(
                 ? VedicCalendar.GetHouse(sidereal, ascendantSidereal.Value)
                 : (int?)null;
 
-            // Divisional charts — we compute the major 10 classical D-charts.
             var navamsaIdx = VedicCalendar.GetNavamsaRashi(sidereal);
-            var navamsaRashi = VedicCalendar.GetRashi(navamsaIdx);
-            var vargottama = navamsaIdx == rashiIdx;
-            var drekkanaRashi = VedicCalendar.GetRashi(VedicCalendar.GetDrekkanaRashi(sidereal));
-            var chaturthamsaRashi = VedicCalendar.GetRashi(VedicCalendar.GetChaturthamsaRashi(sidereal));
-            var saptamsaRashi = VedicCalendar.GetRashi(VedicCalendar.GetSaptamsaRashi(sidereal));
-            var dasamsaRashi = VedicCalendar.GetRashi(VedicCalendar.GetDasamsaRashi(sidereal));
-            var dvadasamsaRashi = VedicCalendar.GetRashi(VedicCalendar.GetDvadasamsaRashi(sidereal));
-            var shodasamsaRashi = VedicCalendar.GetRashi(VedicCalendar.GetShodasamsaRashi(sidereal));
-            var vimsamsaRashi = VedicCalendar.GetRashi(VedicCalendar.GetVimsamsaRashi(sidereal));
-            var chaturvimsamsaRashi = VedicCalendar.GetRashi(VedicCalendar.GetChaturvimsamsaRashi(sidereal));
-
-            // Degree-level flags
-            var dignity = VedicCalendar.GetDignity(p.Name, rashiIdx, degInRashi);
-            var sandhi = VedicCalendar.IsInSandhi(degInRashi);
-            var retrograde = PlanetaryPositions.IsRetrograde(p.Name, birthDateTime);
-            var combust = PlanetaryPositions.IsCombust(p.Name, p.Tropical, sunTropicalForCombustion, retrograde);
-
-            var planetKey = p.Name.ToLowerInvariant();
-            // Planet-in-house is the most specific interpretation; fall back to
-            // planet-in-sign if the house version isn't in the corpus.
-            object? interpretation = null;
-            if (house.HasValue)
-                interpretation = InterpretationFor($"{planetKey}_in_h{house.Value}");
-            interpretation ??= InterpretationFor(
-                $"{planetKey}_in_{NormalizeRashi(VedicCalendar.GetRashi(rashiIdx))}");
+            var rashiLabel = VedicCalendar.GetRashi(rashiIdx);
 
             return new
             {
                 Name = p.Name,
-                Rashi = VedicCalendar.GetRashi(rashiIdx),
-                Degree = Math.Round(degInRashi, 2),
-                Nakshatra = nakName,
-                NakshatraQuality = nakQuality,
+                Tropical = p.Tropical,
+                Sidereal = sidereal,
+                RashiIdx = rashiIdx,
+                RashiLabel = rashiLabel,
+                DegInRashi = degInRashi,
+                NakName = nakName,
+                NakQuality = nakQuality,
                 Pada = VedicCalendar.GetPada(sidereal),
                 House = house,
-                Dignity = dignity,
-                NavamsaRashi = navamsaRashi,
-                DrekkanaRashi = drekkanaRashi,
-                ChaturthamsaRashi = chaturthamsaRashi,
-                SaptamsaRashi = saptamsaRashi,
-                DasamsaRashi = dasamsaRashi,
-                DvadasamsaRashi = dvadasamsaRashi,
-                ShodasamsaRashi = shodasamsaRashi,
-                VimsamsaRashi = vimsamsaRashi,
-                ChaturvimsamsaRashi = chaturvimsamsaRashi,
-                Vargottama = vargottama,
-                Retrograde = retrograde,
-                Combust = combust,
-                Sandhi = sandhi,
+                NavamsaRashi = VedicCalendar.GetRashi(navamsaIdx),
+                Vargottama = navamsaIdx == rashiIdx,
+                DrekkanaRashi = VedicCalendar.GetRashi(VedicCalendar.GetDrekkanaRashi(sidereal)),
+                ChaturthamsaRashi = VedicCalendar.GetRashi(VedicCalendar.GetChaturthamsaRashi(sidereal)),
+                SaptamsaRashi = VedicCalendar.GetRashi(VedicCalendar.GetSaptamsaRashi(sidereal)),
+                DasamsaRashi = VedicCalendar.GetRashi(VedicCalendar.GetDasamsaRashi(sidereal)),
+                DvadasamsaRashi = VedicCalendar.GetRashi(VedicCalendar.GetDvadasamsaRashi(sidereal)),
+                ShodasamsaRashi = VedicCalendar.GetRashi(VedicCalendar.GetShodasamsaRashi(sidereal)),
+                VimsamsaRashi = VedicCalendar.GetRashi(VedicCalendar.GetVimsamsaRashi(sidereal)),
+                ChaturvimsamsaRashi = VedicCalendar.GetRashi(VedicCalendar.GetChaturvimsamsaRashi(sidereal)),
+                Dignity = VedicCalendar.GetDignity(p.Name, rashiIdx, degInRashi),
+                Sandhi = VedicCalendar.IsInSandhi(degInRashi),
+                Retrograde = PlanetaryPositions.IsRetrograde(p.Name, birthDateTime),
+                Combust = PlanetaryPositions.IsCombust(
+                    p.Name, p.Tropical, sunTropicalForCombustion,
+                    PlanetaryPositions.IsRetrograde(p.Name, birthDateTime))
+            };
+        }).ToList();
+
+        var dasha = VedicCalendar.GetCurrentDasha(birthDateTime, DateTime.UtcNow);
+
+        // Collect every signature we might need across the whole chart.
+        var candidateSignatures = new List<string> {
+            $"moon_in_{NormalizeNakshatra(moonNakshatraName)}",
+            $"{dasha.Mahadasha.ToLowerInvariant()}_mahadasha"
+        };
+        string? lagnaRashiNormalized = null;
+        if (lagna is not null)
+        {
+            var lagnaRashiLabel = (string)((dynamic)lagna).Rashi;
+            lagnaRashiNormalized = NormalizeRashi(lagnaRashiLabel);
+            candidateSignatures.Add($"lagna_in_{lagnaRashiNormalized}");
+        }
+        foreach (var pr in planetRows)
+        {
+            var planetKey = pr.Name.ToLowerInvariant();
+            var rashiKey = NormalizeRashi(pr.RashiLabel);
+            if (pr.House.HasValue)
+            {
+                candidateSignatures.Add($"{planetKey}_in_h{pr.House.Value}");
+                // Compound signature — planet in house with ascendant in specific rashi.
+                if (lagnaRashiNormalized is not null)
+                    candidateSignatures.Add($"{planetKey}_in_h{pr.House.Value}__lagna_{lagnaRashiNormalized}");
+            }
+            candidateSignatures.Add($"{planetKey}_in_{rashiKey}");
+        }
+
+        // Single DB round-trip. Build an in-memory dict keyed by each signature
+        // string (lowercased) to the first matching passage.
+        var passages = await knowledge.GetPassagesAsync(candidateSignatures, ct);
+        var bySignature = passages
+            .SelectMany(p => p.Signatures.Select(sig => (Key: sig.Trim().ToLowerInvariant(), Passage: p)))
+            .GroupBy(x => x.Key)
+            .ToDictionary(g => g.Key, g => g.First().Passage);
+
+        // Pass 2: build the final response, attaching interpretations from the dict.
+        var planets = planetRows.Select(pr =>
+        {
+            var planetKey = pr.Name.ToLowerInvariant();
+            var rashiKey = NormalizeRashi(pr.RashiLabel);
+
+            // Prefer the most specific match: compound (with ascendant) → house → sign.
+            object? interpretation = null;
+            if (pr.House.HasValue && lagnaRashiNormalized is not null)
+                interpretation = InterpretationFor(
+                    $"{planetKey}_in_h{pr.House.Value}__lagna_{lagnaRashiNormalized}", bySignature);
+            if (interpretation is null && pr.House.HasValue)
+                interpretation = InterpretationFor($"{planetKey}_in_h{pr.House.Value}", bySignature);
+            interpretation ??= InterpretationFor($"{planetKey}_in_{rashiKey}", bySignature);
+
+            return new
+            {
+                Name = pr.Name,
+                Rashi = pr.RashiLabel,
+                Degree = Math.Round(pr.DegInRashi, 2),
+                Nakshatra = pr.NakName,
+                NakshatraQuality = pr.NakQuality,
+                Pada = pr.Pada,
+                House = pr.House,
+                Dignity = pr.Dignity,
+                NavamsaRashi = pr.NavamsaRashi,
+                DrekkanaRashi = pr.DrekkanaRashi,
+                ChaturthamsaRashi = pr.ChaturthamsaRashi,
+                SaptamsaRashi = pr.SaptamsaRashi,
+                DasamsaRashi = pr.DasamsaRashi,
+                DvadasamsaRashi = pr.DvadasamsaRashi,
+                ShodasamsaRashi = pr.ShodasamsaRashi,
+                VimsamsaRashi = pr.VimsamsaRashi,
+                ChaturvimsamsaRashi = pr.ChaturvimsamsaRashi,
+                Vargottama = pr.Vargottama,
+                Retrograde = pr.Retrograde,
+                Combust = pr.Combust,
+                Sandhi = pr.Sandhi,
                 Interpretation = interpretation
             };
         }).ToList();
 
-        // Current dasha
-        var dasha = VedicCalendar.GetCurrentDasha(birthDateTime, DateTime.UtcNow);
+        // Re-attach nakshatra/lagna interpretations from the dict (rebuild with it).
+        var nakshatraAttrsWithInterp = new
+        {
+            nakshatraAttrs.Name,
+            nakshatraAttrs.Quality,
+            nakshatraAttrs.Pada,
+            nakshatraAttrs.Yoni,
+            nakshatraAttrs.Nadi,
+            nakshatraAttrs.Gana,
+            nakshatraAttrs.Deity,
+            nakshatraAttrs.Lord,
+            Interpretation = InterpretationFor($"moon_in_{NormalizeNakshatra(moonNakshatraName)}", bySignature)
+        };
+
+        object? lagnaWithInterp = null;
+        if (lagna is not null && lagnaRashiNormalized is not null)
+        {
+            var d = (dynamic)lagna;
+            lagnaWithInterp = new
+            {
+                Rashi = (string)d.Rashi,
+                Degree = (double)d.Degree,
+                Nakshatra = (string)d.Nakshatra,
+                NakshatraQuality = (string)d.NakshatraQuality,
+                Pada = (int)d.Pada,
+                Interpretation = InterpretationFor($"lagna_in_{lagnaRashiNormalized}", bySignature)
+            };
+        }
 
         return Ok(new
         {
@@ -273,8 +359,8 @@ public class JyotishController(
                 Place = birth.BirthPlace,
                 HasCoordinates = latitude.HasValue && longitude.HasValue
             },
-            Nakshatra = nakshatraAttrs,
-            Lagna = lagna,
+            Nakshatra = nakshatraAttrsWithInterp,
+            Lagna = lagnaWithInterp,
             Planets = planets,
             Dasha = new
             {
@@ -284,7 +370,7 @@ public class JyotishController(
                 AntardashaEnd = dasha.AntardashaEnd.ToString("yyyy-MM-dd"),
                 MahadashaStart = dasha.MahadashaStart.ToString("yyyy-MM-dd"),
                 MahadashaEnd = dasha.MahadashaEnd.ToString("yyyy-MM-dd"),
-                Interpretation = InterpretationFor($"{dasha.Mahadasha.ToLowerInvariant()}_mahadasha")
+                Interpretation = InterpretationFor($"{dasha.Mahadasha.ToLowerInvariant()}_mahadasha", bySignature)
             }
         });
     }

@@ -90,7 +90,7 @@ try
     builder.Services.AddJournalModule(vectorDataSource);
     builder.Services.AddWellnessModule(connStr, appConfig.VoiceBucketName);
     builder.Services.AddInsightsModule(vectorDataSource);
-    builder.Services.AddJyotishModule();
+    builder.Services.AddJyotishModule(vectorDataSource);
 
     // ── Controller discovery from domain assemblies ─────────────────────
     builder.Services.AddControllers()
@@ -215,6 +215,7 @@ try
         await sp.GetRequiredService<ShantiSangha.Journal.Data.JournalDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Wellness.Data.WellnessDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Insights.Data.InsightsDbContext>().Database.MigrateAsync();
+        await sp.GetRequiredService<ShantiSangha.Jyotish.Data.JyotishDbContext>().Database.MigrateAsync();
 
     }
 
