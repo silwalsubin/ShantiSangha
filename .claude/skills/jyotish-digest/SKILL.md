@@ -1,6 +1,6 @@
 ---
 name: jyotish-digest
-description: "Modernizes and digests passages from public domain Vedic astrology (Jyotish) classical texts into JSON passages for the ShantiSangha knowledge corpus. Use this skill whenever the user pastes text from classical Jyotish sources (Brihat Parashara Hora Shastra, Phaladeepika, Saravali, Brihat Jataka, Jataka Parijata, Sarvartha Chintamani, Hora Sara) or their public domain English translations (Suryanarain Rao, Subrahmanya Sastri, Chidambaram Aiyar, Ernest Wood) and asks to digest, modernize, convert, add to corpus, or produce passages for the app. Also trigger when the user mentions ingesting Jyotish knowledge, adding to JyotishCorpus.json, or processing archive.org Jyotish PDFs. This skill produces source-cited JSON passages that maintain the tradition's interpretive core while removing archaic language, prediction-as-fate, and outdated cultural assumptions."
+description: "Digests passages from public domain Vedic astrology (Jyotish) classical texts and ingests them into the ShantiSangha pgvector corpus behind the admin-key-gated `/api/jyotish/ingest/batch` endpoint. Use this skill whenever the user pastes or points to text from classical Jyotish sources (Brihat Parashara Hora Shastra, Phaladeepika, Saravali, Brihat Jataka, Jataka Parijata, Sarvartha Chintamani, Hora Sara) or their public domain English translations (Suryanarain Rao, Subrahmanya Sastri, Chidambaram Aiyar, Ernest Wood), asks to digest, modernize, convert, ingest, or produce passages, or mentions adding to the Jyotish corpus. The skill owns the full pipeline: sourcing → modernization → JSON staging → DTO packaging → SSO-authenticated ingestion via AWS CLI + curl. Produces source-cited passages that keep the tradition's interpretive core while removing archaic language, prediction-as-fate, and outdated cultural assumptions."
 ---
 
 # Jyotish Corpus Digest
@@ -185,7 +185,65 @@ When invoked:
 
 5. **Produce the JSON.** Include all required fields. Preserve the raw excerpt.
 
-6. **Present for review.** The user reviews. If approved, they or you append to `backend/ShantiSangha.Jyotish/Data/JyotishCorpus.json` (or the future DB ingestion pipeline).
+6. **Stage the batch.** Write the digested passages to a staging file under `/tmp/jyotish_<chapter_or_topic>.json` (not to a repo path). Never overwrite previously staged files; each digest run lives in its own file.
+
+7. **Present for review.** Surface a representative sample (2 nourishing, 2 challenging_with_depth, 2 sub-variants) in chat so the user can sanity-check tone. Report the full file path so they can read the rest on disk.
+
+8. **Package for ingestion.** Once approved, transform the skill's output shape (snake_case, with `raw_source_excerpt`) into the ingestion endpoint's DTO shape using `jq`:
+
+   ```bash
+   jq -s '
+     [.[][] |
+       {
+         id: .id,
+         signatureType: .signature_type,
+         signatures: .signatures,
+         title: .title,
+         content: .content,
+         themes: .themes,
+         polarity: .polarity,
+         scope: .scope,
+         sourceBook: "<full book name>",
+         sourceAuthor: "<translator name>",
+         sourceYear: <translation year>,
+         sourceLicense: "public_domain",
+         sourceChapter: (.source | sub("^<book prefix>"; "") | sub(", tr\\..*$"; "")),
+         sourceVerse: null,
+         rawSourceExcerpt: .raw_source_excerpt,
+         source: .source
+       }
+     ]
+   ' /tmp/jyotish_<file>.json > /tmp/jyotish_ingest_payload_<topic>.json
+   ```
+
+9. **Ingest to the live corpus.** The corpus lives in Postgres (pgvector) behind an admin-key-gated endpoint. The key is auto-generated in Terraform and stored in AWS Secrets Manager; retrieve via SSO-authenticated AWS CLI, then POST:
+
+   ```bash
+   PROFILE=AdministratorAccess-362249013106   # or user's equivalent SSO profile
+   ADMIN_KEY=$(aws secretsmanager get-secret-value \
+     --secret-id shantisangha/jyotish_admin_key \
+     --profile $PROFILE \
+     --query SecretString --output text)
+
+   curl -sS -X POST https://shantisangha.com/api/jyotish/ingest/batch \
+     -H "Content-Type: application/json" \
+     -H "X-Admin-Key: $ADMIN_KEY" \
+     -d @/tmp/jyotish_ingest_payload_<topic>.json \
+     --max-time 180
+
+   # Verify the count went up:
+   curl -sS -H "X-Admin-Key: $ADMIN_KEY" \
+     https://shantisangha.com/api/jyotish/ingest/count
+   ```
+
+   The endpoint is upsert-idempotent by `id`, so re-ingesting is safe. Each passage's embedding is generated server-side on insert.
+
+10. **If the user hasn't configured SSO yet**, point them at:
+    - AWS Console → IAM Identity Center dashboard for the AWS access portal URL
+    - `aws configure sso` locally with the portal URL, region (`us-east-1`), and session name (`shantisangha`)
+    - The profile name will be `AdministratorAccess-<account-id>` by default
+
+    Do NOT ever fall back to writing the corpus into a local JSON file — the old `JyotishCorpus.json` is deleted and the DB is the only source of truth.
 
 ## Public Domain Sources (safe to use)
 

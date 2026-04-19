@@ -51,15 +51,21 @@ public class ConversationsController(
     }
 
     [HttpPost]
-    public async Task<IActionResult> CreateConversation(CancellationToken ct = default)
+    public async Task<IActionResult> CreateConversation(
+        [FromBody] CreateConversationRequest? request,
+        CancellationToken ct = default)
     {
         var user = await currentUser.GetAsync();
         if (user is null) return Unauthorized();
+
+        var title = request?.Title?.Trim();
+        if (string.IsNullOrWhiteSpace(title)) title = null;
 
         var conversation = new Conversation
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
+            Title = title,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -67,8 +73,10 @@ public class ConversationsController(
         db.Conversations.Add(conversation);
         await db.SaveChangesAsync(ct);
 
-        return Created($"/conversations/{conversation.Id}", new { conversation.Id, conversation.CreatedAt });
+        return Created($"/conversations/{conversation.Id}", new { conversation.Id, conversation.Title, conversation.CreatedAt });
     }
+
+    public record CreateConversationRequest(string? Title);
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetConversation(Guid id, CancellationToken ct = default)

@@ -6,12 +6,19 @@ struct ChatView: View {
     let conversationId: String
     let title: String
 
-    @State private var displayTitle: String = "Conversation"
+    @State private var displayTitle: String
     @State private var messages: [ChatMessage] = []
     @State private var inputText = ""
     @State private var loading = true
     @State private var sending = false
     private let api = ApiService.shared
+
+    init(conversationId: String, title: String) {
+        self.conversationId = conversationId
+        self.title = title
+        let initial = (title.isEmpty || title == "New Conversation") ? "Conversation" : title
+        _displayTitle = State(initialValue: initial)
+    }
 
     var body: some View {
         VStack(spacing: 0) {

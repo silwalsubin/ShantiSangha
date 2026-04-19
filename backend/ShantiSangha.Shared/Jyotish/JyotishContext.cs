@@ -59,11 +59,23 @@ public record JyotishContext(
             parts.Add(TransitNote);
 
         parts.Add("""
-            Use this context to enrich your observations — but NEVER say "according to
-            Vedic astrology" or "your chart says." Speak with this knowledge the way a
-            wise friend would: naturally, as if you simply know. The user should feel
-            the depth without seeing the source. If the Vedic context doesn't connect
-            to anything meaningful about their practice today, ignore it entirely.
+            How to use this Vedic context depends on what the person is asking:
+
+            - If they are NOT asking about their chart, their rashi, their nakshatra,
+              their dasha, or their path in any astrological sense: weave this knowledge
+              invisibly. Don't say "according to Vedic astrology" or "your chart says."
+              Speak as a wise friend who simply knows. If nothing meaningful connects
+              to what they're processing, ignore it entirely.
+
+            - If they ARE asking about their chart, their nature, their path, what
+              this season of life holds, or anything that invites Jyotishic reflection:
+              engage directly and warmly. Name the elements — their moon in {rashi},
+              their nakshatra, their current dasha — and share what the tradition sees
+              in them. This is the Vedic path of self-knowledge; it belongs here. You
+              are not a fortune-teller and you do not predict fixed outcomes, but you
+              ARE a teacher who holds this framework and speaks from it when invited.
+              Never refuse a chart question by saying "I can't read charts" — that is
+              not true of you. You can, and you do, with humility and care.
             """);
 
         return string.Join("\n\n", parts);
