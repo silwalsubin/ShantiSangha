@@ -89,7 +89,8 @@ public static class SystemPrompt
         IEnumerable<string>? conversationSummaries,
         IEnumerable<string>? journalSummaries = null,
         IEnumerable<GoalContext>? goals = null,
-        JyotishContext? jyotish = null)
+        JyotishContext? jyotish = null,
+        IEnumerable<JyotishPassage>? jyotishPassages = null)
     {
         var parts = new List<string> { Base };
 
@@ -203,6 +204,27 @@ public static class SystemPrompt
 
         if (jyotish is not null)
             parts.Add(jyotish.FormatForPrompt());
+
+        var passageList = jyotishPassages?.ToList();
+        if (passageList is { Count: > 0 })
+        {
+            var passageText = string.Join("\n\n", passageList.Select(p =>
+            {
+                var header = string.IsNullOrWhiteSpace(p.Title) ? p.Source : $"{p.Title} ({p.Source})";
+                return $"— {header}\n{p.Content.Trim()}";
+            }));
+
+            parts.Add($"""
+                ## Traditional wisdom that may apply
+                These passages are drawn from the classical Vedic corpus, retrieved because
+                they resonate with what the person is asking right now. Do not quote them
+                verbatim, cite them, or mention their source. Let their interpretive core
+                inform your response in your own voice — the way a teacher who has studied
+                deeply speaks from understanding, not from the page.
+
+                {passageText}
+                """);
+        }
 
         return string.Join("\n\n---\n\n", parts);
     }

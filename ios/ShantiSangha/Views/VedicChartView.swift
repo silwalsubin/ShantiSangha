@@ -21,46 +21,52 @@ struct VedicChartView: View {
     @State private var showBirthDatePicker = false
     @State private var showBirthTimePicker = false
     @State private var showBirthPlacePicker = false
+    @State private var pendingChatId: String?
+    @State private var startingChat = false
 
     private let api = ApiService.shared
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                birthDetailsCard
+        ZStack(alignment: .bottomTrailing) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    birthDetailsCard
 
-                if loading {
-                    ProgressView()
-                        .tint(.sacredGold)
-                        .frame(maxWidth: .infinity, minHeight: 200)
-                } else if let error {
-                    errorView(error)
-                } else if let chart, chart.available {
-                    if let planets = chart.planets, !planets.isEmpty {
-                        rashiSection(planets: planets)
+                    if loading {
+                        ProgressView()
+                            .tint(.sacredGold)
+                            .frame(maxWidth: .infinity, minHeight: 200)
+                    } else if let error {
+                        errorView(error)
+                    } else if let chart, chart.available {
+                        if let planets = chart.planets, !planets.isEmpty {
+                            rashiSection(planets: planets)
+                        }
+                        if let nakshatra = chart.nakshatra {
+                            nakshatraSection(nakshatra)
+                        }
+                        if let lagna = chart.lagna {
+                            lagnaSection(lagna)
+                        }
+                        if let dasha = chart.dasha {
+                            dashaSection(dasha)
+                        }
+                        if let planets = chart.planets, !planets.isEmpty {
+                            planetsSection(planets, hasHouses: chart.lagna != nil)
+                            legendSection()
+                        }
+                    } else if let chart, !chart.available {
+                        unavailablePrompt(reason: chart.reason)
                     }
-                    if let nakshatra = chart.nakshatra {
-                        nakshatraSection(nakshatra)
-                    }
-                    if let lagna = chart.lagna {
-                        lagnaSection(lagna)
-                    }
-                    if let dasha = chart.dasha {
-                        dashaSection(dasha)
-                    }
-                    if let planets = chart.planets, !planets.isEmpty {
-                        planetsSection(planets, hasHouses: chart.lagna != nil)
-                        legendSection()
-                    }
-                } else if let chart, !chart.available {
-                    unavailablePrompt(reason: chart.reason)
                 }
+                .padding(16)
+                .padding(.bottom, 100)
             }
-            .padding(16)
-            .padding(.bottom, 40)
+            .background(Color.sacredBg.ignoresSafeArea())
+            .refreshable { await load() }
+
+            askChartFAB
         }
-        .background(Color.sacredBg.ignoresSafeArea())
-        .refreshable { await load() }
         .navigationTitle("Your Birth Chart")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
@@ -89,6 +95,49 @@ struct VedicChartView: View {
                     Task { await saveBirthDetails(); await load() }
                 }
             )
+        }
+        .navigationDestination(item: $pendingChatId) { id in
+            ChatView(conversationId: id, title: "Birth Chart")
+        }
+    }
+
+    // MARK: - Ask-the-chart FAB
+
+    private var askChartFAB: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            Task { await startChartChat() }
+        } label: {
+            Group {
+                if startingChat {
+                    ProgressView().tint(.white)
+                } else {
+                    Image(systemName: "bubble.left")
+                        .font(.sacredHeading)
+                        .foregroundColor(.white)
+                }
+            }
+            .frame(width: 56, height: 56)
+            .goldShine()
+            .clipShape(Circle())
+        }
+        .disabled(startingChat)
+        .padding(.trailing, 20)
+        .padding(.bottom, 20)
+    }
+
+    private func startChartChat() async {
+        guard !startingChat else { return }
+        startingChat = true
+        defer { startingChat = false }
+        do {
+            let conv: ConversationItem = try await api.post(
+                "/conversations",
+                body: ["title": "Birth Chart"]
+            )
+            pendingChatId = conv.id
+        } catch {
+            AppLogger.shared.error("VedicChart", "Failed to start chart chat: \(error)")
         }
     }
 

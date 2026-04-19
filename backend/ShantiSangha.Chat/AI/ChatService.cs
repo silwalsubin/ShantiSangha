@@ -24,12 +24,14 @@ public class ChatService(
     IReflectionQueryService reflectionQuery,
     IProfileQueryService profileQuery,
     IJyotishContextService jyotishService,
+    IJyotishKnowledgeService jyotishKnowledge,
     IEventBus eventBus,
     ILogger<ChatService> logger) : IChatService
 {
     private const int RecentMessageCount = 20;
     private const int SummaryCount = 3;
     private const int InsightCount = 5;
+    private const int PassageCount = 4;
 
     public async IAsyncEnumerable<string> StreamResponseAsync(
         Guid userId,
@@ -152,6 +154,7 @@ public class ChatService(
         IReadOnlyList<GoalSummaryDto> goalDtos = [];
         IReadOnlyList<string> insights = [];
         JyotishContext? jyotish = null;
+        IReadOnlyList<JyotishPassage> passages = [];
 
         try
         {
@@ -195,6 +198,18 @@ public class ChatService(
             logger.LogWarning(ex, "Failed to load insights for conversation {ConversationId} — continuing without insights", conversationId);
         }
 
+        if (!string.IsNullOrWhiteSpace(currentMessage))
+        {
+            try
+            {
+                passages = await jyotishKnowledge.SearchSemanticAsync(currentMessage, topK: PassageCount, ct: cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Jyotish RAG retrieval failed for conversation {ConversationId} — continuing without passages", conversationId);
+            }
+        }
+
         var goalContexts = goalDtos.Select(g => new GoalContext(
             Title: g.Title,
             Type: g.Type,
@@ -212,7 +227,8 @@ public class ChatService(
             conversationSummaries: summaries,
             journalSummaries: journalSummaries,
             goals: goalContexts,
-            jyotish: jyotish);
+            jyotish: jyotish,
+            jyotishPassages: passages);
 
         var history = new ChatHistory(systemPrompt);
 
