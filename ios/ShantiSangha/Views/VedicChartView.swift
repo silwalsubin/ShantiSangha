@@ -1,6 +1,5 @@
 import SwiftUI
 import CoreLocation
-import PhosphorSwift
 
 /// Detailed Vedic birth chart — nakshatra attributes, lagna, 9 planets with
 /// rashi/degree/house/nakshatra/pada, current dasha. Reached from Journey tab.
@@ -44,7 +43,7 @@ struct VedicChartView: View {
                     } else if let error {
                         errorView(error)
                     } else if let chart, chart.available {
-                        chartReadingCard
+                        ChartReadingCard(reading: reading, loading: readingLoading)
 
                         if let planets = chart.planets, !planets.isEmpty {
                             rashiSection(planets: planets)
@@ -150,86 +149,7 @@ struct VedicChartView: View {
     }
 
     // MARK: - Chart reading (pre-composed from corpus)
-
-    /// The "Your Reading" card — 6 collapsible sections composed server-side
-    /// from the user's chart + classical Brihat Jataka passages. Shows a
-    /// shimmer while first-time generation runs (can take ~10s).
-    @ViewBuilder
-    private var chartReadingCard: some View {
-        if readingLoading && reading == nil {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("YOUR READING")
-                    .font(.sacredSectionLabel)
-                    .tracking(3)
-                    .foregroundColor(.sacredLabel)
-                HStack(spacing: 10) {
-                    ProgressView().tint(.sacredGold)
-                    Text("Composing your reading from the classical sources…")
-                        .font(.sacredMicro)
-                        .italic()
-                        .foregroundColor(.sacredMuted)
-                }
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
-        } else if let reading, !reading.sections.isEmpty {
-            VStack(alignment: .leading, spacing: 14) {
-                Text("YOUR READING")
-                    .font(.sacredSectionLabel)
-                    .tracking(3)
-                    .foregroundColor(.sacredLabel)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(ChartReadingSectionKey.ordered, id: \.key) { section in
-                        if let prose = reading.sections[section.key], !prose.isEmpty {
-                            readingRow(key: "reading.\(section.key)", title: section.title, prose: prose)
-                        }
-                    }
-                }
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
-        }
-    }
-
-    private func readingRow(key: String, title: String, prose: String) -> some View {
-        let isOpen = expanded.contains(key)
-        return VStack(alignment: .leading, spacing: 8) {
-            Button {
-                withAnimation(.easeOut(duration: 0.2)) {
-                    if isOpen { expanded.remove(key) } else { expanded.insert(key) }
-                }
-            } label: {
-                HStack(spacing: 10) {
-                    Text(title)
-                        .font(.sacredSmallSemibold)
-                        .foregroundColor(.sacredText)
-                    Spacer(minLength: 0)
-                    Image(systemName: isOpen ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 9, weight: .bold, design: .serif))
-                        .foregroundColor(.sacredMuted.opacity(0.6))
-                }
-                .padding(.vertical, 8)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            if isOpen {
-                Text(prose)
-                    .font(.sacredSmall)
-                    .italic()
-                    .foregroundColor(.sacredTextSecondary)
-                    .lineSpacing(3)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.bottom, 4)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-        }
-    }
+    // Card view is in ChartReadingCard.swift.
 
     private func loadReading() async {
         guard reading == nil else { return }
@@ -255,7 +175,7 @@ struct VedicChartView: View {
                 .foregroundColor(.sacredLabel)
 
             birthRow(
-                icon: Ph.calendar.duotone,
+                icon: Image(systemName: "calendar"),
                 label: birthDate.map { formatBirthDate($0) } ?? "Add birth date",
                 set: birthDate != nil
             ) { showBirthDatePicker = true }
@@ -263,7 +183,7 @@ struct VedicChartView: View {
             Divider()
 
             birthRow(
-                icon: Ph.clock.duotone,
+                icon: Image(systemName: "clock"),
                 label: birthTime.map { formatBirthTime($0) } ?? "Add birth time",
                 set: birthTime != nil
             ) { showBirthTimePicker = true }
@@ -271,7 +191,7 @@ struct VedicChartView: View {
             Divider()
 
             birthRow(
-                icon: Ph.mapPin.duotone,
+                icon: Image(systemName: "mappin.and.ellipse"),
                 label: birthPlaceQuery.isEmpty ? "Add birth place" : birthPlaceQuery,
                 set: !birthPlaceQuery.isEmpty
             ) { showBirthPlacePicker = true }
@@ -648,33 +568,33 @@ struct VedicChartView: View {
                 legendGroup(
                     title: "Positive",
                     rows: [
-                        ("legend.deep_exalted", Ph.arrowCircleUp.fill, .sacredGreen, "Deep Exalted",
+                        ("legend.deep_exalted", Image(systemName: "arrow.up.circle.fill"), .sacredGreen, "Deep Exalted",
                          "At the very peak of its strength — a rare placement where the planet's best qualities shine most clearly."),
-                        ("legend.exalted", Ph.arrowCircleUp.duotone, .sacredGreen, "Exalted",
+                        ("legend.exalted", Image(systemName: "arrow.up.circle"), .sacredGreen, "Exalted",
                          "In the sign that amplifies its natural qualities. The planet expresses itself with confidence and ease."),
-                        ("legend.moolatrikona", Ph.crownSimple.duotone, .sacredGreen, "Moolatrikona",
+                        ("legend.moolatrikona", Image(systemName: "crown"), .sacredGreen, "Moolatrikona",
                          "In its honored seat — acts with authority and purpose, deeply connected to its role in the chart."),
-                        ("legend.own_sign", Ph.anchor.duotone, .sacredGreen, "Own Sign",
+                        ("legend.own_sign", Image(systemName: "house"), .sacredGreen, "Own Sign",
                          "The planet is at home. It expresses itself freely and without effort here."),
-                        ("legend.vargottama", Ph.squaresFour.duotone, .sacredGreen, "Vargottama",
+                        ("legend.vargottama", Image(systemName: "square.grid.2x2"), .sacredGreen, "Vargottama",
                          "The planet occupies the same sign in two key charts — a sign of consistent, reinforced strength.")
                     ]
                 )
                 legendGroup(
                     title: "Challenging",
                     rows: [
-                        ("legend.debilitated", Ph.arrowCircleDown.duotone, .sacredRed, "Debilitated",
+                        ("legend.debilitated", Image(systemName: "arrow.down.circle"), .sacredRed, "Debilitated",
                          "In a sign where it feels out of place. Not a fault — a quiet invitation to grow into this part of life."),
-                        ("legend.combust", Ph.sunDim.duotone, .sacredRed, "Combust",
+                        ("legend.combust", Image(systemName: "sun.haze"), .sacredRed, "Combust",
                          "Sitting too close to the Sun. Its outward expression is quieter; its energy turns inward rather than broadcasting."),
-                        ("legend.sandhi", Ph.circleHalf.duotone, .sacredRed, "Sandhi",
+                        ("legend.sandhi", Image(systemName: "circle.righthalf.filled"), .sacredRed, "Sandhi",
                          "Right at a sign boundary — between two worlds. Its character feels less settled, as if it's in transition.")
                     ]
                 )
                 legendGroup(
                     title: "Notable",
                     rows: [
-                        ("legend.retrograde", Ph.arrowUUpLeft.duotone, .sacredGold, "Retrograde",
+                        ("legend.retrograde", Image(systemName: "arrow.uturn.left"), .sacredGold, "Retrograde",
                          "Moving backward through the zodiac at birth. Classically a sign of intensified strength — its themes come through with extra depth.")
                     ]
                 )
@@ -839,14 +759,14 @@ struct VedicChartView: View {
         }
     }
 
-    /// Phosphor icon for each dignity state, matching the legend.
+    /// SF Symbol for each dignity state, matching the legend.
     private func dignityIcon(_ dignity: String) -> Image? {
         switch dignity {
-        case "deep_exalted": return Ph.arrowCircleUp.fill
-        case "exalted": return Ph.arrowCircleUp.duotone
-        case "moolatrikona": return Ph.crownSimple.duotone
-        case "own_sign": return Ph.anchor.duotone
-        case "debilitated": return Ph.arrowCircleDown.duotone
+        case "deep_exalted": return Image(systemName: "arrow.up.circle.fill")
+        case "exalted": return Image(systemName: "arrow.up.circle")
+        case "moolatrikona": return Image(systemName: "crown")
+        case "own_sign": return Image(systemName: "house")
+        case "debilitated": return Image(systemName: "arrow.down.circle")
         default: return nil
         }
     }
@@ -862,16 +782,16 @@ struct VedicChartView: View {
                 stateGlyph(icon, color: dignityColor(p.dignity), label: dignityLabel(p.dignity))
             }
             if p.vargottama == true {
-                stateGlyph(Ph.squaresFour.duotone, color: .sacredGreen, label: "Vargottama")
+                stateGlyph(Image(systemName: "square.grid.2x2"), color: .sacredGreen, label: "Vargottama")
             }
             if p.retrograde == true {
-                stateGlyph(Ph.arrowUUpLeft.duotone, color: .sacredGold, label: "Retrograde")
+                stateGlyph(Image(systemName: "arrow.uturn.left"), color: .sacredGold, label: "Retrograde")
             }
             if p.combust == true {
-                stateGlyph(Ph.sunDim.duotone, color: .sacredRed, label: "Combust")
+                stateGlyph(Image(systemName: "sun.haze"), color: .sacredRed, label: "Combust")
             }
             if p.sandhi == true {
-                stateGlyph(Ph.circleHalf.duotone, color: .sacredRed, label: "Sandhi")
+                stateGlyph(Image(systemName: "circle.righthalf.filled"), color: .sacredRed, label: "Sandhi")
             }
         }
     }
@@ -1045,119 +965,4 @@ struct VedicChartView: View {
     }
 }
 
-private struct MeResponse: Decodable {
-    let profile: MeProfileData?
-}
-
-private struct MeProfileData: Decodable {
-    let birthDate: String?
-    let birthTime: String?
-    let birthPlace: String?
-}
-
-// MARK: - Chart reading
-
-/// Response from GET /api/jyotish/reading.
-struct ChartReadingResponse: Decodable {
-    let sections: [String: String]
-    let generatedAt: String
-    let isComplete: Bool
-}
-
-/// The six sections of the pre-composed chart reading, in display order.
-/// Keys match the backend's ChartReadingSection constants.
-enum ChartReadingSectionKey {
-    static let ordered: [(key: String, title: String)] = [
-        ("essence", "Your essence"),
-        ("emotional_nature", "Your emotional nature"),
-        ("mind_and_voice", "Your mind and voice"),
-        ("drive_and_action", "Your drive and action"),
-        ("path_of_growth", "Your path of growth"),
-        ("season", "This season of your life"),
-    ]
-}
-
-// MARK: - Response models
-
-struct VedicChart: Decodable {
-    let available: Bool
-    let reason: String?
-    let birth: Birth?
-    let nakshatra: NakshatraAttrs?
-    let lagna: Lagna?
-    let planets: [Planet]?
-    let dasha: DashaInfo?
-
-    struct Birth: Decodable {
-        let date: String
-        let time: String?
-        let place: String?
-        let hasCoordinates: Bool
-    }
-}
-
-struct Interpretation: Decodable {
-    let content: String
-    let source: String
-    let polarity: String
-    let themes: [String]
-}
-
-struct NakshatraAttrs: Decodable {
-    let name: String
-    let quality: String
-    let pada: Int
-    let yoni: String
-    let nadi: String
-    let gana: String
-    let deity: String
-    let lord: String
-    let interpretation: Interpretation?
-}
-
-struct Lagna: Decodable {
-    let rashi: String
-    let degree: Double
-    let nakshatra: String
-    let nakshatraQuality: String
-    let pada: Int
-    let interpretation: Interpretation?
-}
-
-struct Planet: Decodable, Identifiable {
-    var id: String { name }
-    let name: String
-    let rashi: String
-    let degree: Double
-    let nakshatra: String
-    let nakshatraQuality: String
-    let pada: Int
-    let house: Int?
-    /// deep_exalted | exalted | moolatrikona | own_sign | debilitated | neutral
-    let dignity: String
-    let drekkanaRashi: String?
-    let chaturthamsaRashi: String?
-    let saptamsaRashi: String?
-    let navamsaRashi: String?
-    let dasamsaRashi: String?
-    let dvadasamsaRashi: String?
-    let shodasamsaRashi: String?
-    let vimsamsaRashi: String?
-    let chaturvimsamsaRashi: String?
-    /// True when the planet's D1 sign == D9 sign — classically very strong
-    let vargottama: Bool?
-    let retrograde: Bool?
-    let combust: Bool?
-    let sandhi: Bool?
-    let interpretation: Interpretation?
-}
-
-struct DashaInfo: Decodable {
-    let mahadasha: String
-    let antardasha: String
-    let antardashaStart: String
-    let antardashaEnd: String
-    let mahadashaStart: String
-    let mahadashaEnd: String
-    let interpretation: Interpretation?
-}
+// Models moved to VedicChartModels.swift to keep the SwiftUI type checker fast.

@@ -1,5 +1,4 @@
 import SwiftUI
-import PhosphorSwift
 
 /// Full depth on a single planet — opens from a row tap on VedicChartView.
 /// Carries the classical detail (divisional positions, dignity, status flags,
@@ -101,19 +100,19 @@ struct PlanetDetailView: View {
             badges.append((icon, dignityColor(planet.dignity), dignityLabel(planet.dignity), dignityDescription(planet.dignity)))
         }
         if planet.vargottama == true {
-            badges.append((Ph.squaresFour.duotone, .sacredGreen, "VARGOTTAMA",
+            badges.append((Image(systemName: "square.grid.2x2"), .sacredGreen, "VARGOTTAMA",
                            "same sign in D1 and D9 — classically very strong"))
         }
         if planet.retrograde == true {
-            badges.append((Ph.arrowUUpLeft.duotone, .sacredGold, "RETROGRADE",
+            badges.append((Image(systemName: "arrow.uturn.left"), .sacredGold, "RETROGRADE",
                            "moving backward along the ecliptic at birth"))
         }
         if planet.combust == true {
-            badges.append((Ph.sunDim.duotone, .sacredRed, "COMBUST",
+            badges.append((Image(systemName: "sun.haze"), .sacredRed, "COMBUST",
                            "within the Sun's classical orb — natural strength muted"))
         }
         if planet.sandhi == true {
-            badges.append((Ph.circleHalf.duotone, .sacredRed, "SANDHI",
+            badges.append((Image(systemName: "circle.righthalf.filled"), .sacredRed, "SANDHI",
                            "sits in the first or last 1° of its sign — cusp weakness"))
         }
         return badges
@@ -252,11 +251,11 @@ struct PlanetDetailView: View {
 
     private func dignityIcon(_ dignity: String) -> Image? {
         switch dignity {
-        case "deep_exalted": return Ph.arrowCircleUp.fill
-        case "exalted": return Ph.arrowCircleUp.duotone
-        case "moolatrikona": return Ph.crownSimple.duotone
-        case "own_sign": return Ph.anchor.duotone
-        case "debilitated": return Ph.arrowCircleDown.duotone
+        case "deep_exalted": return Image(systemName: "arrow.up.circle.fill")
+        case "exalted": return Image(systemName: "arrow.up.circle")
+        case "moolatrikona": return Image(systemName: "crown")
+        case "own_sign": return Image(systemName: "house")
+        case "debilitated": return Image(systemName: "arrow.down.circle")
         default: return nil
         }
     }
