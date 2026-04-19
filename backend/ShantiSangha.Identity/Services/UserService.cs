@@ -1,10 +1,15 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using ShantiSangha.Identity.Contracts;
 using ShantiSangha.Identity.Data;
+using ShantiSangha.Shared.Interfaces;
 
 namespace ShantiSangha.Identity.Services;
 
-public class UserService(IdentityDbContext db) : IUserService
+public class UserService(
+    IdentityDbContext db,
+    IChartReadingService chartReadingService,
+    ILogger<UserService> logger) : IUserService
 {
     public async Task<UserResponse?> GetMeAsync(Guid userId, CancellationToken ct = default)
     {
@@ -51,6 +56,10 @@ public class UserService(IdentityDbContext db) : IUserService
             db.Profiles.Add(user.Profile);
         }
 
+        var prevBirthDate = user.Profile.BirthDate;
+        var prevBirthTime = user.Profile.BirthTime;
+        var prevBirthPlace = user.Profile.BirthPlace;
+
         if (request.DisplayName is not null) user.Profile.DisplayName = request.DisplayName;
         if (request.Timezone is not null) user.Profile.Timezone = request.Timezone;
         if (request.ReminderHour is not null) user.Profile.ReminderHour = Math.Clamp(request.ReminderHour.Value, 0, 23);
@@ -70,6 +79,28 @@ public class UserService(IdentityDbContext db) : IUserService
         user.Profile.UpdatedAt = DateTime.UtcNow;
         user.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
+
+        var birthChanged =
+            prevBirthDate != user.Profile.BirthDate ||
+            prevBirthTime != user.Profile.BirthTime ||
+            prevBirthPlace != user.Profile.BirthPlace;
+
+        if (birthChanged)
+        {
+            try
+            {
+                await chartReadingService.InvalidateAsync(user.Id, ct);
+            }
+            catch (Exception ex)
+            {
+                // Invalidation failure is non-fatal — the stale-hash check in
+                // ChartReadingService.GetAsync will still catch the change on
+                // the next read. Log and move on.
+                logger.LogWarning(ex,
+                    "Failed to invalidate chart reading after birth details change for user {UserId}",
+                    user.Id);
+            }
+        }
 
         return true;
     }

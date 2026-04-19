@@ -151,8 +151,9 @@ struct VedicChartView: View {
     // MARK: - Chart reading (pre-composed from corpus)
     // Card view is in ChartReadingCard.swift.
 
-    private func loadReading() async {
-        guard reading == nil else { return }
+    private func loadReading(force: Bool = false) async {
+        if !force, reading != nil { return }
+        if force { reading = nil }
         readingLoading = true
         defer { readingLoading = false }
         do {
@@ -945,6 +946,9 @@ struct VedicChartView: View {
         do {
             let _: EmptyResponse = try await api.patchRaw("/me", body: data)
             AppLogger.shared.info("Chart", "Birth details saved: \(body.keys.joined(separator: ", "))")
+            // Birth details changed → server-side reading is invalidated.
+            // Force a refetch so the user sees the regenerated reading.
+            await loadReading(force: true)
         } catch {
             AppLogger.shared.error("Chart", "Birth save failed: \(error)")
         }
