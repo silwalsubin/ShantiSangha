@@ -169,6 +169,11 @@ public static class JyotishSignatureDerivation
                 if (lagnaRashi is not null)
                     sigs.Add($"{planet}_in_h{p.House.Value}__lagna_{lagnaRashi}");
             }
+
+            // Planet's role for this ascendant — e.g. "jupiter_for_lagna_mesha"
+            // indexes Jataka Chandrika's per-lagna friend/foe classifications.
+            if (lagnaRashi is not null)
+                sigs.Add($"{planet}_for_lagna_{lagnaRashi}");
         }
 
         // Two-planet conjunctions (any two planets sharing a sign)

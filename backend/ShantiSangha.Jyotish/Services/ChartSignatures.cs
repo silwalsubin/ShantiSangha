@@ -60,11 +60,13 @@ public static class ChartSignatures
 
         // Ascendant — only if we have lat/lon
         double? ascSidereal = null;
+        string? lagnaRashi = null;
         if (latitude.HasValue && longitude.HasValue)
         {
             var ascTropical = VedicCalendar.GetTropicalAscendant(birthUtc, latitude.Value, longitude.Value);
             ascSidereal = VedicCalendar.ToSidereal(ascTropical, birthUtc);
-            signatures.Add($"lagna_in_{RashiSanskrit[VedicCalendar.GetRashiIndex(ascSidereal.Value)]}");
+            lagnaRashi = RashiSanskrit[VedicCalendar.GetRashiIndex(ascSidereal.Value)];
+            signatures.Add($"lagna_in_{lagnaRashi}");
         }
 
         var planetLongitudes = new (string Lower, string Cap, double Tropical)[]
@@ -134,6 +136,11 @@ public static class ChartSignatures
                 var house = VedicCalendar.GetHouse(sid, ascSidereal.Value);
                 signatures.Add($"{lower}_in_h{house}");
             }
+
+            // Planet's role for this ascendant — e.g. "saturn_for_lagna_vrishabha"
+            // indexes Jataka Chandrika's per-lagna friend/foe classifications.
+            if (lagnaRashi is not null)
+                signatures.Add($"{lower}_for_lagna_{lagnaRashi}");
         }
 
         // Current Mahadasha signature — doesn't depend on lagna

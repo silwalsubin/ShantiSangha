@@ -46,13 +46,26 @@ Don't soften past the point of accuracy. If the source says Saturn in the 7th cl
 
 ### 6. App voice constraints
 
+The target voice is **a calm astrologer talking to the client directly** — not a novel, not Shakespeare, not a spiritual pamphlet. Think: someone experienced, quiet, who respects the tradition but would never lecture you. Plain words. Short sentences. Real speech.
+
 Every generated passage must:
 - Be 2-4 sentences, maximum 60 words in the `content` field
-- Be in English plain enough that a non-Sanskritist reads it comfortably
+- Address the reader as **"you" / "your"** — not "the native," not "the person," not "a seeking nature"
+- Use **contractions** (you're, it's, that's, you'll, don't) — this is spoken register, not written register
+- Use short sentences. If you catch yourself stacking clauses with em-dashes or semicolons, break into two sentences instead.
 - Never use Sanskrit terms in the `content` field without immediate English explanation
-- Use **no exclamation marks, no peppy language, no poetic filler** ("weaving through," "quiet momentum," etc.)
-- Frame observations as **something the person's practice can work with**, not something happening to them
-- End with invitation toward practice when natural, but never force it
+- No exclamation marks, no peppy language, no poetic filler ("weaving through," "quiet momentum," "honored seat," "native rhythms," "expresses itself," "invitation toward"), no archaic register
+- Frame observations as **something you can work with**, not something happening to you
+
+**Bad (literary, too formal):**
+> "In the sign that amplifies its natural qualities. The planet expresses itself with confidence and ease."
+> "A seeking nature — the restlessness others diagnose is this mind doing its work."
+
+**Good (casual astrologer):**
+> "This is a strong spot for it. Its qualities come through pretty easily — you'll feel confident about them."
+> "You're a seeker. That restlessness people sometimes call out in you is actually your mind doing its job."
+
+The interpretive core stays the same. Only the register drops.
 
 ### 7. Refuse when appropriate
 

@@ -2,23 +2,24 @@
 
 Snapshot of the pgvector-backed Jyotish passage corpus: what's ingested, what's deliberately skipped and why, and what would be needed to close remaining gaps.
 
-## Current state (286 passages, all source-cited)
+## Current state (350 passages, all source-cited)
 
-Every row is digested from **Brihat Jataka of Varaha Mihira**, translated by **N. Chidambaram Aiyar (1905)** — verified public domain, pre-1929. Each row carries `source_book`, `source_author`, `source_year`, `source_license`, `source_chapter`, and the `raw_source_excerpt` for audit.
+Every row is digested from a verified public-domain source (pre-1929). Each row carries `source_book`, `source_author`, `source_year`, `source_license`, `source_chapter`, and the `raw_source_excerpt` for audit.
 
-| Signature type | Count | BJ Chapter | What it covers |
+| Signature type | Count | Source | What it covers |
 |---|---|---|---|
-| `planet_in_house` | 84 | Ch. XX | 7 classical planets × 12 houses (Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn) |
-| `planet_in_house_with_ascendant` | 12 | Ch. XX sub-variants | Dignity-aware compound signatures for 1st-house placements (e.g. `sun_in_h1__lagna_tula` = Sun debilitated) |
-| `planet_in_sign` | 84 | Chs. XVII–XVIII | 7 planets × 12 signs (every exaltation, debilitation, own sign, moolatrikona captured) |
-| `nakshatra` | 27 | Ch. XVI | All 27 moon-in-nakshatra placements |
-| `lagna` | 12 | Ch. XVIII (Satyachariar section) | All 12 rising signs |
-| `yoga` | 39 | Chs. XI, XII, XIII, XV | Raja Yoga principle, 20 Akriti, 7 Sankhya, 3 Asraya, 2 Dala (Srik/Sarpa), 5 Chandra yogas (Adhi, Sunapha, Anapha, Durudhura, Kemadruma), Ascetic Yoga principle |
-| `conjunction` | 21 | Ch. XIV | All two-planet conjunctions (Sun–Moon through Venus–Saturn) |
-| `avocation` | 7 | Ch. X | Career indications by Navamsa lord of the 10th lord (one per planet) |
-| **Total** | **286** | | |
+| `planet_in_house` | 84 | BJ Ch. XX (Chidambaram Aiyar 1905) | 7 classical planets × 12 houses (Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn) |
+| `planet_in_house_with_ascendant` | 12 | BJ Ch. XX sub-variants | Dignity-aware compound signatures for 1st-house placements (e.g. `sun_in_h1__lagna_tula` = Sun debilitated) |
+| `planet_in_sign` | 84 | BJ Chs. XVII–XVIII | 7 planets × 12 signs (every exaltation, debilitation, own sign, moolatrikona captured) |
+| `planet_for_lagna` | 64 | **Jataka Chandrika Stanzas 41–71 (Suryanarayana Row 1900)** | Per-ascendant friend/foe classification: which planets are yogakarakas, benefics, or malefics for each of the 12 rising signs |
+| `nakshatra` | 27 | BJ Ch. XVI | All 27 moon-in-nakshatra placements |
+| `lagna` | 12 | BJ Ch. XVIII (Satyachariar section) | All 12 rising signs |
+| `yoga` | 39 | BJ Chs. XI, XII, XIII, XV | Raja Yoga principle, 20 Akriti, 7 Sankhya, 3 Asraya, 2 Dala (Srik/Sarpa), 5 Chandra yogas (Adhi, Sunapha, Anapha, Durudhura, Kemadruma), Ascetic Yoga principle |
+| `conjunction` | 21 | BJ Ch. XIV | All two-planet conjunctions (Sun–Moon through Venus–Saturn) |
+| `avocation` | 7 | BJ Ch. X | Career indications by Navamsa lord of the 10th lord (one per planet) |
+| **Total** | **350** | | |
 
-Every chart element the app currently computes has a real classical passage attached — nakshatra, lagna, each planet row (with lagna-compound fallback and planet-in-sign fallback).
+Every chart element the app currently computes has a real classical passage attached — nakshatra, lagna, each planet row (with lagna-compound fallback, per-ascendant friend/foe fallback, and planet-in-sign fallback).
 
 ## What's deliberately skipped
 
@@ -105,11 +106,12 @@ aws secretsmanager get-secret-value \
 
 Expected output (as of last ingestion):
 ```json
-{"total":286,"byType":[
+{"total":350,"byType":[
   {"type":"avocation","count":7},
   {"type":"conjunction","count":21},
   {"type":"lagna","count":12},
   {"type":"nakshatra","count":27},
+  {"type":"planet_for_lagna","count":64},
   {"type":"planet_in_house","count":84},
   {"type":"planet_in_house_with_ascendant","count":12},
   {"type":"planet_in_sign","count":84},
