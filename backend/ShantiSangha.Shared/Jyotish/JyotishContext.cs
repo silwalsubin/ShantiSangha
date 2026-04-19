@@ -136,6 +136,90 @@ public record JyotishChartDetails(
 
 public record ChartLagna(string Rashi, double Degree, string Nakshatra, int Pada);
 
+public static class JyotishSignatureDerivation
+{
+    /// <summary>
+    /// Derives corpus signature strings from a populated birth chart.
+    /// These are the same shape as signatures produced by the chart engine
+    /// so signature-based corpus lookup hits the right passages.
+    /// </summary>
+    public static IEnumerable<string> DeriveSignatures(this JyotishChartDetails chart)
+    {
+        var sigs = new List<string>();
+
+        var lagnaRashi = chart.Lagna is not null
+            ? ExtractSanskrit(chart.Lagna.Rashi).ToLowerInvariant()
+            : null;
+
+        if (lagnaRashi is not null)
+            sigs.Add($"lagna_in_{lagnaRashi}");
+
+        foreach (var p in chart.Planets)
+        {
+            var planet = p.Name.ToLowerInvariant();
+            var rashi = ExtractSanskrit(p.Rashi).ToLowerInvariant();
+
+            sigs.Add($"{planet}_in_{rashi}");
+
+            if (p.House.HasValue)
+            {
+                sigs.Add($"{planet}_in_h{p.House.Value}");
+                // Compound (planet in house with specific ascendant) — only
+                // ingested today for 1st-house variants but harmless otherwise.
+                if (lagnaRashi is not null)
+                    sigs.Add($"{planet}_in_h{p.House.Value}__lagna_{lagnaRashi}");
+            }
+        }
+
+        // Two-planet conjunctions (any two planets sharing a sign)
+        var byRashi = chart.Planets
+            .GroupBy(p => ExtractSanskrit(p.Rashi).ToLowerInvariant())
+            .Where(g => g.Count() >= 2);
+        foreach (var group in byRashi)
+        {
+            var names = group.Select(p => p.Name.ToLowerInvariant()).OrderBy(n => n, StringComparer.Ordinal).ToList();
+            for (int i = 0; i < names.Count; i++)
+                for (int j = i + 1; j < names.Count; j++)
+                    sigs.Add($"conj_{names[i]}_{names[j]}");
+        }
+
+        // Moon's nakshatra — the nakshatra passages in the corpus are keyed
+        // as moon_in_{nakshatra}.
+        var moon = chart.Planets.FirstOrDefault(p => p.Name == "Moon");
+        if (moon is not null)
+            sigs.Add($"moon_in_{NormalizeNakshatra(moon.Nakshatra)}");
+
+        return sigs;
+    }
+
+    /// <summary>
+    /// Derives signatures from the full context (chart + current dasha).
+    /// </summary>
+    public static IEnumerable<string> DeriveSignatures(this JyotishContext ctx)
+    {
+        var sigs = new List<string>();
+        if (ctx.Chart is not null)
+            sigs.AddRange(ctx.Chart.DeriveSignatures());
+        if (!string.IsNullOrWhiteSpace(ctx.Mahadasha))
+            sigs.Add($"{ctx.Mahadasha.ToLowerInvariant()}_mahadasha");
+        return sigs;
+    }
+
+    /// <summary>"Mesha (Aries)" → "Mesha". Handles labels that already have no paren.</summary>
+    private static string ExtractSanskrit(string rashiLabel)
+    {
+        var paren = rashiLabel.IndexOf('(');
+        return (paren > 0 ? rashiLabel[..paren] : rashiLabel).Trim();
+    }
+
+    /// <summary>
+    /// Nakshatra signature normalization — strip spaces, dots, and lowercase.
+    /// "Purva Phalguni" → "purvaphalguni"; matches the corpus's alias spellings.
+    /// </summary>
+    private static string NormalizeNakshatra(string name)
+        => name.Replace(" ", "").Replace(".", "").Replace("_", "").ToLowerInvariant();
+}
+
 public record ChartPlanet(
     string Name,
     string Rashi,

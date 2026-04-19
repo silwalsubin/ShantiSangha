@@ -133,7 +133,7 @@ struct VedicChartView: View {
         do {
             let conv: ConversationItem = try await api.post(
                 "/conversations",
-                body: ["title": "Birth Chart"]
+                body: ["title": "Birth Chart", "type": "chart"]
             )
             pendingChatId = conv.id
         } catch {

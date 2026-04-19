@@ -62,11 +62,16 @@ public class ConversationsController(
         var title = request?.Title?.Trim();
         if (string.IsNullOrWhiteSpace(title)) title = null;
 
+        var type = string.Equals(request?.Type?.Trim(), ConversationType.Chart, StringComparison.OrdinalIgnoreCase)
+            ? ConversationType.Chart
+            : ConversationType.General;
+
         var conversation = new Conversation
         {
             Id = Guid.NewGuid(),
             UserId = user.Id,
             Title = title,
+            Type = type,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -74,10 +79,10 @@ public class ConversationsController(
         db.Conversations.Add(conversation);
         await db.SaveChangesAsync(ct);
 
-        return Created($"/conversations/{conversation.Id}", new { conversation.Id, conversation.Title, conversation.CreatedAt });
+        return Created($"/conversations/{conversation.Id}", new { conversation.Id, conversation.Title, conversation.Type, conversation.CreatedAt });
     }
 
-    public record CreateConversationRequest(string? Title);
+    public record CreateConversationRequest(string? Title, string? Type = null);
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetConversation(Guid id, CancellationToken ct = default)

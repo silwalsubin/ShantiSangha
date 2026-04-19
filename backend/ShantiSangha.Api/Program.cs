@@ -217,6 +217,13 @@ try
         await sp.GetRequiredService<ShantiSangha.Insights.Data.InsightsDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Jyotish.Data.JyotishDbContext>().Database.MigrateAsync();
 
+        // Chat module has no EF migrations folder — schema was bootstrapped
+        // pre-migration-framework. Apply lightweight additive changes via
+        // idempotent SQL here until Chat gets a proper migration baseline.
+        var chatDb = sp.GetRequiredService<ShantiSangha.Chat.Data.ChatDbContext>();
+        await chatDb.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE \"Conversations\" ADD COLUMN IF NOT EXISTS \"Type\" text NOT NULL DEFAULT 'general';");
+
     }
 
     // Recurring jobs — use the DI-resolved manager since static JobStorage.Current

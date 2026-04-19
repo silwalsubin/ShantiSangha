@@ -145,6 +145,15 @@ public class ChatService(
         CancellationToken cancellationToken,
         string? currentMessage = null)
     {
+        // Determine conversation type up-front — chart conversations use a
+        // tighter, corpus-bounded prompt; general conversations use the
+        // broader spiritual-companion prompt with full personal context.
+        var conversationType = await db.Conversations
+            .Where(c => c.Id == conversationId)
+            .Select(c => c.Type)
+            .FirstOrDefaultAsync(cancellationToken) ?? ConversationType.General;
+        var isChart = conversationType == ConversationType.Chart;
+
         // Load all context in parallel — each task is fault-tolerant so a single
         // failure (e.g. embedding search) doesn't kill the entire conversation.
         string? displayName = null;
@@ -158,56 +167,98 @@ public class ChatService(
 
         try
         {
+            // For chart conversations we skip goals / journal / insight / reflection
+            // context entirely — they dilute the corpus grounding and aren't what
+            // the person is asking about. Chart chat is Jyotish-only.
             var displayNameTask = profileQuery.GetDisplayNameAsync(userId, cancellationToken);
-            var summariesTask = summaryQuery.GetRecentSummariesAsync(userId, SummaryCount, cancellationToken);
-            var journalSummariesTask = summaryQuery.GetRecentJournalSummariesAsync(userId, SummaryCount, cancellationToken);
-            var goalsTask = goalQuery.GetActiveGoalsForContextAsync(userId, ct: cancellationToken);
-            var reflectionTask = reflectionQuery.GetRecentReflectionAsync(userId, cancellationToken);
             var jyotishTask = jyotishService.GetContextAsync(userId, DateOnly.FromDateTime(DateTime.UtcNow), cancellationToken);
 
-            await Task.WhenAll(displayNameTask, summariesTask, journalSummariesTask, goalsTask, reflectionTask, jyotishTask);
+            if (isChart)
+            {
+                await Task.WhenAll(displayNameTask, jyotishTask);
+                displayName = displayNameTask.Result;
+                jyotish = jyotishTask.Result;
+            }
+            else
+            {
+                var summariesTask = summaryQuery.GetRecentSummariesAsync(userId, SummaryCount, cancellationToken);
+                var journalSummariesTask = summaryQuery.GetRecentJournalSummariesAsync(userId, SummaryCount, cancellationToken);
+                var goalsTask = goalQuery.GetActiveGoalsForContextAsync(userId, ct: cancellationToken);
+                var reflectionTask = reflectionQuery.GetRecentReflectionAsync(userId, cancellationToken);
 
-            displayName = displayNameTask.Result;
-            summaries = summariesTask.Result;
-            journalSummaries = journalSummariesTask.Result;
-            goalDtos = goalsTask.Result;
-            todaysReflection = reflectionTask.Result;
-            jyotish = jyotishTask.Result;
+                await Task.WhenAll(displayNameTask, summariesTask, journalSummariesTask, goalsTask, reflectionTask, jyotishTask);
+
+                displayName = displayNameTask.Result;
+                summaries = summariesTask.Result;
+                journalSummaries = journalSummariesTask.Result;
+                goalDtos = goalsTask.Result;
+                todaysReflection = reflectionTask.Result;
+                jyotish = jyotishTask.Result;
+            }
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to load some context for conversation {ConversationId} — continuing with partial context", conversationId);
         }
 
-        try
-        {
-            if (!string.IsNullOrWhiteSpace(currentMessage))
-            {
-                insights = await insightQuery.SearchInsightsAsync(userId, currentMessage, InsightCount, cancellationToken);
-
-                if (insights.Count == 0)
-                    insights = await insightQuery.GetRecentInsightsAsync(userId, InsightCount, cancellationToken);
-            }
-            else
-            {
-                insights = await insightQuery.GetRecentInsightsAsync(userId, InsightCount, cancellationToken);
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Failed to load insights for conversation {ConversationId} — continuing without insights", conversationId);
-        }
-
-        if (!string.IsNullOrWhiteSpace(currentMessage))
+        if (!isChart)
         {
             try
             {
-                passages = await jyotishKnowledge.SearchSemanticAsync(currentMessage, topK: PassageCount, ct: cancellationToken);
+                if (!string.IsNullOrWhiteSpace(currentMessage))
+                {
+                    insights = await insightQuery.SearchInsightsAsync(userId, currentMessage, InsightCount, cancellationToken);
+
+                    if (insights.Count == 0)
+                        insights = await insightQuery.GetRecentInsightsAsync(userId, InsightCount, cancellationToken);
+                }
+                else
+                {
+                    insights = await insightQuery.GetRecentInsightsAsync(userId, InsightCount, cancellationToken);
+                }
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Jyotish RAG retrieval failed for conversation {ConversationId} — continuing without passages", conversationId);
+                logger.LogWarning(ex, "Failed to load insights for conversation {ConversationId} — continuing without insights", conversationId);
             }
+        }
+
+        // Retrieve Jyotish passages. Chart conversations rely exclusively on
+        // signature-based retrieval from the user's actual chart. General
+        // conversations supplement with semantic search for thematic gaps.
+        try
+        {
+            var chartPassages = Array.Empty<JyotishPassage>() as IReadOnlyList<JyotishPassage>;
+            if (jyotish is not null)
+            {
+                var signatures = jyotish.DeriveSignatures().Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                if (signatures.Count > 0)
+                    chartPassages = await jyotishKnowledge.GetPassagesAsync(signatures, cancellationToken);
+            }
+
+            IReadOnlyList<JyotishPassage> semanticPassages = Array.Empty<JyotishPassage>();
+            if (!isChart && !string.IsNullOrWhiteSpace(currentMessage))
+                semanticPassages = await jyotishKnowledge.SearchSemanticAsync(currentMessage, topK: PassageCount, ct: cancellationToken);
+
+            // Topic routing: on chart conversations, rerank chart passages so
+            // the ones matching the user's question topic bubble to the top.
+            // This is what makes "how does my chart say about investing?"
+            // prioritize wealth/career-house passages over, e.g., siblings.
+            if (isChart && !string.IsNullOrWhiteSpace(currentMessage) && chartPassages.Count > 0)
+                chartPassages = ChartTopicRouter.Rerank(currentMessage!, chartPassages);
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var merged = new List<JyotishPassage>();
+            foreach (var p in chartPassages.Concat(semanticPassages))
+            {
+                if (seen.Add(p.Id))
+                    merged.Add(p);
+            }
+            passages = merged;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Jyotish RAG retrieval failed for conversation {ConversationId} — continuing without passages", conversationId);
         }
 
         var goalContexts = goalDtos.Select(g => new GoalContext(
@@ -220,15 +271,20 @@ public class ChatService(
             IsCompleted: g.IsCompleted,
             DeeperWhy: g.DeeperWhy)).ToList();
 
-        var systemPrompt = SystemPrompt.WithContext(
-            displayName: displayName,
-            todaysReflection: todaysReflection,
-            savedInsights: insights,
-            conversationSummaries: summaries,
-            journalSummaries: journalSummaries,
-            goals: goalContexts,
-            jyotish: jyotish,
-            jyotishPassages: passages);
+        var systemPrompt = isChart
+            ? SystemPrompt.ForChart(
+                displayName: displayName,
+                jyotish: jyotish,
+                jyotishPassages: passages)
+            : SystemPrompt.WithContext(
+                displayName: displayName,
+                todaysReflection: todaysReflection,
+                savedInsights: insights,
+                conversationSummaries: summaries,
+                journalSummaries: journalSummaries,
+                goals: goalContexts,
+                jyotish: jyotish,
+                jyotishPassages: passages);
 
         var history = new ChatHistory(systemPrompt);
 
