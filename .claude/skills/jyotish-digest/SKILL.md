@@ -278,6 +278,7 @@ These are post-1929 but treated as "effectively public domain" for this project:
 | Source | Translator | Year | Why accepted | Closest clean alternative |
 |--------|-----------|------|--------------|---------------------------|
 | Jataka Parijata (Vaidyanatha) | V. Subrahmanya Sastri | 1932 | Sastri died 1945 → Indian PD since 2005. Covers Rahu/Ketu per house AND dasha phalas, neither of which exists in pre-1929 English. | Sanskrit Jataka Parijata (always PD) — not directly digestible |
+| Phaladeepika (Mantreswara) | V. Subrahmanya Sastri | 1937 | Sastri died 1945 → Indian PD since 2005. Covers dasha-antardasha pair phalas (classical 81-combo set), named yogas systematically, and rich per-bhava content not otherwise available in pre-1929 English. | Sanskrit Phaladeepika (always PD) — not directly digestible |
 
 When citing an acceptable-with-note source, set `sourceLicense: "acceptable_with_note"` (not `public_domain`) and include the alternative in commit messages/documentation so the legal posture is traceable.
 
@@ -288,7 +289,6 @@ When citing an acceptable-with-note source, set `sourceLicense: "acceptable_with
 - David Frawley — copyrighted
 - Sanjay Rath — copyrighted
 - P.V.R. Narasimha Rao — free distribution but verify exact license terms
-- V. Subrahmanya Sastri's Phaladeepika (1937) — post-1929, no Indian-PD date met yet at time of writing
 - Any 21st-century Jyotish interpretation
 
 ## Refusal template

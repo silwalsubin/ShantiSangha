@@ -2,23 +2,25 @@
 
 Snapshot of the pgvector-backed Jyotish passage corpus: what's ingested, what's deliberately skipped and why, and what would be needed to close remaining gaps.
 
-## Current state (387 passages, all source-cited)
+## Current state (410 passages, all source-cited)
 
-Every row carries `source_book`, `source_author`, `source_year`, `source_license`, `source_chapter`, and the `raw_source_excerpt` for audit. 350 originally from pre-1929 public-domain sources; 37 passages from Jataka Parijata 1932 (marked `acceptable_with_note` — see Sourcing policy below).
+Every row carries `source_book`, `source_author`, `source_year`, `source_license`, `source_chapter`, and the `raw_source_excerpt` for audit. 350 from pre-1929 public-domain sources; 60 from JP 1932 + Phaladeepika 1937 (marked `acceptable_with_note` — see Sourcing policy below).
 
 | Signature type | Count | Source | What it covers |
 |---|---|---|---|
-| `planet_in_house` | **106** | BJ Ch. XX + **JP Adh. VIII (Rahu/Ketu)** | 7 classical planets × 12 houses (84) + Rahu × 12 (12) + Ketu × 10 (10; Ketu in 7th & 8th not in JP Adh. VIII) |
+| `planet_in_house` | **108 ✅ complete** | BJ Ch. XX + JP Adh. VIII + **Phaladeepika Adh. VIII** | 9 grahas × 12 houses. Ketu in 7th & 8th filled from Phaladeepika (PD Adh. VIII slokas 31). |
 | `planet_in_house_with_ascendant` | 12 | BJ Ch. XX sub-variants | Dignity-aware compound signatures for 1st-house placements |
-| `planet_in_sign` | 84 | BJ Chs. XVII–XVIII | 7 classical planets × 12 signs (Rahu/Ketu per-sign not in JP Adh. VIII — would need a different source) |
-| `planet_for_lagna` | 64 | Jataka Chandrika Stanzas 41–71 (Suryanarayana Row 1900) | Per-ascendant friend/foe classification |
+| `planet_in_sign` | 84 | BJ Chs. XVII–XVIII | 7 classical planets × 12 signs (Rahu/Ketu per-sign deferred) |
+| `planet_for_lagna` | 64 | Jataka Chandrika Stanzas 41–71 | Per-ascendant friend/foe classification |
 | `nakshatra` | 27 | BJ Ch. XVI | All 27 moon-in-nakshatra placements |
 | `lagna` | 12 | BJ Ch. XVIII (Satyachariar section) | All 12 rising signs |
-| `yoga` | 45 | BJ + JP Adh. VII | 39 from BJ + 5 Pancha Mahapurusha + Neecha Bhanga |
+| `yoga` | **54** | BJ + JP Adh. VII + **Phaladeepika Adh. VI** | 39 BJ + 6 JP (Pancha Mahapurusha, Neecha Bhanga) + 9 Phaladeepika (Gajakesari, Mahabhagya, Sakata, Subhakartari/Papakartari, Amala, Vasumat, Pushkala, Lakshmi) |
 | `conjunction` | 21 | BJ Ch. XIV | All two-planet conjunctions among the 7 classical planets |
 | `avocation` | 7 | BJ Ch. X | Career indications by Navamsa lord of the 10th lord |
-| `dasha` | 9 | JP Adh. XVIII | All 9 mahadasha phalas |
-| **Total** | **387** | | |
+| `dasha` | **21** | JP Adh. XVIII + **Phaladeepika Adh. XX** | 9 mahadasha phalas (JP) + 12 bhava-lord dasha phalas (Phaladeepika — new signature `dasha_of_lord_of_h{N}`) |
+| **Total** | **410** | | |
+
+The `dasha_of_lord_of_h{N}` signature requires the chart engine to know the current mahadasha + which houses that planet lords (based on Lagna). Both signature emitters (ChartSignatures.cs + JyotishContext.cs) updated to emit these.
 
 ## Sourcing policy
 
@@ -112,17 +114,17 @@ aws secretsmanager get-secret-value \
 
 Expected output (as of last ingestion):
 ```json
-{"total":387,"byType":[
+{"total":410,"byType":[
   {"type":"avocation","count":7},
   {"type":"conjunction","count":21},
-  {"type":"dasha","count":9},
+  {"type":"dasha","count":21},
   {"type":"lagna","count":12},
   {"type":"nakshatra","count":27},
   {"type":"planet_for_lagna","count":64},
-  {"type":"planet_in_house","count":106},
+  {"type":"planet_in_house","count":108},
   {"type":"planet_in_house_with_ascendant","count":12},
   {"type":"planet_in_sign","count":84},
-  {"type":"yoga","count":45}
+  {"type":"yoga","count":54}
 ]}
 ```
 

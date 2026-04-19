@@ -206,9 +206,41 @@ public static class JyotishSignatureDerivation
         if (ctx.Chart is not null)
             sigs.AddRange(ctx.Chart.DeriveSignatures());
         if (!string.IsNullOrWhiteSpace(ctx.Mahadasha))
-            sigs.Add($"{ctx.Mahadasha.ToLowerInvariant()}_mahadasha");
+        {
+            var mahadashaPlanet = ctx.Mahadasha.ToLowerInvariant();
+            sigs.Add($"{mahadashaPlanet}_mahadasha");
+
+            // Bhava-lord dasha signatures: for each house whose lord is the
+            // current mahadasha planet, emit dasha_of_lord_of_h{N}.
+            if (ctx.Chart?.Lagna is not null)
+            {
+                var lagnaRashi = ExtractSanskrit(ctx.Chart.Lagna.Rashi).ToLowerInvariant();
+                if (RashiIndex.TryGetValue(lagnaRashi, out var lagnaIdx))
+                {
+                    for (int house = 1; house <= 12; house++)
+                    {
+                        var signIdx = (lagnaIdx + house - 1) % 12;
+                        if (string.Equals(RashiLord[signIdx], mahadashaPlanet, StringComparison.Ordinal))
+                            sigs.Add($"dasha_of_lord_of_h{house}");
+                    }
+                }
+            }
+        }
         return sigs;
     }
+
+    private static readonly Dictionary<string, int> RashiIndex = new(StringComparer.Ordinal)
+    {
+        ["mesha"] = 0, ["vrishabha"] = 1, ["mithuna"] = 2, ["karka"] = 3, ["kataka"] = 3,
+        ["simha"] = 4, ["kanya"] = 5, ["tula"] = 6, ["thula"] = 6, ["vrischika"] = 7, ["vrishchika"] = 7,
+        ["dhanu"] = 8, ["dhanus"] = 8, ["makara"] = 9, ["kumbha"] = 10, ["meena"] = 11,
+    };
+
+    private static readonly string[] RashiLord =
+    [
+        "mars", "venus", "mercury", "moon", "sun", "mercury",
+        "venus", "mars", "jupiter", "saturn", "saturn", "jupiter"
+    ];
 
     /// <summary>"Mesha (Aries)" → "Mesha". Handles labels that already have no paren.</summary>
     private static string ExtractSanskrit(string rashiLabel)

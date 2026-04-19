@@ -147,9 +147,43 @@ public static class ChartSignatures
         if (now.HasValue)
         {
             var dasha = VedicCalendar.GetCurrentDasha(birthUtc, now.Value);
-            signatures.Add($"{dasha.Mahadasha.ToLowerInvariant()}_mahadasha");
+            var mahadashaPlanet = dasha.Mahadasha.ToLowerInvariant();
+            signatures.Add($"{mahadashaPlanet}_mahadasha");
+
+            // Bhava-lord dasha signatures: for each house whose lord is the
+            // current mahadasha planet, emit dasha_of_lord_of_h{N}. Indexes
+            // Phaladeepika Adh. XX per-bhava dasha phalas.
+            if (ascSidereal.HasValue)
+            {
+                var lagnaIdx = VedicCalendar.GetRashiIndex(ascSidereal.Value);
+                for (int house = 1; house <= 12; house++)
+                {
+                    var signIdx = (lagnaIdx + house - 1) % 12;
+                    if (string.Equals(RashiLord[signIdx], mahadashaPlanet, StringComparison.Ordinal))
+                        signatures.Add($"dasha_of_lord_of_h{house}");
+                }
+            }
         }
 
         return signatures.ToList();
     }
+
+    // Sign lords — same zero-indexed order as RashiSanskrit. Rahu/Ketu aren't
+    // classical sign lords in Jyotish, so this array covers the 7 grahas that
+    // rule signs.
+    private static readonly string[] RashiLord =
+    [
+        "mars",      // mesha
+        "venus",     // vrishabha
+        "mercury",   // mithuna
+        "moon",      // karka
+        "sun",       // simha
+        "mercury",   // kanya
+        "venus",     // tula
+        "mars",      // vrischika
+        "jupiter",   // dhanu
+        "saturn",    // makara
+        "saturn",    // kumbha
+        "jupiter",   // meena
+    ];
 }
