@@ -2,23 +2,23 @@
 
 Snapshot of the pgvector-backed Jyotish passage corpus: what's ingested, what's deliberately skipped and why, and what would be needed to close remaining gaps.
 
-## Current state (365 passages, all source-cited)
+## Current state (387 passages, all source-cited)
 
-Every row carries `source_book`, `source_author`, `source_year`, `source_license`, `source_chapter`, and the `raw_source_excerpt` for audit. All 350 originally from pre-1929 public-domain sources; 15 passages newly added from Jataka Parijata 1932 (marked `acceptable_with_note` — see Sourcing policy below).
+Every row carries `source_book`, `source_author`, `source_year`, `source_license`, `source_chapter`, and the `raw_source_excerpt` for audit. 350 originally from pre-1929 public-domain sources; 37 passages from Jataka Parijata 1932 (marked `acceptable_with_note` — see Sourcing policy below).
 
 | Signature type | Count | Source | What it covers |
 |---|---|---|---|
-| `planet_in_house` | 84 | BJ Ch. XX (Chidambaram Aiyar 1905) | 7 classical planets × 12 houses (Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn) |
-| `planet_in_house_with_ascendant` | 12 | BJ Ch. XX sub-variants | Dignity-aware compound signatures for 1st-house placements (e.g. `sun_in_h1__lagna_tula` = Sun debilitated) |
-| `planet_in_sign` | 84 | BJ Chs. XVII–XVIII | 7 planets × 12 signs (every exaltation, debilitation, own sign, moolatrikona captured) |
-| `planet_for_lagna` | 64 | Jataka Chandrika Stanzas 41–71 (Suryanarayana Row 1900) | Per-ascendant friend/foe classification: which planets are yogakarakas, benefics, or malefics for each of the 12 rising signs |
+| `planet_in_house` | **106** | BJ Ch. XX + **JP Adh. VIII (Rahu/Ketu)** | 7 classical planets × 12 houses (84) + Rahu × 12 (12) + Ketu × 10 (10; Ketu in 7th & 8th not in JP Adh. VIII) |
+| `planet_in_house_with_ascendant` | 12 | BJ Ch. XX sub-variants | Dignity-aware compound signatures for 1st-house placements |
+| `planet_in_sign` | 84 | BJ Chs. XVII–XVIII | 7 classical planets × 12 signs (Rahu/Ketu per-sign not in JP Adh. VIII — would need a different source) |
+| `planet_for_lagna` | 64 | Jataka Chandrika Stanzas 41–71 (Suryanarayana Row 1900) | Per-ascendant friend/foe classification |
 | `nakshatra` | 27 | BJ Ch. XVI | All 27 moon-in-nakshatra placements |
 | `lagna` | 12 | BJ Ch. XVIII (Satyachariar section) | All 12 rising signs |
-| `yoga` | 45 | BJ + **Jataka Parijata Adh. VII** | BJ: 39 (Raja Yoga, Akriti, Sankhya, Asraya, Dala, Chandra yogas, Ascetic Yoga). JP: 6 (5 Pancha Mahapurusha — Ruchaka/Bhadra/Hamsa/Malavya/Sasa — plus Neecha Bhanga Raja Yoga) |
+| `yoga` | 45 | BJ + JP Adh. VII | 39 from BJ + 5 Pancha Mahapurusha + Neecha Bhanga |
 | `conjunction` | 21 | BJ Ch. XIV | All two-planet conjunctions among the 7 classical planets |
-| `avocation` | 7 | BJ Ch. X | Career indications by Navamsa lord of the 10th lord (one per planet) |
-| `dasha` | **9** | **Jataka Parijata Adh. XVIII (Sastri 1932)** | All 9 mahadasha phalas (Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu, Ketu) — unlocks the Mahadasha indicator in the chart UI |
-| **Total** | **365** | | |
+| `avocation` | 7 | BJ Ch. X | Career indications by Navamsa lord of the 10th lord |
+| `dasha` | 9 | JP Adh. XVIII | All 9 mahadasha phalas |
+| **Total** | **387** | | |
 
 ## Sourcing policy
 
@@ -82,11 +82,13 @@ Classical Jyotish leans heavily on "lord of Xth house placed in Yth house" — 1
 
 Pancha Mahapurusha (Ruchaka / Bhadra / Hamsa / Malavya / Sasa) and Neecha Bhanga Raja Yoga are now ingested from Jataka Parijata Adh. VII. Still open: **Gajakesari** (Moon–Jupiter kendra) and some Dhana Yogas — implied but not named. `conj_jupiter_moon` already covers the Gajakesari phenomenon in effect.
 
-### 6. Rahu/Ketu per-house placements — STRUCTURAL GAP
+### 6. Rahu/Ketu per-house placements — ✅ MOSTLY RESOLVED
 
-Initially targeted for ingestion from Jataka Parijata, but on close inspection the classical Jyotish canon (BJ, JP, JC, Sarvartha Chintamani) does **not** provide systematic "Rahu in Nth house" or "Ketu in Nth house" individual phalas. Classical texts treat the nodes as modifiers in specific combinations (e.g. "Sun + Rahu in 4th", "Ketu + lord-of-6th"), not as primary agents in each bhava. The familiar per-house Rahu/Ketu tables are post-BPHS-Santhanam (1984) territory.
+Earlier documented as a structural gap on the basis of surface scans, but on closer reading **JP Adhyaya VIII does systematically cover Rahu and Ketu per bhava** as part of its full bhava-by-bhava treatment. 22 per-bhava passages (Rahu × 12, Ketu × 10) ingested from JP Adh. VIII slokas 60–99. Ketu in 7th and 8th bhavas are not explicitly covered in JP Adh. VIII — remaining honest gap.
 
-**Next action options:** (a) accept the canonical limitation and let the chart UI display Rahu/Ketu without a retrievable passage; (b) license a modern translation; (c) extract combination passages from JP Adh. XI–XV (Rahu + another planet in specific bhava) as compound signatures — technically faithful to the classical canon but requires chart-engine changes to emit the compound signatures.
+### 7. Rahu/Ketu per-sign — STILL OPEN
+
+JP's per-sign content for nodes appears only in the dasha chapter (Adh. XVIII) and is period-specific, not lifetime. Clean `rahu_in_{sign}` / `ketu_in_{sign}` passages would need a different source. Deferred; low priority.
 
 ## How to continue digestion
 
@@ -110,14 +112,14 @@ aws secretsmanager get-secret-value \
 
 Expected output (as of last ingestion):
 ```json
-{"total":365,"byType":[
+{"total":387,"byType":[
   {"type":"avocation","count":7},
   {"type":"conjunction","count":21},
   {"type":"dasha","count":9},
   {"type":"lagna","count":12},
   {"type":"nakshatra","count":27},
   {"type":"planet_for_lagna","count":64},
-  {"type":"planet_in_house","count":84},
+  {"type":"planet_in_house","count":106},
   {"type":"planet_in_house_with_ascendant","count":12},
   {"type":"planet_in_sign","count":84},
   {"type":"yoga","count":45}
