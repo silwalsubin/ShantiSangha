@@ -30,7 +30,9 @@ public record JyotishContext(
     /// <summary>When the current Antardasha started — used to detect recent shifts</summary>
     DateTime? AntardashaStart = null,
     /// <summary>Raw birth nakshatra name (for matching against current day's nakshatra)</summary>
-    string? BirthNakshatraName = null)
+    string? BirthNakshatraName = null,
+    /// <summary>Full birth chart details — birth data, lagna, all planets. Null if birth time or place unavailable.</summary>
+    JyotishChartDetails? Chart = null)
 {
     /// <summary>
     /// Formats this context as a text block for AI prompt injection.
@@ -58,6 +60,9 @@ public record JyotishContext(
         if (TransitNote is not null)
             parts.Add(TransitNote);
 
+        if (Chart is not null)
+            parts.Add(Chart.FormatForPrompt());
+
         parts.Add("""
             How to use this Vedic context depends on what the person is asking:
 
@@ -76,8 +81,68 @@ public record JyotishContext(
               ARE a teacher who holds this framework and speaks from it when invited.
               Never refuse a chart question by saying "I can't read charts" — that is
               not true of you. You can, and you do, with humility and care.
+
+            CRITICAL: Their birth date, birth time, birth place, lagna, and every
+            planet are already above. Never ask them to share their birth details or
+            chart data — you have it. Just read it and speak from it.
             """);
 
         return string.Join("\n\n", parts);
     }
 }
+
+/// <summary>
+/// Full computed birth chart for AI prompt context. Mirrors what is shown in
+/// the Birth Chart UI so the AI never has to ask for birth details already on file.
+/// </summary>
+public record JyotishChartDetails(
+    string BirthDate,
+    string BirthTime,
+    string? BirthPlace,
+    ChartLagna? Lagna,
+    IReadOnlyList<ChartPlanet> Planets)
+{
+    public string FormatForPrompt()
+    {
+        var parts = new List<string> { "## Their birth chart (already on file — do NOT ask for birth details)" };
+
+        var birthLine = $"Born {BirthDate} at {BirthTime}";
+        if (!string.IsNullOrWhiteSpace(BirthPlace))
+            birthLine += $" ({BirthPlace})";
+        birthLine += ".";
+        parts.Add(birthLine);
+
+        if (Lagna is not null)
+            parts.Add($"Lagna (Ascendant): {Lagna.Rashi}, {Lagna.Degree:F2}°, in {Lagna.Nakshatra} nakshatra (pada {Lagna.Pada}).");
+
+        if (Planets.Count > 0)
+        {
+            var planetLines = Planets.Select(p =>
+            {
+                var house = p.House.HasValue ? $", house {p.House.Value}" : "";
+                var flags = new List<string>();
+                if (!string.IsNullOrWhiteSpace(p.Dignity) && p.Dignity != "Neutral") flags.Add(p.Dignity.ToLowerInvariant());
+                if (p.Retrograde) flags.Add("retrograde");
+                if (p.Combust) flags.Add("combust");
+                var flagText = flags.Count > 0 ? $" [{string.Join(", ", flags)}]" : "";
+                return $"- {p.Name}: {p.Rashi}, {p.Degree:F2}°, in {p.Nakshatra} nakshatra (pada {p.Pada}){house}{flagText}";
+            });
+            parts.Add("Planets:\n" + string.Join("\n", planetLines));
+        }
+
+        return string.Join("\n\n", parts);
+    }
+}
+
+public record ChartLagna(string Rashi, double Degree, string Nakshatra, int Pada);
+
+public record ChartPlanet(
+    string Name,
+    string Rashi,
+    double Degree,
+    int? House,
+    string Nakshatra,
+    int Pada,
+    string Dignity,
+    bool Retrograde,
+    bool Combust);

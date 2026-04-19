@@ -27,6 +27,7 @@ public class JyotishContextService(IProfileQueryService profileQuery) : IJyotish
         string? mahadasha = null;
         string? antardasha = null;
         DateTime? antardashaStart = null;
+        JyotishChartDetails? chartDetails = null;
 
         if (birth.BirthDate is not null)
         {
@@ -52,8 +53,8 @@ public class JyotishContextService(IProfileQueryService profileQuery) : IJyotish
             // Resolve local birth time → UTC via IANA timezone at birth location.
             var birthDateTime = BirthTimeResolver.ResolveBirthUtc(birthDate, birthTimeOnly, lat, lon);
 
-            var sunSidereal = VedicCalendar.ToSidereal(
-                VedicCalendar.GetTropicalSunLongitude(birthDateTime), birthDateTime);
+            var sunTropical = VedicCalendar.GetTropicalSunLongitude(birthDateTime);
+            var sunSidereal = VedicCalendar.ToSidereal(sunTropical, birthDateTime);
             sunRashi = VedicCalendar.GetRashi(VedicCalendar.GetRashiIndex(sunSidereal));
 
             if (birth.BirthTime is not null)
@@ -72,6 +73,8 @@ public class JyotishContextService(IProfileQueryService profileQuery) : IJyotish
                 mahadasha = dasha.Mahadasha;
                 antardasha = dasha.Antardasha;
                 antardashaStart = dasha.AntardashaStart;
+
+                chartDetails = BuildChartDetails(birth, birthDateTime, sunTropical, lat, lon);
             }
 
             transitNote = GenerateTransitNote(sunRashi, todayNakshatra, todayNakshatraQuality, tithi);
@@ -99,7 +102,76 @@ public class JyotishContextService(IProfileQueryService profileQuery) : IJyotish
             Mahadasha: mahadasha,
             Antardasha: antardasha,
             AntardashaStart: antardashaStart,
-            BirthNakshatraName: birthNakshatraName);
+            BirthNakshatraName: birthNakshatraName,
+            Chart: chartDetails);
+    }
+
+    private static JyotishChartDetails BuildChartDetails(
+        UserBirthInfo birth,
+        DateTime birthDateTime,
+        double sunTropical,
+        double? lat,
+        double? lon)
+    {
+        ChartLagna? lagnaDetails = null;
+        double? ascendantSidereal = null;
+        if (lat.HasValue && lon.HasValue)
+        {
+            var ascTropical = VedicCalendar.GetTropicalAscendant(birthDateTime, lat.Value, lon.Value);
+            var ascSidereal = VedicCalendar.ToSidereal(ascTropical, birthDateTime);
+            ascendantSidereal = ascSidereal;
+            var ascRashiIdx = VedicCalendar.GetRashiIndex(ascSidereal);
+            var ascNakIdx = VedicCalendar.GetNakshatraIndex(ascSidereal);
+            var (ascNakName, _) = VedicCalendar.GetNakshatra(ascNakIdx);
+            lagnaDetails = new ChartLagna(
+                Rashi: VedicCalendar.GetRashi(ascRashiIdx),
+                Degree: Math.Round(VedicCalendar.GetDegreeInRashi(ascSidereal), 2),
+                Nakshatra: ascNakName,
+                Pada: VedicCalendar.GetPada(ascSidereal));
+        }
+
+        var planetLongitudes = new (string Name, double Tropical)[]
+        {
+            ("Sun", sunTropical),
+            ("Moon", VedicCalendar.GetTropicalMoonLongitude(birthDateTime)),
+            ("Mercury", PlanetaryPositions.GetTropicalMercuryLongitude(birthDateTime)),
+            ("Venus", PlanetaryPositions.GetTropicalVenusLongitude(birthDateTime)),
+            ("Mars", PlanetaryPositions.GetTropicalMarsLongitude(birthDateTime)),
+            ("Jupiter", PlanetaryPositions.GetTropicalJupiterLongitude(birthDateTime)),
+            ("Saturn", PlanetaryPositions.GetTropicalSaturnLongitude(birthDateTime)),
+            ("Rahu", PlanetaryPositions.GetTropicalRahuLongitude(birthDateTime)),
+            ("Ketu", PlanetaryPositions.GetTropicalKetuLongitude(birthDateTime))
+        };
+
+        var planets = planetLongitudes.Select(p =>
+        {
+            var sidereal = VedicCalendar.ToSidereal(p.Tropical, birthDateTime);
+            var rashiIdx = VedicCalendar.GetRashiIndex(sidereal);
+            var degInRashi = VedicCalendar.GetDegreeInRashi(sidereal);
+            var nakIdx = VedicCalendar.GetNakshatraIndex(sidereal);
+            var (nakName, _) = VedicCalendar.GetNakshatra(nakIdx);
+            int? house = ascendantSidereal.HasValue
+                ? VedicCalendar.GetHouse(sidereal, ascendantSidereal.Value)
+                : null;
+            var retrograde = PlanetaryPositions.IsRetrograde(p.Name, birthDateTime);
+            return new ChartPlanet(
+                Name: p.Name,
+                Rashi: VedicCalendar.GetRashi(rashiIdx),
+                Degree: Math.Round(degInRashi, 2),
+                House: house,
+                Nakshatra: nakName,
+                Pada: VedicCalendar.GetPada(sidereal),
+                Dignity: VedicCalendar.GetDignity(p.Name, rashiIdx, degInRashi),
+                Retrograde: retrograde,
+                Combust: PlanetaryPositions.IsCombust(p.Name, p.Tropical, sunTropical, retrograde));
+        }).ToList();
+
+        return new JyotishChartDetails(
+            BirthDate: birth.BirthDate!.Value.ToString("MMMM d, yyyy"),
+            BirthTime: birth.BirthTime ?? "unknown",
+            BirthPlace: birth.BirthPlace,
+            Lagna: lagnaDetails,
+            Planets: planets);
     }
 
     private static string? GenerateTransitNote(
