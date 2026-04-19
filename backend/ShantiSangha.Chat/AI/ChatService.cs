@@ -25,6 +25,7 @@ public class ChatService(
     IProfileQueryService profileQuery,
     IJyotishContextService jyotishService,
     IJyotishKnowledgeService jyotishKnowledge,
+    IChartReadingService chartReadingService,
     IEventBus eventBus,
     ILogger<ChatService> logger) : IChatService
 {
@@ -271,11 +272,30 @@ public class ChatService(
             IsCompleted: g.IsCompleted,
             DeeperWhy: g.DeeperWhy)).ToList();
 
+        // Chart conversations read from the pre-composed chart reading when
+        // one exists. If no reading is cached yet, we skip it here (lazy-
+        // generating on every chat turn would be too expensive); the iOS
+        // chart page's GET /api/jyotish/reading triggers generation
+        // separately when the user opens the chart.
+        ChartReading? chartReading = null;
+        if (isChart)
+        {
+            try
+            {
+                chartReading = await chartReadingService.GetAsync(userId, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to load chart reading for conversation {ConversationId}", conversationId);
+            }
+        }
+
         var systemPrompt = isChart
             ? SystemPrompt.ForChart(
                 displayName: displayName,
                 jyotish: jyotish,
-                jyotishPassages: passages)
+                jyotishPassages: passages,
+                reading: chartReading)
             : SystemPrompt.WithContext(
                 displayName: displayName,
                 todaysReflection: todaysReflection,

@@ -6,10 +6,21 @@ namespace ShantiSangha.Jyotish.Data;
 public class JyotishDbContext(DbContextOptions<JyotishDbContext> options) : DbContext(options)
 {
     public DbSet<JyotishPassageEntity> Passages => Set<JyotishPassageEntity>();
+    public DbSet<ChartReadingEntity> Readings => Set<ChartReadingEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasPostgresExtension("vector");
+
+        modelBuilder.Entity<ChartReadingEntity>(e =>
+        {
+            e.ToTable("jyotish_readings");
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.UserId).IsUnique();  // one reading per user
+            e.Property(x => x.ChartHash).IsRequired().HasMaxLength(64);
+            e.Property(x => x.SectionsJson).HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.PassageUsageJson).HasColumnType("jsonb").IsRequired();
+        });
 
         modelBuilder.Entity<JyotishPassageEntity>(e =>
         {

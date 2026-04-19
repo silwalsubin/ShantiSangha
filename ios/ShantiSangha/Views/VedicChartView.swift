@@ -24,6 +24,11 @@ struct VedicChartView: View {
     @State private var pendingChatId: String?
     @State private var startingChat = false
 
+    // Pre-composed chart reading (classical corpus-grounded). Loaded in
+    // parallel with the chart; generation on first access can take ~10s.
+    @State private var reading: ChartReadingResponse?
+    @State private var readingLoading = false
+
     private let api = ApiService.shared
 
     var body: some View {
@@ -39,6 +44,8 @@ struct VedicChartView: View {
                     } else if let error {
                         errorView(error)
                     } else if let chart, chart.available {
+                        chartReadingCard
+
                         if let planets = chart.planets, !planets.isEmpty {
                             rashiSection(planets: planets)
                         }
@@ -83,6 +90,7 @@ struct VedicChartView: View {
         }
         .task { await loadBirthDetails() }
         .task { await load() }
+        .task { await loadReading() }
         .sheet(isPresented: $showBirthDatePicker) { birthDateSheet }
         .sheet(isPresented: $showBirthTimePicker) { birthTimeSheet }
         .sheet(isPresented: $showBirthPlacePicker) {
@@ -138,6 +146,102 @@ struct VedicChartView: View {
             pendingChatId = conv.id
         } catch {
             AppLogger.shared.error("VedicChart", "Failed to start chart chat: \(error)")
+        }
+    }
+
+    // MARK: - Chart reading (pre-composed from corpus)
+
+    /// The "Your Reading" card — 6 collapsible sections composed server-side
+    /// from the user's chart + classical Brihat Jataka passages. Shows a
+    /// shimmer while first-time generation runs (can take ~10s).
+    @ViewBuilder
+    private var chartReadingCard: some View {
+        if readingLoading && reading == nil {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("YOUR READING")
+                    .font(.sacredSectionLabel)
+                    .tracking(3)
+                    .foregroundColor(.sacredLabel)
+                HStack(spacing: 10) {
+                    ProgressView().tint(.sacredGold)
+                    Text("Composing your reading from the classical sources…")
+                        .font(.sacredMicro)
+                        .italic()
+                        .foregroundColor(.sacredMuted)
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
+        } else if let reading, !reading.sections.isEmpty {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("YOUR READING")
+                    .font(.sacredSectionLabel)
+                    .tracking(3)
+                    .foregroundColor(.sacredLabel)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(ChartReadingSectionKey.ordered, id: \.key) { section in
+                        if let prose = reading.sections[section.key], !prose.isEmpty {
+                            readingRow(key: "reading.\(section.key)", title: section.title, prose: prose)
+                        }
+                    }
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
+        }
+    }
+
+    private func readingRow(key: String, title: String, prose: String) -> some View {
+        let isOpen = expanded.contains(key)
+        return VStack(alignment: .leading, spacing: 8) {
+            Button {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    if isOpen { expanded.remove(key) } else { expanded.insert(key) }
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Text(title)
+                        .font(.sacredSmallSemibold)
+                        .foregroundColor(.sacredText)
+                    Spacer(minLength: 0)
+                    Image(systemName: isOpen ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 9, weight: .bold, design: .serif))
+                        .foregroundColor(.sacredMuted.opacity(0.6))
+                }
+                .padding(.vertical, 8)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isOpen {
+                Text(prose)
+                    .font(.sacredSmall)
+                    .italic()
+                    .foregroundColor(.sacredTextSecondary)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.bottom, 4)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+
+    private func loadReading() async {
+        guard reading == nil else { return }
+        readingLoading = true
+        defer { readingLoading = false }
+        do {
+            let result: ChartReadingResponse = try await api.get("/jyotish/reading")
+            withAnimation(.easeIn(duration: 0.3)) { reading = result }
+        } catch {
+            if !error.isCancellation {
+                AppLogger.shared.error("VedicChart", "Failed to load chart reading: \(error)")
+            }
         }
     }
 
@@ -949,6 +1053,28 @@ private struct MeProfileData: Decodable {
     let birthDate: String?
     let birthTime: String?
     let birthPlace: String?
+}
+
+// MARK: - Chart reading
+
+/// Response from GET /api/jyotish/reading.
+struct ChartReadingResponse: Decodable {
+    let sections: [String: String]
+    let generatedAt: String
+    let isComplete: Bool
+}
+
+/// The six sections of the pre-composed chart reading, in display order.
+/// Keys match the backend's ChartReadingSection constants.
+enum ChartReadingSectionKey {
+    static let ordered: [(key: String, title: String)] = [
+        ("essence", "Your essence"),
+        ("emotional_nature", "Your emotional nature"),
+        ("mind_and_voice", "Your mind and voice"),
+        ("drive_and_action", "Your drive and action"),
+        ("path_of_growth", "Your path of growth"),
+        ("season", "This season of your life"),
+    ]
 }
 
 // MARK: - Response models

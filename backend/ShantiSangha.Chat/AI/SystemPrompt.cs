@@ -253,7 +253,8 @@ public static class SystemPrompt
     public static string ForChart(
         string? displayName,
         JyotishContext? jyotish,
-        IEnumerable<JyotishPassage>? jyotishPassages)
+        IEnumerable<JyotishPassage>? jyotishPassages,
+        ChartReading? reading = null)
     {
         var parts = new List<string>
         {
@@ -307,6 +308,34 @@ public static class SystemPrompt
 
         if (jyotish is not null)
             parts.Add(jyotish.FormatForPrompt());
+
+        if (reading is not null && reading.Sections.Count > 0)
+        {
+            var sectionParts = new List<string>();
+            foreach (var key in ChartReadingSection.All)
+            {
+                if (reading.Sections.TryGetValue(key, out var prose) && !string.IsNullOrWhiteSpace(prose))
+                {
+                    var label = key.Replace('_', ' ');
+                    label = char.ToUpperInvariant(label[0]) + label[1..];
+                    sectionParts.Add($"### {label}\n{prose.Trim()}");
+                }
+            }
+
+            if (sectionParts.Count > 0)
+            {
+                parts.Add($"""
+                    ## Their chart reading (pre-composed from the corpus)
+                    This is the grounded, source-backed reading of their whole
+                    chart. Use it as the substrate for your response — when a
+                    question touches a section below, start from what the
+                    reading already says and deepen it with the specific
+                    passages below. Do not contradict the reading.
+
+                    {string.Join("\n\n", sectionParts)}
+                    """);
+            }
+        }
 
         var passageList = jyotishPassages?.ToList();
         if (passageList is { Count: > 0 })
