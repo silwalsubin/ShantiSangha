@@ -188,6 +188,48 @@ public class JyotishIngestController(
         return Ok(new { total, byType });
     }
 
+    /// <summary>
+    /// Admin-only dump of all passages in ingest DTO shape. Used for retone
+    /// passes: pull existing passages, rewrite their content field, re-post
+    /// to the batch endpoint (which upserts by id).
+    /// Optional signatureType query filters to one type.
+    /// </summary>
+    [HttpGet("all")]
+    public async Task<IActionResult> All(
+        [FromQuery] string? signatureType,
+        CancellationToken ct)
+    {
+        var q = db.Passages.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(signatureType))
+            q = q.Where(p => p.SignatureType == signatureType);
+
+        var passages = await q
+            .OrderBy(p => p.SignatureType)
+            .ThenBy(p => p.PassageId)
+            .Select(p => new
+            {
+                id = p.PassageId,
+                signatureType = p.SignatureType,
+                signatures = p.Signatures,
+                title = p.Title,
+                content = p.Content,
+                themes = p.Themes,
+                polarity = p.Polarity,
+                scope = p.Scope,
+                sourceBook = p.SourceBook,
+                sourceAuthor = p.SourceAuthor,
+                sourceYear = p.SourceYear,
+                sourceLicense = p.SourceLicense,
+                sourceChapter = p.SourceChapter,
+                sourceVerse = p.SourceVerse,
+                rawSourceExcerpt = p.RawSourceExcerpt,
+                source = p.Source,
+            })
+            .ToListAsync(ct);
+
+        return Ok(passages);
+    }
+
     private static bool Validate(IngestPassageDto dto, out string error)
     {
         if (string.IsNullOrWhiteSpace(dto.Id)) { error = "id required"; return false; }
