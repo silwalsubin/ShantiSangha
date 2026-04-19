@@ -1,6 +1,6 @@
 ---
 name: jyotish-digest
-description: "Digests passages from public domain Vedic astrology (Jyotish) classical texts and ingests them into the ShantiSangha pgvector corpus behind the admin-key-gated `/api/jyotish/ingest/batch` endpoint. Use this skill whenever the user pastes or points to text from classical Jyotish sources (Brihat Parashara Hora Shastra, Phaladeepika, Saravali, Brihat Jataka, Jataka Parijata, Sarvartha Chintamani, Hora Sara) or their public domain English translations (Suryanarain Rao, Subrahmanya Sastri, Chidambaram Aiyar, Ernest Wood), asks to digest, modernize, convert, ingest, or produce passages, or mentions adding to the Jyotish corpus. The skill owns the full pipeline: sourcing → modernization → JSON staging → DTO packaging → SSO-authenticated ingestion via AWS CLI + curl. Produces source-cited passages that keep the tradition's interpretive core while removing archaic language, prediction-as-fate, and outdated cultural assumptions."
+description: "Digests passages from public domain Vedic astrology (Jyotish) classical texts and ingests them into the ShantiSangha pgvector corpus behind the admin-key-gated `/api/jyotish/ingest/batch` endpoint. Use this skill whenever the user pastes or points to text from classical Jyotish sources (Brihat Parashara Hora Shastra, Phaladeepika, Saravali, Brihat Jataka, Jataka Parijata, Sarvartha Chintamani, Hora Sara) or their public domain English translations (Suryanarain Rao, Subrahmanya Sastri, Chidambaram Aiyar, Ernest Wood), asks to digest, modernize, convert, ingest, or produce passages, or mentions adding to the Jyotish corpus. Also use this skill when the user asks to audit the corpus, find knowledge gaps, see what's missing, check coverage, or asks 'what should we ingest next?' — the skill pulls live inventory from the AWS-hosted corpus, diffs against full coverage targets, and (only with user confirmation) proposes other public domain sources to fill the gaps. The skill owns the full pipeline: sourcing → modernization → JSON staging → DTO packaging → SSO-authenticated ingestion via AWS CLI + curl. Produces source-cited passages that keep the tradition's interpretive core while removing archaic language, prediction-as-fate, and outdated cultural assumptions."
 ---
 
 # Jyotish Corpus Digest
@@ -285,3 +285,89 @@ When invoked:
 If you must refuse, say clearly what's missing or blocked and suggest the fix. Example:
 
 > "I can't produce a passage from this — the provided text is from R. Santhanam's 1984 translation, which is still under copyright. For the same interpretation from a public domain source, try V. Subrahmanya Sastri's 1917 Phaladeepika (Ch. 10) or B. Suryanarain Rao's BPHS editions. I can digest those."
+
+## Gap Analysis Mode
+
+Triggered when the user asks to **audit the corpus**, **find gaps**, **check coverage**, **see what's missing**, or **decide what to ingest next**. This mode is read-first, write-only-on-confirmation. It does NOT generate or ingest new passages on its own — its output is always a gap report and a question.
+
+### Step 1 — Pull live inventory from AWS
+
+Use the existing admin endpoints. Reuse the SSO + admin-key flow from the ingest workflow:
+
+```bash
+PROFILE=AdministratorAccess-362249013106   # or user's equivalent SSO profile
+ADMIN_KEY=$(aws secretsmanager get-secret-value \
+  --secret-id shantisangha/jyotish_admin_key \
+  --profile $PROFILE \
+  --query SecretString --output text)
+
+# Quick totals grouped by signature_type:
+curl -sS -H "X-Admin-Key: $ADMIN_KEY" \
+  https://shantisangha.com/api/jyotish/ingest/count
+
+# Full dump (use for signature-level diffing). Filter by type to bound size:
+curl -sS -H "X-Admin-Key: $ADMIN_KEY" \
+  "https://shantisangha.com/api/jyotish/ingest/all?signatureType=planet_in_house" \
+  > /tmp/jyotish_existing_planet_in_house.json
+```
+
+Pull each signature type independently rather than the full corpus at once.
+
+### Step 2 — Diff against the coverage matrix
+
+| signature_type | Full coverage = | Notes |
+|---|---|---|
+| `planet_in_house` | 9 grahas × 12 houses = **108** | Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu, Ketu × H1–H12 |
+| `planet_in_sign` | 9 grahas × 12 rashis = **108** | Same grahas × Mesha–Meena |
+| `nakshatra` | **27** | Moon-in-nakshatra is the priority; Lagna-in-nakshatra is a stretch goal |
+| `dasha` | **9** mahadasha cores | One per planetary period |
+| `dasha_pair` | classically-cited subset | Don't pursue all 81; focus on combinations the classics actually discuss |
+| `yoga` | defined named-yoga set | Gajakesari, Pancha Mahapurusha, Raja Yogas, Dhana Yogas, Neecha Bhanga, etc. — keep a curated list, not exhaustive |
+| `transit_aspect` | open-ended | Lowest priority; only if user asks |
+
+For each signature_type, extract the existing `signatures` arrays from the dump, normalize, and compute the missing set against the coverage target. Always prefer **English aliases** (`saturn_in_h7`, not just `shani_in_h7`) when reporting gaps so they map cleanly to the engine's signature lookup.
+
+### Step 3 — Present the gap report
+
+Group by signature_type. For each group: total covered / target, then the missing signatures (or a representative sample if there are more than ~15). Also surface which **source books** the existing coverage came from (from `sourceBook` in the dump) so the user can see whether the corpus leans on one translator.
+
+Example output shape:
+
+> **Coverage**
+> - planet_in_house: 41/108 (62% missing). Notable gaps: rahu_in_h2, rahu_in_h6, rahu_in_h8, ketu_in_h3, ketu_in_h9, mars_in_h12, mercury_in_h8…
+> - nakshatra: 12/27 (15 missing). Gaps: moon_in_ardra, moon_in_purvaphalguni, moon_in_uttaraphalguni, moon_in_hasta, moon_in_chitra…
+> - dasha: 6/9 (3 missing). Gaps: rahu_mahadasha, ketu_mahadasha, mercury_mahadasha
+> - dasha_pair: 4 covered, no defined target — flag for user judgment
+> - yoga: 7 covered, no defined target — flag for user judgment
+>
+> **Source coverage skew**: 78% of existing passages cite Suryanarain Rao's BPHS; only 9% cite Subrahmanya Sastri's Brihat Jataka. Phaladeepika and Saravali are barely tapped.
+
+### Step 4 — Ask before exploring sources (REQUIRED)
+
+This is the gating step. Do **not** start drafting passages or pulling source text yet. Ask the user explicitly, naming the candidate sources:
+
+> "I see 67 missing planet_in_house signatures and 15 missing nakshatras. Want me to look at these public domain sources to fill those gaps?
+> - **Phaladeepika** (V. Subrahmanya Sastri, 1917) — strong on planet-in-house and yogas; barely used so far
+> - **Saravali** (B. Suryanarain Rao) — covers planet-in-sign and nakshatra in detail
+> - **Brihat Jataka** (Subrahmanya Sastri 1918) — the canonical nakshatra source
+> - **Jataka Parijata** (Suryanarain Rao) — good for dasha treatment
+>
+> Confirm which sources I should pull from, and I'll draft the staging file for your review before any ingest."
+
+Wait for the user to confirm. Never auto-proceed to drafting or ingestion.
+
+### Step 5 — On confirmation, hand off to the standard digest workflow
+
+Once the user picks sources, return to the normal flow:
+1. Locate the source text (user-provided, archive.org, etc. — never invent passages)
+2. Apply the modernization rules
+3. Stage to `/tmp/jyotish_<topic>.json`
+4. Surface a sample for review
+5. Package and POST to `/api/jyotish/ingest/batch`
+
+### Boundaries on this mode
+
+- **Read-only by default.** Inventory pulls, diffs, and reports never modify the corpus.
+- **Never invent gap content.** Identifying that `rahu_in_h2` is missing is not permission to draft a passage from nothing — the same source-grounding rules apply (Hard Rule #1).
+- **Don't suggest copyrighted sources** to fill gaps. The "NOT public domain" list still applies.
+- **Don't promise gaps will be filled.** Some signatures (e.g., outer-planet-style framings, some nakshatra subtleties) may not be well-covered in any pre-1929 translation. Be honest if a gap is hard to source.
