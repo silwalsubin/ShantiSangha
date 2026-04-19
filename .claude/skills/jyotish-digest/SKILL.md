@@ -262,14 +262,24 @@ When invoked:
 
 | Source | Translator | Year | Notes |
 |--------|-----------|------|-------|
-| Brihat Jataka (Varahamihira, 6th c.) | V. Subrahmanya Sastri | 1918 | Public domain. Archive.org. |
-| Brihat Jataka | B. Suryanarain Rao | 1895 | Public domain. |
-| Brihat Parashara Hora Shastra | B. Suryanarain Rao (various editions) | late 1800s–1917 | Public domain for editions pre-1929. |
-| Phaladeepika | V. Subrahmanya Sastri | 1917 | Public domain. |
-| Saravali | B. Suryanarain Rao | early 1900s | Public domain. |
-| Jataka Parijata | B. Suryanarain Rao | early 1900s | Public domain. |
-| Sarvartha Chintamani | B. Suryanarain Rao | early 1900s | Public domain. |
-| Sanskrit originals (all) | — | — | Ancient, always public domain. |
+| Brihat Jataka (Varahamihira, 6th c.) | N. Chidambaram Aiyar | 1905 | Public domain. Archive.org. |
+| Brihat Jataka | V. Subrahmanya Sastri | 1918 | Public domain. Archive.org. |
+| Brihat Jataka | B. Suryanarain Rao | 1919 | Public domain. |
+| Jataka Chandrika (Venkatesa Pundit) | B. Suryanarayana Row | 1900 | Public domain. Archive.org. |
+| Sarvartha Chintamani (Venkatesa) | B. Suryanarayana Row | 1899 | Public domain. Archive.org OCR incomplete (Ch. I–III of 16). |
+| Astrological Self Instructor | B. Suryanarayana Row | 1893 | Public domain. Primer; rarely digestible. |
+| An Introduction to the Study of Astrology | B. Suryanarayana Row | 1900 | Public domain. Primer. |
+| Sanskrit originals (all) | — | — | Ancient, always public domain. Not directly digestible without a licensed English translation. |
+
+## Acceptable-with-note sources (project-specific policy)
+
+These are post-1929 but treated as "effectively public domain" for this project: the author died >60 years ago (Indian copyright expired), the work sits openly on archive.org with no takedowns, and no cleaner pre-1929 English equivalent exists for the topic covered.
+
+| Source | Translator | Year | Why accepted | Closest clean alternative |
+|--------|-----------|------|--------------|---------------------------|
+| Jataka Parijata (Vaidyanatha) | V. Subrahmanya Sastri | 1932 | Sastri died 1945 → Indian PD since 2005. Covers Rahu/Ketu per house AND dasha phalas, neither of which exists in pre-1929 English. | Sanskrit Jataka Parijata (always PD) — not directly digestible |
+
+When citing an acceptable-with-note source, set `sourceLicense: "acceptable_with_note"` (not `public_domain`) and include the alternative in commit messages/documentation so the legal posture is traceable.
 
 ## NOT public domain (refuse unless licensed)
 
@@ -278,6 +288,7 @@ When invoked:
 - David Frawley — copyrighted
 - Sanjay Rath — copyrighted
 - P.V.R. Narasimha Rao — free distribution but verify exact license terms
+- V. Subrahmanya Sastri's Phaladeepika (1937) — post-1929, no Indian-PD date met yet at time of writing
 - Any 21st-century Jyotish interpretation
 
 ## Refusal template

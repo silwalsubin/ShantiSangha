@@ -2,22 +2,29 @@
 
 Snapshot of the pgvector-backed Jyotish passage corpus: what's ingested, what's deliberately skipped and why, and what would be needed to close remaining gaps.
 
-## Current state (350 passages, all source-cited)
+## Current state (365 passages, all source-cited)
 
-Every row is digested from a verified public-domain source (pre-1929). Each row carries `source_book`, `source_author`, `source_year`, `source_license`, `source_chapter`, and the `raw_source_excerpt` for audit.
+Every row carries `source_book`, `source_author`, `source_year`, `source_license`, `source_chapter`, and the `raw_source_excerpt` for audit. All 350 originally from pre-1929 public-domain sources; 15 passages newly added from Jataka Parijata 1932 (marked `acceptable_with_note` — see Sourcing policy below).
 
 | Signature type | Count | Source | What it covers |
 |---|---|---|---|
 | `planet_in_house` | 84 | BJ Ch. XX (Chidambaram Aiyar 1905) | 7 classical planets × 12 houses (Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn) |
 | `planet_in_house_with_ascendant` | 12 | BJ Ch. XX sub-variants | Dignity-aware compound signatures for 1st-house placements (e.g. `sun_in_h1__lagna_tula` = Sun debilitated) |
 | `planet_in_sign` | 84 | BJ Chs. XVII–XVIII | 7 planets × 12 signs (every exaltation, debilitation, own sign, moolatrikona captured) |
-| `planet_for_lagna` | 64 | **Jataka Chandrika Stanzas 41–71 (Suryanarayana Row 1900)** | Per-ascendant friend/foe classification: which planets are yogakarakas, benefics, or malefics for each of the 12 rising signs |
+| `planet_for_lagna` | 64 | Jataka Chandrika Stanzas 41–71 (Suryanarayana Row 1900) | Per-ascendant friend/foe classification: which planets are yogakarakas, benefics, or malefics for each of the 12 rising signs |
 | `nakshatra` | 27 | BJ Ch. XVI | All 27 moon-in-nakshatra placements |
 | `lagna` | 12 | BJ Ch. XVIII (Satyachariar section) | All 12 rising signs |
-| `yoga` | 39 | BJ Chs. XI, XII, XIII, XV | Raja Yoga principle, 20 Akriti, 7 Sankhya, 3 Asraya, 2 Dala (Srik/Sarpa), 5 Chandra yogas (Adhi, Sunapha, Anapha, Durudhura, Kemadruma), Ascetic Yoga principle |
-| `conjunction` | 21 | BJ Ch. XIV | All two-planet conjunctions (Sun–Moon through Venus–Saturn) |
+| `yoga` | 45 | BJ + **Jataka Parijata Adh. VII** | BJ: 39 (Raja Yoga, Akriti, Sankhya, Asraya, Dala, Chandra yogas, Ascetic Yoga). JP: 6 (5 Pancha Mahapurusha — Ruchaka/Bhadra/Hamsa/Malavya/Sasa — plus Neecha Bhanga Raja Yoga) |
+| `conjunction` | 21 | BJ Ch. XIV | All two-planet conjunctions among the 7 classical planets |
 | `avocation` | 7 | BJ Ch. X | Career indications by Navamsa lord of the 10th lord (one per planet) |
-| **Total** | **350** | | |
+| `dasha` | **9** | **Jataka Parijata Adh. XVIII (Sastri 1932)** | All 9 mahadasha phalas (Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu, Ketu) — unlocks the Mahadasha indicator in the chart UI |
+| **Total** | **365** | | |
+
+## Sourcing policy
+
+Every passage is source-cited with `source_license` set to one of:
+- `public_domain` — translator's work published pre-1929 (Chidambaram Aiyar, Suryanarayana Row, etc.)
+- `acceptable_with_note` — post-1929 but author died > 60 years ago (Indian copyright expired), work openly republished on archive.org, no cleaner pre-1929 English equivalent exists. Currently: **Jataka Parijata tr. V. Subrahmanya Sastri 1932** (Sastri d. 1945 → PD in India since 2005). Closest clean alternative: Sanskrit Jataka Parijata (always PD but requires a translator).
 
 Every chart element the app currently computes has a real classical passage attached — nakshatra, lagna, each planet row (with lagna-compound fallback, per-ascendant friend/foe fallback, and planet-in-sign fallback).
 
@@ -49,14 +56,9 @@ All 350 passages have been re-voiced to the **casual-astrologer register** — d
 
 ## What's still a real gap
 
-### 1. Dasha interpretations
+### 1. Dasha interpretations — ✅ RESOLVED
 
-The app shows the current Mahadasha (e.g., "Jupiter Mahadasha, 2014–2030") and expects a `jupiter_mahadasha` signature with interpretive content. **BJ doesn't provide this.** The widely-used per-planet dasa interpretations come from:
-
-- **Phaladeepika** (Mantreshwar, tr. V. Subrahmanya Sastri 1917) — public domain, has dasa phalas
-- **Parashara's Brihat Parashara Hora Shastra (BPHS)** — Suryanarain Rao partial translations pre-1929; most complete English versions (Santhanam 1984, Sharma 1995) are copyrighted
-
-**Next action:** source a public-domain dasa phala text and run it through `jyotish-digest`.
+All 9 mahadasha phalas are now ingested (`dasha` signature type) from Jataka Parijata Adhyaya XVIII (V. Subrahmanya Sastri, 1932). Sourced under `acceptable_with_note` — see Sourcing Policy above. The Mahadasha indicator in the chart UI now retrieves a real passage.
 
 ### 2. Aspect-based retrieval
 
@@ -76,15 +78,15 @@ Classical Jyotish leans heavily on "lord of Xth house placed in Yth house" — 1
 
 **Next action:** BPHS (public-domain fragments) or Phaladeepika for lord-placement phalas.
 
-### 5. Named yogas beyond BJ
+### 5. Named yogas beyond BJ — ✅ PARTIAL
 
-Several widely-cited named yogas aren't in BJ by name:
-- **Gajakesari** (Moon–Jupiter kendra relationship) — implied but not named in BJ
-- **Budha-Aditya** (Sun–Mercury) — captured as conj_mercury_sun
-- **Pancha Mahapurusha Yogas** (Ruchaka, Bhadra, Hamsa, Malavya, Sasa) — specific exalted/own-sign placements in kendras. Listed in Saravali and Phaladeepika.
-- **Neecha Bhanga** (cancellation of debilitation) rules — scattered across texts
+Pancha Mahapurusha (Ruchaka / Bhadra / Hamsa / Malavya / Sasa) and Neecha Bhanga Raja Yoga are now ingested from Jataka Parijata Adh. VII. Still open: **Gajakesari** (Moon–Jupiter kendra) and some Dhana Yogas — implied but not named. `conj_jupiter_moon` already covers the Gajakesari phenomenon in effect.
 
-**Next action:** Saravali or Phaladeepika for these named yogas.
+### 6. Rahu/Ketu per-house placements — STRUCTURAL GAP
+
+Initially targeted for ingestion from Jataka Parijata, but on close inspection the classical Jyotish canon (BJ, JP, JC, Sarvartha Chintamani) does **not** provide systematic "Rahu in Nth house" or "Ketu in Nth house" individual phalas. Classical texts treat the nodes as modifiers in specific combinations (e.g. "Sun + Rahu in 4th", "Ketu + lord-of-6th"), not as primary agents in each bhava. The familiar per-house Rahu/Ketu tables are post-BPHS-Santhanam (1984) territory.
+
+**Next action options:** (a) accept the canonical limitation and let the chart UI display Rahu/Ketu without a retrievable passage; (b) license a modern translation; (c) extract combination passages from JP Adh. XI–XV (Rahu + another planet in specific bhava) as compound signatures — technically faithful to the classical canon but requires chart-engine changes to emit the compound signatures.
 
 ## How to continue digestion
 
@@ -108,24 +110,24 @@ aws secretsmanager get-secret-value \
 
 Expected output (as of last ingestion):
 ```json
-{"total":350,"byType":[
+{"total":365,"byType":[
   {"type":"avocation","count":7},
   {"type":"conjunction","count":21},
+  {"type":"dasha","count":9},
   {"type":"lagna","count":12},
   {"type":"nakshatra","count":27},
   {"type":"planet_for_lagna","count":64},
   {"type":"planet_in_house","count":84},
   {"type":"planet_in_house_with_ascendant","count":12},
   {"type":"planet_in_sign","count":84},
-  {"type":"yoga","count":39}
+  {"type":"yoga","count":45}
 ]}
 ```
 
 ## Priorities ranked by effort × value
 
-1. **Phaladeepika digestion — dasa phalas** — unblocks Mahadasha interpretation shown in chart UI today. Highest user-visible value.
-2. **Chart-engine aspect detection + Ch. XIX digest** — adds aspect-aware interpretation to the chart page. Medium effort (chart engine change + 72 passages).
-3. **Phaladeepika / BPHS — house-lord placements** — 144 compound signatures for "lord of Xth in Yth." Classical Jyotish depth. Medium-high effort.
-4. **Saravali — Pancha Mahapurusha + Neecha Bhanga** — ~10 named yogas widely referenced. Low effort, moderate value.
-5. **Pada-level nakshatra source** — 81 new passages (27 extant × 3 additional padas each). Medium effort.
-6. **Drekkana imagery layer** — iconographic descriptions, only useful if a symbol-rendering surface is built. Low priority.
+1. **Chart-engine aspect detection + Ch. XIX digest** — adds aspect-aware interpretation to the chart page. Medium effort (chart engine change + 72 passages).
+2. **House-lord placements** — 144 compound signatures for "lord of Xth in Yth." Classical Jyotish depth. JP Adh. XI–XV covers this; medium-high effort.
+3. **Pada-level nakshatra source** — 81 new passages (27 extant × 3 additional padas each). Medium effort.
+4. **Rahu/Ketu compound combinations** — JP Adh. XI–XV has "node + planet in specific bhava" passages. Requires chart-engine changes to emit compound signatures.
+5. **Drekkana imagery layer** — iconographic descriptions, only useful if a symbol-rendering surface is built. Low priority.
