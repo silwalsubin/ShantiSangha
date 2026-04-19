@@ -17,6 +17,7 @@ namespace ShantiSangha.Jyotish.Controllers;
 /// </summary>
 [ApiController]
 [AllowAnonymous]
+[AdminKeyAuthorize]
 [Route("api/jyotish/ingest")]
 public class JyotishIngestController(
     JyotishDbContext db,

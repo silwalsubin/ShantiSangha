@@ -157,6 +157,10 @@ resource "aws_ecs_task_definition" "api" {
       {
         name      = "OPENAI_API_KEY"
         valueFrom = aws_secretsmanager_secret.app["openai_api_key"].arn
+      },
+      {
+        name      = "JYOTISH_ADMIN_KEY"
+        valueFrom = aws_secretsmanager_secret.jyotish_admin_key.arn
       }
     ], local.firebase_enabled ? [
       {

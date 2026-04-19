@@ -23,6 +23,22 @@ resource "aws_secretsmanager_secret_version" "database_url" {
   secret_string = "Host=${aws_db_instance.postgres.address};Port=5432;Database=shantisangha;Username=${var.db_username};Password=${random_password.db.result}"
 }
 
+# Auto-generated admin key for Jyotish ingest endpoints — read on-demand via
+# `aws secretsmanager get-secret-value --secret-id shantisangha/jyotish_admin_key`.
+resource "random_password" "jyotish_admin_key" {
+  length  = 48
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "jyotish_admin_key" {
+  name = "${var.app_name}/jyotish_admin_key"
+}
+
+resource "aws_secretsmanager_secret_version" "jyotish_admin_key" {
+  secret_id     = aws_secretsmanager_secret.jyotish_admin_key.id
+  secret_string = random_password.jyotish_admin_key.result
+}
+
 # Required secrets
 
 resource "aws_secretsmanager_secret" "app" {
