@@ -21,6 +21,8 @@ Every row is digested from a verified public-domain source (pre-1929). Each row 
 
 Every chart element the app currently computes has a real classical passage attached — nakshatra, lagna, each planet row (with lagna-compound fallback, per-ascendant friend/foe fallback, and planet-in-sign fallback).
 
+All 350 passages have been re-voiced to the **casual-astrologer register** — direct "you/your" address, contractions, short sentences, plain words. The interpretive core and source citations remain unchanged; only the register dropped. See `.claude/skills/jyotish-digest/SKILL.md` Rule 6 for the voice constraints that produce this tone.
+
 ## What's deliberately skipped
 
 ### Chapters not digested, with reasons
