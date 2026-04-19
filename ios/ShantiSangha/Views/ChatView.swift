@@ -261,32 +261,54 @@ struct ChatView: View {
             request.httpBody = try JSONEncoder().encode(["content": text])
 
             let (bytes, _) = try await URLSession.shared.bytes(for: request)
-            var buffer = ""
+            var buffer = Data()
             var firstToken = true
+            let eventTerminator = Data("\n\n".utf8)
 
             for try await byte in bytes {
-                buffer += String(UnicodeScalar(byte))
-                if buffer.hasSuffix("\n") {
-                    let line = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
-                    buffer = ""
-                    if line.hasPrefix("data: ") {
-                        let payload = String(line.dropFirst(6))
-                        if payload == "[DONE]" { continue }
+                buffer.append(byte)
 
-                        // Ensure typing indicator shows for at least 1 second
-                        if firstToken {
-                            let elapsed = Date().timeIntervalSince(typingStart)
-                            if elapsed < 1.0 {
-                                try? await Task.sleep(nanoseconds: UInt64((1.0 - elapsed) * 1_000_000_000))
-                            }
-                            firstToken = false
+                // Drain any complete SSE events from the buffer. Events are
+                // separated by `\n\n` per spec.
+                while let range = buffer.range(of: eventTerminator) {
+                    let eventData = buffer.subdata(in: 0..<range.lowerBound)
+                    buffer.removeSubrange(0..<range.upperBound)
+
+                    guard let eventText = String(data: eventData, encoding: .utf8) else { continue }
+
+                    // An SSE event may have multiple `data:` lines; join their
+                    // payloads with `\n` per spec.
+                    var dataParts: [String] = []
+                    for line in eventText.split(separator: "\n", omittingEmptySubsequences: false) {
+                        if line.hasPrefix("data: ") {
+                            dataParts.append(String(line.dropFirst(6)))
+                        } else if line.hasPrefix("data:") {
+                            dataParts.append(String(line.dropFirst(5)))
                         }
+                    }
+                    let payload = dataParts.joined(separator: "\n")
+                    if payload.isEmpty || payload == "[DONE]" { continue }
 
-                        if let idx = messages.firstIndex(where: { $0.id == assistantId }) {
-                            messages[idx].content += payload
-                            if messages[idx].timestamp == nil {
-                                messages[idx].timestamp = Date()
-                            }
+                    // Each payload is a JSON-encoded string. Decoding restores
+                    // any embedded newlines, quotes, or non-ASCII chars intact.
+                    guard let payloadData = payload.data(using: .utf8),
+                          let decoded = try? JSONDecoder().decode(String.self, from: payloadData) else {
+                        continue
+                    }
+
+                    // Ensure typing indicator shows for at least 1 second
+                    if firstToken {
+                        let elapsed = Date().timeIntervalSince(typingStart)
+                        if elapsed < 1.0 {
+                            try? await Task.sleep(nanoseconds: UInt64((1.0 - elapsed) * 1_000_000_000))
+                        }
+                        firstToken = false
+                    }
+
+                    if let idx = messages.firstIndex(where: { $0.id == assistantId }) {
+                        messages[idx].content += decoded
+                        if messages[idx].timestamp == nil {
+                            messages[idx].timestamp = Date()
                         }
                     }
                 }

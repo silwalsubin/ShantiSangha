@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -150,7 +151,11 @@ public class ConversationsController(
         await foreach (var chunk in chatService.StreamResponseAsync(
             user.Id, id, body.Content, cancellationToken))
         {
-            var line = $"data: {chunk}\n\n";
+            // JSON-serialize the chunk so embedded newlines, quotes, and other
+            // control characters survive SSE framing intact. Client JSON-decodes
+            // each payload back to the original string.
+            var payload = JsonSerializer.Serialize(chunk);
+            var line = $"data: {payload}\n\n";
             await HttpContext.Response.WriteAsync(line, Encoding.UTF8, cancellationToken);
             await HttpContext.Response.Body.FlushAsync(cancellationToken);
         }

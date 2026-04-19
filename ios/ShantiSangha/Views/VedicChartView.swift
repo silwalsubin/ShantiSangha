@@ -546,13 +546,13 @@ struct VedicChartView: View {
                     rows: [
                         ("legend.deep_exalted", Ph.arrowCircleUp.fill, .sacredGreen, "Deep Exalted",
                          "At the very peak of its strength — a rare placement where the planet's best qualities shine most clearly."),
-                        ("legend.exalted", Ph.arrowCircleUp.duotone, .sacredGreen.opacity(0.85), "Exalted",
+                        ("legend.exalted", Ph.arrowCircleUp.duotone, .sacredGreen, "Exalted",
                          "In the sign that amplifies its natural qualities. The planet expresses itself with confidence and ease."),
-                        ("legend.moolatrikona", Ph.crownSimple.duotone, .sacredGreen.opacity(0.7), "Moolatrikona",
+                        ("legend.moolatrikona", Ph.crownSimple.duotone, .sacredGreen, "Moolatrikona",
                          "In its honored seat — acts with authority and purpose, deeply connected to its role in the chart."),
-                        ("legend.own_sign", Ph.anchor.duotone, .sacredGreen.opacity(0.55), "Own Sign",
+                        ("legend.own_sign", Ph.anchor.duotone, .sacredGreen, "Own Sign",
                          "The planet is at home. It expresses itself freely and without effort here."),
-                        ("legend.vargottama", Ph.squaresFour.duotone, .sacredGreen.opacity(0.9), "Vargottama",
+                        ("legend.vargottama", Ph.squaresFour.duotone, .sacredGreen, "Vargottama",
                          "The planet occupies the same sign in two key charts — a sign of consistent, reinforced strength.")
                     ]
                 )
@@ -561,16 +561,16 @@ struct VedicChartView: View {
                     rows: [
                         ("legend.debilitated", Ph.arrowCircleDown.duotone, .sacredRed, "Debilitated",
                          "In a sign where it feels out of place. Not a fault — a quiet invitation to grow into this part of life."),
-                        ("legend.combust", Ph.sunDim.duotone, .sacredRed.opacity(0.75), "Combust",
+                        ("legend.combust", Ph.sunDim.duotone, .sacredRed, "Combust",
                          "Sitting too close to the Sun. Its outward expression is quieter; its energy turns inward rather than broadcasting."),
-                        ("legend.sandhi", Ph.circleHalf.duotone, .sacredRed.opacity(0.55), "Sandhi",
+                        ("legend.sandhi", Ph.circleHalf.duotone, .sacredRed, "Sandhi",
                          "Right at a sign boundary — between two worlds. Its character feels less settled, as if it's in transition.")
                     ]
                 )
                 legendGroup(
                     title: "Notable",
                     rows: [
-                        ("legend.retrograde", Ph.arrowUUpLeft.duotone, .sacredGold.opacity(0.75), "Retrograde",
+                        ("legend.retrograde", Ph.arrowUUpLeft.duotone, .sacredGold, "Retrograde",
                          "Moving backward through the zodiac at birth. Classically a sign of intensified strength — its themes come through with extra depth.")
                     ]
                 )
@@ -729,10 +729,7 @@ struct VedicChartView: View {
     /// the chart can weigh each mark's importance at a glance.
     private func dignityColor(_ dignity: String) -> Color {
         switch dignity {
-        case "deep_exalted": return .sacredGreen
-        case "exalted": return .sacredGreen.opacity(0.85)
-        case "moolatrikona": return .sacredGreen.opacity(0.7)
-        case "own_sign": return .sacredGreen.opacity(0.55)
+        case "deep_exalted", "exalted", "moolatrikona", "own_sign": return .sacredGreen
         case "debilitated": return .sacredRed
         default: return .sacredMuted
         }
@@ -761,16 +758,16 @@ struct VedicChartView: View {
                 stateGlyph(icon, color: dignityColor(p.dignity), label: dignityLabel(p.dignity))
             }
             if p.vargottama == true {
-                stateGlyph(Ph.squaresFour.duotone, color: .sacredGreen.opacity(0.9), label: "Vargottama")
+                stateGlyph(Ph.squaresFour.duotone, color: .sacredGreen, label: "Vargottama")
             }
             if p.retrograde == true {
-                stateGlyph(Ph.arrowUUpLeft.duotone, color: .sacredGold.opacity(0.75), label: "Retrograde")
+                stateGlyph(Ph.arrowUUpLeft.duotone, color: .sacredGold, label: "Retrograde")
             }
             if p.combust == true {
-                stateGlyph(Ph.sunDim.duotone, color: .sacredRed.opacity(0.75), label: "Combust")
+                stateGlyph(Ph.sunDim.duotone, color: .sacredRed, label: "Combust")
             }
             if p.sandhi == true {
-                stateGlyph(Ph.circleHalf.duotone, color: .sacredRed.opacity(0.55), label: "Sandhi")
+                stateGlyph(Ph.circleHalf.duotone, color: .sacredRed, label: "Sandhi")
             }
         }
     }

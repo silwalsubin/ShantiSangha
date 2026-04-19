@@ -101,19 +101,19 @@ struct PlanetDetailView: View {
             badges.append((icon, dignityColor(planet.dignity), dignityLabel(planet.dignity), dignityDescription(planet.dignity)))
         }
         if planet.vargottama == true {
-            badges.append((Ph.squaresFour.duotone, .sacredGreen.opacity(0.9), "VARGOTTAMA",
+            badges.append((Ph.squaresFour.duotone, .sacredGreen, "VARGOTTAMA",
                            "same sign in D1 and D9 — classically very strong"))
         }
         if planet.retrograde == true {
-            badges.append((Ph.arrowUUpLeft.duotone, .sacredGold.opacity(0.75), "RETROGRADE",
+            badges.append((Ph.arrowUUpLeft.duotone, .sacredGold, "RETROGRADE",
                            "moving backward along the ecliptic at birth"))
         }
         if planet.combust == true {
-            badges.append((Ph.sunDim.duotone, .sacredRed.opacity(0.75), "COMBUST",
+            badges.append((Ph.sunDim.duotone, .sacredRed, "COMBUST",
                            "within the Sun's classical orb — natural strength muted"))
         }
         if planet.sandhi == true {
-            badges.append((Ph.circleHalf.duotone, .sacredRed.opacity(0.55), "SANDHI",
+            badges.append((Ph.circleHalf.duotone, .sacredRed, "SANDHI",
                            "sits in the first or last 1° of its sign — cusp weakness"))
         }
         return badges
@@ -244,10 +244,7 @@ struct PlanetDetailView: View {
 
     private func dignityColor(_ dignity: String) -> Color {
         switch dignity {
-        case "deep_exalted": return .sacredGreen
-        case "exalted": return .sacredGreen.opacity(0.85)
-        case "moolatrikona": return .sacredGreen.opacity(0.7)
-        case "own_sign": return .sacredGreen.opacity(0.55)
+        case "deep_exalted", "exalted", "moolatrikona", "own_sign": return .sacredGreen
         case "debilitated": return .sacredRed
         default: return .sacredMuted
         }
