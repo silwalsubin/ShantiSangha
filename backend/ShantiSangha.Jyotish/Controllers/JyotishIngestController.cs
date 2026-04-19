@@ -189,6 +189,19 @@ public class JyotishIngestController(
     }
 
     /// <summary>
+    /// Wipes every cached chart reading. Next time a user hits
+    /// GET /api/jyotish/reading, a fresh reading regenerates from the
+    /// current corpus. Use after a bulk retone pass so everyone gets the
+    /// new voice without per-user invalidation.
+    /// </summary>
+    [HttpDelete("readings")]
+    public async Task<IActionResult> InvalidateAllReadings(CancellationToken ct)
+    {
+        var removed = await db.Readings.ExecuteDeleteAsync(ct);
+        return Ok(new { removed });
+    }
+
+    /// <summary>
     /// Admin-only dump of all passages in ingest DTO shape. Used for retone
     /// passes: pull existing passages, rewrite their content field, re-post
     /// to the batch endpoint (which upserts by id).
