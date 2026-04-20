@@ -135,6 +135,13 @@ public static class ChartSignatures
             {
                 var house = VedicCalendar.GetHouse(sid, ascSidereal.Value);
                 signatures.Add($"{lower}_in_h{house}");
+
+                // Mangal dosha (Manglik): Mars in 1st, 2nd, 4th, 7th, 8th, or 12th
+                // from Lagna. Classical marker for partnership emphasis. Internal
+                // signature only — never surfaced as a label in the UI. Lets the
+                // chart chat and RAG answer "am I Manglik?" with grounded context.
+                if (lower == "mars" && (house is 1 or 2 or 4 or 7 or 8 or 12))
+                    signatures.Add("manglik");
             }
 
             // Planet's role for this ascendant — e.g. "saturn_for_lagna_vrishabha"

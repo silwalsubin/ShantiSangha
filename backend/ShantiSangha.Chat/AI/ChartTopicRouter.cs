@@ -37,6 +37,16 @@ internal static class ChartTopicRouter
             Houses: [7, 5],
             Planets: ["venus", "jupiter"]),
 
+        // Manglik / Mangal Dosha / Kuja Dosha — classical names for Mars
+        // afflicting 1/2/4/7/8/12 from Lagna. Route the question to those
+        // houses + Mars so the relevant passages land at the top of the
+        // prompt. The "manglik" signature itself is internal; the user-
+        // facing answer is grounded in the Mars-in-house passages.
+        new TopicRule(
+            Keywords: ["manglik", "mangalik", "mangal dosha", "mangala dosha", "kuja dosha", "mars dosha"],
+            Houses: [1, 2, 4, 7, 8, 12],
+            Planets: ["mars"]),
+
         new TopicRule(
             Keywords: ["love", "romance", "passion", "attraction", "desire"],
             Houses: [5, 7],

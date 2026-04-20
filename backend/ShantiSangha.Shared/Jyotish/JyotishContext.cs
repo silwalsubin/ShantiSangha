@@ -168,6 +168,13 @@ public static class JyotishSignatureDerivation
                 // ingested today for 1st-house variants but harmless otherwise.
                 if (lagnaRashi is not null)
                     sigs.Add($"{planet}_in_h{p.House.Value}__lagna_{lagnaRashi}");
+
+                // Mangal dosha (Manglik): Mars in 1st, 2nd, 4th, 7th, 8th, or 12th
+                // from Lagna. Internal signature only — never surfaced as a UI
+                // label. Lets chart chat + RAG answer "am I Manglik?" with grounded
+                // context rather than relying on the model's training knowledge.
+                if (planet == "mars" && p.House.Value is 1 or 2 or 4 or 7 or 8 or 12)
+                    sigs.Add("manglik");
             }
 
             // Planet's role for this ascendant — e.g. "jupiter_for_lagna_mesha"
