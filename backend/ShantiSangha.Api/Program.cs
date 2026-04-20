@@ -50,10 +50,15 @@ try
             new AuthenticationHeaderValue("Bearer", appConfig.OpenAiApiKey);
     });
 
-    // Semantic Kernel + OpenAI (chat + embeddings) — cross-cutting, consumed by domain projects via DI
+    // Semantic Kernel + OpenAI (chat + embeddings) — cross-cutting, consumed by domain projects via DI.
+    // Two chat models are registered under named service keys so each surface
+    // can pick the right tier: Smart (gpt-4o) for synthesis-heavy work (chart
+    // chat, chart reading), Fast (gpt-4o-mini) for short stylistic output
+    // (titles, summaries, reflections, journal prompts). See Shared/AiModels.cs.
 #pragma warning disable SKEXP0010
     var kernelBuilder = builder.Services.AddKernel()
-        .AddOpenAIChatCompletion("gpt-4o", appConfig.OpenAiApiKey)
+        .AddOpenAIChatCompletion(AiModels.SmartModel, appConfig.OpenAiApiKey, serviceId: AiModels.SmartServiceId)
+        .AddOpenAIChatCompletion(AiModels.FastModel, appConfig.OpenAiApiKey, serviceId: AiModels.FastServiceId)
         .AddOpenAIEmbeddingGenerator("text-embedding-3-small", appConfig.OpenAiApiKey);
 #pragma warning restore SKEXP0010
 

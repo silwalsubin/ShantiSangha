@@ -4,6 +4,7 @@ using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using ShantiSangha.Chat.Data;
 using ShantiSangha.Chat.Models;
+using ShantiSangha.Shared;
 
 namespace ShantiSangha.Chat.Jobs;
 
@@ -31,7 +32,7 @@ public class GenerateConversationTitleJob(
 
         try
         {
-            var chatCompletion = kernel.GetRequiredService<IChatCompletionService>();
+            var chatCompletion = kernel.GetRequiredService<IChatCompletionService>(AiModels.FastServiceId);
             var history = new ChatHistory("""
                 Generate a short, poetic title (3-6 words) for a spiritual conversation.
                 The title should capture the essence of what the person is reflecting on.

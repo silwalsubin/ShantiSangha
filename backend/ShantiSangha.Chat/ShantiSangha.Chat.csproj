@@ -21,4 +21,8 @@
   <ItemGroup>
     <ProjectReference Include="..\ShantiSangha.Shared\ShantiSangha.Shared.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ShantiSangha.AiEval.Tests" />
+  </ItemGroup>
 </Project>

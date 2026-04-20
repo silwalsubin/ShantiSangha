@@ -7,6 +7,7 @@ using ShantiSangha.Chat.Data;
 using ShantiSangha.Chat.Models;
 using ShantiSangha.Chat.Safety;
 using ShantiSangha.Chat.Services;
+using ShantiSangha.Shared;
 using ShantiSangha.Shared.Events;
 using ShantiSangha.Shared.Interfaces;
 using ShantiSangha.Shared.Jyotish;
@@ -33,6 +34,18 @@ public class ChatService(
     private const int SummaryCount = 3;
     private const int InsightCount = 5;
     private const int PassageCount = 4;
+
+    // A full chart emits 30–40 signature matches, each pulling a passage.
+    // Sending all of them to the LLM bloats the prompt with low-relevance
+    // material. After topic-rerank we cap to the top slice — keeps tokens
+    // tight without losing the passages that actually answer the question.
+    private const int MaxChartPassagesWhenNoReading = 12;
+
+    // When a pre-composed chart reading is present, the reading already
+    // synthesises the corpus — so we only need a handful of topic-matched
+    // passages to let the model deepen the specific thread being asked
+    // about. Smaller cap here is intentional.
+    private const int MaxChartPassagesWhenReading = 6;
 
     public async IAsyncEnumerable<string> StreamResponseAsync(
         Guid userId,
@@ -77,7 +90,7 @@ public class ChatService(
 
         // --- Step 3: Build context and stream AI response ---
         var chatHistory = await BuildChatHistoryAsync(userId, conversationId, cancellationToken, userMessage);
-        var chatCompletion = kernel.GetRequiredService<IChatCompletionService>();
+        var chatCompletion = kernel.GetRequiredService<IChatCompletionService>(AiModels.SmartServiceId);
         var responseChunks = new List<string>();
 
         await foreach (var chunk in chatCompletion.GetStreamingChatMessageContentsAsync(
@@ -224,6 +237,24 @@ public class ChatService(
             }
         }
 
+        // Chart conversations read from the pre-composed chart reading when
+        // one exists. If no reading is cached yet, we skip it here (lazy-
+        // generating on every chat turn would be too expensive); the iOS
+        // chart page's GET /api/jyotish/reading triggers generation
+        // separately when the user opens the chart.
+        ChartReading? chartReading = null;
+        if (isChart)
+        {
+            try
+            {
+                chartReading = await chartReadingService.GetAsync(userId, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to load chart reading for conversation {ConversationId}", conversationId);
+            }
+        }
+
         // Retrieve Jyotish passages. Chart conversations rely exclusively on
         // signature-based retrieval from the user's actual chart. General
         // conversations supplement with semantic search for thematic gaps.
@@ -248,6 +279,20 @@ public class ChatService(
             if (isChart && !string.IsNullOrWhiteSpace(currentMessage) && chartPassages.Count > 0)
                 chartPassages = ChartTopicRouter.Rerank(currentMessage!, chartPassages);
 
+            // Cap chart passages to keep the prompt tight. When the pre-
+            // composed reading is present it already weaves the full corpus,
+            // so we only need a handful of topic-matched passages here; when
+            // no reading is cached we allow a wider slice so the model still
+            // has the tradition to speak from.
+            if (isChart && chartPassages.Count > 0)
+            {
+                var cap = chartReading is not null
+                    ? MaxChartPassagesWhenReading
+                    : MaxChartPassagesWhenNoReading;
+                if (chartPassages.Count > cap)
+                    chartPassages = chartPassages.Take(cap).ToList();
+            }
+
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var merged = new List<JyotishPassage>();
             foreach (var p in chartPassages.Concat(semanticPassages))
@@ -271,24 +316,6 @@ public class ChatService(
             DaysRemaining: g.DaysRemaining,
             IsCompleted: g.IsCompleted,
             DeeperWhy: g.DeeperWhy)).ToList();
-
-        // Chart conversations read from the pre-composed chart reading when
-        // one exists. If no reading is cached yet, we skip it here (lazy-
-        // generating on every chat turn would be too expensive); the iOS
-        // chart page's GET /api/jyotish/reading triggers generation
-        // separately when the user opens the chart.
-        ChartReading? chartReading = null;
-        if (isChart)
-        {
-            try
-            {
-                chartReading = await chartReadingService.GetAsync(userId, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to load chart reading for conversation {ConversationId}", conversationId);
-            }
-        }
 
         var systemPrompt = isChart
             ? SystemPrompt.ForChart(

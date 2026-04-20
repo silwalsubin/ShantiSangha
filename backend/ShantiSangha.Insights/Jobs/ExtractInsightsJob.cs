@@ -6,6 +6,7 @@ using Microsoft.SemanticKernel.ChatCompletion;
 using ShantiSangha.Insights.Data;
 using ShantiSangha.Insights.Models;
 using ShantiSangha.Insights.Services;
+using ShantiSangha.Shared;
 using ShantiSangha.Shared.Interfaces;
 
 namespace ShantiSangha.Insights.Jobs;
@@ -101,7 +102,7 @@ public class ExtractInsightsJob(
     {
         try
         {
-            var chat = kernel.GetRequiredService<IChatCompletionService>();
+            var chat = kernel.GetRequiredService<IChatCompletionService>(AiModels.FastServiceId);
             var history = new ChatHistory("You are a concise insight extraction assistant. Respond only with valid JSON.");
             history.AddUserMessage(prompt);
             var result = await chat.GetChatMessageContentAsync(history);

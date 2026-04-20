@@ -4,7 +4,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
+using ShantiSangha.Shared;
 using ShantiSangha.Shared.Interfaces;
+using ShantiSangha.Shared.Jyotish;
 using ShantiSangha.Wellness.Data;
 using ShantiSangha.Wellness.Models;
 
@@ -23,6 +25,7 @@ public class GeneratePortraitJob(
     IInsightQueryService insightQuery,
     IProfileQueryService profileQuery,
     IJyotishContextService jyotishService,
+    IJyotishKnowledgeService jyotishKnowledge,
     ILogger<GeneratePortraitJob> logger)
 {
     public async Task RunAsync(Guid userId)
@@ -48,9 +51,13 @@ public class GeneratePortraitJob(
             var totalReflections = await db.DailyReflections
                 .CountAsync(r => r.UserId == userId);
 
-            // Vedic context
+            // Vedic context — and 3 chart-matched corpus passages so the
+            // portrait carries the tradition's voice, not just the user's
+            // data. Passages rotate by (userId, day) so regenerating on
+            // different days surfaces different classical angles.
             string? birthNakshatra = null;
             string? moonRashi = null;
+            List<string> vedicPassageLines = [];
             try
             {
                 var jyotish = await jyotishService.GetContextAsync(userId, today);
@@ -58,6 +65,21 @@ public class GeneratePortraitJob(
                 {
                     birthNakshatra = jyotish.BirthNakshatra;
                     moonRashi = jyotish.MoonRashi;
+
+                    var signatures = jyotish.DeriveSignatures()
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                    if (signatures.Count > 0)
+                    {
+                        var allPassages = await jyotishKnowledge.GetPassagesAsync(signatures);
+                        if (allPassages.Count > 0)
+                        {
+                            var chosen = allPassages.Rotate(userId, today, count: 3);
+                            vedicPassageLines = chosen
+                                .Select(p => $"  - [{p.Polarity}] {p.Content}")
+                                .ToList();
+                        }
+                    }
                 }
             }
             catch (Exception ex)
@@ -101,6 +123,14 @@ public class GeneratePortraitJob(
                 if (birthNakshatra is not null)
                     vedicLines.Add($"Birth nakshatra: {birthNakshatra}");
                 contextParts.Add($"Vedic identity:\n{string.Join("\n", vedicLines)}");
+            }
+
+            if (vedicPassageLines.Count > 0)
+            {
+                contextParts.Add(
+                    "Classical Vedic wisdom for their chart (ground the portrait in this — " +
+                    "never quote, never cite sources, never use Sanskrit terms from these):\n" +
+                    string.Join("\n", vedicPassageLines));
             }
 
             // Goals and practice patterns
@@ -153,7 +183,7 @@ public class GeneratePortraitJob(
             }
 
             // Generate portrait
-            var chatCompletion = kernel.GetRequiredService<IChatCompletionService>();
+            var chatCompletion = kernel.GetRequiredService<IChatCompletionService>(AiModels.FastServiceId);
             var history = new ChatHistory(BuildSystemPrompt(totalReflections, birthNakshatra is not null));
 
             history.AddUserMessage($"Everything known about this person:\n{context}");

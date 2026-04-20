@@ -2,10 +2,12 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel.ChatCompletion;
 using ShantiSangha.Jyotish.Data;
 using ShantiSangha.Jyotish.Models;
+using ShantiSangha.Shared;
 using ShantiSangha.Shared.Interfaces;
 using ShantiSangha.Shared.Jyotish;
 
@@ -25,7 +27,7 @@ public class ChartReadingService(
     JyotishDbContext db,
     IJyotishContextService jyotishContext,
     IJyotishKnowledgeService knowledge,
-    IChatCompletionService chat,
+    [FromKeyedServices(AiModels.SmartServiceId)] IChatCompletionService chat,
     ILogger<ChartReadingService> logger) : IChartReadingService
 {
     /// <summary>

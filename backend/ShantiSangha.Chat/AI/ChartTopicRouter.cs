@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using ShantiSangha.Shared.Jyotish;
 
 namespace ShantiSangha.Chat.AI;
@@ -93,7 +94,7 @@ internal static class ChartTopicRouter
             Planets: ["saturn", "mars", "ketu"]),
 
         new TopicRule(
-            Keywords: ["spirituality", "moksha", "liberation", "solitude", "retreat", "sleep", "dreams"],
+            Keywords: ["spirituality", "spiritual path", "moksha", "liberation", "solitude", "retreat", "sleep", "dreams"],
             Houses: [12, 9],
             Planets: ["jupiter", "ketu"]),
 
@@ -119,7 +120,10 @@ internal static class ChartTopicRouter
         var activePlanets = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var rule in Rules)
         {
-            if (rule.Keywords.Any(k => lower.Contains(k)))
+            // Word-boundary match — prevents "art" from hitting "chart", "self"
+            // from hitting "yourself", and other near-ubiquitous substring
+            // false-positives that silently dilute every question's routing.
+            if (rule.Keywords.Any(k => ContainsWholeWord(lower, k)))
             {
                 foreach (var h in rule.Houses) activeHouses.Add(h);
                 foreach (var p in rule.Planets) activePlanets.Add(p);
@@ -137,6 +141,15 @@ internal static class ChartTopicRouter
             .ToList();
     }
 
+    private static bool ContainsWholeWord(string haystack, string needle)
+    {
+        // Boundary on each side: letter/digit characters can't flank the match.
+        // "mangal dosha" still matches as a single phrase because the internal
+        // space is fine; "art" is required to stand alone, not hide in "chart".
+        var pattern = $@"(?<![\p{{L}}\p{{N}}]){Regex.Escape(needle)}(?![\p{{L}}\p{{N}}])";
+        return Regex.IsMatch(haystack, pattern);
+    }
+
     private static int Score(JyotishPassage p, HashSet<int> activeHouses, HashSet<string> activePlanets)
     {
         int score = 0;
@@ -152,11 +165,12 @@ internal static class ChartTopicRouter
                     break;
                 }
             }
-            // House signatures contain "_h{N}_" or end with "_h{N}".
+            // House signatures contain "_h{N}_" or end with "_h{N}". Bound the
+            // match on the trailing side so "_h1" doesn't spuriously match
+            // "_h10", "_h11", "_h12" (a silent router bug pre-eval).
             foreach (var h in activeHouses)
             {
-                var houseToken = $"_h{h}";
-                if (s.Contains(houseToken, StringComparison.Ordinal))
+                if (ContainsHouseToken(s, h))
                 {
                     score += 3;
                     break;
@@ -164,6 +178,23 @@ internal static class ChartTopicRouter
             }
         }
         return score;
+    }
+
+    private static bool ContainsHouseToken(string sig, int house)
+    {
+        var token = $"_h{house}";
+        var idx = 0;
+        while ((idx = sig.IndexOf(token, idx, StringComparison.Ordinal)) >= 0)
+        {
+            var after = idx + token.Length;
+            // Valid match when the token is followed by end-of-string or a
+            // non-digit (e.g. "_h1" in "mars_in_h1" or "mars_in_h1__lagna_x",
+            // but NOT "_h1" as a prefix of "_h10"/"_h11"/"_h12").
+            if (after == sig.Length || !char.IsDigit(sig[after]))
+                return true;
+            idx = after;
+        }
+        return false;
     }
 
     private record TopicRule(string[] Keywords, int[] Houses, string[] Planets);

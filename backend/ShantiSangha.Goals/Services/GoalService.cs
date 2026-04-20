@@ -5,6 +5,7 @@ using Microsoft.SemanticKernel.ChatCompletion;
 using ShantiSangha.Goals.Contracts;
 using ShantiSangha.Goals.Data;
 using ShantiSangha.Goals.Models;
+using ShantiSangha.Shared;
 using ShantiSangha.Shared.Interfaces;
 
 namespace ShantiSangha.Goals.Services;
@@ -551,7 +552,7 @@ public class GoalService(
 
         try
         {
-            var chat = kernel.GetRequiredService<IChatCompletionService>();
+            var chat = kernel.GetRequiredService<IChatCompletionService>(AiModels.FastServiceId);
             var history = new ChatHistory("""
                 You are a gentle spiritual companion narrating the user's journey.
                 Given practice data and thematic context from their reflections,

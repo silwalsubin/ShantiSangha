@@ -2,7 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
+using ShantiSangha.Shared;
 using ShantiSangha.Shared.Interfaces;
+using ShantiSangha.Shared.Jyotish;
 using ShantiSangha.Wellness.Data;
 using ShantiSangha.Wellness.Models;
 
@@ -16,6 +18,7 @@ public class GenerateDailyReflectionJob(
     IInsightQueryService insightQuery,
     IProfileQueryService profileQuery,
     IJyotishContextService jyotishService,
+    IJyotishKnowledgeService jyotishKnowledge,
     IPushNotificationService pushService,
     ILogger<GenerateDailyReflectionJob> logger)
 {
@@ -127,12 +130,36 @@ public class GenerateDailyReflectionJob(
                 contextParts.Add($"Previous reflections (use for continuity, avoid repeating themes):\n{string.Join("\n", prevLines)}");
             }
 
-            // Vedic astrology context (invisible — enriches the reflection voice)
+            // Vedic astrology context (invisible — enriches the reflection voice).
+            // Also pulls 2 chart-matched passages from the classical corpus,
+            // rotated by (userId, day) so the invisible tradition behind each
+            // reflection shifts angle each morning rather than repeating one
+            // or two signatures every time.
             try
             {
                 var jyotish = await jyotishService.GetContextAsync(userId, today);
                 if (jyotish is not null)
+                {
                     contextParts.Add(jyotish.FormatForPrompt());
+
+                    var signatures = jyotish.DeriveSignatures()
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                    if (signatures.Count > 0)
+                    {
+                        var allPassages = await jyotishKnowledge.GetPassagesAsync(signatures);
+                        if (allPassages.Count > 0)
+                        {
+                            var chosen = allPassages.Rotate(userId, today, count: 2);
+                            var passageLines = chosen.Select(p =>
+                                $"  - [{p.Polarity}] {p.Content}");
+                            contextParts.Add(
+                                "Classical Vedic wisdom for their chart (weave invisibly — " +
+                                "never quote, never name the source, never use Sanskrit terms from these):\n" +
+                                string.Join("\n", passageLines));
+                        }
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -147,7 +174,7 @@ public class GenerateDailyReflectionJob(
                 ? string.Join("\n\n", contextParts)
                 : "No context available yet — they are new.";
 
-            var chatCompletion = kernel.GetRequiredService<IChatCompletionService>();
+            var chatCompletion = kernel.GetRequiredService<IChatCompletionService>(AiModels.FastServiceId);
             var history = new ChatHistory(BuildSystemPrompt());
 
             history.AddUserMessage($"Context about this person:\n{context}");

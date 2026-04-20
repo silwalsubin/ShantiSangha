@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
+using ShantiSangha.Shared;
 using ShantiSangha.Shared.Interfaces;
 using ShantiSangha.Shared.Jyotish;
 using ShantiSangha.Wellness.Data;
@@ -101,7 +102,7 @@ public class GenerateDailyReadingJob(
 
                     if (allPassages.Count > 0)
                     {
-                        var chosen = RotatePassages(allPassages, userId, today, count: 2);
+                        var chosen = allPassages.Rotate(userId, today, count: 2);
                         var passageLines = chosen.Select(p =>
                             $"  - [{p.Polarity}] {p.Content}");
                         contextParts.Add(
@@ -116,7 +117,7 @@ public class GenerateDailyReadingJob(
                 logger.LogWarning(ex, "Failed to retrieve Jyotish wisdom passages for user {UserId} — continuing without", userId);
             }
 
-            var chatCompletion = kernel.GetRequiredService<IChatCompletionService>();
+            var chatCompletion = kernel.GetRequiredService<IChatCompletionService>(AiModels.FastServiceId);
             var history = new ChatHistory(BuildSystemPrompt(framing));
             history.AddUserMessage($"Context:\n{string.Join("\n\n", contextParts)}");
 
@@ -146,31 +147,6 @@ public class GenerateDailyReadingJob(
         {
             logger.LogError(ex, "Failed to generate daily reading for user {UserId}", userId);
         }
-    }
-
-    /// <summary>
-    /// Deterministically selects N passages from the pool, rotating based on
-    /// (userId, date) so each day surfaces a different subset. Different users
-    /// on the same day see different rotations; the same user sees a different
-    /// subset each day.
-    /// </summary>
-    private static IReadOnlyList<JyotishPassage> RotatePassages(
-        IReadOnlyList<JyotishPassage> pool, Guid userId, DateOnly date, int count)
-    {
-        if (pool.Count <= count) return pool;
-
-        // Seed: combine user GUID with day-of-year so rotation advances daily.
-        var seed = unchecked(userId.GetHashCode() ^ date.DayNumber.GetHashCode());
-        var rng = new Random(seed);
-        var indices = Enumerable.Range(0, pool.Count).ToList();
-        var chosen = new List<JyotishPassage>(count);
-        for (var i = 0; i < count; i++)
-        {
-            var idx = rng.Next(indices.Count);
-            chosen.Add(pool[indices[idx]]);
-            indices.RemoveAt(idx);
-        }
-        return chosen;
     }
 
     private static Framing DetermineFraming(JyotishContext jyotish, DateOnly today)

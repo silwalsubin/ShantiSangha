@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
+using ShantiSangha.Shared;
 using ShantiSangha.Shared.Interfaces;
 using ShantiSangha.Wellness.Data;
 using ShantiSangha.Wellness.Models;
@@ -130,7 +131,7 @@ public class JournalPromptController(
 
         try
         {
-            var chat = kernel.GetRequiredService<IChatCompletionService>();
+            var chat = kernel.GetRequiredService<IChatCompletionService>(AiModels.FastServiceId);
             var history = new ChatHistory("""
                 You write a single journal prompt for someone about to open a blank
                 journal editor in a spiritual wellness app. The prompt appears as
