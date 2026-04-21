@@ -48,7 +48,6 @@ struct RecurringSummaryView: View {
         .background(Color.sacredBg.ignoresSafeArea())
         .navigationTitle("Practices")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
     }
 
     private var progressRing: some View {

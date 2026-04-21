@@ -83,7 +83,6 @@ struct JournalEditorView: View {
         .background(Color.sacredBg.ignoresSafeArea())
         .navigationTitle(isNew ? "New Entry" : "Journal")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if !content.trimmingCharacters(in: .whitespaces).isEmpty {

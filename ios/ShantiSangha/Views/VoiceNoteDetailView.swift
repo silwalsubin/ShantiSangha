@@ -98,7 +98,6 @@ struct VoiceNoteDetailView: View {
         .background(Color.sacredBg.ignoresSafeArea())
         .navigationTitle("Voice Note")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if let transcript = entry?.transcript, !transcript.isEmpty {

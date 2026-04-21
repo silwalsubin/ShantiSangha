@@ -71,7 +71,6 @@ struct QuickAddGoalView: View {
         .padding(.horizontal, 16)
         .background(Color.sacredBg.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
         .onAppear { focused = true }
     }
 

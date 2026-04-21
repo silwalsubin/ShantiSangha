@@ -10,6 +10,10 @@ import SwiftUI
 struct DailyReadingCardView: View {
     let content: String
     @Binding var isOpened: Bool
+    /// Called when the user taps the close button on the opened card —
+    /// parent is expected to hide the card and persist "dismissed for today"
+    /// so it doesn't reappear until tomorrow's reading is ready.
+    var onDismiss: (() -> Void)?
 
     /// Within the opened state, prose is clamped to 2 lines by default so
     /// Home doesn't collapse under two back-to-back italic essays. User
@@ -88,6 +92,21 @@ struct DailyReadingCardView: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 Spacer(minLength: 0)
+
+                if onDismiss != nil {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        onDismiss?()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 11, weight: .semibold, design: .serif))
+                            .foregroundColor(.sacredMuted)
+                            .padding(8)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Close today's reading")
+                }
             }
 
             Button {

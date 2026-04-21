@@ -111,7 +111,6 @@ struct VoiceNoteView: View {
         .background(Color.sacredBg.ignoresSafeArea())
         .navigationTitle("Voice Note")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
         .alert("Microphone Access Required", isPresented: $permissionDenied) {
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {

@@ -71,7 +71,6 @@ struct MilestoneSummaryView: View {
         }
         .background(Color.sacredBg.ignoresSafeArea())
         .navigationTitle("Goals")
-        .toolbar(.hidden, for: .tabBar)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

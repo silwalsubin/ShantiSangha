@@ -27,7 +27,6 @@ struct GoalCalendarBrowseView: View {
         }
         .background(Color.sacredBg.ignoresSafeArea())
         .navigationTitle("Calendar")
-        .toolbar(.hidden, for: .tabBar)
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(isPresented: $showDateGoals) {
             DateGoalsView(vm: vm, date: navigateToDate ?? today)

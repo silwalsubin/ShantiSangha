@@ -45,7 +45,6 @@ struct HangfireDebugView: View {
         .background(Color.sacredBg.ignoresSafeArea())
         .navigationTitle("Hangfire Jobs")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {

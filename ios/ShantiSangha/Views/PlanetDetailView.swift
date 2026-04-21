@@ -24,7 +24,6 @@ struct PlanetDetailView: View {
         .background(Color.sacredBg.ignoresSafeArea())
         .navigationTitle(planet.name)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
     }
 
     // MARK: - Header

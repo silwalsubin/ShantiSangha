@@ -84,7 +84,6 @@ struct VedicChartView: View {
         }
         .navigationTitle("Your Birth Chart")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {

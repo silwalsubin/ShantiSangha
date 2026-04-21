@@ -91,7 +91,6 @@ struct ChatView: View {
         .background(Color.sacredBg.ignoresSafeArea())
         .navigationTitle(displayTitle)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if !messages.isEmpty {

@@ -16,6 +16,10 @@ struct HomeView: View {
     @State private var reflectionIsFallback: Bool = false
     @State private var dailyReadingContent: String?
     @State private var dailyReadingOpened: Bool = false
+    /// Per-day dismissal. When the user taps the close button on the opened
+    /// card, the card clears for the rest of today and returns tomorrow with
+    /// the next reading.
+    @State private var dailyReadingDismissed: Bool = false
     @State private var showFAB = true
     @State private var practicesCompleted = false
     @State private var ringPulse = false
@@ -42,8 +46,9 @@ struct HomeView: View {
                         .padding(.top, 16)
                     }
 
-                    // Daily Vedic reading — sealed note; user taps to open.
-                    if let dailyReadingContent {
+                    // Daily Vedic reading — sealed note; user taps to open,
+                    // close to dismiss for today.
+                    if let dailyReadingContent, !dailyReadingDismissed {
                         DailyReadingCardView(
                             content: dailyReadingContent,
                             isOpened: Binding(
@@ -52,7 +57,13 @@ struct HomeView: View {
                                     dailyReadingOpened = newValue
                                     persistDailyReadingOpened(newValue)
                                 }
-                            )
+                            ),
+                            onDismiss: {
+                                withAnimation(.easeOut(duration: 0.25)) {
+                                    dailyReadingDismissed = true
+                                }
+                                persistDailyReadingDismissed(true)
+                            }
                         )
                         .padding(.top, 20)
                     }
@@ -480,6 +491,7 @@ struct HomeView: View {
     // MARK: - Daily Reading
 
     private static let dailyReadingOpenedKeyPrefix = "home.daily_reading.opened."
+    private static let dailyReadingDismissedKeyPrefix = "home.daily_reading.dismissed."
 
     private var todayDateString: String {
         let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
@@ -493,7 +505,7 @@ struct HomeView: View {
             let response: DailyReadingResponse = try await ApiService.shared.get("/daily-reading/today?date=\(dateStr)")
             if let content = response.content, !content.isEmpty {
                 dailyReadingContent = content
-                dailyReadingOpened = UserDefaults.standard.bool(forKey: Self.dailyReadingOpenedKeyPrefix + dateStr)
+                hydrateDailyReadingPerDayState(dateStr: dateStr)
                 return
             }
 
@@ -503,7 +515,7 @@ struct HomeView: View {
                 let retry: DailyReadingResponse = try await ApiService.shared.get("/daily-reading/today?date=\(dateStr)")
                 if let content = retry.content, !content.isEmpty {
                     dailyReadingContent = content
-                    dailyReadingOpened = UserDefaults.standard.bool(forKey: Self.dailyReadingOpenedKeyPrefix + dateStr)
+                    hydrateDailyReadingPerDayState(dateStr: dateStr)
                     return
                 }
             }
@@ -518,8 +530,18 @@ struct HomeView: View {
         }
     }
 
+    private func hydrateDailyReadingPerDayState(dateStr: String) {
+        let defaults = UserDefaults.standard
+        dailyReadingOpened = defaults.bool(forKey: Self.dailyReadingOpenedKeyPrefix + dateStr)
+        dailyReadingDismissed = defaults.bool(forKey: Self.dailyReadingDismissedKeyPrefix + dateStr)
+    }
+
     private func persistDailyReadingOpened(_ opened: Bool) {
         UserDefaults.standard.set(opened, forKey: Self.dailyReadingOpenedKeyPrefix + todayDateString)
+    }
+
+    private func persistDailyReadingDismissed(_ dismissed: Bool) {
+        UserDefaults.standard.set(dismissed, forKey: Self.dailyReadingDismissedKeyPrefix + todayDateString)
     }
 
     // MARK: - Profile

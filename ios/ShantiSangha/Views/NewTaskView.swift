@@ -75,7 +75,6 @@ struct NewTaskView: View {
         }
         .background(Color.sacredBg.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
     }
 
     // MARK: - Approach button
