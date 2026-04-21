@@ -11,8 +11,9 @@ struct HomeView: View {
     @State private var showMilestoneSummary = false
     @State private var reflection: String?
     @State private var reflectionDate: String?
-    @State private var reflectionLoading = true
-    @State private var reflectionFallback = false
+    /// True when `reflection` is a prior day's reflection shown while today's
+    /// is still being composed. Drives the "TODAY'S IS BEING WRITTEN" chip.
+    @State private var reflectionIsFallback: Bool = false
     @State private var dailyReadingContent: String?
     @State private var dailyReadingOpened: Bool = false
     @State private var showFAB = true
@@ -29,17 +30,14 @@ struct HomeView: View {
                         .font(.sacredTitle)
                         .foregroundColor(.sacredText)
 
-                    // Daily reflection
+                    // Daily reflection. Today's if ready, else yesterday's (or
+                    // day-before's) as a fallback with a subtle chip. Home is
+                    // never empty — the server returns a fallback reflection
+                    // when today's hasn't been composed yet.
                     if let reflection {
-                        ReflectionCardView(content: reflection)
-                            .padding(.top, 16)
-                    } else if reflectionLoading {
-                        ReflectionCardView(content: "Preparing your reflection...", isLoading: true)
-                            .padding(.top, 16)
-                    } else if reflectionFallback {
                         ReflectionCardView(
-                            content: "Your reflection is still arriving. Pull down to refresh in a moment.",
-                            isLoading: true
+                            content: reflection,
+                            caption: reflectionIsFallback ? "TODAY'S IS BEING WRITTEN" : nil
                         )
                         .padding(.top, 16)
                     }
@@ -423,7 +421,9 @@ struct HomeView: View {
         let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
         let dateStr = df.string(from: Date())
 
-        // Hydrate from persistent cache first so Home is never empty on tab switch/relaunch
+        // Hydrate from persistent cache first so Home is never empty on tab
+        // switch / relaunch. Only today's real reflection is cached — fallbacks
+        // aren't persisted so we always re-check the server for the real one.
         if !force, reflection == nil {
             let defaults = UserDefaults.standard
             if let cachedDate = defaults.string(forKey: Self.cachedReflectionDateKey),
@@ -432,50 +432,52 @@ struct HomeView: View {
                !cachedContent.isEmpty {
                 reflection = cachedContent
                 reflectionDate = cachedDate
-                reflectionLoading = false
-                reflectionFallback = false
+                reflectionIsFallback = false
                 return
             }
         }
 
-        // In-memory fast path — already have today's reflection
-        if !force, reflection != nil, reflectionDate == dateStr { return }
-
-        reflectionLoading = true
-        reflectionFallback = false
-        defer { reflectionLoading = false }
+        // In-memory fast path — already have today's real reflection. If the
+        // state is a fallback we still re-check the server in case today's
+        // has been composed since the last fetch.
+        if !force, reflection != nil, reflectionDate == dateStr, !reflectionIsFallback { return }
 
         do {
             let response: DailyReflectionResponse = try await ApiService.shared.get("/reflection/today?date=\(dateStr)")
+
             if let content = response.content, !content.isEmpty {
+                // Today's is ready — persist and end the fallback state if any.
                 persistReflection(content, date: dateStr)
                 return
             }
 
-            // Generation triggered — poll for result
-            for _ in 1...5 {
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                let retry: DailyReflectionResponse = try await ApiService.shared.get("/reflection/today?date=\(dateStr)")
-                if let content = retry.content, !content.isEmpty {
-                    persistReflection(content, date: dateStr)
-                    return
-                }
+            // Today's isn't ready yet. The server enqueued generation and
+            // returned the most recent prior reflection as a fallback. Show
+            // it with a caption; when the silent push "type: reflection"
+            // arrives, loadReflection(force: true) swaps in the real one.
+            if let fallback = response.fallback, !fallback.content.isEmpty {
+                reflection = fallback.content
+                reflectionDate = fallback.date
+                reflectionIsFallback = true
+                return
             }
 
-            // Timed out — show a warm fallback so Home is never empty
-            reflectionFallback = true
+            // Brand-new user with no prior reflections at all. Leave the card
+            // hidden; generation will catch up, silent push will wake us.
+            reflection = nil
+            reflectionDate = nil
+            reflectionIsFallback = false
         } catch {
             if !error.isCancellation {
                 AppLogger.shared.error("Reflection", "Failed: \(error.localizedDescription)")
             }
-            reflectionFallback = true
         }
     }
 
     private func persistReflection(_ content: String, date: String) {
         reflection = content
         reflectionDate = date
-        reflectionFallback = false
+        reflectionIsFallback = false
         let defaults = UserDefaults.standard
         defaults.set(content, forKey: Self.cachedReflectionKey)
         defaults.set(date, forKey: Self.cachedReflectionDateKey)
@@ -550,6 +552,12 @@ struct HomeView: View {
 
 private struct DailyReflectionResponse: Decodable {
     let content: String?
+    let fallback: FallbackReflection?
+
+    struct FallbackReflection: Decodable {
+        let content: String
+        let date: String
+    }
 }
 
 private struct DailyReadingResponse: Decodable {

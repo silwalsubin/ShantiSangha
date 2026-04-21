@@ -18,6 +18,11 @@ public class ReflectionController(
     IBackgroundJobClient jobs,
     ILogger<ReflectionController> logger) : ControllerBase
 {
+    // Fallback window: show yesterday's (or day-before-yesterday's) reflection
+    // when today's isn't ready yet. Beyond this, the fallback feels stale and
+    // we'd rather show the "still arriving" copy than a reflection from a week ago.
+    private const int FallbackMaxAgeDays = 3;
+
     [HttpGet("today")]
     public async Task<IActionResult> GetToday([FromQuery] string? date, CancellationToken ct)
     {
@@ -36,12 +41,35 @@ public class ReflectionController(
         if (reflection is not null)
         {
             logger.LogInformation("Reflection cache hit for user {UserId} on {Date}", user.Id, today);
-            return Ok(reflection);
+            return Ok(new
+            {
+                Content = reflection.Content,
+                Date = reflection.Date,
+                Type = reflection.Type,
+                Fallback = (object?)null,
+            });
         }
 
+        // Cache miss — enqueue generation, and return the most recent prior
+        // reflection as a fallback so home is never empty while the job runs.
+        // The client uses `fallback` to render yesterday's text with a subtle
+        // "today's is being written" chip instead of a dead spinner.
         logger.LogInformation("Reflection cache miss for user {UserId} on {Date} — enqueueing generation", user.Id, today);
         jobs.Enqueue<GenerateDailyReflectionJob>(j => j.RunAsync(user.Id, today));
 
-        return Ok(new { Content = (string?)null, Date = today });
+        var fallbackCutoff = today.AddDays(-FallbackMaxAgeDays);
+        var fallback = await db.DailyReflections
+            .Where(r => r.UserId == user.Id && r.Date < today && r.Date >= fallbackCutoff)
+            .OrderByDescending(r => r.Date)
+            .Select(r => new { r.Content, r.Date, Type = r.Type.ToString() })
+            .FirstOrDefaultAsync(ct);
+
+        return Ok(new
+        {
+            Content = (string?)null,
+            Date = today,
+            Type = (string?)null,
+            Fallback = fallback,
+        });
     }
 }
