@@ -52,34 +52,19 @@ struct QuickAddGoalView: View {
             }
 
             // Save
-            Button {
-                guard !title.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+            SacredPrimaryButton(
+                "Set this goal",
+                style: .commit,
+                isDisabled: title.trimmingCharacters(in: .whitespaces).isEmpty,
+                isLoading: saving
+            ) {
                 saving = true
                 let dateStr = formatDate(targetDate)
                 Task {
                     await onCreate(title.trimmingCharacters(in: .whitespaces), .oneTime, dateStr)
                     dismiss()
                 }
-            } label: {
-                HStack {
-                    Spacer()
-                    if saving {
-                        ProgressView().tint(.white)
-                    } else {
-                        Text("Set this goal")
-                            .font(.sacredTextSemibold)
-                    }
-                    Spacer()
-                }
-                .foregroundColor(.white)
-                .padding(.vertical, 14)
-                .background(LinearGradient.sacredGoldShiny)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .shimmer()
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .opacity(title.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1)
             }
-            .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty || saving)
 
             Spacer()
         }

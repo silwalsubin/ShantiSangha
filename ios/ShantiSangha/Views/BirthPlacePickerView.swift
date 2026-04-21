@@ -50,6 +50,10 @@ struct BirthPlacePickerView: View {
                 }
             }
         }
+        // When the user has picked a result but not yet committed with
+        // "Use this place", block the drag-dismiss gesture so they don't
+        // lose the selection by accident. Cancel still works via the toolbar.
+        .interactiveDismissDisabled(selectedCoordinate != nil)
     }
 
     // MARK: - Search bar
@@ -194,18 +198,10 @@ struct BirthPlacePickerView: View {
 
             Spacer()
 
-            Button {
+            SacredPrimaryButton("Use this place", fullWidth: true) {
                 if let coord = selectedCoordinate {
                     onSelect(selectedName, coord.latitude, coord.longitude)
                 }
-            } label: {
-                Text("Use this place")
-                    .font(.sacredTextSemibold)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(LinearGradient.sacredGoldShinyVertical)
-                    .clipShape(Capsule())
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 16)

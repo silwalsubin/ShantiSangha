@@ -263,14 +263,8 @@ struct HomeView: View {
                 .font(.sacredText)
                 .foregroundColor(.sacredTextSecondary)
 
-            Button { showNewTask = true } label: {
-                Text("Set your first practice")
-                    .font(.sacredTextSemibold)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
-                    .background(LinearGradient.sacredGoldShiny)
-                    .clipShape(Capsule())
+            SacredPrimaryButton("Set your first practice") {
+                showNewTask = true
             }
         }
         .frame(maxWidth: .infinity)

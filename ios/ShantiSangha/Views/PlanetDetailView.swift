@@ -126,6 +126,7 @@ struct PlanetDetailView: View {
     private var positionsSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 withAnimation(.easeOut(duration: 0.25)) {
                     positionsExpanded.toggle()
                 }
@@ -197,7 +198,8 @@ struct PlanetDetailView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
+        .background(Color.sacredBgCard)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
     }
 
@@ -271,18 +273,8 @@ struct PlanetDetailView: View {
 
     // MARK: - Helpers
 
-    private func card<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.sacredSectionLabel)
-                .tracking(3)
-                .foregroundColor(.sacredLabel)
-            content()
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
+    private func card<Content: View>(title: String, @ViewBuilder content: @escaping () -> Content) -> some View {
+        SacredCard(title, content: content)
     }
 
     private func shortRashi(_ rashi: String) -> String {

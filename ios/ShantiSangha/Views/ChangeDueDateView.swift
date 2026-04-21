@@ -42,26 +42,11 @@ struct ChangeDueDateView: View {
             }
 
             // Save button
-            VStack(spacing: 12) {
-                Button {
-                    let f = DateFormatter()
-                    f.dateFormat = "yyyy-MM-dd"
-                    onSave(f.string(from: selectedDate))
-                    dismiss()
-                } label: {
-                    HStack {
-                        Spacer()
-                        Text("Save")
-                            .font(.sacredTextSemibold)
-                        Spacer()
-                    }
-                    .foregroundColor(.white)
-                    .padding(.vertical, 14)
-                    .background(LinearGradient.sacredGoldShiny)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .shimmer()
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                }
+            SacredPrimaryButton("Save", style: .commit) {
+                let f = DateFormatter()
+                f.dateFormat = "yyyy-MM-dd"
+                onSave(f.string(from: selectedDate))
+                dismiss()
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 20)

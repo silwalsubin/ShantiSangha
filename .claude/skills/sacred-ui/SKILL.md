@@ -1,6 +1,6 @@
 ---
 name: sacred-ui
-description: "Enforces the ShantiSangha sacred design system and iOS UX patterns when creating or editing UI code — Vue/Tailwind and SwiftUI. Use this skill whenever the user asks to build, edit, style, or create any UI component, page, view, screen, button, card, form, modal, or layout in this project. Also trigger when the user mentions colors, fonts, spacing, icons, animations, visual styling, gestures, navigation, transitions, loading states, empty states, or interaction patterns. Even if the user doesn't mention 'sacred' or 'design system', always apply these rules when touching UI code. This skill covers both how things LOOK (colors, fonts, layout) and how things FEEL (gestures, transitions, loading behavior, navigation flow)."
+description: "Enforces the ShantiSangha sacred design system and iOS UX patterns when creating or editing UI code — Vue/Tailwind and SwiftUI. Use this skill whenever the user asks to build, edit, style, or create any UI component, page, view, screen, button, card, form, modal, or layout in this project. Also trigger when the user mentions colors, fonts, spacing, icons, animations, visual styling, gestures, navigation, transitions, loading states, empty states, or interaction patterns. When the task adds a NEW screen, view, tab, route, modal, sheet, or navigation path, also run a workflow audit: scan the codebase for duplicate features before building, and verify there are no dead ends (missing back navigation, orphaned routes, empty states with no action, unresolved loading/error states) after building. Even if the user doesn't mention 'sacred' or 'design system', always apply these rules when touching UI code. This skill covers both how things LOOK (colors, fonts, layout) and how things FEEL (gestures, transitions, loading behavior, navigation flow, and whether the overall workflow holds together)."
 ---
 
 # Sacred UI — ShantiSangha Design System
@@ -369,6 +369,59 @@ Animations must be functional (convey state change), not decorative.
 - **VoiceOver:** Every interactive element needs an accessible label. Swipe actions must have menu alternatives.
 - **Contrast:** Sacred gold (#c4873b) on sacred bg (#faf5ed) meets AA contrast. Never go lighter than `.sacredMuted` for meaningful text.
 - **Touch targets:** 44pt minimum on everything tappable — this is both an Apple guideline and sacred-ui law.
+
+## Workflow Audit — New Screens & Flows
+
+Run this audit when the task introduces a **new navigation node**: a new route, view, page, tab, modal, sheet, full-screen cover, or a new user flow that spans multiple screens. Skip it for styling tweaks, copy changes, or component-level edits to an existing screen.
+
+This overlaps intentionally with the `product-guardian` skill — product-guardian judges whether a feature *should* exist; sacred-ui checks whether the flow *mechanically holds together*. Both checks are worth running on new flows; they ask different questions.
+
+### Before building — duplicate scan
+
+Before writing any code for a new screen or flow, verify it doesn't already exist somewhere in the app. ShantiSangha is explicitly *one experience, not a pile of modules* — two screens doing the same thing is worse than one imperfect screen, because it fragments the user's mental model and creates ambiguous entry points.
+
+Run these searches (the exact keywords depend on the feature):
+
+- **Web routes:** `grep -r "<feature-keyword>" frontend/src/router` and `frontend/src/views`, `frontend/src/pages`
+- **iOS views:** `grep -ri "<feature-keyword>" ios/ShantiSangha/Views`
+- **Feature docs:** check `docs/features/` — if the feature already has a doc, the UI likely already exists
+- **Components:** does an existing card, modal, list, or form already render this data or capture this input?
+
+Then report the scan result to the user **before writing code**:
+
+- If nothing matches: "No existing screen does this — proceeding."
+- If something matches: "`<existing screen>` already does `<X>`. Should we extend it, replace it, or is this genuinely a distinct flow? I'd lean toward extending rather than adding a parallel path." — and wait for the user's call.
+
+Defaulting to a new screen when one exists is the single most common way this app gets cluttered. When in doubt, extend.
+
+### After building — dead-end audit
+
+After the new screen or flow is wired up, walk it as if you were the user and verify every exit path. A dead end is any state where the user gets stuck, confused about where they are, or unable to continue the daily rhythm.
+
+Check each of these for the new screen:
+
+1. **Entry:** Is it reachable from at least one other screen (tab, navigation push, link, sheet trigger)? If it's orphaned, delete it or wire up the entry point.
+2. **Back:** Can the user always return to where they came from?
+   - SwiftUI push: has a `NavigationStack` ancestor → iOS back button works
+   - SwiftUI sheet / `fullScreenCover`: has a working dismiss button or drag-to-dismiss
+   - Vue page: `router.back()` works, or there's a close/cancel affordance
+3. **Forward:** Every primary action on the screen leads somewhere real. No buttons that do nothing. No inputs with no submit path.
+4. **Empty state:** If the screen can legitimately be empty (no data yet), it shows a warm message and **one clear next action** — not a blank canvas. "Set your first practice" not just "No practices."
+5. **Loading state:** First load shows a spinner only if there's truly nothing cached. Subsequent loads show the previous data while refreshing. Never a blank white screen.
+6. **Error state:** Silent failures fall back to cached data. Unrecoverable errors show a gentle fallback message, never a raw error string. Retry is available where it makes sense.
+7. **Completion / submit:** After the user saves, submits, or completes the action, where do they land? The destination should be obvious — usually back one level with the new data reflected. Don't leave them on a stale form.
+8. **Ties to the daily rhythm:** Does the flow return the user to the 3-tab loop (Home / Reflect / Journey), or does it pull them off into a side path they might get stuck in? Side paths are fine for focused tasks, but they must terminate cleanly back into a main tab.
+
+If any of these fail, fix them before reporting the task as complete, and explicitly name what you fixed ("added a back button to X, wired up empty state on Y"). Don't quietly ship a screen with a missing exit.
+
+### Reporting the audit
+
+When the task is done, surface the audit result briefly so the user can sanity-check:
+
+- "Duplicate scan: no overlap" (or "extended `X` instead of adding new")
+- "Dead-end audit: back nav works, empty state handled, submit returns to `<screen>`"
+
+One or two lines is enough. The point is to make the check visible, not to write a report.
 
 ## Reference Files
 

@@ -18,10 +18,14 @@ infrastructure/terraform/.terraform/
 infrastructure/terraform/*.tfstate
 infrastructure/terraform/*.tfstate.backup
 infrastructure/terraform/.terraform.lock.hcl
-ios/ShantiSangha.xcodeproj/project.xcworkspace/xcuserdata/subinsilwal.xcuserdatad/UserInterfaceState.xcuserstate
+# Xcode
+ios/build/
+ios/DerivedData/
+ios/ShantiSangha.xcodeproj/project.xcworkspace/xcuserdata/
+ios/ShantiSangha.xcodeproj/xcuserdata/
+
 .claude/settings.json
 
 
 # Skills
 sacred-ui-workspace/
-ios/ShantiSangha.xcodeproj/project.xcworkspace/xcuserdata/subinsilwal.xcuserdatad/UserInterfaceState.xcuserstate

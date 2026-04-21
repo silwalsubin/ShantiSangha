@@ -62,28 +62,52 @@ struct DailyReadingCardView: View {
     // MARK: - Opened
 
     private var openedView: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "envelope.open")
-                .font(.sacredMicro)
-                .foregroundColor(.sacredGold.opacity(0.6))
-                .padding(.top, 3)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "envelope.open")
+                    .font(.sacredMicro)
+                    .foregroundColor(.sacredGold.opacity(0.6))
+                    .padding(.top, 3)
 
-            Text(content)
-                .font(.system(size: 13, weight: .regular, design: .serif))
-                .italic()
-                .foregroundColor(.sacredTextSecondary)
-                .multilineTextAlignment(.leading)
-                .lineSpacing(3)
-                .fixedSize(horizontal: false, vertical: true)
+                Text(content)
+                    .font(.system(size: 13, weight: .regular, design: .serif))
+                    .italic()
+                    .foregroundColor(.sacredTextSecondary)
+                    .multilineTextAlignment(.leading)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
 
-            Spacer(minLength: 0)
+                Spacer(minLength: 0)
+            }
+
+            NavigationLink(destination: VedicChartView()) {
+                HStack(spacing: 6) {
+                    Image(systemName: "moon.stars")
+                        .font(.sacredMicro)
+                        .foregroundColor(.sacredGold.opacity(0.8))
+                    Text("Read your full chart")
+                        .font(.sacredSectionLabel)
+                        .tracking(2)
+                        .foregroundColor(.sacredLabel)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 8, weight: .bold, design: .serif))
+                        .foregroundColor(.sacredMuted)
+                    Spacer(minLength: 0)
+                }
+                .padding(.top, 4)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .simultaneousGesture(TapGesture().onEnded {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            })
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(.ultraThinMaterial)
+                .fill(Color.sacredBgCard)
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
                         .stroke(Color.sacredGold.opacity(0.12), lineWidth: 0.5)
