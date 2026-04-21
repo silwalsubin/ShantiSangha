@@ -21,6 +21,25 @@ public class SafetyService(
         "harm someone", "hurt someone", "kill someone"
     ];
 
+    // OpenAI moderation returns many categories (sexual, hate, harassment,
+    // violence, etc.). We intentionally allow most of them — users may need
+    // to process intimacy, anger, conflict, grief, or embodied experience
+    // without the chat refusing. The AI's own tone is already shaped by
+    // the SystemPrompt.
+    //
+    // These categories remain blocked regardless:
+    //   - sexual/minors: legal boundary, never permitted.
+    //   - self-harm/*:   a safety net behind the crisis keyword list. If a
+    //                    phrasing slips past the keyword match, moderation
+    //                    still routes the user to crisis support.
+    private static readonly HashSet<string> AlwaysBlockedCategories = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "sexual/minors",
+        "self-harm",
+        "self-harm/intent",
+        "self-harm/instructions",
+    };
+
     public async Task<SafetyCheckResult> CheckInputAsync(string content, CancellationToken ct = default)
     {
         var lowerContent = content.ToLowerInvariant();
@@ -85,11 +104,17 @@ public class SafetyService(
             if (!flagged.Flagged)
                 return new SafetyCheckResult(SafetyCheckOutcome.Clear);
 
-            var topCategory = flagged.CategoryScores
-                .OrderByDescending(kv => kv.Value)
-                .First(kv => flagged.Categories.TryGetValue(kv.Key, out var isFlagged) && isFlagged);
+            // Only block if a category from our hard list fired. Other
+            // flagged categories (sexual, hate, harassment, violence,
+            // graphic) pass through — the chat allows users to process
+            // those topics without being cut off.
+            var hardBlocked = flagged.Categories
+                .FirstOrDefault(kv => kv.Value && AlwaysBlockedCategories.Contains(kv.Key));
 
-            return new SafetyCheckResult(SafetyCheckOutcome.Flagged, $"Category: {topCategory.Key}");
+            if (hardBlocked.Key is null)
+                return new SafetyCheckResult(SafetyCheckOutcome.Clear);
+
+            return new SafetyCheckResult(SafetyCheckOutcome.Flagged, $"Category: {hardBlocked.Key}");
         }
         catch (Exception ex)
         {
