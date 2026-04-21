@@ -6,6 +6,11 @@ import SwiftUI
 struct PlanetDetailView: View {
     let planet: Planet
 
+    /// Divisional-chart positions are dense reference data. Collapsed by
+    /// default so the page leads with the planet's meaning + classical
+    /// reading; user taps to reveal the D-charts when they want them.
+    @State private var positionsExpanded: Bool = false
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -119,54 +124,81 @@ struct PlanetDetailView: View {
     // MARK: - Positions (divisional charts)
 
     private var positionsSection: some View {
-        card(title: "POSITIONS") {
-            VStack(spacing: 0) {
-                positionRow("Rasi (D1)", shortRashi(planet.rashi), subtitle: "physical self, overall life")
-                Divider().padding(.vertical, 8)
-                if let d3 = planet.drekkanaRashi {
-                    positionRow("Drekkana (D3)", shortRashi(d3), subtitle: "siblings, courage")
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeOut(duration: 0.25)) {
+                    positionsExpanded.toggle()
+                }
+            } label: {
+                HStack {
+                    Text("POSITIONS")
+                        .font(.sacredSectionLabel)
+                        .tracking(3)
+                        .foregroundColor(.sacredLabel)
+                    Spacer()
+                    Image(systemName: positionsExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 11, weight: .bold, design: .serif))
+                        .foregroundColor(.sacredMuted)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if positionsExpanded {
+                VStack(spacing: 0) {
+                    positionRow("Rasi (D1)", shortRashi(planet.rashi), subtitle: "physical self, overall life")
                     Divider().padding(.vertical, 8)
+                    if let d3 = planet.drekkanaRashi {
+                        positionRow("Drekkana (D3)", shortRashi(d3), subtitle: "siblings, courage")
+                        Divider().padding(.vertical, 8)
+                    }
+                    if let d4 = planet.chaturthamsaRashi {
+                        positionRow("Chaturthamsa (D4)", shortRashi(d4), subtitle: "home, property, inner life")
+                        Divider().padding(.vertical, 8)
+                    }
+                    if let d7 = planet.saptamsaRashi {
+                        positionRow("Saptamsa (D7)", shortRashi(d7), subtitle: "children, creativity")
+                        Divider().padding(.vertical, 8)
+                    }
+                    if let d9 = planet.navamsaRashi {
+                        positionRow(
+                            "Navamsa (D9)",
+                            shortRashi(d9),
+                            subtitle: planet.vargottama == true
+                                ? "vargottama — D1 and D9 match"
+                                : "marriage, dharma, planetary strength",
+                            badge: planet.vargottama == true ? "★" : nil
+                        )
+                        Divider().padding(.vertical, 8)
+                    }
+                    if let d10 = planet.dasamsaRashi {
+                        positionRow("Dasamsa (D10)", shortRashi(d10), subtitle: "career, public life")
+                        Divider().padding(.vertical, 8)
+                    }
+                    if let d12 = planet.dvadasamsaRashi {
+                        positionRow("Dvadasamsa (D12)", shortRashi(d12), subtitle: "parents, lineage")
+                        Divider().padding(.vertical, 8)
+                    }
+                    if let d16 = planet.shodasamsaRashi {
+                        positionRow("Shodasamsa (D16)", shortRashi(d16), subtitle: "vehicles, comforts")
+                        Divider().padding(.vertical, 8)
+                    }
+                    if let d20 = planet.vimsamsaRashi {
+                        positionRow("Vimsamsa (D20)", shortRashi(d20), subtitle: "spiritual practice, upasana")
+                        Divider().padding(.vertical, 8)
+                    }
+                    if let d24 = planet.chaturvimsamsaRashi {
+                        positionRow("Chaturvimsamsa (D24)", shortRashi(d24), subtitle: "learning, education")
+                    }
                 }
-                if let d4 = planet.chaturthamsaRashi {
-                    positionRow("Chaturthamsa (D4)", shortRashi(d4), subtitle: "home, property, inner life")
-                    Divider().padding(.vertical, 8)
-                }
-                if let d7 = planet.saptamsaRashi {
-                    positionRow("Saptamsa (D7)", shortRashi(d7), subtitle: "children, creativity")
-                    Divider().padding(.vertical, 8)
-                }
-                if let d9 = planet.navamsaRashi {
-                    positionRow(
-                        "Navamsa (D9)",
-                        shortRashi(d9),
-                        subtitle: planet.vargottama == true
-                            ? "vargottama — D1 and D9 match"
-                            : "marriage, dharma, planetary strength",
-                        badge: planet.vargottama == true ? "★" : nil
-                    )
-                    Divider().padding(.vertical, 8)
-                }
-                if let d10 = planet.dasamsaRashi {
-                    positionRow("Dasamsa (D10)", shortRashi(d10), subtitle: "career, public life")
-                    Divider().padding(.vertical, 8)
-                }
-                if let d12 = planet.dvadasamsaRashi {
-                    positionRow("Dvadasamsa (D12)", shortRashi(d12), subtitle: "parents, lineage")
-                    Divider().padding(.vertical, 8)
-                }
-                if let d16 = planet.shodasamsaRashi {
-                    positionRow("Shodasamsa (D16)", shortRashi(d16), subtitle: "vehicles, comforts")
-                    Divider().padding(.vertical, 8)
-                }
-                if let d20 = planet.vimsamsaRashi {
-                    positionRow("Vimsamsa (D20)", shortRashi(d20), subtitle: "spiritual practice, upasana")
-                    Divider().padding(.vertical, 8)
-                }
-                if let d24 = planet.chaturvimsamsaRashi {
-                    positionRow("Chaturvimsamsa (D24)", shortRashi(d24), subtitle: "learning, education")
-                }
+                .padding(.top, 12)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
     }
 
     private func positionRow(_ label: String, _ value: String,
