@@ -61,6 +61,25 @@ Use `Color.sacred*` extensions exclusively:
 | **Gold gradients** | `LinearGradient.sacredGoldShiny`, `.sacredGoldShinyVertical` |
 | **Radial gold** | `RadialGradient.sacredGoldShiny` |
 
+### Dark Mode (iOS)
+
+The SwiftUI tokens are adaptive: text, muted, label, bg, and bg-card all use `Color.adaptive(light:, dark:)` and switch automatically based on `UITraitCollection.userInterfaceStyle`. Do NOT add `.preferredColorScheme(.light)` overrides unless there's a specific reason to pin one mode — the design is meant to work in both.
+
+Dark variants (reference):
+
+| Token | Light | Dark |
+|-------|-------|------|
+| `sacredText` | `#2b1e10` | `#f5ebe0` |
+| `sacredTextSecondary` | `#6b5740` | `#c4a882` |
+| `sacredMuted` | `#9a8568` | `#8a7a64` |
+| `sacredLabel` | `#a38d6d` | `#b5996f` |
+| `sacredBg` | `#faf5ed` (parchment) | `#1a1410` (deep warm brown) |
+| `sacredBgCard` | `#f5ebe0` | `#2a2018` |
+
+Gold tokens (`sacredGold`, `sacredGoldDark`, `sacredGoldShine`) and status colors (`sacredGreen`, `sacredRed`) are intentionally **not** adaptive — the saffron/gold is the sacred identity itself, and flipping it per appearance would break the palette. If green or red reads too saturated against the dark background, reduce opacity (`.opacity(0.9)`) rather than introduce a dark variant.
+
+When reviewing a dark-mode screenshot: the background should read as a warm brown-black (#1a1410), never pure black or blue-black. Text should be warm cream (#f5ebe0), never cold white. If you see cold tones, a non-sacred color is leaking through (usually `.ultraThinMaterial` or a system background).
+
 ## Typography
 
 ### Vue / Tailwind

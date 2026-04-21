@@ -11,23 +11,43 @@ struct JourneyView: View {
     @State private var insights: [InsightItem] = []
     @State private var portrait: String?
     @State private var portraitLoading = false
+    /// Portrait is identity-level prose. Collapsed by default so the ring
+    /// and practice list become the hero; user taps to read the whole thing.
+    @State private var portraitExpanded = false
     private let api = ApiService.shared
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                // Portrait — who you are, seen through your practice
+                // Portrait — who you are, seen through your practice.
+                // Clamped to two lines by default; tap "Read more" to expand.
                 if let portrait = portrait {
-                    Text(portrait)
-                        .font(.sacredText)
-                        .italic()
-                        .foregroundColor(.sacredText)
-                        .multilineTextAlignment(.center)
-                        .lineSpacing(6)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity)
-                        .padding(.horizontal, 8)
-                        .padding(.bottom, 24)
+                    VStack(spacing: 8) {
+                        Text(portrait)
+                            .font(.sacredText)
+                            .italic()
+                            .foregroundColor(.sacredText)
+                            .multilineTextAlignment(.center)
+                            .lineSpacing(6)
+                            .lineLimit(portraitExpanded ? nil : 2)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity)
+
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            withAnimation(.easeOut(duration: 0.25)) {
+                                portraitExpanded.toggle()
+                            }
+                        } label: {
+                            Text(portraitExpanded ? "Show less" : "Read more")
+                                .font(.sacredSectionLabel)
+                                .tracking(2)
+                                .foregroundColor(.sacredLabel)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 24)
                 } else if portraitLoading {
                     VStack(spacing: 8) {
                         ProgressView()
@@ -44,21 +64,22 @@ struct JourneyView: View {
                 HStack(spacing: 6) {
                     ForEach(JourneyPeriod.allCases, id: \.self) { period in
                         Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             withAnimation(.easeOut(duration: 0.2)) { selectedPeriod = period }
                             Task { await loadAll() }
                         } label: {
                             Text(period.label)
                                 .font(.sacredMicro)
-                                .foregroundColor(selectedPeriod == period ? .sacredGold : .sacredMuted)
+                                .foregroundColor(selectedPeriod == period ? .white : .sacredMuted)
                                 .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
+                                .padding(.vertical, 7)
                                 .background(
                                     Capsule()
-                                        .fill(selectedPeriod == period ? Color.sacredGold.opacity(0.12) : Color.clear)
+                                        .fill(selectedPeriod == period ? Color.sacredGold : Color.clear)
                                 )
                                 .overlay(
                                     Capsule()
-                                        .stroke(selectedPeriod == period ? Color.sacredGold.opacity(0.3) : Color.sacredMuted.opacity(0.15), lineWidth: 1)
+                                        .stroke(selectedPeriod == period ? Color.clear : Color.sacredMuted.opacity(0.25), lineWidth: 1)
                                 )
                         }
                     }
@@ -95,7 +116,7 @@ struct JourneyView: View {
                         .frame(width: 120, height: 120)
 
                         if journey.summary.completionRate > 0 {
-                            Text("\(journey.summary.completionRate)% consistency")
+                            Text(consistencyPhrase(rate: journey.summary.completionRate))
                                 .font(.sacredSmallMedium)
                                 .foregroundColor(.sacredText)
                         }
@@ -250,6 +271,18 @@ struct JourneyView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await loadAll() }
         .task { await loadPortrait() }
+    }
+
+    // MARK: - Copy
+
+    /// Warm, non-clinical replacement for "53% consistency". The ring already
+    /// shows the ratio visually — this is the mantra-sized word beneath it.
+    private func consistencyPhrase(rate: Int) -> String {
+        switch rate {
+        case 75...: return "Steady rhythm"
+        case 40..<75: return "Finding the rhythm"
+        default: return "Early days"
+        }
     }
 
     // MARK: - Insight Card
