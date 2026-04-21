@@ -73,7 +73,8 @@ struct ReflectionWidgetView: View {
                     .italic()
                     .foregroundColor(sacredText)
                     .lineLimit(6)
-                    .minimumScaleFactor(0.75)
+                    .truncationMode(.tail)
+                    .minimumScaleFactor(0.85)
             } else {
                 Text("Open the app to begin your practice.")
                     .font(.system(size: 13, weight: .regular, design: .serif))
@@ -123,14 +124,19 @@ struct DashboardWidgetView: View {
                     .foregroundColor(sacredTextSecondary)
                 }
 
-                // Reflection — takes remaining space
+                // Reflection — takes remaining space. Hard-cap to 5 lines and
+                // let SwiftUI truncate with an ellipsis. Never use
+                // `fixedSize(vertical: true)` here — it would let the Text
+                // grow past the widget's bounds and mangle the layout.
                 if let reflection = entry.reflection, !reflection.isEmpty {
                     Text(reflection)
                         .font(.system(size: 12, weight: .regular, design: .serif))
                         .italic()
                         .foregroundColor(sacredText)
-                        .minimumScaleFactor(0.7)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(5)
+                        .truncationMode(.tail)
+                        .minimumScaleFactor(0.85)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
             }
 
