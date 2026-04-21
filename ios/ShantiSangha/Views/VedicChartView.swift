@@ -340,7 +340,11 @@ struct VedicChartView: View {
                     ("LORD", n.lord)
                 ])
 
-                interpretationPanel(key: "nakshatra", interpretation: n.interpretation)
+                interpretationPanel(
+                    key: "nakshatra",
+                    concept: JyotishMeanings.nakshatra,
+                    interpretation: n.interpretation
+                )
             }
         }
     }
@@ -373,7 +377,11 @@ struct VedicChartView: View {
                     .foregroundColor(.sacredTextSecondary)
                     .padding(.top, 2)
 
-                interpretationPanel(key: "lagna", interpretation: l.interpretation)
+                interpretationPanel(
+                    key: "lagna",
+                    concept: JyotishMeanings.lagna,
+                    interpretation: l.interpretation
+                )
             }
         }
     }
@@ -407,7 +415,11 @@ struct VedicChartView: View {
                     .font(.sacredMicro)
                     .foregroundColor(.sacredMuted)
 
-                interpretationPanel(key: "dasha", interpretation: d.interpretation)
+                interpretationPanel(
+                    key: "dasha",
+                    concept: JyotishMeanings.dasha,
+                    interpretation: d.interpretation
+                )
             }
         }
     }
@@ -663,55 +675,75 @@ struct VedicChartView: View {
         }
     }
 
-    // MARK: - Interpretation panel
+    // MARK: - What-this-means panel
 
-    /// Expandable disclosure that reveals a tradition-sourced passage for the
-    /// given chart element. Hidden entirely if the backend has no passage
-    /// matching this element's signature.
+    /// Expandable disclosure on each chart element. Shows TWO layers when open:
+    ///   1. A plain-language explanation of what this concept is in Jyotish
+    ///      (nakshatra / lagna / dasha). Teaches the user the term itself.
+    ///   2. The classical passage describing their specific placement.
+    /// Collapsed by default — user taps to expand.
     @ViewBuilder
-    private func interpretationPanel(key: String, interpretation: Interpretation?) -> some View {
-        if let interpretation {
-            let isOpen = expanded.contains(key)
-            VStack(alignment: .leading, spacing: 0) {
-                Button {
-                    withAnimation(.easeOut(duration: 0.25)) {
-                        if isOpen { expanded.remove(key) } else { expanded.insert(key) }
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "book")
-                            .font(.sacredMicro)
-                            .foregroundColor(.sacredGold.opacity(0.7))
-                        Text(isOpen ? "Hide tradition" : "Tradition speaks")
-                            .font(.sacredMicro)
-                            .tracking(1.5)
-                            .foregroundColor(.sacredLabel)
-                        Image(systemName: isOpen ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 8, weight: .bold, design: .serif))
-                            .foregroundColor(.sacredMuted)
-                        Spacer()
-                    }
-                    .padding(.top, 8)
+    private func interpretationPanel(
+        key: String,
+        concept: String,
+        interpretation: Interpretation?
+    ) -> some View {
+        let isOpen = expanded.contains(key)
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeOut(duration: 0.25)) {
+                    if isOpen { expanded.remove(key) } else { expanded.insert(key) }
                 }
-                .buttonStyle(.plain)
-
-                if isOpen {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(interpretation.content)
-                            .font(.sacredSmall)
-                            .italic()
-                            .foregroundColor(.sacredTextSecondary)
-                            .lineSpacing(3)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        Text(interpretation.source)
-                            .font(.system(size: 9, weight: .regular, design: .serif))
-                            .foregroundColor(.sacredMuted.opacity(0.7))
-                            .padding(.top, 2)
-                    }
-                    .padding(.top, 8)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                        .font(.sacredMicro)
+                        .foregroundColor(.sacredGold.opacity(0.7))
+                    Text(isOpen ? "Hide" : "What this means")
+                        .font(.sacredMicro)
+                        .tracking(1.5)
+                        .foregroundColor(.sacredLabel)
+                    Image(systemName: isOpen ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 8, weight: .bold, design: .serif))
+                        .foregroundColor(.sacredMuted)
+                    Spacer()
                 }
+                .padding(.top, 8)
+            }
+            .buttonStyle(.plain)
+
+            if isOpen {
+                VStack(alignment: .leading, spacing: 14) {
+                    // Layer 1 — the concept itself in plain English.
+                    Text(concept)
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredTextSecondary)
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    // Layer 2 — classical passage for the user's specific
+                    // placement. Only shown when the corpus has a match.
+                    if let interpretation {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("WHAT THE TRADITION SAYS ABOUT YOURS")
+                                .font(.system(size: 8, weight: .bold, design: .serif))
+                                .tracking(1.5)
+                                .foregroundColor(.sacredLabel)
+                            Text(interpretation.content)
+                                .font(.sacredSmall)
+                                .italic()
+                                .foregroundColor(.sacredTextSecondary)
+                                .lineSpacing(3)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text(interpretation.source)
+                                .font(.system(size: 9, weight: .regular, design: .serif))
+                                .foregroundColor(.sacredMuted.opacity(0.7))
+                                .padding(.top, 2)
+                        }
+                    }
+                }
+                .padding(.top, 10)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
     }

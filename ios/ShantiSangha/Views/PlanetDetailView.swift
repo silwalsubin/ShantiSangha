@@ -11,9 +11,7 @@ struct PlanetDetailView: View {
             VStack(alignment: .leading, spacing: 20) {
                 header
                 positionsSection
-                if let i = planet.interpretation {
-                    traditionSection(i)
-                }
+                whatThisMeansSection
             }
             .padding(16)
             .padding(.bottom, 40)
@@ -202,21 +200,39 @@ struct PlanetDetailView: View {
         }
     }
 
-    // MARK: - Tradition
+    // MARK: - What this means
 
-    private func traditionSection(_ i: Interpretation) -> some View {
-        card(title: "TRADITION SPEAKS") {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(i.content)
+    /// Two-layer card: the planet's general meaning in Jyotish (static,
+    /// plain English) on top, the classical passage for this user's specific
+    /// placement underneath. Shown together so the user learns what the
+    /// planet signifies AND what the tradition says about where theirs sits.
+    private var whatThisMeansSection: some View {
+        card(title: "WHAT THIS MEANS") {
+            VStack(alignment: .leading, spacing: 14) {
+                Text(JyotishMeanings.planet(planet.name))
                     .font(.sacredText)
-                    .italic()
                     .foregroundColor(.sacredTextSecondary)
                     .lineSpacing(4)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(i.source)
-                    .font(.system(size: 9, weight: .regular, design: .serif))
-                    .foregroundColor(.sacredMuted.opacity(0.7))
-                    .padding(.top, 2)
+
+                if let i = planet.interpretation {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("WHAT THE TRADITION SAYS ABOUT YOURS")
+                            .font(.system(size: 9, weight: .bold, design: .serif))
+                            .tracking(1.5)
+                            .foregroundColor(.sacredLabel)
+                        Text(i.content)
+                            .font(.sacredText)
+                            .italic()
+                            .foregroundColor(.sacredTextSecondary)
+                            .lineSpacing(4)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(i.source)
+                            .font(.system(size: 9, weight: .regular, design: .serif))
+                            .foregroundColor(.sacredMuted.opacity(0.7))
+                            .padding(.top, 2)
+                    }
+                }
             }
         }
     }

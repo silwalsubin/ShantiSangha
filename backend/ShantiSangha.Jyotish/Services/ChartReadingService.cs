@@ -35,7 +35,7 @@ public class ChartReadingService(
     /// retrieved per section, or the underlying corpus is materially updated.
     /// Each bump invalidates every user's cached reading — next GET regenerates.
     /// </summary>
-    private const string ReadingVersion = "v2-2026-04-19-central-signatures";
+    private const string ReadingVersion = "v3-2026-04-19-richer-sections";
 
     public async Task<ChartReading?> GetAsync(Guid userId, CancellationToken ct = default)
     {
@@ -49,7 +49,46 @@ public class ChartReadingService(
         if (currentHash != row.ChartHash) return null;
 
         var sections = Deserialize(row.SectionsJson);
-        return new ChartReading(sections, row.GeneratedAt);
+        var reading = new ChartReading(sections, row.GeneratedAt);
+
+        // If the cached reading is missing any sections (transient LLM
+        // failure on the original generation), lazy-retry just the missing
+        // ones and upsert the merged result. Heals gaps over time without
+        // forcing a full six-call regeneration each page open.
+        if (!reading.IsComplete && jyotish?.Chart is not null)
+        {
+            var missing = ChartReadingSection.All
+                .Where(s => !sections.ContainsKey(s) || string.IsNullOrWhiteSpace(sections[s]))
+                .ToList();
+
+            if (missing.Count > 0)
+            {
+                var allSignatures = jyotish.DeriveSignatures().ToList();
+                var retried = await Task.WhenAll(missing
+                    .Select(s => ComposeSectionSafeAsync(s, jyotish, allSignatures, userId, ct)));
+
+                var healed = false;
+                var mergedSections = new Dictionary<string, string>(sections);
+                var mergedUsage = DeserializeUsage(row.PassageUsageJson);
+                foreach (var (section, prose, passageIds, failed) in retried)
+                {
+                    if (!failed && !string.IsNullOrWhiteSpace(prose))
+                    {
+                        mergedSections[section] = prose;
+                        mergedUsage[section] = passageIds;
+                        healed = true;
+                    }
+                }
+
+                if (healed)
+                {
+                    var updated = await UpsertAsync(userId, currentHash, mergedSections, mergedUsage, ct);
+                    return new ChartReading(mergedSections, updated.GeneratedAt);
+                }
+            }
+        }
+
+        return reading;
     }
 
     public async Task<ChartReading> GenerateAsync(Guid userId, CancellationToken ct = default)
@@ -93,16 +132,18 @@ public class ChartReadingService(
             if (failed) failedSections.Add(section);
         }
 
+        // Cache the reading even when some sections failed. The alternative
+        // (not caching partial) means every page open re-runs all six LLM
+        // calls whenever any section transiently errors, which wastes spend
+        // and makes users see different reading lengths on different opens.
+        // With caching on, GetAsync returns what we have; GetAsync also
+        // lazily retries the missing sections so gaps fill in over time
+        // without forcing a full six-call regeneration each visit.
         if (failedSections.Count > 0)
         {
-            // If any section failed, don't cache the partial reading — it
-            // would ship to the user as silent gaps on the Birth Chart page.
-            // Log loud so we notice; caller sees an incomplete reading and
-            // can retry next time.
-            logger.LogError(
-                "Chart reading for user {UserId} had {FailedCount} failed sections: {Sections}. Not caching.",
+            logger.LogWarning(
+                "Chart reading for user {UserId} had {FailedCount} failed sections: {Sections}. Caching partial; will lazy-retry empty sections on next open.",
                 userId, failedSections.Count, string.Join(", ", failedSections));
-            return new ChartReading(sections, DateTime.UtcNow);
         }
 
         var row = await UpsertAsync(userId, chartHash, sections, usage, ct);
@@ -348,20 +389,43 @@ public class ChartReadingService(
             focus here produces a richer whole.
 
             ## Composition rules
-            - 80–120 words. One or two short paragraphs.
+            - Length: 200–280 words. Three to four substantive paragraphs. The
+              user is opening a dedicated chart page expecting depth, not a
+              horoscope blurb. Fill the space with specific observations; the
+              goal is that they feel genuinely read, not glanced at.
             - Second-person, contemplative voice. "Your Moon..." / "Your Saturn..."
-            - Speak the specific placements — name the sign, nakshatra, house,
-              dignity. The person wants to be seen in their actual chart.
-            - Use tendency language ("tends to", "often", "inclines toward"),
-              never absolute predictions. Jyotish describes patterns, not fates.
-            - Ground everything in the retrieved passages below. If a claim
-              can't be traced to a passage or to a named chart fact, leave it out.
-            - If the chart facts + passages don't cover the section's focus
-              well, produce a shorter, humbler section rather than speculating
-              to fill space.
+            - Speak the specific placements — name the sign, the nakshatra, the
+              house, the dignity (exalted / debilitated / own sign / moolatrikona),
+              retrograde, combustion, vargottama. Use every relevant chart fact
+              you have access to. The person wants to be seen in their actual
+              chart, not in the chart of a generic human.
+            - Go beyond the surface of each placement:
+                • How the dignity or retrograde shifts the expression — an
+                  exalted planet behaves differently than a debilitated one.
+                • What the nakshatra's quality adds — the inner flavour on top
+                  of the sign's outer mode.
+                • How placements interact with the ones already named in this
+                  section (e.g. Sun + lagna both speak to identity; Mars + Sun
+                  both speak to drive). Draw those threads.
+            - Use tendency language ("tends to", "often", "inclines toward",
+              "may find", "shows up as"), never absolute predictions. Jyotish
+              describes patterns, not fates.
+            - Ground interpretation in BOTH the retrieved passages below AND
+              the chart facts above. The chart facts alone carry a great deal
+              of classical meaning (a debilitated Saturn in the 4th says
+              something about the home life even without a specific passage);
+              the passages add depth and specificity. When passages are thin,
+              lean harder on the chart facts — never go thin on the section.
+              When passages are rich, weave their interpretive core into your
+              voice without quoting.
+            - NEVER fabricate outcomes, life events, or predictions. DO
+              interpret the character, texture, and pattern of each placement
+              richly and specifically.
             - Output plain prose only. No headings, no bullets, no markdown.
-            - Do NOT quote passages or cite sources. Weave their interpretive
-              core into your own voice.
+            - Do NOT quote passages or cite sources. Do NOT introduce
+              astrological concepts the passages and chart facts don't
+              support. Do NOT use Sanskrit term names unless they already
+              appear in the chart facts above.
             """;
 
         // ---- VARIABLE SUFFIX ----
@@ -463,6 +527,18 @@ public class ChartReadingService(
         catch
         {
             return new Dictionary<string, string>();
+        }
+    }
+
+    private static Dictionary<string, string[]> DeserializeUsage(string json)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<Dictionary<string, string[]>>(json) ?? new();
+        }
+        catch
+        {
+            return new Dictionary<string, string[]>();
         }
     }
 }
