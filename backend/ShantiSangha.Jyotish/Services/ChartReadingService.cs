@@ -35,7 +35,7 @@ public class ChartReadingService(
     /// retrieved per section, or the underlying corpus is materially updated.
     /// Each bump invalidates every user's cached reading — next GET regenerates.
     /// </summary>
-    private const string ReadingVersion = "v3-2026-04-19-richer-sections";
+    private const string ReadingVersion = "v4-2026-04-20-softer-prompt-with-retries";
 
     public async Task<ChartReading?> GetAsync(Guid userId, CancellationToken ct = default)
     {
@@ -162,6 +162,12 @@ public class ChartReadingService(
 
     // --- Section composition ----------------------------------------------
 
+    /// <summary>
+    /// Composes a section with up to 3 attempts, retrying on both empty
+    /// output AND transient exceptions. Rendering an empty section as a
+    /// silent gap on the chart page is strictly worse than waiting an extra
+    /// ~500ms for one retry, so we'd rather pay the cost than ship a hole.
+    /// </summary>
     private async Task<(string Section, string Prose, string[] PassageIds, bool Failed)> ComposeSectionSafeAsync(
         string section,
         JyotishContext jyotish,
@@ -169,27 +175,54 @@ public class ChartReadingService(
         Guid userId,
         CancellationToken ct)
     {
-        try
+        const int MaxAttempts = 3;
+
+        for (int attempt = 1; attempt <= MaxAttempts; attempt++)
         {
-            var (prose, passageIds) = await ComposeSectionAsync(section, jyotish, allSignatures, ct);
-            // An empty response from the LLM is also a failure worth marking.
-            // Empty sections render as silent gaps on the chart page.
-            var failed = string.IsNullOrWhiteSpace(prose);
-            if (failed)
+            try
             {
+                var (prose, passageIds) = await ComposeSectionAsync(section, jyotish, allSignatures, ct);
+                if (!string.IsNullOrWhiteSpace(prose))
+                {
+                    if (attempt > 1)
+                    {
+                        logger.LogInformation(
+                            "Chart reading section '{Section}' succeeded on attempt {Attempt} for user {UserId}",
+                            section, attempt, userId);
+                    }
+                    return (section, prose, passageIds, false);
+                }
+
                 logger.LogWarning(
-                    "Chart reading section '{Section}' produced empty prose for user {UserId}",
-                    section, userId);
+                    "Chart reading section '{Section}' returned empty on attempt {Attempt} for user {UserId}",
+                    section, attempt, userId);
             }
-            return (section, prose, passageIds, failed);
+            catch (Exception ex) when (attempt < MaxAttempts)
+            {
+                logger.LogWarning(ex,
+                    "Chart reading section '{Section}' threw on attempt {Attempt} for user {UserId} — retrying",
+                    section, attempt, userId);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex,
+                    "Chart reading section '{Section}' failed after {Attempts} attempts for user {UserId}",
+                    section, MaxAttempts, userId);
+                return (section, string.Empty, Array.Empty<string>(), true);
+            }
+
+            if (attempt < MaxAttempts)
+            {
+                // Short backoff: empty returns and rate-limit blips both
+                // clear within a second or two.
+                await Task.Delay(TimeSpan.FromMilliseconds(500 * attempt), ct);
+            }
         }
-        catch (Exception ex)
-        {
-            logger.LogError(ex,
-                "Chart reading section '{Section}' threw for user {UserId}",
-                section, userId);
-            return (section, string.Empty, Array.Empty<string>(), true);
-        }
+
+        logger.LogError(
+            "Chart reading section '{Section}' returned empty across all {Attempts} attempts for user {UserId}",
+            section, MaxAttempts, userId);
+        return (section, string.Empty, Array.Empty<string>(), true);
     }
 
     private async Task<(string Prose, string[] PassageIds)> ComposeSectionAsync(
@@ -379,53 +412,53 @@ public class ChartReadingService(
 
         // ---- STABLE PREFIX ----
         // Same across every section composition, so it cache-matches.
+        //
+        // Tone is intentionally constructive rather than strict. A prior
+        // version packed this prompt with NEVER / Do NOT rules and a hard
+        // 200-280 word target; under those constraints the model returned
+        // empty prose on sections where it couldn't confidently meet the
+        // demand, and combined with partial-read caching, users saw only
+        // 2-3 of the 6 sections. The guardrails that matter (grounded,
+        // tendency language, no citations) are still here — just phrased
+        // as guidance rather than threats.
         var stable = """
-            You are composing one section of a classical Vedic birth-chart reading
-            for a person who has opened the chart page in the ShantiSangha app.
+            You are composing one section of a classical Vedic birth-chart
+            reading for a person who has opened the chart page in the
+            ShantiSangha app.
 
-            The full reading is six sections, composed in parallel. You are composing
-            exactly one of them right now. Stay in your section — don't reach into
-            the others. The user will see all six as a cohesive reading, so a tight
-            focus here produces a richer whole.
+            The full reading is six sections, composed in parallel. You are
+            composing exactly one of them right now. Stay in your section;
+            the user will read all six as a cohesive whole.
 
             ## Composition rules
-            - Length: 200–280 words. Three to four substantive paragraphs. The
-              user is opening a dedicated chart page expecting depth, not a
-              horoscope blurb. Fill the space with specific observations; the
-              goal is that they feel genuinely read, not glanced at.
-            - Second-person, contemplative voice. "Your Moon..." / "Your Saturn..."
-            - Speak the specific placements — name the sign, the nakshatra, the
-              house, the dignity (exalted / debilitated / own sign / moolatrikona),
-              retrograde, combustion, vargottama. Use every relevant chart fact
-              you have access to. The person wants to be seen in their actual
-              chart, not in the chart of a generic human.
-            - Go beyond the surface of each placement:
-                • How the dignity or retrograde shifts the expression — an
-                  exalted planet behaves differently than a debilitated one.
-                • What the nakshatra's quality adds — the inner flavour on top
-                  of the sign's outer mode.
-                • How placements interact with the ones already named in this
-                  section (e.g. Sun + lagna both speak to identity; Mars + Sun
-                  both speak to drive). Draw those threads.
-            - Use tendency language ("tends to", "often", "inclines toward",
-              "may find", "shows up as"), never absolute predictions. Jyotish
-              describes patterns, not fates.
-            - Ground interpretation in BOTH the retrieved passages below AND
-              the chart facts above. The chart facts alone carry a great deal
-              of classical meaning (a debilitated Saturn in the 4th says
-              something about the home life even without a specific passage);
-              the passages add depth and specificity. When passages are thin,
-              lean harder on the chart facts — never go thin on the section.
-              When passages are rich, weave their interpretive core into your
-              voice without quoting.
-            - NEVER fabricate outcomes, life events, or predictions. DO
-              interpret the character, texture, and pattern of each placement
-              richly and specifically.
-            - Output plain prose only. No headings, no bullets, no markdown.
-            - Do NOT quote passages or cite sources. Do NOT introduce
-              astrological concepts the passages and chart facts don't
-              support. Do NOT use Sanskrit term names unless they already
-              appear in the chart facts above.
+
+            Length: around 160–220 words, flowing through two or three
+            paragraphs. The user is on a dedicated page expecting to feel
+            clearly seen, so go deeper than a horoscope blurb.
+
+            Voice: second-person, contemplative. "Your Moon..." / "Your
+            Saturn..."
+
+            Specificity: name the placements you're reading — the sign, the
+            nakshatra, the house, the dignity (exalted / debilitated / own
+            sign / moolatrikona), retrograde, combust, vargottama — and
+            describe the TEXTURE of each, not just its presence. What does
+            an exalted Moon in Vrishabha feel like from the inside? How
+            does Mercury combust in the 9th express itself? Name it, then
+            explore it.
+
+            Grounding: the chart facts above and the retrieved passages
+            below are your substrate. Chart facts alone carry classical
+            meaning — a debilitated Saturn in the 4th speaks to the home
+            life even when no specific passage appears. Passages add
+            depth where they exist. Use both.
+
+            Pattern, not fate: say "tends to", "often", "inclines toward",
+            "may find". Jyotish describes patterns, not certainties. Do
+            not predict specific life events.
+
+            Format: plain prose only. No headings, no bullets, no markdown,
+            no quotations, no source citations.
             """;
 
         // ---- VARIABLE SUFFIX ----
