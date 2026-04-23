@@ -117,7 +117,6 @@ struct HomeView: View {
                         // Inline practice list — swipe to check in without leaving Home
                         if !vm.pendingRecurring.isEmpty {
                             inlinePractices
-                                .padding(.horizontal, 16)
                                 .padding(.top, 8)
                         }
 

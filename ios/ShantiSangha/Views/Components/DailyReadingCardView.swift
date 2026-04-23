@@ -2,11 +2,9 @@ import SwiftUI
 
 /// A short Vedic daily reading that appears as a sealed note on Home.
 /// The user taps to open it — the reading is always present, but they
-/// choose whether to engage with it today.
-///
-/// Two-stage disclosure: sealed → opened-preview (2 lines) → expanded.
-/// The sealed/opened flip is per-day (persisted by the caller); the
-/// preview/expanded flip is per-session (resets each open).
+/// choose whether to engage with it today. Sealed/opened flip is per-day
+/// (persisted by the caller); opened shows the full reading with a close
+/// button to dismiss it for today.
 struct DailyReadingCardView: View {
     let content: String
     @Binding var isOpened: Bool
@@ -14,11 +12,6 @@ struct DailyReadingCardView: View {
     /// parent is expected to hide the card and persist "dismissed for today"
     /// so it doesn't reappear until tomorrow's reading is ready.
     var onDismiss: (() -> Void)?
-
-    /// Within the opened state, prose is clamped to 2 lines by default so
-    /// Home doesn't collapse under two back-to-back italic essays. User
-    /// taps "Read more" to expand.
-    @State private var proseExpanded = false
 
     var body: some View {
         Group {
@@ -88,7 +81,6 @@ struct DailyReadingCardView: View {
                     .foregroundColor(.sacredTextSecondary)
                     .multilineTextAlignment(.leading)
                     .lineSpacing(3)
-                    .lineLimit(proseExpanded ? nil : 2)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Spacer(minLength: 0)
@@ -108,21 +100,6 @@ struct DailyReadingCardView: View {
                     .accessibilityLabel("Close today's reading")
                 }
             }
-
-            Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                withAnimation(.easeOut(duration: 0.25)) {
-                    proseExpanded.toggle()
-                }
-            } label: {
-                Text(proseExpanded ? "Show less" : "Read more")
-                    .font(.sacredSectionLabel)
-                    .tracking(2)
-                    .foregroundColor(.sacredLabel)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
 
             NavigationLink(destination: VedicChartView()) {
                 HStack(spacing: 6) {
