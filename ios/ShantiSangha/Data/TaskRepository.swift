@@ -108,6 +108,8 @@ class TaskRepository: ObservableObject {
     // MARK: - Writes (local first + queue sync)
 
     func checkIn(id: String, completed: Bool) async {
+        var mindfulTitle: String?
+
         if let idx = tasks.firstIndex(where: { $0.id == id }) {
             let isMilestone = tasks[idx].type == .oneTime
 
@@ -121,12 +123,20 @@ class TaskRepository: ObservableObject {
                 else { tasks[idx].currentStreak = 0 }
             }
             updateLocal(tasks[idx], pending: true)
+
+            if !isMilestone && completed && HealthKitService.countsAsMindful(title: tasks[idx].title) {
+                mindfulTitle = tasks[idx].title
+            }
         }
 
         // Queue sync
         let body: [String: Any] = ["completed": completed, "note": NSNull(), "date": localDateStr()]
         if let data = try? JSONSerialization.data(withJSONObject: body) {
             await sync.enqueue(method: "POST", path: "/goals/\(id)/checkin", body: RawData(data: data))
+        }
+
+        if mindfulTitle != nil {
+            await HealthKitService.shared.logMindfulSession()
         }
     }
 

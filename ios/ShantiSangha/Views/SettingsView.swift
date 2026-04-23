@@ -3,10 +3,14 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var auth: AuthService
     @StateObject private var notifications = NotificationService.shared
+    @StateObject private var health = HealthKitService.shared
+    @StateObject private var weather = WeatherService.shared
     @State private var showSignOutConfirmation = false
     @State private var showErrorDetail = false
     @State private var showTimePicker = false
     @State private var serverStatus: ServerStatus = .loading
+    @State private var healthPermissionDenied = false
+    @State private var weatherPermissionDenied = false
 
     private let api = ApiService.shared
 
@@ -104,6 +108,95 @@ struct SettingsView: View {
                     }
                 }
 
+                // Apple Health
+                settingsCard(title: "APPLE HEALTH") {
+                    Toggle(isOn: $health.isEnabled) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "heart")
+                                .font(.sacredSmall)
+                                .foregroundColor(.sacredMuted)
+                            Text("Sync meditation to Health")
+                                .font(.sacredText)
+                                .foregroundColor(.sacredText)
+                        }
+                    }
+                    .tint(.sacredGold)
+                    .onChange(of: health.isEnabled) {
+                        if health.isEnabled {
+                            Task {
+                                let granted = await health.requestAuthorization()
+                                if !granted {
+                                    health.isEnabled = false
+                                    healthPermissionDenied = true
+                                }
+                            }
+                        }
+                    }
+
+                    if health.isEnabled {
+                        infoRow(
+                            icon: "sparkles",
+                            label: "Written today",
+                            value: health.minutesWrittenToday == 0
+                                ? "—"
+                                : "\(health.minutesWrittenToday) min"
+                        )
+                        Text("Meditation check-ins will be recorded in the Health app alongside your other practices.")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
+                // Weather
+                settingsCard(title: "WEATHER") {
+                    Toggle(isOn: $weather.isEnabled) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "cloud.sun")
+                                .font(.sacredSmall)
+                                .foregroundColor(.sacredMuted)
+                            Text("Sense today's sky")
+                                .font(.sacredText)
+                                .foregroundColor(.sacredText)
+                        }
+                    }
+                    .tint(.sacredGold)
+                    .onChange(of: weather.isEnabled) {
+                        if weather.isEnabled {
+                            Task {
+                                let ok = await weather.requestPermissionAndFetch()
+                                if !ok {
+                                    weather.isEnabled = false
+                                    weatherPermissionDenied = true
+                                }
+                            }
+                        }
+                    }
+
+                    if weather.isEnabled {
+                        if let snap = weather.snapshot {
+                            HStack(spacing: 10) {
+                                Image(systemName: snap.conditionSymbol)
+                                    .font(.sacredSmall)
+                                    .foregroundColor(.sacredMuted)
+                                Text("Now")
+                                    .font(.sacredText)
+                                    .foregroundColor(.sacredTextSecondary)
+                                Spacer()
+                                Text("\(snap.temperatureLabel) · \(snap.conditionLabel)")
+                                    .font(.sacredText)
+                                    .foregroundColor(.sacredText)
+                            }
+                        } else {
+                            infoRow(icon: "hourglass", label: "Fetching…", value: "")
+                        }
+                        Text("Your reflection will learn to sense the weather you're living under.")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
                 // iOS Client
                 settingsCard(title: "IOS CLIENT") {
                     infoRow(icon: "square.stack", label: "Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
@@ -186,13 +279,37 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await fetchServerVersion() }
+        .task {
+            await fetchServerVersion()
+            if health.isEnabled { await health.refreshTodayMinutes() }
+            if weather.isEnabled { await weather.refreshIfStale() }
+        }
         .alert("Server Error", isPresented: $showErrorDetail) {
             Button("OK", role: .cancel) {}
         } message: {
             if case .unreachable(let msg) = serverStatus {
                 Text(msg)
             }
+        }
+        .alert("Health Access Needed", isPresented: $healthPermissionDenied) {
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            Button("Not Now", role: .cancel) {}
+        } message: {
+            Text("ShantiSangha needs permission to write mindful sessions to Apple Health. Enable it under Settings → Privacy → Health → ShantiSangha.")
+        }
+        .alert("Location Access Needed", isPresented: $weatherPermissionDenied) {
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            Button("Not Now", role: .cancel) {}
+        } message: {
+            Text("ShantiSangha needs your location to read today's weather. Enable it under Settings → Privacy → Location → ShantiSangha.")
         }
         .confirmationDialog("Are you sure you want to sign out?", isPresented: $showSignOutConfirmation, titleVisibility: .visible) {
             Button("Sign Out", role: .destructive) {
