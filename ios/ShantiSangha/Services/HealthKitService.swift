@@ -26,6 +26,20 @@ final class HealthKitService: ObservableObject {
     /// as a confidence-building diagnostic.
     @Published private(set) var minutesWrittenToday: Int = 0
 
+    /// Steps recorded so far today across all sources. `nil` means "not read
+    /// yet" (or user denied); UI should hide the field rather than show zero.
+    @Published private(set) var stepsToday: Int?
+
+    /// Hours asleep last night (6pm previous day → 11am today), summed across
+    /// all asleep categories. `nil` means "not read yet" or no data.
+    @Published private(set) var sleepHoursLastNight: Double?
+
+    /// Total mindful minutes logged today across ALL sources — ours plus
+    /// Calm, Headspace, Apple's own Mindful app, anything. This is the real
+    /// "did you sit today" number, and will power auto-streak-credit in
+    /// Phase 3.
+    @Published private(set) var mindfulMinutesTotalToday: Int?
+
     private let store = HKHealthStore()
 
     var isAvailable: Bool { HKHealthStore.isHealthDataAvailable() }
@@ -122,6 +136,118 @@ final class HealthKitService: ObservableObject {
 
         let totalSeconds = samples.reduce(0.0) { $0 + $1.endDate.timeIntervalSince($1.startDate) }
         minutesWrittenToday = Int(totalSeconds / 60.0)
+    }
+
+    // MARK: - Reads
+
+    /// Reads everything we surface on Home. Safe to call even when some
+    /// permissions were denied — each read fails gracefully and leaves its
+    /// published property nil.
+    func refreshWholeDayContext() async {
+        guard isEnabled, isAvailable else { return }
+        async let steps = queryStepsToday()
+        async let sleep = querySleepLastNight()
+        async let mindful = queryMindfulMinutesToday(allSources: true)
+        let (s, sl, m) = await (steps, sleep, mindful)
+        stepsToday = s
+        sleepHoursLastNight = sl
+        mindfulMinutesTotalToday = m
+    }
+
+    private func queryStepsToday() async -> Int? {
+        guard let type = HKObjectType.quantityType(forIdentifier: .stepCount) else { return nil }
+
+        let start = Calendar.current.startOfDay(for: Date())
+        let end = Date()
+        let predicate = HKQuery.predicateForSamples(withStart: start, end: end, options: [])
+
+        return await withCheckedContinuation { (cont: CheckedContinuation<Int?, Never>) in
+            let q = HKStatisticsQuery(
+                quantityType: type,
+                quantitySamplePredicate: predicate,
+                options: .cumulativeSum
+            ) { _, result, _ in
+                let steps = result?.sumQuantity()?.doubleValue(for: .count())
+                cont.resume(returning: steps.map { Int($0) })
+            }
+            store.execute(q)
+        }
+    }
+
+    /// Sleep "last night" = 6pm previous day → 11am today, summing any
+    /// asleep category (core, deep, REM, or legacy "asleep").
+    private func querySleepLastNight() async -> Double? {
+        guard let type = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) else { return nil }
+
+        let cal = Calendar.current
+        let now = Date()
+        let todayStart = cal.startOfDay(for: now)
+        guard let windowStart = cal.date(byAdding: .hour, value: -6, to: todayStart),
+              let windowEnd = cal.date(byAdding: .hour, value: 11, to: todayStart) else {
+            return nil
+        }
+
+        let predicate = HKQuery.predicateForSamples(withStart: windowStart, end: windowEnd, options: [])
+
+        let samples: [HKCategorySample] = await withCheckedContinuation { cont in
+            let q = HKSampleQuery(
+                sampleType: type,
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: nil
+            ) { _, results, _ in
+                cont.resume(returning: (results as? [HKCategorySample]) ?? [])
+            }
+            store.execute(q)
+        }
+
+        let asleepValues: Set<Int> = [
+            HKCategoryValueSleepAnalysis.asleepCore.rawValue,
+            HKCategoryValueSleepAnalysis.asleepDeep.rawValue,
+            HKCategoryValueSleepAnalysis.asleepREM.rawValue,
+            HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue
+        ]
+
+        let seconds = samples
+            .filter { asleepValues.contains($0.value) }
+            .reduce(0.0) { $0 + $1.endDate.timeIntervalSince($1.startDate) }
+
+        guard seconds > 0 else { return nil }
+        return seconds / 3600.0
+    }
+
+    /// Total mindful minutes today, optionally including samples from other
+    /// apps (Calm, Headspace, Apple Mindful). When `allSources` is false,
+    /// only this app's contributions count.
+    private func queryMindfulMinutesToday(allSources: Bool) async -> Int? {
+        guard let type = HKObjectType.categoryType(forIdentifier: .mindfulSession) else { return nil }
+
+        let start = Calendar.current.startOfDay(for: Date())
+        let end = Date()
+        let datePred = HKQuery.predicateForSamples(withStart: start, end: end, options: [])
+        let predicate: NSPredicate
+        if allSources {
+            predicate = datePred
+        } else {
+            let sourcePred = HKQuery.predicateForObjects(from: HKSource.default())
+            predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [datePred, sourcePred])
+        }
+
+        let samples: [HKCategorySample] = await withCheckedContinuation { cont in
+            let q = HKSampleQuery(
+                sampleType: type,
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: nil
+            ) { _, results, _ in
+                cont.resume(returning: (results as? [HKCategorySample]) ?? [])
+            }
+            store.execute(q)
+        }
+
+        let seconds = samples.reduce(0.0) { $0 + $1.endDate.timeIntervalSince($1.startDate) }
+        guard seconds > 0 else { return nil }
+        return Int(seconds / 60.0)
     }
 
     // MARK: - Classification

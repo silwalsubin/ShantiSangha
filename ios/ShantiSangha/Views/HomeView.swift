@@ -6,6 +6,8 @@ import WidgetKit
 struct HomeView: View {
     @EnvironmentObject var auth: AuthService
     @StateObject private var vm = HomeViewModel()
+    @StateObject private var health = HealthKitService.shared
+    @StateObject private var weather = WeatherService.shared
     @State private var showNewTask = false
     @State private var showRecurringSummary = false
     @State private var showMilestoneSummary = false
@@ -33,6 +35,13 @@ struct HomeView: View {
                     Text(timeGreeting)
                         .font(.sacredTitle)
                         .foregroundColor(.sacredText)
+
+                    // Whole-day context strip — sleep, steps, weather. Only
+                    // appears when the user has enabled Health / Weather in
+                    // Settings AND the relevant data is available. Silent
+                    // otherwise so Home stays uncluttered.
+                    WholeDayContextStrip(health: health, weather: weather)
+                        .padding(.top, 10)
 
                     // Daily reflection. Today's if ready, else yesterday's (or
                     // day-before's) as a fallback with a subtle chip. Home is
@@ -162,6 +171,7 @@ struct HomeView: View {
                 await loadReflection(force: true)
                 await loadDailyReading()
                 updateWidgetData()
+                await refreshWholeDayContext()
             }
             .task {
                 await vm.load()
@@ -170,6 +180,7 @@ struct HomeView: View {
                 updateWidgetData()
                 // Sync completion state on initial load (no haptic)
                 practicesCompleted = vm.allPracticesDone
+                await refreshWholeDayContext()
             }
             .onChange(of: vm.doneRecurring) { updateWidgetData() }
             .onChange(of: vm.doneMilestones) { updateWidgetData() }
@@ -552,6 +563,16 @@ struct HomeView: View {
         return String(source.prefix(1)).uppercased()
     }
 
+    // MARK: - Whole-day context
+
+    /// Pulls fresh Health + Weather data in parallel. No-op for disabled
+    /// services — each one guards itself internally.
+    private func refreshWholeDayContext() async {
+        async let h: () = health.refreshWholeDayContext()
+        async let w: Bool = weather.refreshIfStale()
+        _ = await (h, w)
+    }
+
     // MARK: - Time greeting
 
     private var timeGreeting: String {
@@ -578,6 +599,79 @@ private struct DailyReflectionResponse: Decodable {
 private struct DailyReadingResponse: Decodable {
     let content: String?
     let date: String
+}
+
+// MARK: - Whole-day context strip
+
+/// Thin, muted row under the greeting showing any "whole day context" the
+/// user has enabled — sleep, steps, weather. Stays silent (empty view) when
+/// nothing is available, so Home remains uncluttered for users who haven't
+/// turned on Health or Weather in Settings.
+private struct WholeDayContextStrip: View {
+    @ObservedObject var health: HealthKitService
+    @ObservedObject var weather: WeatherService
+
+    var body: some View {
+        let items = buildItems()
+        if items.isEmpty {
+            EmptyView()
+        } else {
+            HStack(spacing: 10) {
+                ForEach(items.indices, id: \.self) { i in
+                    if i > 0 {
+                        Circle()
+                            .fill(Color.sacredMuted.opacity(0.4))
+                            .frame(width: 2, height: 2)
+                    }
+                    HStack(spacing: 5) {
+                        Image(systemName: items[i].symbol)
+                            .font(.system(size: 11))
+                            .foregroundColor(.sacredMuted)
+                        Text(items[i].label)
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredTextSecondary)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private struct Item {
+        let symbol: String
+        let label: String
+    }
+
+    private func buildItems() -> [Item] {
+        var items: [Item] = []
+
+        if weather.isEnabled, let snap = weather.snapshot {
+            items.append(Item(symbol: snap.conditionSymbol, label: snap.temperatureLabel))
+        }
+
+        if health.isEnabled {
+            if let hours = health.sleepHoursLastNight, hours > 0 {
+                let rounded = (hours * 10).rounded() / 10
+                let label = rounded.truncatingRemainder(dividingBy: 1) == 0
+                    ? "\(Int(rounded))h"
+                    : String(format: "%.1fh", rounded)
+                items.append(Item(symbol: "moon.zzz", label: label))
+            }
+            if let steps = health.stepsToday, steps > 0 {
+                items.append(Item(symbol: "figure.walk", label: stepsLabel(steps)))
+            }
+        }
+
+        return items
+    }
+
+    private func stepsLabel(_ steps: Int) -> String {
+        if steps >= 1000 {
+            let k = Double(steps) / 1000.0
+            return String(format: "%.1fk", k)
+        }
+        return "\(steps)"
+    }
 }
 
 // MARK: - Profile menu sheet
