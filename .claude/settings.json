@@ -57,14 +57,16 @@
       "Bash(xcodebuild -project ShantiSangha.xcodeproj -target ShantiSangha -destination 'generic/platform=iOS Simulator' -configuration Debug build)",
       "Bash(xcodebuild -scheme ShantiSangha -project ShantiSangha.xcodeproj -destination 'generic/platform=iOS Simulator' -configuration Debug -skipPackagePluginValidation build)",
       "Bash(git check-ignore *)",
-      "Bash(echo \"exit: $?\")"
+      "Bash(echo \"exit: $?\")",
+      "Edit(/.claude/skills/roi-critic/**)"
     ],
     "additionalDirectories": [
       "/Users/subinsilwal/Desktop/code/maiself/.claude",
       "/Users/subinsilwal/Desktop/code/maiself/ios/ShantiSangha/ShantiSangha/.git",
       "/private/tmp",
       "/Users/subinsilwal/Downloads",
-      "/Users/subinsilwal/Desktop/code/maiself/ios"
+      "/Users/subinsilwal/Desktop/code/maiself/ios",
+      "/Users/subinsilwal/Desktop/code/maiself/.claude/skills"
     ]
   }
 }
