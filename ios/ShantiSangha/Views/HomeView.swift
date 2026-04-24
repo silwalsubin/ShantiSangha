@@ -70,7 +70,7 @@ struct HomeView: View {
                                 .padding(.top, 8)
                         }
 
-                        addPracticeRow
+                        addTaskRow
                             .padding(.horizontal, 16)
                             .padding(.top, vm.pendingRecurring.isEmpty ? 8 : 18)
 
@@ -210,7 +210,7 @@ struct HomeView: View {
         .animation(.easeOut(duration: 0.3), value: vm.pendingRecurring.map(\.id))
     }
 
-    private var addPracticeRow: some View {
+    private var addTaskRow: some View {
         Button {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             showNewTask = true
@@ -222,7 +222,7 @@ struct HomeView: View {
                     .frame(width: 30, height: 30)
                     .background(Circle().fill(Color.sacredGold.opacity(0.08)))
 
-                Text("Add practice")
+                Text("Add task")
                     .font(.sacredTextMedium)
                     .foregroundColor(.sacredTextSecondary)
 
@@ -246,7 +246,7 @@ struct HomeView: View {
                 .font(.sacredText)
                 .foregroundColor(.sacredTextSecondary)
 
-            SacredPrimaryButton("Set your first practice") {
+            SacredPrimaryButton("Set your first task") {
                 showNewTask = true
             }
         }
