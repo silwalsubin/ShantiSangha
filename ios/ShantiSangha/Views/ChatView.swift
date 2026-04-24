@@ -5,6 +5,7 @@ import FirebaseAuth
 struct ChatView: View {
     let conversationId: String
     let title: String
+    let initialText: String?
 
     @State private var displayTitle: String
     @State private var messages: [ChatMessage] = []
@@ -12,13 +13,16 @@ struct ChatView: View {
     @State private var loading = true
     @State private var sending = false
     @State private var failedSendText: String?
+    @State private var openingPrompt = "You are here. What feels present today?"
     private let api = ApiService.shared
 
-    init(conversationId: String, title: String) {
+    init(conversationId: String, title: String, initialText: String? = nil) {
         self.conversationId = conversationId
         self.title = title
+        self.initialText = initialText
         let initial = (title.isEmpty || title == "New Conversation") ? "Conversation" : title
         _displayTitle = State(initialValue: initial)
+        _inputText = State(initialValue: initialText ?? "")
     }
 
     var body: some View {
@@ -27,6 +31,14 @@ struct ChatView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 16) {
+                        if loading {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 80)
+                        } else if messages.isEmpty {
+                            openingCard
+                        }
+
                         ForEach(Array(messages.enumerated()), id: \.element.id) { index, msg in
                             // Date divider when date changes between messages
                             if let label = dateDividerLabel(at: index) {
@@ -127,7 +139,12 @@ struct ChatView: View {
                 }
             }
         }
-        .task { await loadMessages() }
+        .task {
+            await loadMessages()
+            if messages.isEmpty {
+                await loadOpeningPrompt()
+            }
+        }
     }
 
     // MARK: - Share
@@ -179,6 +196,31 @@ struct ChatView: View {
                 .padding(.vertical, 8)
             Spacer()
         }
+    }
+
+    private var openingCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Image(systemName: "sparkle")
+                .font(.sacredSmall)
+                .foregroundColor(.sacredGold)
+            Text(openingPrompt)
+                .font(.sacredBody)
+                .italic()
+                .foregroundColor(.sacredText)
+                .lineSpacing(5)
+            if initialText != nil {
+                Text("Your note is ready below if you want to begin there.")
+                    .font(.sacredSmall)
+                    .foregroundColor(.sacredMuted)
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.sacredGold.opacity(0.05))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.1), lineWidth: 1))
+        )
+        .padding(.top, 40)
     }
 
     // MARK: - Date dividers
@@ -254,6 +296,23 @@ struct ChatView: View {
             }
         }
         loading = false
+    }
+
+    private func loadOpeningPrompt() async {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        do {
+            let tasks: [AppTask] = try await api.get("/goals/today?date=\(f.string(from: Date()))")
+            if let practice = tasks.first(where: { !$0.checkedIn && $0.type == .recurring }) {
+                openingPrompt = "You are carrying \(practice.title) today. What feels alive around it?"
+            } else if let commitment = tasks.first(where: { $0.type == .oneTime && $0.completedAt == nil }) {
+                openingPrompt = "\(commitment.title) is in your field today. What would help you meet it clearly?"
+            }
+        } catch {
+            if !error.isCancellation {
+                AppLogger.shared.error("Chat", "Failed to load opening prompt context: \(error)")
+            }
+        }
     }
 
     private func sendMessage() async {

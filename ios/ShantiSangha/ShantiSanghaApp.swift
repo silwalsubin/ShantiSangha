@@ -188,11 +188,8 @@ struct ShantiSanghaApp: App {
                 repo.configure(context: context)
                 await SyncService.shared.configure(container: container)
 
-                // Request notification permission on first launch
-                if !UserDefaults.standard.bool(forKey: "notificationPermissionAsked") {
-                    UserDefaults.standard.set(true, forKey: "notificationPermissionAsked")
-                    _ = await notifications.requestPermission()
-                }
+                // Notification permission is requested contextually from
+                // settings or reminder flows, not on first launch.
             }
             .onChange(of: repo.tasks) {
                 notifications.reschedule(tasks: repo.tasks)

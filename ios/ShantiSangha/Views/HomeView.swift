@@ -231,8 +231,8 @@ struct HomeView: View {
             }
         }
         .navigationDestination(isPresented: $showNewTask) {
-            NewTaskView { title, type, targetDate in
-                await vm.createTask(title: title, type: type, targetDate: targetDate)
+            NewTaskView { title, type, targetDate, deeperWhy in
+                await vm.createTask(title: title, type: type, targetDate: targetDate, deeperWhy: deeperWhy)
             }
         }
         .navigationDestination(isPresented: $showRecurringSummary) {
@@ -799,4 +799,3 @@ struct ProfileMenuSheet: View {
         return String(source.prefix(1)).uppercased()
     }
 }
-

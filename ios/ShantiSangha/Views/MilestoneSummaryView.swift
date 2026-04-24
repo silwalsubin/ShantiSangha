@@ -91,8 +91,8 @@ struct MilestoneSummaryView: View {
             GoalCalendarBrowseView(vm: vm)
         }
         .navigationDestination(isPresented: $showNewTask) {
-            NewTaskView { title, type, targetDate in
-                await vm.createTask(title: title, type: type, targetDate: targetDate)
+            NewTaskView { title, type, targetDate, deeperWhy in
+                await vm.createTask(title: title, type: type, targetDate: targetDate, deeperWhy: deeperWhy)
             }
         }
     }

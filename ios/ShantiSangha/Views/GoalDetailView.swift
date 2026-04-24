@@ -16,6 +16,7 @@ struct GoalDetailView: View {
     @State private var showProgress = false
     @State private var progressValue: Double = 0
     @State private var navigateToDueDate = false
+    @State private var toastMessage: String?
     private let api = ApiService.shared
 
     private var goalPathWithDate: String {
@@ -214,6 +215,7 @@ struct GoalDetailView: View {
             }
         }
         .background(Color.sacredBg.ignoresSafeArea())
+        .sacredToast($toastMessage)
         .navigationDestination(isPresented: $navigateToDueDate) {
             if let goal = goal, goal.type == .oneTime {
                 ChangeDueDateView(
@@ -343,7 +345,10 @@ struct GoalDetailView: View {
             let g: Goal = try await api.get(goalPathWithDate)
             goal = g
         } catch {
-            print("Failed to load goal: \(error)")
+            if !error.isCancellation {
+                toastMessage = "Could not load this task. Try again in a moment."
+                AppLogger.shared.error("GoalDetail", "Failed to load goal: \(error)")
+            }
         }
         loading = false
     }
@@ -355,11 +360,16 @@ struct GoalDetailView: View {
             return f.string(from: Date())
         }()
         let body: [String: Any] = ["completed": true, "date": dateStr]
-        if let data = try? JSONSerialization.data(withJSONObject: body) {
-            let _: EmptyResponse? = try? await api.postRaw("/goals/\(goalId)/checkin", body: data)
+        do {
+            let data = try JSONSerialization.data(withJSONObject: body)
+            let _: EmptyResponse = try await api.postRaw("/goals/\(goalId)/checkin", body: data)
+            goal = try await api.get(goalPathWithDate)
+        } catch {
+            if !error.isCancellation {
+                toastMessage = "Could not complete this task. Try again."
+                AppLogger.shared.error("GoalDetail", "Failed to complete goal: \(error)")
+            }
         }
-        // Reload to reflect new state
-        goal = try? await api.get(goalPathWithDate)
     }
 
     private func skipForToday() async {
@@ -369,10 +379,16 @@ struct GoalDetailView: View {
             return f.string(from: Date())
         }()
         let body: [String: Any] = ["completed": false, "date": dateStr]
-        if let data = try? JSONSerialization.data(withJSONObject: body) {
-            let _: EmptyResponse? = try? await api.postRaw("/goals/\(goalId)/checkin", body: data)
+        do {
+            let data = try JSONSerialization.data(withJSONObject: body)
+            let _: EmptyResponse = try await api.postRaw("/goals/\(goalId)/checkin", body: data)
+            goal = try await api.get(goalPathWithDate)
+        } catch {
+            if !error.isCancellation {
+                toastMessage = "Could not pause this task for today. Try again."
+                AppLogger.shared.error("GoalDetail", "Failed to skip goal: \(error)")
+            }
         }
-        goal = try? await api.get(goalPathWithDate)
     }
 
     private func updateProgress(_ value: Int) async {
@@ -381,7 +397,10 @@ struct GoalDetailView: View {
             let _: EmptyResponse = try await api.patch("/goals/\(goalId)", body: body)
             goal = try await api.get(goalPathWithDate)
         } catch {
-            print("Failed to update progress: \(error)")
+            if !error.isCancellation {
+                toastMessage = "Could not update progress. Try again."
+                AppLogger.shared.error("GoalDetail", "Failed to update progress: \(error)")
+            }
         }
     }
 
@@ -391,7 +410,10 @@ struct GoalDetailView: View {
             let _: EmptyResponse = try await api.patch("/goals/\(goalId)", body: body)
             goal = try await api.get(goalPathWithDate)
         } catch {
-            print("Failed to update due date: \(error)")
+            if !error.isCancellation {
+                toastMessage = "Could not change the date. Try again."
+                AppLogger.shared.error("GoalDetail", "Failed to update due date: \(error)")
+            }
         }
     }
 
@@ -400,7 +422,10 @@ struct GoalDetailView: View {
             try await api.delete("/goals/\(goalId)")
             dismiss()
         } catch {
-            print("Failed to delete goal: \(error)")
+            if !error.isCancellation {
+                toastMessage = "Could not delete this task. Try again."
+                AppLogger.shared.error("GoalDetail", "Failed to delete goal: \(error)")
+            }
         }
     }
 
@@ -412,7 +437,10 @@ struct GoalDetailView: View {
             let _: EmptyResponse = try await api.patch("/goals/\(goalId)", body: body)
             goal = try await api.get(goalPathWithDate)
         } catch {
-            print("Failed to save title: \(error)")
+            if !error.isCancellation {
+                toastMessage = "Could not rename this task. Try again."
+                AppLogger.shared.error("GoalDetail", "Failed to save title: \(error)")
+            }
         }
     }
 
@@ -423,7 +451,10 @@ struct GoalDetailView: View {
             let _: EmptyResponse = try await api.patch("/goals/\(goalId)", body: body)
             goal = try await api.get(goalPathWithDate)
         } catch {
-            print("Failed to save deeper why: \(error)")
+            if !error.isCancellation {
+                toastMessage = "Could not save your deeper why. Try again."
+                AppLogger.shared.error("GoalDetail", "Failed to save deeper why: \(error)")
+            }
         }
     }
 
@@ -432,7 +463,10 @@ struct GoalDetailView: View {
         do {
             activities = try await api.get("/goals/\(goalId)/history")
         } catch {
-            print("Failed to load history: \(error)")
+            if !error.isCancellation {
+                toastMessage = "Could not load the history. Try again."
+                AppLogger.shared.error("GoalDetail", "Failed to load history: \(error)")
+            }
         }
         historyLoading = false
     }

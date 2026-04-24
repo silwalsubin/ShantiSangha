@@ -4,6 +4,8 @@ import SwiftUI
 /// Custom sacred icons matching the web app's SacredIcons.vue
 struct MainTabView: View {
     @EnvironmentObject var auth: AuthService
+    @StateObject private var network = NetworkMonitor.shared
+    @StateObject private var syncStatus = SyncStatus.shared
     @State private var selectedTab = 0
 
     init() {
@@ -50,39 +52,101 @@ struct MainTabView: View {
     }
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            NavigationStack {
-                HomeView()
-            }
-            .tabItem {
-                Image("tab.vajra")
-                Text("Home")
-            }
-            .tag(0)
+        ZStack(alignment: .top) {
+            TabView(selection: $selectedTab) {
+                NavigationStack {
+                    HomeView()
+                }
+                .tabItem {
+                    Image("tab.vajra")
+                    Text("Home")
+                }
+                .tag(0)
 
-            NavigationStack {
-                ReflectView()
-            }
-            .tabItem {
-                Image("tab.dialogue")
-                Text("Reflect")
-            }
-            .tag(1)
+                NavigationStack {
+                    ReflectView()
+                }
+                .tabItem {
+                    Image("tab.dialogue")
+                    Text("Reflect")
+                }
+                .tag(1)
 
-            NavigationStack {
-                JourneyView()
+                NavigationStack {
+                    JourneyView()
+                }
+                .tabItem {
+                    Image("tab.peepal")
+                    Text("Journey")
+                }
+                .tag(2)
             }
-            .tabItem {
-                Image("tab.peepal")
-                Text("Journey")
-            }
-            .tag(2)
+            .tint(.sacredGold)
+
+            SyncBanner(
+                isConnected: network.isConnected,
+                syncing: syncStatus.syncing,
+                pendingCount: syncStatus.pendingCount
+            )
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
         }
-        .tint(.sacredGold)
         .onChange(of: selectedTab) { _, _ in
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
         .onAppear { MotionManager.shared.start() }
         .onDisappear { MotionManager.shared.stop() }
+    }
+}
+
+private struct SyncBanner: View {
+    let isConnected: Bool
+    let syncing: Bool
+    let pendingCount: Int
+
+    private var shouldShow: Bool {
+        !isConnected || syncing || pendingCount > 0
+    }
+
+    var body: some View {
+        if shouldShow {
+            HStack(spacing: 8) {
+                Image(systemName: iconName)
+                    .font(.sacredSmall)
+                    .foregroundColor(accentColor)
+                Text(message)
+                    .font(.sacredSmall)
+                    .foregroundColor(.sacredText)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Color.sacredBgCard)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(accentColor.opacity(0.22), lineWidth: 1))
+            .shadow(color: .sacredMuted.opacity(0.12), radius: 8, y: 4)
+            .transition(.move(edge: .top).combined(with: .opacity))
+            .animation(.easeOut(duration: 0.25), value: shouldShow)
+        }
+    }
+
+    private var iconName: String {
+        if !isConnected { return "wifi.slash" }
+        if syncing { return "arrow.triangle.2.circlepath" }
+        return "tray.and.arrow.up"
+    }
+
+    private var accentColor: Color {
+        !isConnected ? .sacredRed : .sacredGold
+    }
+
+    private var message: String {
+        if !isConnected {
+            return "Offline. Your changes will wait here."
+        }
+        if syncing {
+            return "Saving your changes..."
+        }
+        return "\(pendingCount) change\(pendingCount == 1 ? "" : "s") waiting to sync."
     }
 }

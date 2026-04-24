@@ -4,6 +4,7 @@ import SwiftUI
 struct JournalEditorView: View {
     let journalId: String?
     let isNew: Bool
+    let initialContent: String?
 
     @State private var serverId: String?
     @State private var title = ""
@@ -17,6 +18,12 @@ struct JournalEditorView: View {
     private let api = ApiService.shared
 
     @State private var saveTask: Task<Void, Never>?
+
+    init(journalId: String?, isNew: Bool, initialContent: String? = nil) {
+        self.journalId = journalId
+        self.isNew = isNew
+        self.initialContent = initialContent
+    }
 
     private static let placeholders = [
         "What felt true today...",
@@ -61,7 +68,10 @@ struct JournalEditorView: View {
                         TextField("Title (optional)", text: $title)
                             .font(.sacredHeading)
                             .foregroundColor(.sacredText)
-                            .onChange(of: title) { debounceSave() }
+                            .onChange(of: title) {
+                                persistDraft()
+                                debounceSave()
+                            }
 
                         ZStack(alignment: .topLeading) {
                             if content.isEmpty {
@@ -75,7 +85,10 @@ struct JournalEditorView: View {
                                 .foregroundColor(.sacredText)
                                 .scrollContentBackground(.hidden)
                                 .frame(minHeight: 300)
-                                .onChange(of: content) { debounceSave() }
+                                .onChange(of: content) {
+                                    persistDraft()
+                                    debounceSave()
+                                }
                         }
                     }
                     .padding(16)
@@ -89,7 +102,7 @@ struct JournalEditorView: View {
                             Text("Saving...").font(.sacredSmall).foregroundColor(.sacredMuted)
                         }
                     } else if saveFailed {
-                        Text("Not saved")
+                        Text("Saved locally")
                             .font(.sacredSmallSemibold).foregroundColor(.sacredRed)
                     } else if let saved = lastSaved {
                         Text("Saved \(saved.formatted(.relative(presentation: .named)))")
@@ -137,6 +150,11 @@ struct JournalEditorView: View {
             async let create: () = createJournal()
             async let prompt: () = fetchPrompt()
             _ = await (create, prompt)
+            if let initialContent, !initialContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, content.isEmpty {
+                content = initialContent
+                persistDraft()
+                debounceSave()
+            }
         }
         loading = false
     }
@@ -183,6 +201,7 @@ struct JournalEditorView: View {
                 content: content
             ))
             lastSaved = Date()
+            clearDraft()
         } catch {
             if !error.isCancellation {
                 saveFailed = true
@@ -200,6 +219,7 @@ struct JournalEditorView: View {
                 "/journals", body: CreateJournalRequest(title: "Untitled", content: " "))
             serverId = journal.id
             createFailed = false
+            applyStoredDraftIfPresent()
         } catch {
             if !error.isCancellation {
                 createFailed = true
@@ -220,11 +240,41 @@ struct JournalEditorView: View {
             let journal: JournalDetailResponse = try await api.get("/journals/\(id)")
             title = journal.title ?? ""
             content = journal.content ?? ""
+            applyStoredDraftIfPresent()
         } catch {
             if !error.isCancellation {
                 AppLogger.shared.error("Journal", "Failed to load: \(error)")
             }
         }
+    }
+
+    private var draftKey: String? {
+        serverId.map { "journal.draft.\($0)" }
+    }
+
+    private func persistDraft() {
+        guard let key = draftKey else { return }
+        let draft = JournalDraft(title: title, content: content)
+        if let data = try? JSONEncoder().encode(draft) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
+    }
+
+    private func applyStoredDraftIfPresent() {
+        guard let key = draftKey,
+              let data = UserDefaults.standard.data(forKey: key),
+              let draft = try? JSONDecoder().decode(JournalDraft.self, from: data) else { return }
+
+        if draft.title != title || draft.content != content {
+            title = draft.title
+            content = draft.content
+            saveFailed = true
+        }
+    }
+
+    private func clearDraft() {
+        guard let key = draftKey else { return }
+        UserDefaults.standard.removeObject(forKey: key)
     }
 }
 
@@ -243,4 +293,9 @@ struct UpdateJournalRequest: Encodable {
 
 struct JournalPromptResponse: Decodable {
     let prompt: String?
+}
+
+private struct JournalDraft: Codable {
+    let title: String
+    let content: String
 }

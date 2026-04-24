@@ -2,9 +2,10 @@ import SwiftUI
 
 struct NewTaskView: View {
     @Environment(\.dismiss) private var dismiss
-    let onCreate: (String, TaskType, String?) async -> Void
+    let onCreate: (String, TaskType, String?, String?) async -> Void
 
     @State private var title = ""
+    @State private var deeperWhy = ""
     @State private var type: TaskType = .recurring
     @State private var targetDate = Date()
     @State private var saving = false
@@ -56,6 +57,23 @@ struct NewTaskView: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Why does this matter?")
+                        .font(.sacredTextSemibold)
+                        .foregroundColor(.sacredText)
+                    TextEditor(text: $deeperWhy)
+                        .font(.sacredText)
+                        .foregroundColor(.sacredText)
+                        .scrollContentBackground(.hidden)
+                        .frame(minHeight: 92)
+                        .padding(12)
+                        .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBgCard))
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.12)))
+                    Text("Optional. This helps the app remember the intention beneath the habit.")
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredMuted)
+                }
+
                 // Save
                 SacredPrimaryButton(
                     type == .recurring ? "Start this practice" : "Set this goal",
@@ -66,7 +84,12 @@ struct NewTaskView: View {
                     saving = true
                     let dateStr = type == .oneTime ? formatDate(targetDate) : nil
                     Task {
-                        await onCreate(title.trimmingCharacters(in: .whitespaces), type, dateStr)
+                        await onCreate(
+                            title.trimmingCharacters(in: .whitespaces),
+                            type,
+                            dateStr,
+                            deeperWhy.trimmingCharacters(in: .whitespacesAndNewlines)
+                        )
                         dismiss()
                     }
                 }

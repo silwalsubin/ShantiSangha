@@ -316,8 +316,8 @@ struct JourneyView: View {
         .navigationTitle("Journey")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(isPresented: $showNewTask) {
-            NewTaskView { title, type, targetDate in
-                await taskVM.createTask(title: title, type: type, targetDate: targetDate)
+            NewTaskView { title, type, targetDate, deeperWhy in
+                await taskVM.createTask(title: title, type: type, targetDate: targetDate, deeperWhy: deeperWhy)
                 await loadAll()
             }
         }
@@ -340,19 +340,26 @@ struct JourneyView: View {
     // MARK: - Insight Card
 
     private func insightCard(_ insight: InsightItem) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "flame")
-                .font(.system(size: 12))
-                .foregroundColor(.sacredGold)
-                .padding(.top, 3)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "flame")
+                    .font(.system(size: 12))
+                    .foregroundColor(.sacredGold)
+                    .padding(.top, 3)
 
-            Text(insight.content)
-                .font(.sacredText)
-                .foregroundColor(.sacredText)
-                .lineSpacing(4)
-                .fixedSize(horizontal: false, vertical: true)
+                Text(insight.content)
+                    .font(.sacredText)
+                    .foregroundColor(.sacredText)
+                    .lineSpacing(4)
+                    .fixedSize(horizontal: false, vertical: true)
 
-            Spacer(minLength: 0)
+                Spacer(minLength: 0)
+            }
+
+            Text(insightSourceLabel(insight))
+                .font(.sacredMicro)
+                .foregroundColor(.sacredMuted)
+                .padding(.leading, 24)
         }
         .padding(14)
         .background(
@@ -376,6 +383,12 @@ struct JourneyView: View {
     private func dismissInsight(_ insight: InsightItem) async {
         withAnimation { insights.removeAll { $0.id == insight.id } }
         do { try await api.delete("/insights/\(insight.id)") } catch {}
+    }
+
+    private func insightSourceLabel(_ insight: InsightItem) -> String {
+        if insight.sourceJournalId != nil { return "From a journal" }
+        if insight.sourceConversationId != nil { return "From a conversation" }
+        return "From reflection"
     }
 
     // MARK: - Data Loading

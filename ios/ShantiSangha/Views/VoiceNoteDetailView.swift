@@ -10,6 +10,11 @@ struct VoiceNoteDetailView: View {
     @State private var loading = true
     @State private var retrying = false
     @State private var pollTask: Task<Void, Never>?
+    @State private var showJournalFromVoice = false
+    @State private var showVoiceChat = false
+    @State private var voiceChatId: String?
+    @State private var startingChat = false
+    @State private var toastMessage: String?
     @StateObject private var player = AudioPlayerModel()
     private let api = ApiService.shared
 
@@ -43,10 +48,43 @@ struct VoiceNoteDetailView: View {
 
                     // Transcript
                     if let transcript = entry.transcript, !transcript.isEmpty {
-                        Text(transcript)
-                            .font(.sacredText)
-                            .foregroundColor(.sacredText)
-                            .lineSpacing(6)
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text(transcript)
+                                .font(.sacredText)
+                                .foregroundColor(.sacredText)
+                                .lineSpacing(6)
+
+                            HStack(spacing: 10) {
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    showJournalFromVoice = true
+                                } label: {
+                                    Label("Write from this", systemImage: "square.and.pencil")
+                                        .font(.sacredSmallSemibold)
+                                        .foregroundColor(.white)
+                                        .frame(maxWidth: .infinity, minHeight: 44)
+                                        .background(Capsule().fill(Color.sacredGold))
+                                }
+
+                                Button {
+                                    Task { await startVoiceChat(transcript: transcript) }
+                                } label: {
+                                    Group {
+                                        if startingChat {
+                                            ProgressView().tint(.sacredGold)
+                                        } else {
+                                            Label("Reflect", systemImage: "bubble.left")
+                                        }
+                                    }
+                                    .font(.sacredSmallSemibold)
+                                    .foregroundColor(.sacredGold)
+                                    .frame(maxWidth: .infinity, minHeight: 44)
+                                    .background(Capsule().fill(Color.sacredBgCard))
+                                    .overlay(Capsule().stroke(Color.sacredGold.opacity(0.18), lineWidth: 1))
+                                }
+                                .disabled(startingChat)
+                            }
+                        }
                     } else if entry.status == "Completed" {
                         Text("No transcript available.")
                             .font(.sacredText)
@@ -108,9 +146,18 @@ struct VoiceNoteDetailView: View {
             .padding(16)
         }
         .background(Color.sacredBg.ignoresSafeArea())
+        .sacredToast($toastMessage)
         .refreshable { await loadEntry() }
         .navigationTitle("Voice Note")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: $showJournalFromVoice) {
+            JournalEditorView(journalId: nil, isNew: true, initialContent: entry?.transcript ?? "")
+        }
+        .navigationDestination(isPresented: $showVoiceChat) {
+            if let voiceChatId {
+                ChatView(conversationId: voiceChatId, title: "Voice reflection", initialText: entry?.transcript)
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if let transcript = entry?.transcript, !transcript.isEmpty {
@@ -247,6 +294,25 @@ struct VoiceNoteDetailView: View {
             }
         }
         retrying = false
+    }
+
+    private func startVoiceChat(transcript: String) async {
+        guard !startingChat else { return }
+        startingChat = true
+        defer { startingChat = false }
+        do {
+            let conv: ConversationItem = try await api.post(
+                "/conversations",
+                body: ["title": "Voice reflection"]
+            )
+            voiceChatId = conv.id
+            showVoiceChat = true
+        } catch {
+            if !error.isCancellation {
+                toastMessage = "Could not open a conversation. Try again in a moment."
+                AppLogger.shared.error("VoiceDetail", "Failed to create voice chat: \(error)")
+            }
+        }
     }
 }
 

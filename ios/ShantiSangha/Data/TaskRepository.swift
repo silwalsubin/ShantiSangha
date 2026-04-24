@@ -185,7 +185,7 @@ class TaskRepository: ObservableObject {
         }
     }
 
-    func createTask(title: String, type: TaskType, targetDate: String? = nil) async {
+    func createTask(title: String, type: TaskType, targetDate: String? = nil, deeperWhy: String? = nil) async {
         // Create locally with temp ID
         let tempId = UUID().uuidString
 
@@ -209,6 +209,9 @@ class TaskRepository: ObservableObject {
         // Queue sync — SyncService will replace temp ID with real ID on success
         var body: [String: String] = ["title": title, "type": type.rawValue]
         if let date = targetDate { body["targetDate"] = date }
+        if let deeperWhy, !deeperWhy.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            body["deeperWhy"] = deeperWhy.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         if let data = try? JSONSerialization.data(withJSONObject: body) {
             await sync.enqueue(method: "POST", path: "/goals", body: RawData(data: data), tempId: tempId)
         }

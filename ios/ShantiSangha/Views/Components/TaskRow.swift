@@ -187,6 +187,8 @@ struct TaskRow: View {
                         .padding(.leading, 36)
                 }
             }
+
+            actionStrip
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -202,6 +204,74 @@ struct TaskRow: View {
                 }
             }
         )
+    }
+
+    @ViewBuilder
+    private var actionStrip: some View {
+        if task.saving {
+            HStack(spacing: 6) {
+                ProgressView().scaleEffect(0.7)
+                Text("Saving...")
+                    .font(.sacredSmall)
+                    .foregroundColor(.sacredMuted)
+            }
+            .padding(.leading, 36)
+        } else if task.checkedIn {
+            HStack(spacing: 10) {
+                Text(task.completedToday == false ? "Skipped today" : "Honored today")
+                    .font(.sacredSmall)
+                    .foregroundColor(task.completedToday == false ? .sacredMuted : .sacredGreen)
+                Spacer()
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    onUndo()
+                } label: {
+                    Text("Undo")
+                        .font(.sacredSmallSemibold)
+                        .foregroundColor(.sacredGold)
+                        .frame(minHeight: 44)
+                }
+            }
+            .padding(.leading, 36)
+        } else {
+            HStack(spacing: 10) {
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    onDone()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark")
+                        Text(task.type == .recurring ? checkinMessage : "Done")
+                    }
+                    .font(.sacredSmallSemibold)
+                    .foregroundColor(.white)
+                    .frame(minHeight: 44)
+                    .padding(.horizontal, 14)
+                    .background(Capsule().fill(Color.sacredGreen))
+                }
+
+                if task.type == .recurring {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        onSkip()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "moon.fill")
+                            Text("Not today")
+                        }
+                        .font(.sacredSmallSemibold)
+                        .foregroundColor(.sacredMuted)
+                        .frame(minHeight: 44)
+                        .padding(.horizontal, 14)
+                        .background(Capsule().fill(Color.sacredBgCard))
+                        .overlay(Capsule().stroke(Color.sacredMuted.opacity(0.16), lineWidth: 1))
+                    }
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(.leading, 36)
+        }
     }
 }
 

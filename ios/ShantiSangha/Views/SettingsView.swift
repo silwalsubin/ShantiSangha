@@ -206,51 +206,9 @@ struct SettingsView: View {
                 // App Server
                 serverCard
 
-                // Hangfire debug
-                NavigationLink(destination: HangfireDebugView()) {
-                    HStack {
-                        Image(systemName: "gearshape.2")
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredMuted)
-                        Text("Hangfire Jobs")
-                            .font(.sacredText)
-                            .foregroundColor(.sacredText)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredMuted)
-                    }
-                    .padding(16)
-                    .background(RoundedRectangle(cornerRadius: 20).fill(.ultraThinMaterial))
-                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredGold.opacity(0.08)))
-                }
-
-                // Logs
-                NavigationLink(destination: LogsView()) {
-                    HStack {
-                        Image(systemName: "doc.text")
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredMuted)
-                        Text("Logs")
-                            .font(.sacredText)
-                            .foregroundColor(.sacredText)
-                        Spacer()
-                        if SyncStatus.shared.pendingCount > 0 {
-                            Text("\(SyncStatus.shared.pendingCount)")
-                                .font(.sacredSmallSemibold)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 2)
-                                .background(Capsule().fill(Color.sacredRed))
-                        }
-                        Image(systemName: "chevron.right")
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredMuted)
-                    }
-                    .padding(16)
-                    .background(RoundedRectangle(cornerRadius: 20).fill(.ultraThinMaterial))
-                    .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredGold.opacity(0.08)))
-                }
+                #if DEBUG
+                debugLinks
+                #endif
 
                 // Sign out
                 Button {
@@ -354,6 +312,49 @@ struct SettingsView: View {
     }
 
     // MARK: - Server card with status dot
+
+    #if DEBUG
+    private var debugLinks: some View {
+        VStack(spacing: 12) {
+            NavigationLink(destination: HangfireDebugView()) {
+                debugRow(icon: "gearshape.2", label: "Hangfire Jobs", badge: nil)
+            }
+            NavigationLink(destination: LogsView()) {
+                debugRow(
+                    icon: "doc.text",
+                    label: "Logs",
+                    badge: SyncStatus.shared.pendingCount > 0 ? "\(SyncStatus.shared.pendingCount)" : nil
+                )
+            }
+        }
+    }
+
+    private func debugRow(icon: String, label: String, badge: String?) -> some View {
+        HStack {
+            Image(systemName: icon)
+                .font(.sacredSmall)
+                .foregroundColor(.sacredMuted)
+            Text(label)
+                .font(.sacredText)
+                .foregroundColor(.sacredText)
+            Spacer()
+            if let badge {
+                Text(badge)
+                    .font(.sacredSmallSemibold)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(Color.sacredRed))
+            }
+            Image(systemName: "chevron.right")
+                .font(.sacredSmall)
+                .foregroundColor(.sacredMuted)
+        }
+        .padding(16)
+        .background(RoundedRectangle(cornerRadius: 20).fill(.ultraThinMaterial))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredGold.opacity(0.08)))
+    }
+    #endif
 
     private var serverCard: some View {
         VStack(alignment: .leading, spacing: 12) {
