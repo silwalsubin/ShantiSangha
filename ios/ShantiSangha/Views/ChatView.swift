@@ -11,6 +11,7 @@ struct ChatView: View {
     @State private var inputText = ""
     @State private var loading = true
     @State private var sending = false
+    @State private var failedSendText: String?
     private let api = ApiService.shared
 
     init(conversationId: String, title: String) {
@@ -64,6 +65,30 @@ struct ChatView: View {
                 .onChange(of: messages.last?.content) {
                     proxy.scrollTo("bottom")
                 }
+            }
+
+            // Retry strip
+            if let failedSendText {
+                HStack(spacing: 10) {
+                    Text("Message did not send.")
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredMuted)
+                    Spacer()
+                    Button {
+                        Task { await retryMessage(failedSendText) }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.clockwise")
+                            Text("Try again")
+                        }
+                        .font(.sacredSmallSemibold)
+                        .foregroundColor(.sacredGold)
+                        .frame(minHeight: 44)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .background(Color.sacredBg)
             }
 
             // Input
@@ -234,6 +259,7 @@ struct ChatView: View {
     private func sendMessage() async {
         let text = inputText.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else { return }
+        failedSendText = nil
         inputText = ""
         sending = true
 
@@ -312,9 +338,11 @@ struct ChatView: View {
                     }
                 }
             }
+            failedSendText = nil
         } catch {
             if !error.isCancellation {
                 AppLogger.shared.error("Chat", "Stream error: \(error)")
+                failedSendText = text
                 if let idx = messages.firstIndex(where: { $0.id == assistantId }) {
                     if messages[idx].content.isEmpty {
                         messages[idx].content = "Sorry, something went wrong. Please try again."
@@ -337,6 +365,12 @@ struct ChatView: View {
                 }
             }
         }
+    }
+
+    private func retryMessage(_ text: String) async {
+        inputText = text
+        failedSendText = nil
+        await sendMessage()
     }
 }
 

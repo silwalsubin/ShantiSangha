@@ -9,6 +9,7 @@ struct VoiceNoteDetailView: View {
     @State private var entry: VoiceEntryDetail?
     @State private var loading = true
     @State private var retrying = false
+    @State private var pollTask: Task<Void, Never>?
     @StateObject private var player = AudioPlayerModel()
     private let api = ApiService.shared
 
@@ -81,6 +82,17 @@ struct VoiceNoteDetailView: View {
                             Text("Transcribing your voice note...")
                                 .font(.sacredSmall)
                                 .foregroundColor(.sacredMuted)
+                            Button {
+                                Task { await loadEntry() }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "arrow.clockwise")
+                                    Text("Check again")
+                                }
+                                .font(.sacredSmallSemibold)
+                                .foregroundColor(.sacredGold)
+                                .frame(minHeight: 44)
+                            }
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 40)
@@ -96,6 +108,7 @@ struct VoiceNoteDetailView: View {
             .padding(16)
         }
         .background(Color.sacredBg.ignoresSafeArea())
+        .refreshable { await loadEntry() }
         .navigationTitle("Voice Note")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -109,8 +122,14 @@ struct VoiceNoteDetailView: View {
                 }
             }
         }
-        .task { await loadEntry() }
-        .onDisappear { player.stop() }
+        .task {
+            await loadEntry()
+            startPollingIfNeeded()
+        }
+        .onDisappear {
+            pollTask?.cancel()
+            player.stop()
+        }
     }
 
     // MARK: - Audio Player Bar
@@ -191,6 +210,29 @@ struct VoiceNoteDetailView: View {
             }
         }
         loading = false
+        startPollingIfNeeded()
+    }
+
+    private func startPollingIfNeeded() {
+        guard let entry, entry.transcript?.isEmpty ?? true, entry.status != "Completed", entry.status != "Failed" else {
+            pollTask?.cancel()
+            pollTask = nil
+            return
+        }
+        guard pollTask == nil else { return }
+        pollTask = Task { @MainActor in
+            for _ in 0..<8 {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                if Task.isCancelled { return }
+                await loadEntry()
+                if let current = self.entry,
+                   !(current.transcript?.isEmpty ?? true) || current.status == "Completed" || current.status == "Failed" {
+                    pollTask = nil
+                    return
+                }
+            }
+            pollTask = nil
+        }
     }
 
     private func retryTranscription() async {

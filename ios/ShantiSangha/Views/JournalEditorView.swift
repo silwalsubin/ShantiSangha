@@ -11,6 +11,7 @@ struct JournalEditorView: View {
     @State private var loading = true
     @State private var saving = false
     @State private var saveFailed = false
+    @State private var createFailed = false
     @State private var lastSaved: Date?
     @Environment(\.dismiss) private var dismiss
     private let api = ApiService.shared
@@ -33,6 +34,26 @@ struct JournalEditorView: View {
             if loading {
                 Spacer()
                 ProgressView()
+                Spacer()
+            } else if createFailed {
+                Spacer()
+                VStack(spacing: 14) {
+                    Image(systemName: "exclamationmark.circle")
+                        .font(.sacredHero)
+                        .foregroundColor(.sacredRed)
+                    Text("This entry could not be opened.")
+                        .font(.sacredTextSemibold)
+                        .foregroundColor(.sacredText)
+                    Text("Your private space is still here. Try once more when the connection settles.")
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredMuted)
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(4)
+                    SacredPrimaryButton("Try again", icon: "arrow.clockwise") {
+                        Task { await retryCreate() }
+                    }
+                }
+                .padding(.horizontal, 32)
                 Spacer()
             } else {
                 ScrollView {
@@ -106,6 +127,7 @@ struct JournalEditorView: View {
     // MARK: - Setup
 
     private func setup() async {
+        createFailed = false
         if let id = journalId {
             // Editing existing
             serverId = id
@@ -149,7 +171,10 @@ struct JournalEditorView: View {
     }
 
     private func save() async {
-        guard let id = serverId, !saving else { return }
+        guard let id = serverId, !saving else {
+            saveFailed = true
+            return
+        }
         saving = true
         saveFailed = false
         do {
@@ -174,11 +199,19 @@ struct JournalEditorView: View {
             let journal: JournalCreatedResponse = try await api.post(
                 "/journals", body: CreateJournalRequest(title: "Untitled", content: " "))
             serverId = journal.id
+            createFailed = false
         } catch {
             if !error.isCancellation {
+                createFailed = true
                 AppLogger.shared.error("Journal", "Failed to create: \(error)")
             }
         }
+    }
+
+    private func retryCreate() async {
+        loading = true
+        await createJournal()
+        loading = false
     }
 
     private func loadJournal() async {

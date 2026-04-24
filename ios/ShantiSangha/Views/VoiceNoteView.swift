@@ -9,6 +9,7 @@ struct VoiceNoteView: View {
     @State private var timer: Timer?
     @State private var audioLevels: [CGFloat] = Array(repeating: 0.1, count: 40)
     @State private var uploading = false
+    @State private var uploadFailed = false
     @State private var permissionDenied = false
     @State private var recordingURL: URL?
     @Environment(\.dismiss) private var dismiss
@@ -55,6 +56,34 @@ struct VoiceNoteView: View {
                 ProgressView("Uploading...")
                     .font(.sacredText)
                     .foregroundColor(.sacredMuted)
+            } else if uploadFailed, recordingURL != nil {
+                VStack(spacing: 16) {
+                    Text("This voice note is still here.")
+                        .font(.sacredTextSemibold)
+                        .foregroundColor(.sacredText)
+                    Text("The upload did not finish. Try again, or discard it and begin fresh.")
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredMuted)
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(4)
+                    HStack(spacing: 14) {
+                        Button {
+                            cancelRecording()
+                            uploadFailed = false
+                        } label: {
+                            Text("Discard")
+                                .font(.sacredButtonLabel)
+                                .foregroundColor(.sacredMuted)
+                                .frame(minWidth: 104, minHeight: 44)
+                                .background(Color.sacredBgCard)
+                                .clipShape(Capsule())
+                        }
+                        SacredPrimaryButton("Try again", icon: "arrow.clockwise") {
+                            Task { await stopAndUpload() }
+                        }
+                    }
+                }
+                .padding(.horizontal, 28)
             } else {
                 HStack(spacing: 40) {
                     if isRecording {
@@ -150,6 +179,7 @@ struct VoiceNoteView: View {
     }
 
     private func beginRecording() {
+        uploadFailed = false
         let session = AVAudioSession.sharedInstance()
         do {
             try session.setCategory(.record, mode: .default)
@@ -204,6 +234,7 @@ struct VoiceNoteView: View {
         if let url = recordingURL {
             try? FileManager.default.removeItem(at: url)
         }
+        recordingURL = nil
     }
 
     private func stopAndUpload() async {
@@ -211,6 +242,7 @@ struct VoiceNoteView: View {
         audioRecorder?.stop()
         isRecording = false
         uploading = true
+        uploadFailed = false
 
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
 
@@ -245,6 +277,7 @@ struct VoiceNoteView: View {
         } catch {
             AppLogger.shared.error("Voice", "Failed to upload voice note: \(error)")
             uploading = false
+            uploadFailed = true
         }
     }
 

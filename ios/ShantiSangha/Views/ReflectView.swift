@@ -9,6 +9,7 @@ struct ReflectView: View {
     @State private var newConversationId: String?
     @State private var showReflectMenu = false
     @State private var pendingNavigation: ReflectNavDestination?
+    @State private var toastMessage: String?
     private let api = ApiService.shared
 
     // MARK: - Unified timeline
@@ -142,12 +143,13 @@ struct ReflectView: View {
                 VoiceNoteView()
             }
         }
+        .sacredToast($toastMessage)
     }
 
     // MARK: - Empty state
 
     private var emptyState: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 14) {
             Image(systemName: "leaf")
                 .font(.sacredHero)
                 .foregroundColor(.sacredMutedLight)
@@ -157,9 +159,35 @@ struct ReflectView: View {
             Text("Talk, write, or speak — whatever feels right.")
                 .font(.sacredSmall)
                 .foregroundColor(.sacredMuted)
+                .multilineTextAlignment(.center)
+            HStack(spacing: 10) {
+                emptyActionButton("bubble.left") {
+                    Task { await startChat() }
+                }
+                emptyActionButton("doc.text") {
+                    pendingNavigation = .journal
+                }
+                emptyActionButton("mic") {
+                    pendingNavigation = .voice
+                }
+            }
+            .padding(.top, 6)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
+    }
+
+    private func emptyActionButton(_ icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.sacredTextSemibold)
+                .foregroundColor(.sacredGold)
+                .frame(width: 48, height: 48)
+                .background(Color.sacredBgCard)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color.sacredGold.opacity(0.18), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Timeline row
@@ -353,6 +381,7 @@ struct ReflectView: View {
             newConversationId = conv.id
             pendingNavigation = .chat(id: conv.id)
         } catch {
+            toastMessage = "Could not open a conversation. Try again in a moment."
             AppLogger.shared.error("Reflect", "Failed to create conversation: \(error)")
         }
     }

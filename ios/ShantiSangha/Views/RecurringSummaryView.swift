@@ -24,6 +24,10 @@ struct RecurringSummaryView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
+                if allRecurring.isEmpty {
+                    emptyState
+                }
+
                 // Pending
                 if !pending.isEmpty {
                     sectionLabel("ACTIVE")
@@ -48,6 +52,23 @@ struct RecurringSummaryView: View {
         .background(Color.sacredBg.ignoresSafeArea())
         .navigationTitle("Practices")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 14) {
+            Spacer().frame(height: 40)
+            Image(systemName: "leaf.fill")
+                .font(.system(size: 34))
+                .foregroundColor(.sacredGreen)
+            Text("No practices waiting.")
+                .font(.sacredTextSemibold)
+                .foregroundColor(.sacredText)
+            Text("Return to Home when you are ready to begin again.")
+                .font(.sacredSmall)
+                .foregroundColor(.sacredMuted)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private var progressRing: some View {

@@ -7,6 +7,7 @@ struct MilestoneSummaryView: View {
     @State private var navigateToDate: Date?
     @State private var showDateGoals = false
     @State private var showCalendar = false
+    @State private var showNewTask = false
 
     private let calendar = Calendar.current
     private let today = Calendar.current.startOfDay(for: Date())
@@ -89,6 +90,11 @@ struct MilestoneSummaryView: View {
         .navigationDestination(isPresented: $showCalendar) {
             GoalCalendarBrowseView(vm: vm)
         }
+        .navigationDestination(isPresented: $showNewTask) {
+            NewTaskView { title, type, targetDate in
+                await vm.createTask(title: title, type: type, targetDate: targetDate)
+            }
+        }
     }
 
     // MARK: - Carried over header
@@ -113,7 +119,19 @@ struct MilestoneSummaryView: View {
                 .multilineTextAlignment(.center)
                 .lineSpacing(4)
 
-            Spacer().frame(height: 20)
+            Button {
+                showNewTask = true
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus")
+                    Text("Add a future goal")
+                }
+                .font(.sacredSmallSemibold)
+                .foregroundColor(.sacredGold)
+                .frame(minHeight: 44)
+            }
+
+            Spacer().frame(height: 12)
         }
         .frame(maxWidth: .infinity)
     }

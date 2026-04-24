@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Journey — "How am I actually doing?"
 struct JourneyView: View {
+    @StateObject private var taskVM = HomeViewModel()
     @State private var journey: JourneyData?
     @State private var reflection: String?
     @State private var loading = true
@@ -11,6 +12,7 @@ struct JourneyView: View {
     @State private var insights: [InsightItem] = []
     @State private var portrait: String?
     @State private var portraitLoading = false
+    @State private var showNewTask = false
     /// Portrait is identity-level prose. Collapsed by default so the ring
     /// and practice list become the hero; user taps to read the whole thing.
     @State private var portraitExpanded = false
@@ -130,6 +132,20 @@ struct JourneyView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.bottom, 28)
 
+                    if journey.practices.isEmpty && journey.summary.practicesCompleted == 0 {
+                        VStack(spacing: 12) {
+                            Text("Your journey begins with one practice.")
+                                .font(.sacredText)
+                                .foregroundColor(.sacredTextSecondary)
+                                .multilineTextAlignment(.center)
+                            SacredPrimaryButton("Set your first practice") {
+                                showNewTask = true
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.bottom, 28)
+                    }
+
                     // AI Reflection
                     if reflectionLoading && !reflectionTimedOut {
                         HStack(spacing: 8) {
@@ -153,6 +169,30 @@ struct JourneyView: View {
                             .multilineTextAlignment(.center)
                             .frame(maxWidth: .infinity)
                             .padding(.bottom, 28)
+                    } else if reflectionTimedOut {
+                        VStack(spacing: 10) {
+                            Text("Still gathering your week.")
+                                .font(.sacredSmall)
+                                .foregroundColor(.sacredMuted)
+                            Button {
+                                Task {
+                                    let (from, to) = selectedPeriod.dateRange
+                                    reflectionTimedOut = false
+                                    reflectionLoading = true
+                                    await loadReflectionData(from: from, to: to)
+                                }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "arrow.clockwise")
+                                    Text("Try again")
+                                }
+                                .font(.sacredSmallSemibold)
+                                .foregroundColor(.sacredGold)
+                                .frame(minHeight: 44)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.bottom, 28)
                     }
 
                     // Practice breakdown
@@ -255,11 +295,17 @@ struct JourneyView: View {
                         }
                     }
                 } else {
-                    Text("Start your practices to see your journey unfold.")
-                        .font(.sacredText)
-                        .foregroundColor(.sacredTextSecondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 40)
+                    VStack(spacing: 14) {
+                        Text("Start your practices to see your journey unfold.")
+                            .font(.sacredText)
+                            .foregroundColor(.sacredTextSecondary)
+                            .multilineTextAlignment(.center)
+                        SacredPrimaryButton("Set your first practice") {
+                            showNewTask = true
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 40)
                 }
             }
             .padding(16)
@@ -269,6 +315,12 @@ struct JourneyView: View {
         .refreshable { await loadAll() }
         .navigationTitle("Journey")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: $showNewTask) {
+            NewTaskView { title, type, targetDate in
+                await taskVM.createTask(title: title, type: type, targetDate: targetDate)
+                await loadAll()
+            }
+        }
         .task { await loadAll() }
         .task { await loadPortrait() }
     }
