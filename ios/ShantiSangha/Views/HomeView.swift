@@ -9,6 +9,8 @@ struct HomeView: View {
     @StateObject private var health = HealthKitService.shared
     @StateObject private var weather = WeatherService.shared
     @State private var showNewTask = false
+    @State private var showRecurringSummary = false
+    @State private var showMilestoneSummary = false
     @State private var reflection: String?
     @State private var reflectionDate: String?
     /// True when `reflection` is a prior day's reflection shown while today's
@@ -158,6 +160,12 @@ struct HomeView: View {
                 await vm.createTask(title: title, type: type, targetDate: targetDate, deeperWhy: deeperWhy)
             }
         }
+        .navigationDestination(isPresented: $showRecurringSummary) {
+            RecurringSummaryView(vm: vm)
+        }
+        .navigationDestination(isPresented: $showMilestoneSummary) {
+            MilestoneSummaryView(vm: vm)
+        }
     }
 
     // MARK: - Header
@@ -273,25 +281,37 @@ struct HomeView: View {
 
             HStack(spacing: 0) {
                 if vm.totalRecurring > 0 {
-                    progressCircle(
-                        label: "Practices",
-                        done: vm.doneRecurring,
-                        total: vm.totalRecurring,
-                        color: .sacredGold,
-                        isComplete: vm.allPracticesDone,
-                        almostDone: vm.totalRecurring > 1 && vm.doneRecurring == vm.totalRecurring - 1
-                    )
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        showRecurringSummary = true
+                    } label: {
+                        progressCircle(
+                            label: "Practices",
+                            done: vm.doneRecurring,
+                            total: vm.totalRecurring,
+                            color: .sacredGold,
+                            isComplete: vm.allPracticesDone,
+                            almostDone: vm.totalRecurring > 1 && vm.doneRecurring == vm.totalRecurring - 1
+                        )
+                    }
+                    .buttonStyle(.plain)
                     .frame(maxWidth: .infinity)
                 }
 
                 if vm.filteredTotal > 0 {
-                    progressCircle(
-                        label: "Goals",
-                        done: vm.filteredDone,
-                        total: vm.filteredTotal,
-                        color: .sacredGoldDark,
-                        detail: vm.goalsSummaryDetail
-                    )
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        showMilestoneSummary = true
+                    } label: {
+                        progressCircle(
+                            label: "Goals",
+                            done: vm.filteredDone,
+                            total: vm.filteredTotal,
+                            color: .sacredGoldDark,
+                            detail: vm.goalsSummaryDetail
+                        )
+                    }
+                    .buttonStyle(.plain)
                     .frame(maxWidth: .infinity)
                 }
             }
