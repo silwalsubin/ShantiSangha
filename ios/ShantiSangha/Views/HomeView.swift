@@ -9,19 +9,11 @@ struct HomeView: View {
     @StateObject private var health = HealthKitService.shared
     @StateObject private var weather = WeatherService.shared
     @State private var showNewTask = false
-    @State private var showRecurringSummary = false
-    @State private var showMilestoneSummary = false
     @State private var reflection: String?
     @State private var reflectionDate: String?
     /// True when `reflection` is a prior day's reflection shown while today's
     /// is still being composed. Drives the "TODAY'S IS BEING WRITTEN" chip.
     @State private var reflectionIsFallback: Bool = false
-    @State private var dailyReadingContent: String?
-    @State private var dailyReadingOpened: Bool = false
-    /// Per-day dismissal. When the user taps the close button on the opened
-    /// card, the card clears for the rest of today and returns tomorrow with
-    /// the next reading.
-    @State private var dailyReadingDismissed: Bool = false
     @State private var showFAB = true
     @State private var practicesCompleted = false
     @State private var ringPulse = false
@@ -55,28 +47,6 @@ struct HomeView: View {
                         .padding(.top, 16)
                     }
 
-                    // Daily Vedic reading — sealed note; user taps to open,
-                    // close to dismiss for today.
-                    if let dailyReadingContent, !dailyReadingDismissed {
-                        DailyReadingCardView(
-                            content: dailyReadingContent,
-                            isOpened: Binding(
-                                get: { dailyReadingOpened },
-                                set: { newValue in
-                                    dailyReadingOpened = newValue
-                                    persistDailyReadingOpened(newValue)
-                                }
-                            ),
-                            onDismiss: {
-                                withAnimation(.easeOut(duration: 0.25)) {
-                                    dailyReadingDismissed = true
-                                }
-                                persistDailyReadingDismissed(true)
-                            }
-                        )
-                        .padding(.top, 20)
-                    }
-
                     // Evening nudge
                     if shouldShowNudge {
                         nudgeCard
@@ -93,29 +63,25 @@ struct HomeView: View {
                         // Dashboard circles
                         HStack(spacing: 0) {
                             if vm.totalRecurring > 0 {
-                                Button { showRecurringSummary = true } label: {
-                                    progressCircle(
-                                        label: "Practices",
-                                        done: vm.doneRecurring,
-                                        total: vm.totalRecurring,
-                                        color: .sacredGold,
-                                        isComplete: vm.allPracticesDone,
-                                        almostDone: vm.totalRecurring > 1 && vm.doneRecurring == vm.totalRecurring - 1
-                                    )
-                                }
+                                progressCircle(
+                                    label: "Practices",
+                                    done: vm.doneRecurring,
+                                    total: vm.totalRecurring,
+                                    color: .sacredGold,
+                                    isComplete: vm.allPracticesDone,
+                                    almostDone: vm.totalRecurring > 1 && vm.doneRecurring == vm.totalRecurring - 1
+                                )
                                 .frame(maxWidth: .infinity)
                             }
 
                             if vm.filteredTotal > 0 {
-                                Button { showMilestoneSummary = true } label: {
-                                    progressCircle(
-                                        label: "Goals",
-                                        done: vm.filteredDone,
-                                        total: vm.filteredTotal,
-                                        color: .sacredGoldDark,
-                                        detail: vm.goalsSummaryDetail
-                                    )
-                                }
+                                progressCircle(
+                                    label: "Goals",
+                                    done: vm.filteredDone,
+                                    total: vm.filteredTotal,
+                                    color: .sacredGoldDark,
+                                    detail: vm.goalsSummaryDetail
+                                )
                                 .frame(maxWidth: .infinity)
                             }
                         }
@@ -169,14 +135,12 @@ struct HomeView: View {
             .refreshable {
                 await vm.load()
                 await loadReflection(force: true)
-                await loadDailyReading()
                 updateWidgetData()
                 await refreshWholeDayContext()
             }
             .task {
                 await vm.load()
                 await loadReflection()
-                await loadDailyReading()
                 updateWidgetData()
                 // Sync completion state on initial load (no haptic)
                 practicesCompleted = vm.allPracticesDone
@@ -234,12 +198,6 @@ struct HomeView: View {
             NewTaskView { title, type, targetDate, deeperWhy in
                 await vm.createTask(title: title, type: type, targetDate: targetDate, deeperWhy: deeperWhy)
             }
-        }
-        .navigationDestination(isPresented: $showRecurringSummary) {
-            RecurringSummaryView(vm: vm)
-        }
-        .navigationDestination(isPresented: $showMilestoneSummary) {
-            MilestoneSummaryView(vm: vm)
         }
     }
 
@@ -498,62 +456,6 @@ struct HomeView: View {
         defaults.set(date, forKey: Self.cachedReflectionDateKey)
     }
 
-    // MARK: - Daily Reading
-
-    private static let dailyReadingOpenedKeyPrefix = "home.daily_reading.opened."
-    private static let dailyReadingDismissedKeyPrefix = "home.daily_reading.dismissed."
-
-    private var todayDateString: String {
-        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
-        return df.string(from: Date())
-    }
-
-    private func loadDailyReading() async {
-        let dateStr = todayDateString
-
-        do {
-            let response: DailyReadingResponse = try await ApiService.shared.get("/daily-reading/today?date=\(dateStr)")
-            if let content = response.content, !content.isEmpty {
-                dailyReadingContent = content
-                hydrateDailyReadingPerDayState(dateStr: dateStr)
-                return
-            }
-
-            // Null — job may still be running. Poll a few times.
-            for _ in 1...3 {
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                let retry: DailyReadingResponse = try await ApiService.shared.get("/daily-reading/today?date=\(dateStr)")
-                if let content = retry.content, !content.isEmpty {
-                    dailyReadingContent = content
-                    hydrateDailyReadingPerDayState(dateStr: dateStr)
-                    return
-                }
-            }
-
-            // Still null (no birth data, or generation failed) — don't show the card.
-            dailyReadingContent = nil
-        } catch {
-            if !error.isCancellation {
-                AppLogger.shared.error("DailyReading", "Failed: \(error.localizedDescription)")
-            }
-            dailyReadingContent = nil
-        }
-    }
-
-    private func hydrateDailyReadingPerDayState(dateStr: String) {
-        let defaults = UserDefaults.standard
-        dailyReadingOpened = defaults.bool(forKey: Self.dailyReadingOpenedKeyPrefix + dateStr)
-        dailyReadingDismissed = defaults.bool(forKey: Self.dailyReadingDismissedKeyPrefix + dateStr)
-    }
-
-    private func persistDailyReadingOpened(_ opened: Bool) {
-        UserDefaults.standard.set(opened, forKey: Self.dailyReadingOpenedKeyPrefix + todayDateString)
-    }
-
-    private func persistDailyReadingDismissed(_ dismissed: Bool) {
-        UserDefaults.standard.set(dismissed, forKey: Self.dailyReadingDismissedKeyPrefix + todayDateString)
-    }
-
     // MARK: - Profile
 
     private var profileInitial: String {
@@ -594,11 +496,6 @@ private struct DailyReflectionResponse: Decodable {
         let content: String
         let date: String
     }
-}
-
-private struct DailyReadingResponse: Decodable {
-    let content: String?
-    let date: String
 }
 
 // MARK: - Whole-day context strip
@@ -737,13 +634,6 @@ struct ProfileMenuSheet: View {
 
     private var menuList: some View {
         VStack(spacing: 0) {
-            NavigationLink(destination: VedicChartView()) {
-                menuRow(icon: "moon.stars", label: "Birth chart", subtitle: "Your cosmic context")
-            }
-            .buttonStyle(.plain)
-
-            Divider().padding(.leading, 52)
-
             NavigationLink(destination: SettingsView()) {
                 menuRow(icon: "gearshape", label: "Settings", subtitle: "Your sacred space")
             }

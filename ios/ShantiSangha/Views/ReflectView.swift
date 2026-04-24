@@ -7,7 +7,7 @@ struct ReflectView: View {
     @State private var voiceNotes: [VoiceNoteItem] = []
     @State private var loading = true
     @State private var newConversationId: String?
-    @State private var showReflectMenu = false
+    @State private var showBeginReflection = false
     @State private var pendingNavigation: ReflectNavDestination?
     @State private var toastMessage: String?
     private let api = ApiService.shared
@@ -143,6 +143,22 @@ struct ReflectView: View {
                 VoiceNoteView()
             }
         }
+        .sheet(isPresented: $showBeginReflection) {
+            BeginReflectionSheet(
+                onChat: {
+                    showBeginReflection = false
+                    Task { await startChat() }
+                },
+                onJournal: {
+                    showBeginReflection = false
+                    pendingNavigation = .journal
+                },
+                onVoice: {
+                    showBeginReflection = false
+                    pendingNavigation = .voice
+                }
+            )
+        }
         .sacredToast($toastMessage)
     }
 
@@ -156,38 +172,26 @@ struct ReflectView: View {
             Text("Your reflections will appear here.")
                 .font(.sacredText)
                 .foregroundColor(.sacredTextSecondary)
-            Text("Talk, write, or speak — whatever feels right.")
+            Text("Begin once. Let the form follow.")
                 .font(.sacredSmall)
                 .foregroundColor(.sacredMuted)
                 .multilineTextAlignment(.center)
-            HStack(spacing: 10) {
-                emptyActionButton("bubble.left") {
-                    Task { await startChat() }
-                }
-                emptyActionButton("doc.text") {
-                    pendingNavigation = .journal
-                }
-                emptyActionButton("mic") {
-                    pendingNavigation = .voice
-                }
+            Button {
+                showBeginReflection = true
+            } label: {
+                Text("Begin reflection")
+                    .font(.sacredSmallSemibold)
+                    .foregroundColor(.white)
+                    .frame(minHeight: 44)
+                    .padding(.horizontal, 18)
+                    .background(LinearGradient.sacredGoldShinyVertical)
+                    .clipShape(Capsule())
             }
+            .buttonStyle(.plain)
             .padding(.top, 6)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 40)
-    }
-
-    private func emptyActionButton(_ icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.sacredTextSemibold)
-                .foregroundColor(.sacredGold)
-                .frame(width: 48, height: 48)
-                .background(Color.sacredBgCard)
-                .clipShape(Circle())
-                .overlay(Circle().stroke(Color.sacredGold.opacity(0.18), lineWidth: 1))
-        }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Timeline row
@@ -252,51 +256,19 @@ struct ReflectView: View {
     // MARK: - FAB with menu
 
     private var reflectFAB: some View {
-        VStack(spacing: 16) {
-            if showReflectMenu {
-                reflectMenuIcon(icon: "bubble.left") {
-                    showReflectMenu = false
-                    Task { await startChat() }
-                }
-                reflectMenuIcon(icon: "doc.text") {
-                    showReflectMenu = false
-                    pendingNavigation = .journal
-                }
-                reflectMenuIcon(icon: "mic") {
-                    showReflectMenu = false
-                    pendingNavigation = .voice
-                }
-            }
-
-            // Main FAB
-            Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                    showReflectMenu.toggle()
-                }
-            } label: {
-                Image(systemName: showReflectMenu ? "xmark" : "square.and.pencil")
-                    .font(.sacredHeading)
-                    .foregroundColor(.white)
-                    .frame(width: 56, height: 56)
-                    .goldShine()
-                    .clipShape(Circle())
-            }
-        }
-        .padding(.trailing, 20)
-        .padding(.bottom, 20)
-    }
-
-    private func reflectMenuIcon(icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            showBeginReflection = true
+        } label: {
+            Image(systemName: "square.and.pencil")
                 .font(.sacredHeading)
                 .foregroundColor(.white)
                 .frame(width: 56, height: 56)
                 .goldShine()
                 .clipShape(Circle())
         }
-        .transition(.scale.combined(with: .opacity))
+        .padding(.trailing, 20)
+        .padding(.bottom, 20)
     }
 
     // MARK: - Helpers
@@ -451,6 +423,77 @@ enum ReflectType {
         case .journal: return .sacredGold
         case .voice: return .sacredGold
         }
+    }
+}
+
+private struct BeginReflectionSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let onChat: () -> Void
+    let onJournal: () -> Void
+    let onVoice: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Choose the shape this reflection wants.")
+                    .font(.sacredText)
+                    .foregroundColor(.sacredTextSecondary)
+                    .lineSpacing(4)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                    .padding(.bottom, 20)
+
+                VStack(spacing: 0) {
+                    reflectionRow(icon: "doc.text", title: "Write", action: onJournal)
+                    Divider().padding(.leading, 56)
+                    reflectionRow(icon: "bubble.left", title: "Talk", action: onChat)
+                    Divider().padding(.leading, 56)
+                    reflectionRow(icon: "mic", title: "Speak", action: onVoice)
+                }
+                .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
+                .padding(.horizontal, 20)
+
+                Spacer()
+            }
+            .background(Color.sacredBg.ignoresSafeArea())
+            .navigationTitle("Begin Reflection")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .font(.sacredTextMedium)
+                        .foregroundColor(.sacredMuted)
+                }
+            }
+        }
+        .presentationDetents([.height(320)])
+    }
+
+    private func reflectionRow(icon: String, title: String, action: @escaping () -> Void) -> some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            action()
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: icon)
+                    .font(.sacredText)
+                    .foregroundColor(.sacredGold)
+                    .frame(width: 24)
+                Text(title)
+                    .font(.sacredTextMedium)
+                    .foregroundColor(.sacredText)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.sacredMicro)
+                    .foregroundColor(.sacredMuted.opacity(0.55))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
+            .frame(minHeight: 56)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 
