@@ -634,6 +634,13 @@ struct ProfileMenuSheet: View {
 
     private var menuList: some View {
         VStack(spacing: 0) {
+            NavigationLink(destination: VedicChartView()) {
+                menuRow(icon: "moon.stars", label: "Birth chart", subtitle: "Your Jyotish context")
+            }
+            .buttonStyle(.plain)
+
+            Divider().padding(.leading, 52)
+
             NavigationLink(destination: SettingsView()) {
                 menuRow(icon: "gearshape", label: "Settings", subtitle: "Your sacred space")
             }
