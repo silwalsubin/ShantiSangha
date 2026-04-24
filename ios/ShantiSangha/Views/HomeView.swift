@@ -14,19 +14,18 @@ struct HomeView: View {
     /// True when `reflection` is a prior day's reflection shown while today's
     /// is still being composed. Drives the "TODAY'S IS BEING WRITTEN" chip.
     @State private var reflectionIsFallback: Bool = false
-    @State private var showFAB = true
     @State private var practicesCompleted = false
     @State private var ringPulse = false
     @State private var showProfileMenu = false
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
+        ZStack {
+            LuxHomeBackground()
+                .ignoresSafeArea()
+
             ScrollView {
                 VStack(spacing: 0) {
-                    // Greeting
-                    Text(timeGreeting)
-                        .font(.sacredTitle)
-                        .foregroundColor(.sacredText)
+                    homeHeader
 
                     // Whole-day context strip — sleep, steps, weather. Only
                     // appears when the user has enabled Health / Weather in
@@ -44,7 +43,7 @@ struct HomeView: View {
                             content: reflection,
                             caption: reflectionIsFallback ? "TODAY'S IS BEING WRITTEN" : nil
                         )
-                        .padding(.top, 16)
+                        .padding(.top, 24)
                     }
 
                     // Evening nudge
@@ -60,40 +59,20 @@ struct HomeView: View {
                     } else if !vm.hasTasks {
                         emptyState
                     } else {
-                        // Dashboard circles
-                        HStack(spacing: 0) {
-                            if vm.totalRecurring > 0 {
-                                progressCircle(
-                                    label: "Practices",
-                                    done: vm.doneRecurring,
-                                    total: vm.totalRecurring,
-                                    color: .sacredGold,
-                                    isComplete: vm.allPracticesDone,
-                                    almostDone: vm.totalRecurring > 1 && vm.doneRecurring == vm.totalRecurring - 1
-                                )
-                                .frame(maxWidth: .infinity)
-                            }
-
-                            if vm.filteredTotal > 0 {
-                                progressCircle(
-                                    label: "Goals",
-                                    done: vm.filteredDone,
-                                    total: vm.filteredTotal,
-                                    color: .sacredGoldDark,
-                                    detail: vm.goalsSummaryDetail
-                                )
-                                .frame(maxWidth: .infinity)
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 40)
-                        .padding(.bottom, 20)
+                        dailyRhythmCard
+                            .padding(.horizontal, 16)
+                            .padding(.top, 34)
+                            .padding(.bottom, 20)
 
                         // Inline practice list — swipe to check in without leaving Home
                         if !vm.pendingRecurring.isEmpty {
                             inlinePractices
                                 .padding(.top, 8)
                         }
+
+                        addPracticeRow
+                            .padding(.horizontal, 16)
+                            .padding(.top, vm.pendingRecurring.isEmpty ? 8 : 18)
 
                         // All done message
                         if practicesCompleted {
@@ -109,7 +88,7 @@ struct HomeView: View {
                 .padding(.top, 32)
                 .padding(.bottom, 100)
             }
-            .background(Color.sacredBg.ignoresSafeArea())
+            .background(Color.clear)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { showProfileMenu = true } label: {
@@ -173,32 +152,29 @@ struct HomeView: View {
                     if type == "reflection" { await loadReflection(force: true) }
                 }
             }
-            .onAppear { withAnimation(.easeOut(duration: 0.25)) { showFAB = true } }
-            .onDisappear { showFAB = false }
-
-            // FAB
-            if showFAB {
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    showNewTask = true
-                } label: {
-                    Image(systemName: "square.and.pencil")
-                        .font(.sacredHeading)
-                        .foregroundColor(.white)
-                        .frame(width: 56, height: 56)
-                        .goldShine()
-                        .clipShape(Circle())
-                }
-                .padding(.trailing, 20)
-                .padding(.bottom, 20)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
         }
         .navigationDestination(isPresented: $showNewTask) {
             NewTaskView { title, type, targetDate, deeperWhy in
                 await vm.createTask(title: title, type: type, targetDate: targetDate, deeperWhy: deeperWhy)
             }
         }
+    }
+
+    // MARK: - Header
+
+    private var homeHeader: some View {
+        VStack(spacing: 8) {
+            Text(todayLabel)
+                .font(.sacredSectionLabel)
+                .tracking(3)
+                .foregroundColor(.sacredLabel)
+            Text(timeGreeting)
+                .font(.system(size: 26, weight: .semibold, design: .serif))
+                .foregroundColor(.sacredText)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 6)
     }
 
     // MARK: - Inline practice list
@@ -234,6 +210,34 @@ struct HomeView: View {
         .animation(.easeOut(duration: 0.3), value: vm.pendingRecurring.map(\.id))
     }
 
+    private var addPracticeRow: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            showNewTask = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "plus")
+                    .font(.sacredSmallSemibold)
+                    .foregroundColor(.sacredGold)
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(Color.sacredGold.opacity(0.08)))
+
+                Text("Add practice")
+                    .font(.sacredTextMedium)
+                    .foregroundColor(.sacredTextSecondary)
+
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity)
+            .background(Color.sacredBgCard.opacity(0.55))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+
     // MARK: - Empty state
 
     private var emptyState: some View {
@@ -251,6 +255,69 @@ struct HomeView: View {
     }
 
     // MARK: - Progress circle
+
+    private var dailyRhythmCard: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("TODAY'S RHYTHM")
+                        .font(.sacredSectionLabel)
+                        .tracking(3)
+                        .foregroundColor(.sacredLabel)
+                    Text(rhythmSubtitle)
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredMuted)
+                }
+                Spacer()
+            }
+
+            HStack(spacing: 0) {
+                if vm.totalRecurring > 0 {
+                    progressCircle(
+                        label: "Practices",
+                        done: vm.doneRecurring,
+                        total: vm.totalRecurring,
+                        color: .sacredGold,
+                        isComplete: vm.allPracticesDone,
+                        almostDone: vm.totalRecurring > 1 && vm.doneRecurring == vm.totalRecurring - 1
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+
+                if vm.filteredTotal > 0 {
+                    progressCircle(
+                        label: "Goals",
+                        done: vm.filteredDone,
+                        total: vm.filteredTotal,
+                        color: .sacredGoldDark,
+                        detail: vm.goalsSummaryDetail
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+            }
+        }
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 22)
+                .fill(Color.sacredBgCard.opacity(0.7))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 22)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.sacredGoldShine.opacity(0.08),
+                                    Color.clear,
+                                    Color.sacredGoldDark.opacity(0.04)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                )
+        )
+        .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.sacredGold.opacity(0.11), lineWidth: 1))
+        .shadow(color: .sacredMuted.opacity(0.09), radius: 18, y: 10)
+    }
 
     private func progressCircle(label: String, done: Int, total: Int, color: Color, detail: String? = nil, isComplete: Bool = false, almostDone: Bool = false) -> some View {
         let progress = total > 0 ? Double(done) / Double(total) : 0
@@ -289,7 +356,7 @@ struct HomeView: View {
 
                 // Motion-reactive gold shine — follows the filled arc
                 if done > 0 {
-                    GoldShineRing(size: 130, lineWidth: 10, progress: progress)
+                    GoldShineRing(size: 118, lineWidth: 10, progress: progress)
                 }
 
                 // Count
@@ -315,7 +382,7 @@ struct HomeView: View {
                     }
                 }
             }
-            .frame(width: 130, height: 130)
+            .frame(width: 118, height: 118)
 
             HStack(spacing: 6) {
                 Image(systemName: label == "Practices" ? "arrow.triangle.2.circlepath" : "calendar.badge.clock")
@@ -326,6 +393,17 @@ struct HomeView: View {
                     .foregroundColor(.sacredTextSecondary)
             }
         }
+    }
+
+    private var rhythmSubtitle: String {
+        if vm.allPracticesDone { return "The circle is complete." }
+        if vm.totalRecurring > 0 {
+            let remaining = max(vm.totalRecurring - vm.doneRecurring, 0)
+            if remaining == 1 { return "One quiet step remains." }
+            if remaining > 1 { return "\(remaining) practices are waiting." }
+        }
+        if vm.filteredTotal > 0 { return "Your commitments are in view." }
+        return "A clear day."
     }
 
     // MARK: - Gentle nudge
@@ -486,6 +564,12 @@ struct HomeView: View {
         if hour < 17 { return "Good afternoon\(name)" }
         return "Good evening\(name)"
     }
+
+    private var todayLabel: String {
+        let f = DateFormatter()
+        f.dateFormat = "EEEE, MMM d"
+        return f.string(from: Date()).uppercased()
+    }
 }
 
 private struct DailyReflectionResponse: Decodable {
@@ -495,6 +579,43 @@ private struct DailyReflectionResponse: Decodable {
     struct FallbackReflection: Decodable {
         let content: String
         let date: String
+    }
+}
+
+private struct LuxHomeBackground: View {
+    var body: some View {
+        ZStack {
+            Color.sacredBg
+
+            LinearGradient(
+                colors: [
+                    Color.sacredGoldShine.opacity(0.16),
+                    Color.sacredBg.opacity(0.0)
+                ],
+                startPoint: .top,
+                endPoint: .center
+            )
+
+            RadialGradient(
+                colors: [
+                    Color.sacredGold.opacity(0.11),
+                    Color.clear
+                ],
+                center: .topLeading,
+                startRadius: 20,
+                endRadius: 260
+            )
+
+            RadialGradient(
+                colors: [
+                    Color.sacredGoldDark.opacity(0.06),
+                    Color.clear
+                ],
+                center: .bottomTrailing,
+                startRadius: 10,
+                endRadius: 280
+            )
+        }
     }
 }
 
