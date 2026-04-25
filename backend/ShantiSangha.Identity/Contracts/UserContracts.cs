@@ -9,7 +9,10 @@ public record UpdateMeRequest(
     string? BirthDate = null,
     string? BirthTime = null,
     string? BirthPlace = null,
-    bool? ClearBirthDetails = null);
+    bool? ClearBirthDetails = null,
+    string? Country = null,
+    string? State = null,
+    string? City = null);
 
 public record UserResponse(Guid Id, string Email, DateTime CreatedAt, ProfileResponse? Profile);
 
@@ -20,4 +23,7 @@ public record ProfileResponse(
     bool OnboardingCompleted,
     string? BirthDate,
     string? BirthTime,
-    string? BirthPlace);
+    string? BirthPlace,
+    string? Country,
+    string? State,
+    string? City);

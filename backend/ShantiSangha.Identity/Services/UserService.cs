@@ -30,7 +30,10 @@ public class UserService(
                 user.Profile.OnboardingCompleted,
                 user.Profile.BirthDate?.ToString("yyyy-MM-dd"),
                 user.Profile.BirthTime,
-                user.Profile.BirthPlace
+                user.Profile.BirthPlace,
+                user.Profile.Country,
+                user.Profile.State,
+                user.Profile.City
             )
         );
     }
@@ -75,6 +78,10 @@ public class UserService(
             user.Profile.BirthTime = null;
             user.Profile.BirthPlace = null;
         }
+
+        if (request.Country is not null) user.Profile.Country = request.Country;
+        if (request.State is not null) user.Profile.State = request.State;
+        if (request.City is not null) user.Profile.City = request.City;
 
         user.Profile.UpdatedAt = DateTime.UtcNow;
         user.UpdatedAt = DateTime.UtcNow;

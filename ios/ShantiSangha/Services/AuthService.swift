@@ -16,19 +16,67 @@ class AuthService: ObservableObject {
 
     private var authHandle: AuthStateDidChangeListenerHandle?
 
+    /// Tracks the in-flight `configureApiToken()` task per-user so that
+    /// downstream services (`ProfileService.load`) can await its completion
+    /// before hitting `/me` — `syncTimezone()` lazy-creates the backend
+    /// `Profile` row, and `/me` racing it would 404.
+    private var initialSyncTask: Task<Void, Never>?
+    private var initialSyncUserId: String?
+
     init() {}
 
     /// Call after FirebaseApp.configure()
     func startListening() {
         authHandle = Auth.auth().addStateDidChangeListener { [weak self] _, user in
             Task { @MainActor in
-                self?.user = user
-                self?.isAuthenticated = user != nil
-                if user != nil {
-                    self?.configureApiToken()
+                guard let self else { return }
+                self.user = user
+                self.isAuthenticated = user != nil
+                if let user {
+                    // Spin up the initial sync task per Firebase user so
+                    // each sign-in gets its own awaitable handle. Token
+                    // refreshes for the same user reuse the existing task.
+                    if self.initialSyncUserId != user.uid {
+                        self.initialSyncUserId = user.uid
+                        self.initialSyncTask = Task { @MainActor in
+                            await self.runInitialSync()
+                        }
+                    }
+                } else {
+                    self.initialSyncTask?.cancel()
+                    self.initialSyncTask = nil
+                    self.initialSyncUserId = nil
                 }
             }
         }
+    }
+
+    /// Suspends until the post-sign-in initial sync (`configureApiToken` +
+    /// `syncTimezone`) finishes. Safe to call multiple times — returns
+    /// immediately when no sync is in flight.
+    func awaitInitialSync() async {
+        await initialSyncTask?.value
+    }
+
+    @MainActor
+    private func runInitialSync() async {
+        await ApiService.shared.setTokenProvider {
+            let token = try? await Auth.auth().currentUser?.getIDToken()
+            // Share token with widget extension via App Group
+            if let token {
+                UserDefaults(suiteName: WidgetData.appGroupId)?.set(token, forKey: "widget.authToken")
+            }
+            return token
+        }
+
+        await syncTimezone()
+
+        // Register FCM token with backend after API auth is ready (release only)
+        #if !DEBUG
+        if let fcmToken = Messaging.messaging().fcmToken {
+            await PushTokenService.shared.registerToken(fcmToken)
+        }
+        #endif
     }
 
     func signInWithGoogle() async {
@@ -68,28 +116,6 @@ class AuthService: ObservableObject {
         }
         try? Auth.auth().signOut()
         GIDSignIn.sharedInstance.signOut()
-    }
-
-    private func configureApiToken() {
-        Task {
-            await ApiService.shared.setTokenProvider {
-                let token = try? await Auth.auth().currentUser?.getIDToken()
-                // Share token with widget extension via App Group
-                if let token {
-                    UserDefaults(suiteName: WidgetData.appGroupId)?.set(token, forKey: "widget.authToken")
-                }
-                return token
-            }
-
-            await syncTimezone()
-
-            // Register FCM token with backend after API auth is ready (release only)
-            #if !DEBUG
-            if let fcmToken = Messaging.messaging().fcmToken {
-                await PushTokenService.shared.registerToken(fcmToken)
-            }
-            #endif
-        }
     }
 
     private func syncTimezone() async {

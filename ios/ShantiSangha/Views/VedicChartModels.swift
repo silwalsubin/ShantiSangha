@@ -107,14 +107,3 @@ enum ChartReadingSectionKey {
     ]
 }
 
-// MARK: - Profile fetch (for birth details on the chart page)
-
-struct MeResponse: Decodable {
-    let profile: MeProfileData?
-}
-
-struct MeProfileData: Decodable {
-    let birthDate: String?
-    let birthTime: String?
-    let birthPlace: String?
-}

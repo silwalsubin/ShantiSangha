@@ -5,6 +5,7 @@ import WidgetKit
 /// Home screen — daily dashboard with progress circles
 struct HomeView: View {
     @EnvironmentObject var auth: AuthService
+    @EnvironmentObject var profile: ProfileService
     @StateObject private var vm = HomeViewModel()
     @StateObject private var health = HealthKitService.shared
     @StateObject private var weather = WeatherService.shared
@@ -117,6 +118,7 @@ struct HomeView: View {
             .fullScreenCover(isPresented: $showProfileMenu) {
                 ProfileMenuSheet()
                     .environmentObject(auth)
+                    .environmentObject(profile)
             }
             .refreshable {
                 await vm.load()
@@ -325,10 +327,33 @@ struct HomeView: View {
             practicesTotal: vm.totalRecurring,
             goalsOverdue: pending.filter { ($0.daysRemaining ?? 1) < 0 }.count,
             goalsDueToday: pending.filter { $0.daysRemaining == 0 }.count,
-            userName: Auth.auth().currentUser?.displayName?.components(separatedBy: " ").first
+            userName: preferredFirstName
         )
         WidgetCenter.shared.reloadTimelines(ofKind: "ShantiSanghaReflection")
         WidgetCenter.shared.reloadTimelines(ofKind: "ShantiSanghaDashboard")
+    }
+
+    /// First word of the user's chosen display name when set, falling back
+    /// to the Firebase displayName from Google Sign-In. Used by the
+    /// greeting, the profile-initial avatar, and the widget's user name.
+    private var preferredFirstName: String? {
+        let chosen = profile.profile?.displayName?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let chosen, !chosen.isEmpty {
+            return chosen.components(separatedBy: " ").first
+        }
+        return Auth.auth().currentUser?.displayName?
+            .components(separatedBy: " ").first
+    }
+
+    /// Single-character avatar initial. Prefers the chosen display name,
+    /// falls back to the Firebase displayName, then to the email.
+    private var preferredInitialSource: String {
+        let chosen = profile.profile?.displayName?.trimmingCharacters(in: .whitespaces)
+        if let chosen, !chosen.isEmpty { return chosen }
+        if let firebase = auth.user?.displayName?.trimmingCharacters(in: .whitespaces),
+           !firebase.isEmpty { return firebase }
+        return auth.user?.email ?? "?"
     }
 
     // MARK: - Reflection
@@ -431,10 +456,7 @@ struct HomeView: View {
     // MARK: - Profile
 
     private var profileInitial: String {
-        let source = auth.user?.displayName?.trimmingCharacters(in: .whitespaces)
-            ?? auth.user?.email
-            ?? "?"
-        return String(source.prefix(1)).uppercased()
+        String(preferredInitialSource.prefix(1)).uppercased()
     }
 
     // MARK: - Whole-day context
@@ -451,9 +473,7 @@ struct HomeView: View {
 
     private var timeGreeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
-        let firstName = Auth.auth().currentUser?.displayName?
-            .components(separatedBy: " ").first
-        let name = firstName.map { ", \($0)" } ?? ""
+        let name = preferredFirstName.map { ", \($0)" } ?? ""
         if hour < 12 { return "Good morning\(name)" }
         if hour < 17 { return "Good afternoon\(name)" }
         return "Good evening\(name)"
@@ -482,6 +502,7 @@ private struct DailyReflectionResponse: Decodable {
 /// Owns its own NavigationStack so pushes stay inside the sheet.
 struct ProfileMenuSheet: View {
     @EnvironmentObject var auth: AuthService
+    @EnvironmentObject var profile: ProfileService
     @Environment(\.dismiss) private var dismiss
     @State private var showSignOutConfirmation = false
 
@@ -594,6 +615,10 @@ struct ProfileMenuSheet: View {
     }
 
     private var initial: String {
+        let chosen = profile.profile?.displayName?.trimmingCharacters(in: .whitespaces)
+        if let chosen, !chosen.isEmpty {
+            return String(chosen.prefix(1)).uppercased()
+        }
         let source = auth.user?.displayName?.trimmingCharacters(in: .whitespaces)
             ?? auth.user?.email
             ?? "?"

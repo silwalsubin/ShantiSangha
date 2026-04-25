@@ -140,6 +140,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
 struct ShantiSanghaApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @StateObject private var auth = AuthService.shared
+    @StateObject private var profile = ProfileService.shared
     @StateObject private var network = NetworkMonitor.shared
     @StateObject private var repo = TaskRepository.shared
     @StateObject private var notifications = NotificationService.shared
@@ -169,16 +170,35 @@ struct ShantiSanghaApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if auth.isAuthenticated {
-                    MainTabView()
-                        .environmentObject(auth)
-                        .environmentObject(network)
-                        .environmentObject(repo)
-                } else {
+                if !auth.isAuthenticated {
                     LoginView()
                         .environmentObject(auth)
+                } else if profile.loadState == .idle || profile.loadState == .loading {
+                    GateLoadingView()
+                        .environmentObject(auth)
+                        .environmentObject(profile)
+                } else if case .failed(let message) = profile.loadState {
+                    GateLoadFailedView(message: message)
+                        .environmentObject(auth)
+                        .environmentObject(profile)
+                } else if let gate = profile.requiredGate {
+                    RequiredDataGateView(
+                        gate: gate,
+                        stepIndex: profile.requiredGateIndex,
+                        totalSteps: profile.totalGates
+                    )
+                    .environmentObject(auth)
+                    .environmentObject(profile)
+                } else {
+                    MainTabView()
+                        .environmentObject(auth)
+                        .environmentObject(profile)
+                        .environmentObject(network)
+                        .environmentObject(repo)
                 }
             }
+            .animation(.easeInOut(duration: 0.25), value: auth.isAuthenticated)
+            .animation(.easeInOut(duration: 0.25), value: profile.loadState)
             .onOpenURL { url in
                 if GIDSignIn.sharedInstance.handle(url) { return }
                 DeepLinkRouter.shared.handle(url: url)
@@ -193,6 +213,10 @@ struct ShantiSanghaApp: App {
                 let context = container.mainContext
                 repo.configure(context: context)
                 await SyncService.shared.configure(container: container)
+
+                // Bind profile loading to auth state changes. Safe to call
+                // multiple times — `bind` only adds the subscription once.
+                profile.bind(to: auth)
 
                 // Notification permission is requested contextually from
                 // settings or reminder flows, not on first launch.

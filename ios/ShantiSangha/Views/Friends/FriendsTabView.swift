@@ -6,7 +6,6 @@ struct FriendsTabView: View {
     @StateObject private var vm = FriendsViewModel()
     @State private var showShare = false
     @State private var shareItems: [Any] = []
-    @State private var showDisplayNameCapture = false
 
     var body: some View {
         ZStack {
@@ -72,12 +71,6 @@ struct FriendsTabView: View {
         .task { await vm.refresh() }
         .refreshable { await vm.refresh() }
         .sheet(isPresented: $showShare) { ShareSheet(items: shareItems) }
-        .sheet(isPresented: $showDisplayNameCapture) {
-            DisplayNameCaptureSheet { saved in
-                showDisplayNameCapture = false
-                if saved { Task { await onInvite() } }
-            }
-        }
     }
 
     private var emptyState: some View {
@@ -99,13 +92,10 @@ struct FriendsTabView: View {
     }
 
     private func onInvite() async {
-        let invite = await vm.createInvitation()
-        guard let invite else {
-            if let err = vm.errorMessage, err.localizedCaseInsensitiveContains("display name") {
-                showDisplayNameCapture = true
-            }
-            return
-        }
+        // The root-level required-data gate (`DisplayNameGate`) guarantees the
+        // user has set a display name before reaching the Friends tab — the
+        // legacy `display_name_required` fallback path is no longer reachable.
+        guard let invite = await vm.createInvitation() else { return }
         share(.init(invite))
     }
 

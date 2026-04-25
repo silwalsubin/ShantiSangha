@@ -62,7 +62,9 @@
       "WebFetch(domain:api.anthropic.com)",
       "Bash(tar -tf bundle.tar)",
       "Bash(tar -xf bundle.tar)",
-      "Bash(xcodebuild -project ShantiSangha.xcodeproj -scheme ShantiSangha -sdk iphonesimulator -configuration Debug -destination 'generic/platform=iOS Simulator' build)"
+      "Bash(xcodebuild -project ShantiSangha.xcodeproj -scheme ShantiSangha -sdk iphonesimulator -configuration Debug -destination 'generic/platform=iOS Simulator' build)",
+      "Bash(git fetch *)",
+      "Bash(git ls-tree *)"
     ],
     "additionalDirectories": [
       "/Users/subinsilwal/Desktop/code/maiself/.claude",

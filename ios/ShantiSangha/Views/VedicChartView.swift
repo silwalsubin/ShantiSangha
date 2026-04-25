@@ -5,6 +5,7 @@ import CoreLocation
 /// rashi/degree/house/nakshatra/pada, current dasha. Reached from Home's
 /// daily reading card ("Read your full chart") and from the profile menu.
 struct VedicChartView: View {
+    @EnvironmentObject private var profile: ProfileService
     @State private var chart: VedicChart?
     @State private var loading = true
     @State private var error: String?
@@ -922,68 +923,65 @@ struct VedicChartView: View {
 
     private func loadBirthDetails() async {
         guard !birthDetailsLoaded else { return }
-        do {
-            let response: MeResponse = try await api.get("/me")
-            if let profile = response.profile {
-                if let dateStr = profile.birthDate {
-                    let df = DateFormatter()
-                    df.dateFormat = "yyyy-MM-dd"
-                    birthDate = df.date(from: dateStr)
-                }
-                if let timeStr = profile.birthTime {
-                    let df = DateFormatter()
-                    df.dateFormat = "HH:mm"
-                    birthTime = df.date(from: timeStr)
-                }
-                if let place = profile.birthPlace, !place.isEmpty {
-                    birthPlace = place
-                    // Prefer the user's original display name if we cached it
-                    // when they picked — reverse-geocoding loses that fidelity
-                    // (small towns become "Locality, Country").
-                    if let cached = cachedPlaceName(for: place) {
-                        birthPlaceQuery = cached
-                    } else {
-                        let parts = place.split(separator: ",")
-                        if parts.count == 2, let lat = Double(parts[0]), let lng = Double(parts[1]) {
-                            let location = CLLocation(latitude: lat, longitude: lng)
-                            if let placemark = try? await CLGeocoder().reverseGeocodeLocation(location).first {
-                                let derived = [placemark.locality, placemark.country]
-                                    .compactMap { $0 }
-                                    .joined(separator: ", ")
-                                birthPlaceQuery = derived
-                                if !derived.isEmpty {
-                                    cachePlaceName(coords: place, name: derived)
-                                }
-                            }
+        // Read from the shared ProfileService cache instead of hitting /me
+        // independently — keeps every consumer in sync if the profile changes.
+        guard let snapshot = profile.profile else {
+            birthDetailsLoaded = true
+            return
+        }
+        if let dateStr = snapshot.birthDate {
+            let df = DateFormatter()
+            df.dateFormat = "yyyy-MM-dd"
+            birthDate = df.date(from: dateStr)
+        }
+        if let timeStr = snapshot.birthTime {
+            let df = DateFormatter()
+            df.dateFormat = "HH:mm"
+            birthTime = df.date(from: timeStr)
+        }
+        if let place = snapshot.birthPlace, !place.isEmpty {
+            birthPlace = place
+            // Prefer the user's original display name if we cached it
+            // when they picked — reverse-geocoding loses that fidelity
+            // (small towns become "Locality, Country").
+            if let cached = cachedPlaceName(for: place) {
+                birthPlaceQuery = cached
+            } else {
+                let parts = place.split(separator: ",")
+                if parts.count == 2, let lat = Double(parts[0]), let lng = Double(parts[1]) {
+                    let location = CLLocation(latitude: lat, longitude: lng)
+                    if let placemark = try? await CLGeocoder().reverseGeocodeLocation(location).first {
+                        let derived = [placemark.locality, placemark.country]
+                            .compactMap { $0 }
+                            .joined(separator: ", ")
+                        birthPlaceQuery = derived
+                        if !derived.isEmpty {
+                            cachePlaceName(coords: place, name: derived)
                         }
                     }
                 }
-            }
-        } catch {
-            if !error.isCancellation {
-                AppLogger.shared.error("Chart", "Failed to load birth details: \(error)")
             }
         }
         birthDetailsLoaded = true
     }
 
     private func saveBirthDetails() async {
-        var body: [String: Any] = [:]
+        var patch = UpdateMeRequest()
         if let date = birthDate {
             let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
-            body["birthDate"] = df.string(from: date)
+            patch.birthDate = df.string(from: date)
         }
         if let time = birthTime {
             let df = DateFormatter(); df.dateFormat = "HH:mm"
-            body["birthTime"] = df.string(from: time)
+            patch.birthTime = df.string(from: time)
         }
         if !birthPlace.isEmpty {
-            body["birthPlace"] = birthPlace
+            patch.birthPlace = birthPlace
         }
-        guard !body.isEmpty, let data = try? JSONSerialization.data(withJSONObject: body) else { return }
+        guard patch.birthDate != nil || patch.birthTime != nil || patch.birthPlace != nil else { return }
         do {
-            let _: EmptyResponse = try await api.patchRaw("/me", body: data)
-            AppLogger.shared.info("Chart", "Birth details saved: \(body.keys.joined(separator: ", "))")
+            try await profile.update(patch)
+            AppLogger.shared.info("Chart", "Birth details saved")
             // Birth details changed → server-side reading is invalidated.
             // Force a refetch so the user sees the regenerated reading.
             await loadReading(force: true)

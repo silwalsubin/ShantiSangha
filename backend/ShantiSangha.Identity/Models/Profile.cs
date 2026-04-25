@@ -17,6 +17,16 @@ public class Profile
     public string? BirthTime { get; set; }
     /// <summary>Birth place as "lat,lng" (e.g. "27.7172,85.3240"). Used for lagna/nakshatra calculation.</summary>
     public string? BirthPlace { get; set; }
+
+    // Where the user lives — captured by the LocationGate during onboarding.
+    // Display strings sourced from MapKit/CoreLocation placemark fields:
+    // `country`, `administrativeArea`, `locality`. All required (non-empty)
+    // before the gate is satisfied, but stored nullable so backfills /
+    // schema migrations can grow without breaking anything.
+    public string? Country { get; set; }
+    public string? State { get; set; }
+    public string? City { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
