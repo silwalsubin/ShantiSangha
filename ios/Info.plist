@@ -16,6 +16,8 @@
 	<string>ShantiSangha records your meditation check-ins as mindful minutes so they show up alongside your other practices in the Apple Health app.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>ShantiSangha uses your location to read today's weather so your reflection can sense the sky you're living under.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>ShantiSangha needs access to your photo library so you can attach images to messages you send to friends.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -24,6 +26,16 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>com.googleusercontent.apps.361305168424-umc433jdki16tbit3ou2kkjv1p7k327g</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.shantisangha.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>shantisangha</string>
 			</array>
 		</dict>
 	</array>

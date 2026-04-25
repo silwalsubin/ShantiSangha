@@ -24,6 +24,21 @@ enum SilentPushHandler {
         case "insight", "summary":
             // Insights don't currently surface in widget, but refresh anyway
             break
+        case "friend_message":
+            await MainActor.run {
+                NotificationCenter.default.post(
+                    name: .friendMessageReceived,
+                    object: nil,
+                    userInfo: [
+                        "friendshipId": userInfo["friendshipId"] as? String ?? "",
+                        "messageId": userInfo["messageId"] as? String ?? ""
+                    ])
+                NotificationCenter.default.post(name: .friendsUpdated, object: nil)
+            }
+        case "friendship_created":
+            await MainActor.run {
+                NotificationCenter.default.post(name: .friendsUpdated, object: nil)
+            }
         default:
             break
         }

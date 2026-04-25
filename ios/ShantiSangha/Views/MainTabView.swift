@@ -6,6 +6,7 @@ struct MainTabView: View {
     @EnvironmentObject var auth: AuthService
     @StateObject private var network = NetworkMonitor.shared
     @StateObject private var syncStatus = SyncStatus.shared
+    @StateObject private var deepLinks = DeepLinkRouter.shared
     @State private var selectedTab = 0
 
     init() {
@@ -80,8 +81,22 @@ struct MainTabView: View {
                     Text("Journey")
                 }
                 .tag(2)
+
+                NavigationStack {
+                    FriendsTabView()
+                }
+                .tabItem {
+                    Image(systemName: "person.2")
+                    Text("Friends")
+                }
+                .tag(3)
             }
             .tint(.sacredGold)
+            .sheet(item: deepLinkBinding) { token in
+                AcceptInvitationView(token: token.value) { _ in
+                    selectedTab = 3
+                }
+            }
 
             SyncBanner(
                 isConnected: network.isConnected,
@@ -97,6 +112,23 @@ struct MainTabView: View {
         .onAppear { MotionManager.shared.start() }
         .onDisappear { MotionManager.shared.stop() }
     }
+
+    private var deepLinkBinding: Binding<InviteTokenItem?> {
+        Binding(
+            get: {
+                deepLinks.pendingInviteToken.map { InviteTokenItem(value: $0) }
+            },
+            set: { newValue in
+                if newValue == nil { deepLinks.clear() }
+            }
+        )
+    }
+}
+
+/// Identifiable wrapper for `.sheet(item:)` driven by a token string.
+struct InviteTokenItem: Identifiable {
+    let value: String
+    var id: String { value }
 }
 
 private struct SyncBanner: View {

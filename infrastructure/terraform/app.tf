@@ -140,6 +140,7 @@ resource "aws_ecs_task_definition" "api" {
     environment = [
       { name = "REDIS_URL",              value = local.redis_url },
       { name = "VOICE_BUCKET_NAME",      value = aws_s3_bucket.voice.bucket },
+      { name = "FRIENDS_MEDIA_BUCKET_NAME", value = aws_s3_bucket.friends_media.bucket },
       { name = "AWS_REGION",             value = var.aws_region },
       { name = "LANGFUSE_BASE_URL",      value = "https://cloud.langfuse.com" },
       { name = "LANGFUSE_PUBLIC_KEY",    value = var.langfuse_public_key },

@@ -1,0 +1,316 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using ShantiSangha.Friends.Contracts;
+using ShantiSangha.Friends.Data;
+using ShantiSangha.Friends.Models;
+using ShantiSangha.Friends.Storage;
+using ShantiSangha.Shared.Interfaces;
+
+namespace ShantiSangha.Friends.Services;
+
+public class FriendsService(
+    FriendsDbContext db,
+    IProfileQueryService profileQuery,
+    IPushNotificationService push,
+    FriendsMediaStorage storage,
+    ILogger<FriendsService> logger) : IFriendsService
+{
+    private static readonly TimeSpan InvitationLifetime = TimeSpan.FromDays(7);
+    private const int MaxActiveInvitations = 5;
+    private const int MaxInvitationsPer24Hours = 10;
+
+    public async Task<List<FriendSummaryResponse>> ListFriendsAsync(Guid userId, CancellationToken ct = default)
+    {
+        var friendships = await db.Friendships
+            .Where(f => f.UserAId == userId || f.UserBId == userId)
+            .OrderByDescending(f => f.CreatedAt)
+            .ToListAsync(ct);
+
+        if (friendships.Count == 0) return [];
+
+        var friendshipIds = friendships.Select(f => f.Id).ToList();
+        var lastMessages = await db.Messages
+            .Where(m => friendshipIds.Contains(m.FriendshipId))
+            .GroupBy(m => m.FriendshipId)
+            .Select(g => g.OrderByDescending(m => m.SentAt).First())
+            .ToListAsync(ct);
+        var lastMessageMap = lastMessages.ToDictionary(m => m.FriendshipId, m => m);
+
+        var unreadCounts = await db.Messages
+            .Where(m => friendshipIds.Contains(m.FriendshipId)
+                && m.SenderUserId != userId
+                && m.ReadAt == null)
+            .GroupBy(m => m.FriendshipId)
+            .Select(g => new { FriendshipId = g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+        var unreadMap = unreadCounts.ToDictionary(u => u.FriendshipId, u => u.Count);
+
+        var result = new List<FriendSummaryResponse>(friendships.Count);
+        foreach (var f in friendships)
+        {
+            var friendUserId = f.UserAId == userId ? f.UserBId : f.UserAId;
+            var displayName = await profileQuery.GetDisplayNameAsync(friendUserId, ct) ?? "Friend";
+
+            string? preview = null;
+            DateTime? sentAt = null;
+            if (lastMessageMap.TryGetValue(f.Id, out var last))
+            {
+                preview = BuildPreview(last);
+                sentAt = last.SentAt;
+            }
+
+            result.Add(new FriendSummaryResponse(
+                f.Id,
+                friendUserId,
+                displayName,
+                f.CreatedAt,
+                preview,
+                sentAt,
+                unreadMap.GetValueOrDefault(f.Id, 0)));
+        }
+        return result;
+    }
+
+    public async Task<FriendSummaryResponse?> GetFriendAsync(Guid userId, Guid friendshipId, CancellationToken ct = default)
+    {
+        var f = await FindFriendshipForUserAsync(friendshipId, userId, ct);
+        if (f is null) return null;
+
+        var friendUserId = f.UserAId == userId ? f.UserBId : f.UserAId;
+        var displayName = await profileQuery.GetDisplayNameAsync(friendUserId, ct) ?? "Friend";
+
+        var last = await db.Messages
+            .Where(m => m.FriendshipId == f.Id)
+            .OrderByDescending(m => m.SentAt)
+            .FirstOrDefaultAsync(ct);
+
+        var unread = await db.Messages
+            .CountAsync(m => m.FriendshipId == f.Id && m.SenderUserId != userId && m.ReadAt == null, ct);
+
+        return new FriendSummaryResponse(
+            f.Id, friendUserId, displayName, f.CreatedAt,
+            last is not null ? BuildPreview(last) : null,
+            last?.SentAt,
+            unread);
+    }
+
+    public async Task<CreateInvitationResponse> CreateInvitationAsync(Guid userId, string baseUrl, CancellationToken ct = default)
+    {
+        var displayName = await profileQuery.GetDisplayNameAsync(userId, ct);
+        if (string.IsNullOrWhiteSpace(displayName))
+            throw new FriendsServiceException("display_name_required", "Set a display name before inviting friends.");
+
+        var now = DateTime.UtcNow;
+
+        var activeInvites = await db.Invitations
+            .CountAsync(i => i.InviterUserId == userId
+                && i.AcceptedAt == null
+                && i.RevokedAt == null
+                && i.ExpiresAt > now, ct);
+        if (activeInvites >= MaxActiveInvitations)
+            throw new FriendsServiceException("too_many_active_invites",
+                $"You already have {activeInvites} active invites. Revoke one before creating another.");
+
+        var dayAgo = now.AddDays(-1);
+        var recentCount = await db.Invitations
+            .CountAsync(i => i.InviterUserId == userId && i.CreatedAt >= dayAgo, ct);
+        if (recentCount >= MaxInvitationsPer24Hours)
+            throw new FriendsServiceException("rate_limited",
+                "You've created too many invites today. Try again tomorrow.");
+
+        var token = InvitationTokenGenerator.Generate();
+        var invitation = new FriendInvitation
+        {
+            Id = Guid.NewGuid(),
+            InviterUserId = userId,
+            Token = token,
+            CreatedAt = now,
+            ExpiresAt = now.Add(InvitationLifetime)
+        };
+        db.Invitations.Add(invitation);
+        await db.SaveChangesAsync(ct);
+
+        return new CreateInvitationResponse(
+            invitation.Id, token,
+            BuildShareUrl(baseUrl, token),
+            BuildDeepLinkUrl(token),
+            invitation.ExpiresAt);
+    }
+
+    public async Task<List<PendingInvitationResponse>> ListInvitationsAsync(Guid userId, string baseUrl, CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+        var rows = await db.Invitations
+            .Where(i => i.InviterUserId == userId
+                && i.AcceptedAt == null
+                && i.RevokedAt == null
+                && i.ExpiresAt > now)
+            .OrderByDescending(i => i.CreatedAt)
+            .ToListAsync(ct);
+
+        return rows.Select(i => new PendingInvitationResponse(
+            i.Id, i.Token,
+            BuildShareUrl(baseUrl, i.Token),
+            BuildDeepLinkUrl(i.Token),
+            i.CreatedAt,
+            i.ExpiresAt)).ToList();
+    }
+
+    public async Task<bool> RevokeInvitationAsync(Guid userId, Guid invitationId, CancellationToken ct = default)
+    {
+        var invite = await db.Invitations
+            .FirstOrDefaultAsync(i => i.Id == invitationId && i.InviterUserId == userId, ct);
+        if (invite is null) return false;
+        if (invite.RevokedAt is not null || invite.AcceptedAt is not null) return true;
+
+        invite.RevokedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+
+    public async Task<InvitationPreviewResponse?> PreviewInvitationAsync(Guid userId, string token, CancellationToken ct = default)
+    {
+        var invite = await db.Invitations.FirstOrDefaultAsync(i => i.Token == token, ct);
+        if (invite is null) return null;
+
+        var inviterName = await profileQuery.GetDisplayNameAsync(invite.InviterUserId, ct) ?? "A friend";
+        var alreadyFriends = await ExistsFriendshipAsync(invite.InviterUserId, userId, ct);
+
+        return new InvitationPreviewResponse(
+            inviterName,
+            invite.ExpiresAt < DateTime.UtcNow,
+            invite.AcceptedAt is not null || invite.RevokedAt is not null,
+            alreadyFriends,
+            invite.InviterUserId == userId);
+    }
+
+    public async Task<FriendSummaryResponse> AcceptInvitationAsync(Guid userId, string token, CancellationToken ct = default)
+    {
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+
+        var invite = await db.Invitations.FirstOrDefaultAsync(i => i.Token == token, ct)
+            ?? throw new FriendsServiceException("invalid_token", "This invite link is not valid.");
+
+        if (invite.RevokedAt is not null)
+            throw new FriendsServiceException("revoked", "This invite has been revoked.");
+        if (invite.AcceptedAt is not null)
+            throw new FriendsServiceException("already_used", "This invite has already been accepted.");
+        if (invite.ExpiresAt < DateTime.UtcNow)
+            throw new FriendsServiceException("expired", "This invite has expired.");
+        if (invite.InviterUserId == userId)
+            throw new FriendsServiceException("self", "You can't accept your own invite.");
+
+        if (await ExistsFriendshipAsync(invite.InviterUserId, userId, ct))
+            throw new FriendsServiceException("already_friends", "You're already friends with this person.");
+
+        var (a, b) = invite.InviterUserId.CompareTo(userId) < 0
+            ? (invite.InviterUserId, userId)
+            : (userId, invite.InviterUserId);
+
+        var friendship = new Friendship
+        {
+            Id = Guid.NewGuid(),
+            UserAId = a,
+            UserBId = b,
+            CreatedAt = DateTime.UtcNow
+        };
+        db.Friendships.Add(friendship);
+
+        invite.AcceptedAt = DateTime.UtcNow;
+        invite.AcceptedByUserId = userId;
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException)
+        {
+            throw new FriendsServiceException("already_friends", "You're already friends with this person.");
+        }
+        await tx.CommitAsync(ct);
+
+        var inviterName = await profileQuery.GetDisplayNameAsync(invite.InviterUserId, ct) ?? "Friend";
+        var accepterName = await profileQuery.GetDisplayNameAsync(userId, ct) ?? "A friend";
+
+        try
+        {
+            await push.SendAlertPushAsync(invite.InviterUserId,
+                title: "New friend",
+                body: $"{accepterName} accepted your invite.",
+                data: new Dictionary<string, string>
+                {
+                    ["type"] = "friendship_created",
+                    ["friendshipId"] = friendship.Id.ToString()
+                }, ct: ct);
+            await push.SendAlertPushAsync(userId,
+                title: "New friend",
+                body: $"You and {inviterName} are now friends.",
+                data: new Dictionary<string, string>
+                {
+                    ["type"] = "friendship_created",
+                    ["friendshipId"] = friendship.Id.ToString()
+                }, ct: ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to send friendship_created push for friendship {FriendshipId}", friendship.Id);
+        }
+
+        return new FriendSummaryResponse(
+            friendship.Id, invite.InviterUserId, inviterName,
+            friendship.CreatedAt, null, null, 0);
+    }
+
+    public async Task<bool> EndFriendshipAsync(Guid userId, Guid friendshipId, CancellationToken ct = default)
+    {
+        var f = await FindFriendshipForUserAsync(friendshipId, userId, ct);
+        if (f is null) return false;
+
+        var messages = await db.Messages.Where(m => m.FriendshipId == f.Id).ToListAsync(ct);
+        var mediaKeys = messages.Where(m => m.StorageKey is not null).Select(m => m.StorageKey!).ToList();
+
+        db.Messages.RemoveRange(messages);
+        db.Friendships.Remove(f);
+        await db.SaveChangesAsync(ct);
+
+        if (mediaKeys.Count > 0)
+        {
+            try
+            {
+                await storage.DeleteManyAsync(mediaKeys);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to delete media for ended friendship {FriendshipId}", f.Id);
+            }
+        }
+
+        return true;
+    }
+
+    private async Task<Friendship?> FindFriendshipForUserAsync(Guid friendshipId, Guid userId, CancellationToken ct) =>
+        await db.Friendships.FirstOrDefaultAsync(
+            f => f.Id == friendshipId && (f.UserAId == userId || f.UserBId == userId), ct);
+
+    private async Task<bool> ExistsFriendshipAsync(Guid userA, Guid userB, CancellationToken ct)
+    {
+        var (a, b) = userA.CompareTo(userB) < 0 ? (userA, userB) : (userB, userA);
+        return await db.Friendships.AnyAsync(f => f.UserAId == a && f.UserBId == b, ct);
+    }
+
+    private static string BuildPreview(FriendMessage m) => m.Kind switch
+    {
+        FriendMessageKind.Text => string.IsNullOrWhiteSpace(m.Body)
+            ? "(empty message)"
+            : (m.Body.Length > 80 ? m.Body[..80] + "…" : m.Body),
+        FriendMessageKind.Image => "(photo)",
+        FriendMessageKind.Voice => "(voice message)",
+        _ => "(message)"
+    };
+
+    private static string BuildShareUrl(string baseUrl, string token) =>
+        $"{baseUrl.TrimEnd('/')}/invite/{token}";
+
+    private static string BuildDeepLinkUrl(string token) =>
+        $"shantisangha://invite/{token}";
+}

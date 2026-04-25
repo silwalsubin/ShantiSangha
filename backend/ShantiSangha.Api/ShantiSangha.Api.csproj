@@ -35,6 +35,7 @@
     <ProjectReference Include="..\ShantiSangha.Wellness\ShantiSangha.Wellness.csproj" />
     <ProjectReference Include="..\ShantiSangha.Insights\ShantiSangha.Insights.csproj" />
     <ProjectReference Include="..\ShantiSangha.Jyotish\ShantiSangha.Jyotish.csproj" />
+    <ProjectReference Include="..\ShantiSangha.Friends\ShantiSangha.Friends.csproj" />
   </ItemGroup>
 
 </Project>

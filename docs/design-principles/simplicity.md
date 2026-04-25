@@ -8,7 +8,7 @@ People come to ShantiSangha during emotionally heavy moments. If they have to th
 
 ## Rules
 
-- **3 tabs maximum** — Home, Reflect, Journey. No exceptions.
+- **4 tabs maximum** — Home, Reflect, Journey, Friends. The first three are the solo practice loop (ground, reflect, see growth); Friends is the deliberate social surface gated by explicit consent. No further tabs.
 - **One path, not seven doors** — guide users through a natural flow: ground yourself, reflect, see growth
 - **If a feature needs explanation, it's too complex** — redesign it, don't add a tooltip
 - **Every screen should flow into the next** — no dead ends

@@ -16,6 +16,7 @@ public static class DependencyInjection
 
         services.AddScoped<IGoalService, GoalService>();
         services.AddScoped<IGoalQueryService, GoalQueryService>();
+        services.AddScoped<IPracticeStatusQueryService, PracticeStatusQueryService>();
 
         return services;
     }

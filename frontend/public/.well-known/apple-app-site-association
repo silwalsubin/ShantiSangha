@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["BN6WSF9259.com.shantisangha.app"],
+        "components": [
+          {
+            "/": "/invite/*",
+            "comment": "Friend invite links"
+          }
+        ]
+      }
+    ]
+  }
+}

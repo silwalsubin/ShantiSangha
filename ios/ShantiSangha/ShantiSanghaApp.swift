@@ -180,7 +180,13 @@ struct ShantiSanghaApp: App {
                 }
             }
             .onOpenURL { url in
-                GIDSignIn.sharedInstance.handle(url)
+                if GIDSignIn.sharedInstance.handle(url) { return }
+                DeepLinkRouter.shared.handle(url: url)
+            }
+            .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+                if let url = activity.webpageURL {
+                    DeepLinkRouter.shared.handle(url: url)
+                }
             }
             .task {
                 // Configure repository with SwiftData context

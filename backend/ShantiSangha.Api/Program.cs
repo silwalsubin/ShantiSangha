@@ -12,6 +12,7 @@ using Serilog;
 using ShantiSangha.Api;
 using ShantiSangha.Chat;
 using ShantiSangha.Chat.AI;
+using ShantiSangha.Friends;
 using ShantiSangha.Identity;
 using ShantiSangha.Goals;
 using ShantiSangha.Insights;
@@ -96,6 +97,7 @@ try
     builder.Services.AddWellnessModule(connStr, appConfig.VoiceBucketName);
     builder.Services.AddInsightsModule(vectorDataSource);
     builder.Services.AddJyotishModule(vectorDataSource);
+    builder.Services.AddFriendsModule(connStr, appConfig.FriendsMediaBucketName);
 
     // ── Controller discovery from domain assemblies ─────────────────────
     builder.Services.AddControllers()
@@ -106,6 +108,7 @@ try
         .AddApplicationPart(typeof(ShantiSangha.Wellness.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Insights.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Jyotish.DependencyInjection).Assembly)
+        .AddApplicationPart(typeof(ShantiSangha.Friends.DependencyInjection).Assembly)
         .AddJsonOptions(opts =>
         {
             opts.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
@@ -221,6 +224,7 @@ try
         await sp.GetRequiredService<ShantiSangha.Wellness.Data.WellnessDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Insights.Data.InsightsDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Jyotish.Data.JyotishDbContext>().Database.MigrateAsync();
+        await sp.GetRequiredService<ShantiSangha.Friends.Data.FriendsDbContext>().Database.MigrateAsync();
 
         // Chat module has no EF migrations folder — schema was bootstrapped
         // pre-migration-framework. Apply lightweight additive changes via

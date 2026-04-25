@@ -1,0 +1,228 @@
+import SwiftUI
+
+/// Root of the Friends tab. Lists existing friendships, surfaces pending
+/// invites, and offers the "invite a friend" flow.
+struct FriendsTabView: View {
+    @StateObject private var vm = FriendsViewModel()
+    @State private var showShare = false
+    @State private var shareItems: [Any] = []
+    @State private var showDisplayNameCapture = false
+
+    var body: some View {
+        ZStack {
+            SacredBackground()
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: SacredSpacing.l) {
+                    if vm.loading && vm.friends.isEmpty && vm.pendingInvitations.isEmpty {
+                        ProgressView()
+                            .padding(.top, SacredSpacing.xl * 2)
+                    } else if vm.friends.isEmpty && vm.pendingInvitations.isEmpty {
+                        emptyState
+                            .padding(.horizontal, SacredSpacing.m)
+                            .padding(.top, SacredSpacing.xl)
+                    } else {
+                        if !vm.friends.isEmpty {
+                            VStack(spacing: SacredSpacing.s) {
+                                ForEach(vm.friends) { friend in
+                                    NavigationLink(destination: FriendChatView(friend: friend)) {
+                                        FriendRow(friend: friend)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.horizontal, SacredSpacing.m)
+                            .padding(.top, SacredSpacing.l)
+                        }
+
+                        if !vm.pendingInvitations.isEmpty {
+                            SacredCard("PENDING INVITES") {
+                                VStack(spacing: SacredSpacing.s) {
+                                    ForEach(vm.pendingInvitations) { invite in
+                                        PendingInviteRow(
+                                            invite: invite,
+                                            onShare: { share(invite) },
+                                            onRevoke: { Task { await vm.revoke(invite.invitationId) } })
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, SacredSpacing.m)
+                        }
+
+                        SacredPrimaryButton("Invite another friend", style: .pill, fullWidth: true) {
+                            Task { await onInvite() }
+                        }
+                        .padding(.horizontal, SacredSpacing.m)
+                    }
+
+                    if let err = vm.errorMessage, !shouldHideError {
+                        Text(err)
+                            .font(.sacredMicro)
+                            .foregroundColor(.sacredMuted)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, SacredSpacing.m)
+                    }
+                }
+                .padding(.bottom, SacredSpacing.tabBarSafe)
+            }
+        }
+        .navigationTitle("Friends")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await vm.refresh() }
+        .refreshable { await vm.refresh() }
+        .sheet(isPresented: $showShare) { ShareSheet(items: shareItems) }
+        .sheet(isPresented: $showDisplayNameCapture) {
+            DisplayNameCaptureSheet { saved in
+                showDisplayNameCapture = false
+                if saved { Task { await onInvite() } }
+            }
+        }
+    }
+
+    private var emptyState: some View {
+        SacredCard {
+            SacredEmptyState(
+                icon: "person.2",
+                title: "Walking solo for now.",
+                subtitle: "Invite someone you trust to message inside this private space.",
+                actionLabel: "Invite a friend"
+            ) { Task { await onInvite() } }
+        }
+    }
+
+    /// Hide a one-off decode/network error when we have nothing to show — the
+    /// empty state is the message at that point. Surface errors only when the
+    /// user is mid-action or has loaded data and a follow-up call failed.
+    private var shouldHideError: Bool {
+        vm.friends.isEmpty && vm.pendingInvitations.isEmpty
+    }
+
+    private func onInvite() async {
+        let invite = await vm.createInvitation()
+        guard let invite else {
+            if let err = vm.errorMessage, err.localizedCaseInsensitiveContains("display name") {
+                showDisplayNameCapture = true
+            }
+            return
+        }
+        share(.init(invite))
+    }
+
+    private func share(_ link: ShareLink) {
+        let url = URL(string: link.url) ?? URL(string: "https://shantisangha.com")!
+        let body = "I'm using ShantiSangha. Join me as a friend: \(link.url)"
+        shareItems = [body, url]
+        showShare = true
+    }
+
+    private func share(_ invite: PendingInvitation) {
+        share(.init(invite))
+    }
+}
+
+private struct ShareLink {
+    let url: String
+    init(_ invite: CreateInvitationResponse) { self.url = invite.shareUrl }
+    init(_ invite: PendingInvitation) { self.url = invite.shareUrl }
+}
+
+private struct FriendRow: View {
+    let friend: FriendSummary
+
+    var body: some View {
+        HStack(spacing: SacredSpacing.s) {
+            Avatar(name: friend.displayName)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text(friend.displayName)
+                        .font(.sacredTextSemibold)
+                        .foregroundColor(.sacredText)
+                    Spacer()
+                    if friend.unreadCount > 0 {
+                        Text("\(friend.unreadCount)")
+                            .font(.sacredMicroBold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Color.sacredGold))
+                    }
+                }
+                if let preview = friend.lastMessagePreview {
+                    Text(preview)
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredMuted)
+                        .lineLimit(1)
+                } else {
+                    Text("Say hello.")
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredMutedLight)
+                }
+            }
+        }
+        .padding(SacredSpacing.s)
+        .luxCardChrome()
+    }
+}
+
+private struct PendingInviteRow: View {
+    let invite: PendingInvitation
+    let onShare: () -> Void
+    let onRevoke: () -> Void
+
+    var body: some View {
+        HStack(spacing: SacredSpacing.s) {
+            Image(systemName: "envelope")
+                .foregroundColor(.sacredGold.opacity(0.8))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Waiting to be accepted")
+                    .font(.sacredTextMedium)
+                    .foregroundColor(.sacredText)
+                Text(expiresIn)
+                    .font(.sacredMicro)
+                    .foregroundColor(.sacredMuted)
+            }
+            Spacer()
+            Button("Share") { onShare() }
+                .font(.sacredSmallSemibold)
+                .foregroundColor(.sacredGold)
+            Button("Revoke") { onRevoke() }
+                .font(.sacredSmallSemibold)
+                .foregroundColor(.sacredRed)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var expiresIn: String {
+        guard let expires = FriendsDates.parse(invite.expiresAt) else { return "Expires soon" }
+        let days = max(0, Calendar.current.dateComponents([.day], from: Date(), to: expires).day ?? 0)
+        if days <= 0 { return "Expires today" }
+        if days == 1 { return "Expires tomorrow" }
+        return "Expires in \(days) days"
+    }
+}
+
+private struct Avatar: View {
+    let name: String
+    var initial: String {
+        name.split(separator: " ").compactMap { $0.first }.prefix(2).map(String.init).joined().uppercased()
+    }
+    var body: some View {
+        ZStack {
+            Circle().fill(LinearGradient.sacredGoldShinyVertical)
+            Text(initial.isEmpty ? "·" : initial)
+                .font(.sacredTextSemibold)
+                .foregroundColor(.white)
+        }
+        .frame(width: 40, height: 40)
+    }
+}
+
+/// UIKit share sheet bridge — uses the system's `UIActivityViewController`.
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+    func updateUIViewController(_ vc: UIActivityViewController, context: Context) {}
+}

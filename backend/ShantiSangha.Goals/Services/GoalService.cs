@@ -6,6 +6,7 @@ using ShantiSangha.Goals.Contracts;
 using ShantiSangha.Goals.Data;
 using ShantiSangha.Goals.Models;
 using ShantiSangha.Shared;
+using ShantiSangha.Shared.Events;
 using ShantiSangha.Shared.Interfaces;
 
 namespace ShantiSangha.Goals.Services;
@@ -15,6 +16,7 @@ public class GoalService(
     Kernel kernel,
     IInsightQueryService insightQuery,
     ISummaryQueryService summaryQuery,
+    IEventBus eventBus,
     ILogger<GoalService> logger) : IGoalService
 {
     private void LogActivity(Guid goalId, string action, string? detail = null)
@@ -287,6 +289,12 @@ public class GoalService(
         }
 
         await db.SaveChangesAsync(ct);
+
+        if (body.Completed && (isNew || statusChanged))
+        {
+            await eventBus.PublishAsync(
+                new GoalCheckedInEvent(userId, today, true), ct);
+        }
 
         return new CheckInResult(existing.Id, existing.Date, existing.Completed, existing.Note);
     }
