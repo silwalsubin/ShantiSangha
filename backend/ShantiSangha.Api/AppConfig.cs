@@ -33,7 +33,23 @@ public class AppConfig
         var firebaseProjectId = config["FIREBASE_PROJECT_ID"] ?? throw new InvalidOperationException("FIREBASE_PROJECT_ID is required");
         var openAiKey = config["OPENAI_API_KEY"] ?? throw new InvalidOperationException("OPENAI_API_KEY is required");
         var voiceBucket = config["VOICE_BUCKET_NAME"] ?? throw new InvalidOperationException("VOICE_BUCKET_NAME is required");
-        var friendsMediaBucket = config["FRIENDS_MEDIA_BUCKET_NAME"] ?? throw new InvalidOperationException("FRIENDS_MEDIA_BUCKET_NAME is required");
+        // Prefer the dedicated friends-media bucket, but fall back to the
+        // voice bucket so the backend can boot before the Terraform that
+        // provisions the new bucket has been applied. Keys live under a
+        // `friends/{friendshipId}/...` prefix either way, so they don't
+        // collide with solo voice notes — but media uploaded during the
+        // fallback window won't be reachable after the env var flips, since
+        // presigned URLs are bound to the configured bucket. Apply the
+        // Terraform soon and the fallback path goes dormant.
+        var friendsMediaBucket = config["FRIENDS_MEDIA_BUCKET_NAME"];
+        if (string.IsNullOrWhiteSpace(friendsMediaBucket))
+        {
+            Serilog.Log.Warning(
+                "FRIENDS_MEDIA_BUCKET_NAME is not set — falling back to VOICE_BUCKET_NAME ({Bucket}). " +
+                "Apply infrastructure/terraform to provision the dedicated friends-media bucket and remove this fallback.",
+                voiceBucket);
+            friendsMediaBucket = voiceBucket;
+        }
 
         return new AppConfig
         {
