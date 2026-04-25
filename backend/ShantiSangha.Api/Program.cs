@@ -90,7 +90,10 @@ try
     builder.Services.AddSingleton(vectorDataSource);
 
     // ── Domain module registration ──────────────────────────────────────
-    builder.Services.AddIdentityModule(connStr);
+    // Avatars share the same S3 bucket as friend chat media — they're both
+    // user-shared identity content with the same trust class. Identity owns
+    // the avatar key + lifecycle on its own AvatarStorage S3 client.
+    builder.Services.AddIdentityModule(connStr, appConfig.FriendsMediaBucketName);
     builder.Services.AddGoalsModule(connStr);
     builder.Services.AddChatModule(vectorDataSource);
     builder.Services.AddJournalModule(vectorDataSource);

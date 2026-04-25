@@ -34,4 +34,18 @@ public class UsersController(IUserService userService, ICurrentUser currentUser)
 
         return NoContent();
     }
+
+    [HttpPost("avatar/upload-url")]
+    public async Task<IActionResult> CreateAvatarUploadUrl(
+        [FromBody] AvatarUploadUrlRequest request, CancellationToken ct)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+
+        var result = await userService.CreateAvatarUploadUrlAsync(user.Id, request, ct);
+        if (result is null)
+            return BadRequest(new { error = "unsupported_type", message = "Unsupported image type. Allowed: jpeg, jpg, png, heic, webp." });
+
+        return Ok(result);
+    }
 }

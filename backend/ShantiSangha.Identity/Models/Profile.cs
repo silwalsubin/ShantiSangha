@@ -27,6 +27,12 @@ public class Profile
     public string? State { get; set; }
     public string? City { get; set; }
 
+    /// <summary>S3 object key for the user's avatar image. Lives in the
+    /// shared friends-media bucket under `avatars/{userId}/{guid}.{ext}`.
+    /// Exposed to consumers as a short-lived presigned GET URL generated at
+    /// read time (see UserService.GetMeAsync) — never persist the URL.</summary>
+    public string? AvatarKey { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 

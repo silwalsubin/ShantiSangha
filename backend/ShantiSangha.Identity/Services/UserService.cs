@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using ShantiSangha.Identity.Contracts;
 using ShantiSangha.Identity.Data;
+using ShantiSangha.Identity.Storage;
 using ShantiSangha.Shared.Interfaces;
 
 namespace ShantiSangha.Identity.Services;
@@ -9,8 +10,11 @@ namespace ShantiSangha.Identity.Services;
 public class UserService(
     IdentityDbContext db,
     IChartReadingService chartReadingService,
+    AvatarStorage avatarStorage,
     ILogger<UserService> logger) : IUserService
 {
+    private static readonly TimeSpan AvatarUrlLifetime = TimeSpan.FromHours(1);
+
     public async Task<UserResponse?> GetMeAsync(Guid userId, CancellationToken ct = default)
     {
         var user = await db.Users
@@ -18,6 +22,24 @@ public class UserService(
             .FirstOrDefaultAsync(u => u.Id == userId, ct);
 
         if (user is null) return null;
+
+        // Generate a fresh presigned download URL for the avatar at read
+        // time so the URL is always valid for the lifetime of one /me
+        // refresh on the client. Failure here is non-fatal — we'd rather
+        // return the rest of the profile with no avatar URL than 500 the
+        // whole request.
+        string? avatarUrl = null;
+        if (user.Profile?.AvatarKey is { Length: > 0 } key)
+        {
+            try
+            {
+                avatarUrl = await avatarStorage.GetPresignedDownloadUrlAsync(key, AvatarUrlLifetime);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to presign avatar URL for user {UserId}", userId);
+            }
+        }
 
         return new UserResponse(
             user.Id,
@@ -33,7 +55,9 @@ public class UserService(
                 user.Profile.BirthPlace,
                 user.Profile.Country,
                 user.Profile.State,
-                user.Profile.City
+                user.Profile.City,
+                user.Profile.AvatarKey,
+                avatarUrl
             )
         );
     }
@@ -83,6 +107,19 @@ public class UserService(
         if (request.State is not null) user.Profile.State = request.State;
         if (request.City is not null) user.Profile.City = request.City;
 
+        // Avatar key is only set via the upload-commit flow. When a new key
+        // arrives and replaces a previous one, eagerly delete the old object
+        // so we don't accumulate orphans across re-uploads.
+        if (request.AvatarKey is not null && request.AvatarKey != user.Profile.AvatarKey)
+        {
+            var oldKey = user.Profile.AvatarKey;
+            user.Profile.AvatarKey = string.IsNullOrWhiteSpace(request.AvatarKey) ? null : request.AvatarKey;
+            if (!string.IsNullOrWhiteSpace(oldKey))
+            {
+                _ = avatarStorage.DeleteAsync(oldKey);
+            }
+        }
+
         user.Profile.UpdatedAt = DateTime.UtcNow;
         user.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
@@ -110,5 +147,34 @@ public class UserService(
         }
 
         return true;
+    }
+
+    private static readonly HashSet<string> AllowedAvatarTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "image/jpeg", "image/jpg", "image/png", "image/heic", "image/webp"
+    };
+
+    private static readonly TimeSpan AvatarUploadUrlLifetime = TimeSpan.FromMinutes(15);
+
+    public async Task<AvatarUploadUrlResponse?> CreateAvatarUploadUrlAsync(
+        Guid userId, AvatarUploadUrlRequest request, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.ContentType) ||
+            !AllowedAvatarTypes.Contains(request.ContentType))
+        {
+            return null;
+        }
+
+        var userExists = await db.Users.AnyAsync(u => u.Id == userId, ct);
+        if (!userExists) return null;
+
+        var key = avatarStorage.BuildKey(userId, request.ContentType);
+        var url = await avatarStorage.GetPresignedUploadUrlAsync(
+            key, request.ContentType, AvatarUploadUrlLifetime);
+
+        return new AvatarUploadUrlResponse(
+            ObjectKey: key,
+            UploadUrl: url,
+            UploadUrlExpiresAt: DateTime.UtcNow.Add(AvatarUploadUrlLifetime));
     }
 }

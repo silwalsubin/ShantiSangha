@@ -6,4 +6,5 @@ public interface IUserService
 {
     Task<UserResponse?> GetMeAsync(Guid userId, CancellationToken ct = default);
     Task<bool> UpdateMeAsync(Guid userId, UpdateMeRequest request, CancellationToken ct = default);
+    Task<AvatarUploadUrlResponse?> CreateAvatarUploadUrlAsync(Guid userId, AvatarUploadUrlRequest request, CancellationToken ct = default);
 }

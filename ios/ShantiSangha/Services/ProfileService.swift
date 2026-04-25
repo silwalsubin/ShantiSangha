@@ -17,6 +17,13 @@ struct ProfileResponse: Codable, Equatable {
     let country: String?
     let state: String?
     let city: String?
+    /// Stable S3 key for the user's avatar — round-tripped via PATCH /me
+    /// after a successful upload. Clients shouldn't display this directly.
+    let avatarKey: String?
+    /// Short-lived presigned GET URL for displaying the avatar. Backend
+    /// regenerates this on every /me read; treat as read-only and refetch
+    /// /me to get a new one if it expires.
+    let avatarUrl: String?
 
     /// Defensive default used by the gate orchestrator when `/me` somehow
     /// returns a null profile — every gate predicate fails against this so
@@ -31,7 +38,9 @@ struct ProfileResponse: Codable, Equatable {
         birthPlace: nil,
         country: nil,
         state: nil,
-        city: nil
+        city: nil,
+        avatarKey: nil,
+        avatarUrl: nil
     )
 }
 
@@ -56,6 +65,19 @@ struct UpdateMeRequest: Encodable {
     var country: String? = nil
     var state: String? = nil
     var city: String? = nil
+    var avatarKey: String? = nil
+}
+
+// MARK: - Avatar upload DTOs
+
+struct AvatarUploadUrlRequest: Encodable {
+    let contentType: String
+}
+
+struct AvatarUploadUrlResponse: Decodable {
+    let objectKey: String
+    let uploadUrl: String
+    let uploadUrlExpiresAt: String
 }
 
 // MARK: - ProfileService
@@ -117,6 +139,7 @@ final class ProfileService: ObservableObject {
     private static let gates: [any RequiredGate] = [
         DisplayNameGate(),
         LocationGate(),
+        ProfilePictureGate(),
         // Future gates land here, e.g. BirthDetailsGate(), TimezoneConfirmGate(), ...
     ]
 
@@ -233,6 +256,35 @@ final class ProfileService: ObservableObject {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         try await update(UpdateMeRequest(displayName: trimmed))
+    }
+
+    /// Three-step avatar upload used by `ProfilePictureGate`:
+    /// 1. Ask the backend for a presigned PUT URL (`POST /me/avatar/upload-url`)
+    /// 2. PUT the JPEG bytes directly to S3 — bypasses our backend so we
+    ///    aren't streaming user images through an ECS task
+    /// 3. Commit the new avatar key via `PATCH /me`, which also triggers a
+    ///    `/me` reload so the new presigned download URL lands locally
+    /// Throws on any step. The gate body shows whatever message we surface.
+    func uploadAvatar(jpegData data: Data) async throws {
+        let upload: AvatarUploadUrlResponse = try await ApiService.shared.post(
+            "/me/avatar/upload-url",
+            body: AvatarUploadUrlRequest(contentType: "image/jpeg"))
+
+        try await putAvatarBytes(uploadUrl: upload.uploadUrl, contentType: "image/jpeg", data: data)
+
+        try await update(UpdateMeRequest(avatarKey: upload.objectKey))
+    }
+
+    private func putAvatarBytes(uploadUrl: String, contentType: String, data: Data) async throws {
+        guard let url = URL(string: uploadUrl) else { throw ApiError.invalidURL }
+        var req = URLRequest(url: url)
+        req.httpMethod = "PUT"
+        req.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        req.httpBody = data
+        let (_, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw ApiError.invalidResponse
+        }
     }
 
     // MARK: - Internals

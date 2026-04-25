@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using ShantiSangha.Identity.Data;
 using ShantiSangha.Identity.Models;
 using ShantiSangha.Identity.Services;
+using ShantiSangha.Identity.Storage;
 using ShantiSangha.Shared.Events;
 using ShantiSangha.Shared.Interfaces;
 
@@ -10,10 +12,20 @@ namespace ShantiSangha.Identity;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddIdentityModule(this IServiceCollection services, string connectionString)
+    public static IServiceCollection AddIdentityModule(
+        this IServiceCollection services,
+        string connectionString,
+        string avatarBucketName)
     {
         services.AddDbContext<IdentityDbContext>(options =>
             options.UseNpgsql(connectionString));
+
+        services.AddSingleton(sp =>
+        {
+            var logger = sp.GetRequiredService<ILogger<AvatarStorage>>();
+            var region = Environment.GetEnvironmentVariable("AWS_REGION") ?? "us-east-1";
+            return new AvatarStorage(avatarBucketName, region, logger);
+        });
 
         services.AddScoped<ICurrentUser, CurrentUserService>();
         services.AddScoped<IUserService, UserService>();
