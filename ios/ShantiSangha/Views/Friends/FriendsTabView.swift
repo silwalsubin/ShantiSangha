@@ -14,6 +14,10 @@ struct FriendsTabView: View {
 
             ScrollView {
                 VStack(spacing: SacredSpacing.l) {
+                    findPeopleRow
+                        .padding(.horizontal, SacredSpacing.m)
+                        .padding(.top, SacredSpacing.m)
+
                     if vm.loading && vm.friends.isEmpty && vm.pendingInvitations.isEmpty {
                         ProgressView()
                             .padding(.top, SacredSpacing.xl * 2)
@@ -84,6 +88,32 @@ struct FriendsTabView: View {
         }
     }
 
+    /// Persistent entry point at the top of the Friends tab. Pushes the
+    /// dedicated user-search screen. Styled as a search-bar lookalike so
+    /// the affordance is obvious without the screen actually being a live
+    /// search field (less keyboard accidents on tab open).
+    private var findPeopleRow: some View {
+        NavigationLink(destination: UserSearchView()) {
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .font(.sacredSmall)
+                    .foregroundColor(.sacredMuted)
+                Text("Find people by name or location")
+                    .font(.sacredText)
+                    .foregroundColor(.sacredMuted)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundColor(.sacredMuted.opacity(0.5))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(RoundedRectangle(cornerRadius: 12).fill(.ultraThinMaterial))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.sacredGold.opacity(0.1)))
+        }
+        .buttonStyle(.plain)
+    }
+
     /// Hide a one-off decode/network error when we have nothing to show — the
     /// empty state is the message at that point. Surface errors only when the
     /// user is mid-action or has loaded data and a follow-up call failed.
@@ -122,7 +152,12 @@ private struct FriendRow: View {
 
     var body: some View {
         HStack(spacing: SacredSpacing.s) {
-            Avatar(name: friend.displayName)
+            // FriendSummaryResponse doesn't yet expose AvatarUrl from the
+            // backend — until that ships, SacredAvatar falls back to the
+            // initials circle, which is the same visual the legacy Avatar
+            // private struct produced. Once the backend wires up avatarUrl
+            // for friend rows, just thread `friend.avatarUrl` through.
+            SacredAvatar(displayName: friend.displayName, avatarUrl: nil, size: 40)
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
                     Text(friend.displayName)
@@ -192,21 +227,6 @@ private struct PendingInviteRow: View {
     }
 }
 
-private struct Avatar: View {
-    let name: String
-    var initial: String {
-        name.split(separator: " ").compactMap { $0.first }.prefix(2).map(String.init).joined().uppercased()
-    }
-    var body: some View {
-        ZStack {
-            Circle().fill(LinearGradient.sacredGoldShinyVertical)
-            Text(initial.isEmpty ? "·" : initial)
-                .font(.sacredTextSemibold)
-                .foregroundColor(.white)
-        }
-        .frame(width: 40, height: 40)
-    }
-}
 
 /// UIKit share sheet bridge — uses the system's `UIActivityViewController`.
 struct ShareSheet: UIViewControllerRepresentable {

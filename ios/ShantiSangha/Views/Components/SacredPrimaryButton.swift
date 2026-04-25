@@ -1,10 +1,10 @@
 import SwiftUI
 
-/// The gold-gradient primary action button used for commit moments across the
+/// The sacred-gold primary action button used for commit moments across the
 /// app ("Save", "Try again", "Use this place", "Set your first practice").
 ///
 /// Two shapes cover every primary CTA in the codebase:
-/// - `.pill` — capsule, compact, inline or centered (errors, empty states,
+/// - `.pill` — compact, inline or centered (errors, empty states,
 ///    confirm inside a picker sheet).
 /// - `.commit` — rounded-rectangle with shimmer, used for the big "commit
 ///   this sheet" moment at the bottom of NewTask / QuickAddGoal /
@@ -101,7 +101,7 @@ struct SacredPrimaryButton: View {
 
     private var background: some View {
         switch style {
-        case .pill: return AnyView(LinearGradient.sacredGoldShinyVertical)
+        case .pill: return AnyView(Color.sacredGold)
         case .commit: return AnyView(LinearGradient.sacredGoldShiny)
         }
     }

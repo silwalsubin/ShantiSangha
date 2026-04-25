@@ -155,6 +155,7 @@ struct TaskRow: View {
                 // Streak heat dots for recurring tasks
                 if task.type == .recurring {
                     HeatDotsView(streak: task.currentStreak)
+                        .padding(.trailing, 10)
                 }
 
                 // Milestone due date

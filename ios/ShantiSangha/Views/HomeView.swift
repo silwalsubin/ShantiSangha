@@ -340,16 +340,6 @@ struct HomeView: View {
             .components(separatedBy: " ").first
     }
 
-    /// Single-character avatar initial. Prefers the chosen display name,
-    /// falls back to the Firebase displayName, then to the email.
-    private var preferredInitialSource: String {
-        let chosen = profile.profile?.displayName?.trimmingCharacters(in: .whitespaces)
-        if let chosen, !chosen.isEmpty { return chosen }
-        if let firebase = auth.user?.displayName?.trimmingCharacters(in: .whitespaces),
-           !firebase.isEmpty { return firebase }
-        return auth.user?.email ?? "?"
-    }
-
     // MARK: - Reflection
 
     private static let cachedReflectionKey = "home.reflection.content"
@@ -462,43 +452,9 @@ struct HomeView: View {
 
     @ViewBuilder
     private var profileMenuAvatar: some View {
-        Group {
-            if let rawUrl = profile.profile?.avatarUrl,
-               let url = URL(string: rawUrl) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    default:
-                        profileInitialAvatar
-                    }
-                }
-            } else {
-                profileInitialAvatar
-            }
-        }
-        .frame(width: 36, height: 36)
-        .clipShape(Circle())
-        .overlay(Circle().stroke(Color.sacredGold.opacity(0.42), lineWidth: 2))
-        .shadow(color: Color.black.opacity(0.24), radius: 8, x: 0, y: 5)
+        ProfileAvatarImage(rawUrl: profile.profile?.avatarUrl, size: 36, shadow: true)
         .frame(width: 44, height: 44)
         .contentShape(Circle())
-    }
-
-    private var profileInitialAvatar: some View {
-        Circle()
-            .fill(RadialGradient.sacredGoldShiny)
-            .overlay(
-                Text(profileInitial)
-                    .font(.system(size: 13, weight: .semibold, design: .serif))
-                    .foregroundColor(.white)
-            )
-    }
-
-    private var profileInitial: String {
-        String(preferredInitialSource.prefix(1)).uppercased()
     }
 
     // MARK: - Whole-day context
@@ -633,27 +589,7 @@ struct ProfileMenuSheet: View {
     @ViewBuilder
     private var accountAvatar: some View {
         ZStack(alignment: .bottomTrailing) {
-            Group {
-                if let rawUrl = profile.profile?.avatarUrl,
-                   let url = URL(string: rawUrl) {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFill()
-                        default:
-                            avatarInitials
-                        }
-                    }
-                } else {
-                    avatarInitials
-                }
-            }
-            .frame(width: 104, height: 104)
-            .clipShape(Circle())
-            .overlay(Circle().stroke(Color.sacredGold.opacity(0.42), lineWidth: 2))
-            .shadow(color: Color.black.opacity(0.24), radius: 8, x: 0, y: 5)
+            ProfileAvatarImage(rawUrl: profile.profile?.avatarUrl, size: 104, shadow: true)
 
             Image(systemName: "pencil")
                 .font(.system(size: 13, weight: .bold, design: .serif))
@@ -664,17 +600,6 @@ struct ProfileMenuSheet: View {
                 .offset(x: 2, y: 2)
         }
         .frame(width: 112, height: 112)
-    }
-
-    private var avatarInitials: some View {
-        Circle()
-            .fill(RadialGradient.sacredGoldShiny)
-            .shimmer()
-            .overlay(
-                Text(accountInitials)
-                    .font(.system(size: 38, weight: .semibold, design: .serif))
-                    .foregroundColor(.white)
-            )
     }
 
     @ViewBuilder
@@ -797,17 +722,6 @@ struct ProfileMenuSheet: View {
         return "\(city), \(state)"
     }
 
-    private var accountInitials: String {
-        if let name = profile.profile?.displayName?.nonEmpty {
-            let parts = name.split(separator: " ").compactMap(\.first).map(String.init)
-            let initials = parts.prefix(2).joined().uppercased()
-            if !initials.isEmpty { return initials }
-        }
-        if let email = auth.user?.email?.nonEmpty {
-            return String(email.prefix(1)).uppercased()
-        }
-        return "·"
-    }
 }
 
 private enum AccountEdit: String, Identifiable {

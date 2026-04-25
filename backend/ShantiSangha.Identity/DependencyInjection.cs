@@ -30,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<ICurrentUser, CurrentUserService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IProfileQueryService, ProfileQueryService>();
+        services.AddScoped<IUserSearchService, UserSearchService>();
 
         return services;
     }

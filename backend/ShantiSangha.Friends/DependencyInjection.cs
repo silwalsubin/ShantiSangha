@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using ShantiSangha.Friends.Data;
 using ShantiSangha.Friends.Services;
 using ShantiSangha.Friends.Storage;
+using ShantiSangha.Shared.Interfaces;
 
 namespace ShantiSangha.Friends;
 
@@ -26,6 +27,7 @@ public static class DependencyInjection
 
         services.AddScoped<IFriendsService, FriendsService>();
         services.AddScoped<IFriendMessagesService, FriendMessagesService>();
+        services.AddScoped<IFriendsQueryService, FriendsQueryService>();
 
         return services;
     }

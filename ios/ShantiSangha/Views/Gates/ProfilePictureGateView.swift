@@ -3,7 +3,7 @@ import PhotosUI
 import UIKit
 
 /// Form body for the profile-picture gate. Shows a circular preview of the
-/// pick (or a placeholder with the user's initials), lets the user choose
+/// pick (or a placeholder icon), lets the user choose
 /// from the library or camera, and exports the adjusted circular crop to a
 /// reasonable JPEG before uploading via `ProfileService.uploadAvatar`.
 ///
@@ -97,9 +97,9 @@ struct ProfilePictureGateBody: View {
                     .fill(LinearGradient.sacredGoldShinyVertical)
                     .frame(width: avatarSize, height: avatarSize)
 
-                Text(initials)
-                    .font(.system(size: 48, weight: .semibold, design: .serif))
-                    .foregroundColor(.white)
+                Image(systemName: "person.fill")
+                    .font(.system(size: 64, weight: .regular, design: .serif))
+                    .foregroundColor(.white.opacity(0.9))
             }
         }
         .frame(width: avatarSize, height: avatarSize)
@@ -167,13 +167,6 @@ struct ProfilePictureGateBody: View {
             )
             .tint(.sacredGold)
         }
-    }
-
-    private var initials: String {
-        let name = (profile.profile?.displayName ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        if name.isEmpty { return "·" }
-        let parts = name.split(separator: " ").compactMap(\.first).map(String.init)
-        return parts.prefix(2).joined().uppercased()
     }
 
     // MARK: - Crop handling
@@ -256,7 +249,7 @@ struct ProfilePictureGateBody: View {
             guard sourceImage == nil, let image = UIImage(data: data) else { return }
             setSourceImage(image)
         } catch {
-            // Keep the initials fallback quiet; choosing a new photo still works.
+            // Keep the icon fallback quiet; choosing a new photo still works.
         }
     }
 

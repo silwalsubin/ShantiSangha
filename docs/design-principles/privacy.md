@@ -11,7 +11,7 @@ People share their deepest fears, struggles, and vulnerabilities here — things
 - **Solo content is never shared with another user.** Journal entries, AI chat history, voice notes, daily reflections, goal titles, and "deeper why" text are NEVER visible to anyone else. This is the user's private record of self, and it stays private no matter who their friends are.
 - **No analytics on content** — we may track usage events (taps, sessions) but NEVER analyze the content of conversations, journals, voice notes, or friend messages for business purposes
 - **AI conversations are private** — the AI processes content to respond, but nothing is stored beyond what the user sees in their own account
-- **No public profiles** — there is no concept of a public identity in this app. A friend sees only your chosen Display Name. There is no public profile page, no discoverable directory, no follower counts, no follower graph.
+- **Limited public identity, no public profile page.** Any signed-in user can search the directory by display name + location and find your Display Name, avatar, and city/state/country. Beyond that, there is no public profile page, no follower counts, no follower graph, and no way to see who else is in another user's friend list.
 - **Data deletion must be real** — when a user deletes something, it is gone. Ending a friendship immediately revokes read access on both sides; the message thread is hard-deleted; nothing lingers.
 - **Data export is a right** — users can download everything they've created at any time, including friend messages they sent or received.
 
@@ -26,6 +26,16 @@ A user may consciously connect with other users as Friends. Once connected, frie
 - **Symmetric and ephemeral.** Either side can end a friendship at any time. When they do, the message thread is hard-deleted on both sides, the read grant is revoked, and stored media (images, voice files) is removed from object storage. No notification — the connection simply disappears.
 - **Display Name is required to invite.** The user consciously chooses how they appear to friends before any invite link is generated.
 - **Friend messages bypass the AI.** Messages between friends are NEVER sent to OpenAI, Anthropic, or any model provider. They are not embedded, summarized, indexed, or used for any AI feature. They are end-user-only.
+
+## User search
+
+Any signed-in user can search the directory of all users by display name and optional location. Results expose only:
+
+- Display Name
+- Avatar (default initials circle if not set)
+- City / State / Country (if the user has set them via the location gate)
+
+Search NEVER exposes: email address, friend list, message history, journal entries, AI chats, voice notes, reflections, goal data, streaks, birth details, timezone, reminder schedule, push tokens, or anything other than the four fields listed above. Existing friends and your own row are filtered out of results so search is a discovery tool, not a directory of your existing relationships.
 
 ## How this shows up in the product
 

@@ -10,58 +10,12 @@ struct JourneyView: View {
     @State private var reflectionTimedOut = false
     @State private var selectedPeriod: JourneyPeriod = .lastWeek
     @State private var insights: [InsightItem] = []
-    @State private var portrait: String?
-    @State private var portraitLoading = false
     @State private var showNewTask = false
-    /// Portrait is identity-level prose. Collapsed by default so the ring
-    /// and practice list become the hero; user taps to read the whole thing.
-    @State private var portraitExpanded = false
     private let api = ApiService.shared
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                // Portrait — who you are, seen through your practice.
-                // Clamped to two lines by default; tap "Read more" to expand.
-                if let portrait = portrait {
-                    VStack(spacing: 8) {
-                        Text(portrait)
-                            .font(.sacredText)
-                            .italic()
-                            .foregroundColor(.sacredText)
-                            .multilineTextAlignment(.center)
-                            .lineSpacing(6)
-                            .lineLimit(portraitExpanded ? nil : 2)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity)
-
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            withAnimation(.easeOut(duration: 0.25)) {
-                                portraitExpanded.toggle()
-                            }
-                        } label: {
-                            Text(portraitExpanded ? "Show less" : "Read more")
-                                .font(.sacredSectionLabel)
-                                .tracking(2)
-                                .foregroundColor(.sacredLabel)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 24)
-                } else if portraitLoading {
-                    VStack(spacing: 8) {
-                        ProgressView()
-                            .tint(.sacredGold)
-                        Text("Seeing you...")
-                            .font(.sacredMicro)
-                            .foregroundColor(.sacredMuted)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.bottom, 24)
-                }
-
                 // Period selector
                 HStack(spacing: 6) {
                     ForEach(JourneyPeriod.allCases, id: \.self) { period in
@@ -322,7 +276,6 @@ struct JourneyView: View {
             }
         }
         .task { await loadAll() }
-        .task { await loadPortrait() }
     }
 
     // MARK: - Copy
@@ -438,32 +391,6 @@ struct JourneyView: View {
         }
     }
 
-    private func loadPortrait() async {
-        // Portrait is cached server-side — only fetch once per session
-        guard portrait == nil else { return }
-        portraitLoading = true
-        defer { portraitLoading = false }
-
-        // Poll: first request may trigger generation
-        for attempt in 0..<4 {
-            do {
-                let result: PortraitResponse = try await api.get("/portrait")
-                if let content = result.content, !content.isEmpty {
-                    withAnimation(.easeIn(duration: 0.4)) { portrait = content }
-                    return
-                }
-                // Content is nil — generation in progress
-                if attempt < 3 {
-                    try await Task.sleep(nanoseconds: 3_000_000_000) // 3s
-                }
-            } catch {
-                if !error.isCancellation {
-                    AppLogger.shared.error("Journey", "Failed to load portrait: \(error)")
-                }
-                return
-            }
-        }
-    }
 }
 
 // MARK: - Practice progress ring
@@ -583,9 +510,4 @@ struct InsightItem: Codable, Identifiable {
     let sourceConversationId: String?
     let sourceJournalId: String?
     let createdAt: String
-}
-
-struct PortraitResponse: Codable {
-    let content: String?
-    let generatedAt: String?
 }

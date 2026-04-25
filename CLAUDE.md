@@ -10,6 +10,7 @@ See `docs/features/` for detailed feature documentation (purpose, value, how it 
 - [Insights](docs/features/insights.md) — AI-extracted takeaways from conversations and journals
 - [Voice](docs/features/voice.md) — audio notes with async transcription
 - [Friends](docs/features/friends.md) — quiet shared accountability; aggregated activity only, never content
+- [User search](docs/features/user-search.md) — find people by display name + optional location
 
 ## Design Principles
 Every UI decision must honor these principles. See `docs/design-principles/` for details:
