@@ -77,6 +77,44 @@ def short_digest(digest: str) -> str:
     return digest[:8] + "…"
 
 
+# Threshold beyond which an IN_PROGRESS rollout is considered stuck. A
+# normal Fargate rolling deploy completes in a few minutes; if it's been
+# trying to land for longer than this, something's actively failing.
+ROLLOUT_STUCK_MINUTES = 10
+
+# Phrases that show up in ECS service events when tasks fail to start or
+# get killed by health checks. We count occurrences in recent events to
+# detect a crash-loop pattern.
+_FAILURE_PATTERNS = [
+    "failed to start",
+    "failed container health checks",
+    "essential container",
+    "stopped",
+    "deployment failed",
+    "unable to place a task",
+    "cannot pull container image",
+    "task failed elb health checks",
+]
+
+
+def _parse_iso(ts):
+    """ECS returns timestamps as ISO strings. Return a UTC datetime, or None."""
+    if not ts:
+        return None
+    s = str(ts).replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(s).astimezone(timezone.utc)
+    except (ValueError, TypeError):
+        return None
+
+
+def _age_minutes(ts) -> float | None:
+    dt = _parse_iso(ts)
+    if not dt:
+        return None
+    return (datetime.now(timezone.utc) - dt).total_seconds() / 60
+
+
 # ── 1. ECS service status ───────────────────────────────────────────────────
 def check_ecs_service():
     section(f"ECS service ({ECS_CLUSTER} / {ECS_SERVICE})")
@@ -91,29 +129,190 @@ def check_ecs_service():
     desired = s.get("desiredCount", "?")
     pending = s.get("pendingCount", 0)
     deps    = s.get("deployments") or []
-    deploy_label = "no deployments"
+
+    # Deployment health — the difference between "rolling out smoothly" and
+    # "stuck retrying" is in `rolloutState` + `failedTasks` + `createdAt`.
     rollout = "?"
+    deploy_label = "no deployments"
+    deploy_age = None
+    failed_tasks = 0
+    rollout_reason = ""
     if deps:
         p = deps[0]
-        deploy_label = f"{p.get('status', '?')} (rollout {p.get('rolloutState', '?')})"
         rollout = p.get("rolloutState", "?")
+        deploy_label = f"{p.get('status', '?')} (rollout {rollout})"
+        deploy_age = _age_minutes(p.get("createdAt"))
+        failed_tasks = p.get("failedTasks", 0) or 0
+        rollout_reason = (p.get("rolloutStateReason") or "").strip()
 
-    if running == desired and pending == 0 and desired != 0:
-        if rollout == "IN_PROGRESS":
+    # Verdict on task counts vs deployment health
+    if running == 0 and desired != 0:
+        fail(f"0/{desired} tasks running, {deploy_label}")
+    elif running == desired and pending == 0 and desired != 0:
+        if rollout == "IN_PROGRESS" and deploy_age and deploy_age > ROLLOUT_STUCK_MINUTES:
+            fail(f"{running}/{desired} tasks running but rollout has been "
+                 f"IN_PROGRESS for {deploy_age:.0f} min — stuck deploy")
+        elif rollout == "IN_PROGRESS":
             warn(f"{running}/{desired} tasks running, {deploy_label}")
+        elif rollout == "FAILED":
+            fail(f"{running}/{desired} tasks running, {deploy_label}")
         else:
             ok(f"{running}/{desired} tasks running, {deploy_label}")
-    elif running == 0 and desired != 0:
-        fail(f"0/{desired} tasks running, {deploy_label}")
     else:
         warn(f"{running}/{desired} tasks running ({pending} pending), {deploy_label}")
 
+    # Surface deployment metadata that explains a stuck rollout
+    if deploy_age is not None:
+        note(f"  deployment age: {deploy_age:.1f} min")
+    if failed_tasks > 0:
+        fail(f"deployment has {failed_tasks} failed task launch(es) — "
+             f"new image is crashing on start")
+    if rollout_reason:
+        note(f"  rollout reason: {rollout_reason}")
+
+    # Look at recent events for crash-loop patterns. If many recent events
+    # match failure phrases, that confirms ECS is repeatedly trying and
+    # failing to launch new tasks.
     events = s.get("events") or []
+    recent_events = events[:15]   # ECS returns newest-first
+    failure_event_count = 0
+    for e in recent_events:
+        msg = (e.get("message") or "").lower()
+        if any(p in msg for p in _FAILURE_PATTERNS):
+            failure_event_count += 1
+    if failure_event_count >= 3:
+        fail(f"{failure_event_count} of the last {len(recent_events)} service events "
+             f"indicate task failures — service is crash-looping")
+    elif failure_event_count > 0:
+        warn(f"{failure_event_count} of the last {len(recent_events)} service events "
+             f"indicate task failures")
+
     if events:
         e = events[0]
         msg = (e.get("message") or "").strip()
         created = str(e.get("createdAt", ""))
         note(f"  last event: {created} :: {msg}")
+
+
+# ── 1b. Recent stopped tasks (crash-loop forensics) ─────────────────────────
+def check_stopped_tasks():
+    """Enumerate tasks that ECS has recently STOPPED. In a healthy service
+    there are zero recent stops. If we see several with stoppedReason like
+    "Essential container in task exited" or non-zero exit codes, the service
+    is crash-looping — this is the signal that distinguishes a stuck deploy
+    from a normal rolling deploy."""
+    section("Recent stopped tasks")
+
+    list_data = aws(["ecs", "list-tasks", "--cluster", ECS_CLUSTER,
+                     "--service-name", ECS_SERVICE, "--desired-status", "STOPPED"])
+    if not list_data:
+        warn("Could not list stopped tasks")
+        return
+    arns = list_data.get("taskArns") or []
+    if not arns:
+        ok("no recently stopped tasks (clean deploy history)")
+        return
+
+    desc = aws(["ecs", "describe-tasks", "--cluster", ECS_CLUSTER,
+                "--tasks"] + arns[:10])
+    if not desc:
+        warn(f"{len(arns)} stopped tasks listed but couldn't describe them")
+        return
+
+    tasks = desc.get("tasks") or []
+    # Filter to last 60 minutes only — ECS keeps STOPPED tasks visible for
+    # an hour by default; older ones are noise.
+    recent_stops = []
+    for t in tasks:
+        age = _age_minutes(t.get("stoppedAt"))
+        if age is not None and age <= 60:
+            recent_stops.append((age, t))
+
+    if not recent_stops:
+        ok("no task stops in the last 60 minutes")
+        return
+
+    # Sort newest first
+    recent_stops.sort(key=lambda x: x[0])
+
+    if len(recent_stops) >= 3:
+        fail(f"{len(recent_stops)} task stops in the last 60 min — crash loop")
+    else:
+        warn(f"{len(recent_stops)} task stop(s) in the last 60 min")
+
+    for age, t in recent_stops[:5]:
+        arn_short  = (t.get("taskArn") or "").split("/")[-1][:12]
+        reason     = (t.get("stoppedReason") or "").strip()
+        containers = t.get("containers") or []
+        exit_code  = (containers[0].get("exitCode") if containers else None)
+        c_reason   = ((containers[0].get("reason") if containers else "") or "").strip()
+        digest     = (containers[0].get("imageDigest") if containers else "") or ""
+
+        line = f"  · {age:.1f}m ago, task {arn_short}"
+        if exit_code is not None:
+            line += f", exit={exit_code}"
+        line += f", image {short_digest(digest)}"
+        print(line)
+        if reason:
+            print(f"      reason: {reason[:240]}")
+        if c_reason and c_reason != reason:
+            print(f"      container: {c_reason[:240]}")
+
+    # Dump the last log lines from the most recently stopped task. This is
+    # the highest-signal forensic detail for stuck deploys: the [ERR]/[FTL]
+    # filter misses cases where the container exits cleanly without logging
+    # an error, but the raw tail of the log stream usually shows the real
+    # cause (port already in use, missing dependency, etc.).
+    if recent_stops:
+        _, latest_task = recent_stops[0]
+        latest_arn   = (latest_task.get("taskArn") or "").split("/")[-1]
+        containers   = latest_task.get("containers") or []
+        container_name = (containers[0].get("name") if containers else "") or ECS_SERVICE
+
+        # Stream name follows the awslogs driver convention:
+        # `<prefix>/<container-name>/<task-id>` (prefix is "ecs" per Terraform).
+        # We use describe-log-streams with a prefix search instead of an
+        # exact name lookup so we degrade gracefully if the convention
+        # ever changes — and so we can detect the "no stream exists at
+        # all" case, which itself is diagnostic (the container exited
+        # before producing any stdout/stderr, so awslogs never created
+        # the stream).
+        stream_prefix = f"ecs/{container_name}/{latest_arn}"
+        streams_data = aws(["logs", "describe-log-streams",
+                            "--log-group-name", LOG_GROUP,
+                            "--log-stream-name-prefix", stream_prefix,
+                            "--limit", "1"])
+        actual_stream = ""
+        if streams_data and streams_data.get("logStreams"):
+            actual_stream = streams_data["logStreams"][0].get("logStreamName") or ""
+
+        print()
+        if not actual_stream:
+            warn(f"task {latest_arn[:12]} has no log stream — container exited "
+                 f"before producing any stdout/stderr (very early startup failure)")
+            print(f"      expected stream prefix: {stream_prefix}")
+            return
+
+        # Note: don't pass `--start-from-head false` here — the AWS CLI treats
+        # --start-from-head as a boolean flag (presence = true, absence = false).
+        # Adding it with the value "false" makes the CLI parser reject the call
+        # silently. Default behaviour is "from the end" which is what we want.
+        log_data = aws(["logs", "get-log-events",
+                        "--log-group-name", LOG_GROUP,
+                        "--log-stream-name", actual_stream,
+                        "--limit", "30"])
+        if log_data and log_data.get("events"):
+            events = log_data["events"]
+            print(f"  last {min(len(events), 15)} log lines from task {latest_arn[:12]}:")
+            for e in events[-15:]:
+                msg = (e.get("message") or "").rstrip()
+                if len(msg) > 240:
+                    msg = msg[:240] + "…"
+                print(f"      {msg}")
+        elif log_data is not None:
+            note(f"  (log stream exists but is empty: {actual_stream})")
+        else:
+            note(f"  (couldn't read log stream {actual_stream})")
 
 
 # ── 2. Image freshness + per-task health ────────────────────────────────────
@@ -190,13 +389,22 @@ def check_image_and_task_health():
         if stopped:
             note(f"  stopped: {stopped}")
 
-    # Aggregate verdict on image freshness
+    # Aggregate verdict on image freshness. The interpretation of "older
+    # image" depends on whether a deploy is actively rolling or stuck — but
+    # we already raised that signal in check_ecs_service / check_stopped_tasks.
+    # Here we just describe the gap so the reader can correlate.
     if running_digests == {ecr_digest}:
         ok("all running tasks are on the latest ECR image")
     elif ecr_digest in running_digests and len(running_digests) > 1:
-        warn("mixed image versions across tasks — deploy likely in progress")
+        warn("mixed image versions across tasks — deploy in progress")
     elif running_digests and ecr_digest not in running_digests:
-        warn("running tasks are on an OLDER image than the latest ECR push")
+        # We can't tell from here alone whether this is "deploy in flight"
+        # or "deploy stuck" — but the ECS service section has already raised
+        # the right verdict if it's stuck (deploy age, failedTasks, crash-loop
+        # event pattern). So leave this as a yellow "drift" signal and let
+        # the deployment-health checks own the red verdict.
+        warn("running tasks are on an OLDER image than the latest ECR push "
+             "(see ECS service + stopped-tasks sections for whether the new image is stuck)")
 
 
 # ── 3. CloudWatch errors (grouped) ──────────────────────────────────────────
@@ -284,6 +492,7 @@ def check_cloudwatch_errors():
 
 def main():
     check_ecs_service()
+    check_stopped_tasks()
     check_image_and_task_health()
     check_cloudwatch_errors()
 
