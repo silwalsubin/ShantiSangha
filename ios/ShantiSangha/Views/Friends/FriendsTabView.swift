@@ -152,12 +152,10 @@ private struct FriendRow: View {
 
     var body: some View {
         HStack(spacing: SacredSpacing.s) {
-            // FriendSummaryResponse doesn't yet expose AvatarUrl from the
-            // backend — until that ships, SacredAvatar falls back to the
-            // initials circle, which is the same visual the legacy Avatar
-            // private struct produced. Once the backend wires up avatarUrl
-            // for friend rows, just thread `friend.avatarUrl` through.
-            SacredAvatar(displayName: friend.displayName, avatarUrl: nil, size: 40)
+            SacredAvatar(
+                displayName: friend.displayName,
+                avatarUrl: friend.avatarUrl,
+                size: 40)
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
                     Text(friend.displayName)

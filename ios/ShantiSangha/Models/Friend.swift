@@ -8,6 +8,12 @@ struct FriendSummary: Codable, Identifiable, Equatable {
     let lastMessagePreview: String?
     let lastMessageAt: String?
     let unreadCount: Int
+    /// Stable S3 key for the friend's avatar — round-tripped, not displayed.
+    let avatarKey: String?
+    /// Short-lived presigned download URL the iOS layer feeds into
+    /// `SacredAvatar`. Backend regenerates on every list/refresh; treat as
+    /// read-only and refetch the friend list to get a new one if expired.
+    let avatarUrl: String?
 
     var id: UUID { friendshipId }
 }

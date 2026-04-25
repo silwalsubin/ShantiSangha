@@ -1,17 +1,51 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using ShantiSangha.Identity.Data;
+using ShantiSangha.Identity.Storage;
 using ShantiSangha.Shared.Interfaces;
 
 namespace ShantiSangha.Identity.Services;
 
-public class ProfileQueryService(IdentityDbContext db) : IProfileQueryService
+public class ProfileQueryService(
+    IdentityDbContext db,
+    AvatarStorage avatarStorage,
+    ILogger<ProfileQueryService> logger) : IProfileQueryService
 {
+    private static readonly TimeSpan AvatarUrlLifetime = TimeSpan.FromHours(1);
+
     public async Task<string?> GetDisplayNameAsync(Guid userId, CancellationToken ct = default)
     {
         return await db.Profiles
             .Where(p => p.UserId == userId)
             .Select(p => p.DisplayName)
             .FirstOrDefaultAsync(ct);
+    }
+
+    public async Task<UserAvatarInfo> GetAvatarInfoAsync(Guid userId, CancellationToken ct = default)
+    {
+        var key = await db.Profiles
+            .Where(p => p.UserId == userId)
+            .Select(p => p.AvatarKey)
+            .FirstOrDefaultAsync(ct);
+
+        if (string.IsNullOrEmpty(key))
+        {
+            return new UserAvatarInfo(null, null);
+        }
+
+        try
+        {
+            var url = await avatarStorage.GetPresignedDownloadUrlAsync(key, AvatarUrlLifetime);
+            return new UserAvatarInfo(key, url);
+        }
+        catch (Exception ex)
+        {
+            // Per-row presign failure is non-fatal — return the key so a
+            // smarter caller could retry, and log so it shows up in
+            // CloudWatch if it ever happens at scale.
+            logger.LogWarning(ex, "Failed to presign avatar URL for user {UserId}", userId);
+            return new UserAvatarInfo(key, null);
+        }
     }
 
     public async Task<UserBirthInfo> GetBirthInfoAsync(Guid userId, CancellationToken ct = default)

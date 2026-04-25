@@ -7,7 +7,9 @@ public record FriendSummaryResponse(
     DateTime FriendshipCreatedAt,
     string? LastMessagePreview,
     DateTime? LastMessageAt,
-    int UnreadCount);
+    int UnreadCount,
+    string? AvatarKey,
+    string? AvatarUrl);
 
 public record CreateInvitationResponse(
     Guid InvitationId,

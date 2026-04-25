@@ -50,6 +50,7 @@ public class FriendsService(
         {
             var friendUserId = f.UserAId == userId ? f.UserBId : f.UserAId;
             var displayName = await profileQuery.GetDisplayNameAsync(friendUserId, ct) ?? "Friend";
+            var avatar = await profileQuery.GetAvatarInfoAsync(friendUserId, ct);
 
             string? preview = null;
             DateTime? sentAt = null;
@@ -66,7 +67,9 @@ public class FriendsService(
                 f.CreatedAt,
                 preview,
                 sentAt,
-                unreadMap.GetValueOrDefault(f.Id, 0)));
+                unreadMap.GetValueOrDefault(f.Id, 0),
+                avatar.AvatarKey,
+                avatar.AvatarUrl));
         }
         return result;
     }
@@ -78,6 +81,7 @@ public class FriendsService(
 
         var friendUserId = f.UserAId == userId ? f.UserBId : f.UserAId;
         var displayName = await profileQuery.GetDisplayNameAsync(friendUserId, ct) ?? "Friend";
+        var avatar = await profileQuery.GetAvatarInfoAsync(friendUserId, ct);
 
         var last = await db.Messages
             .Where(m => m.FriendshipId == f.Id)
@@ -91,7 +95,9 @@ public class FriendsService(
             f.Id, friendUserId, displayName, f.CreatedAt,
             last is not null ? BuildPreview(last) : null,
             last?.SentAt,
-            unread);
+            unread,
+            avatar.AvatarKey,
+            avatar.AvatarUrl);
     }
 
     public async Task<CreateInvitationResponse> CreateInvitationAsync(Guid userId, string baseUrl, CancellationToken ct = default)
@@ -256,9 +262,11 @@ public class FriendsService(
             logger.LogWarning(ex, "Failed to send friendship_created push for friendship {FriendshipId}", friendship.Id);
         }
 
+        var inviterAvatar = await profileQuery.GetAvatarInfoAsync(invite.InviterUserId, ct);
         return new FriendSummaryResponse(
             friendship.Id, invite.InviterUserId, inviterName,
-            friendship.CreatedAt, null, null, 0);
+            friendship.CreatedAt, null, null, 0,
+            inviterAvatar.AvatarKey, inviterAvatar.AvatarUrl);
     }
 
     public async Task<bool> EndFriendshipAsync(Guid userId, Guid friendshipId, CancellationToken ct = default)
