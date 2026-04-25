@@ -27,7 +27,9 @@ bash .claude/skills/app-health-check/scripts/health_check.sh
 
 The script writes a structured report to stdout. It exits 0 on green, 1 on yellow (something to look at), 2 on red (something is broken). Use the exit code as a hint, not the final word — read the body.
 
-If the script reports that AWS CLI is not configured, surface the suggested fix in your reply (`aws configure` or set `AWS_PROFILE` / `AWS_REGION`). Do NOT try to set up credentials yourself.
+The script auto-detects an SSO-configured profile (the first non-default one it finds in `~/.aws/config`) and proactively runs `aws sso login` against it before any AWS API call. That call is a no-op when the cached SSO token is still fresh and silently refreshes when it's expired — the only user-visible effect is a browser window if the token actually needs to be re-issued. So the common case (token still valid) just works without prompting.
+
+If the script reports that AWS CLI is still not authenticated after the refresh attempt, surface the suggested fix in your reply (run `aws sso login --profile <name>` manually, or set `AWS_PROFILE` to a working profile). Do NOT try to set up credentials yourself.
 
 ## How to summarize for the user
 

@@ -12,6 +12,17 @@ LOG_GROUP="${LOG_GROUP:-/ecs/shantisangha-api}"
 WINDOW_MIN="${WINDOW_MIN:-30}"
 AWS_REGION="${AWS_REGION:-us-east-1}"
 
+# If AWS_PROFILE isn't already exported, pick the first non-default profile
+# the user has configured. This is almost always the SSO profile (the user's
+# `default` profile usually has stale static keys). Falls through cleanly to
+# the no-credentials path if no profile is found.
+if [ -z "${AWS_PROFILE:-}" ] && command -v aws >/dev/null 2>&1; then
+  candidate="$(aws configure list-profiles 2>/dev/null | grep -v '^default$' | head -1)"
+  if [ -n "$candidate" ]; then
+    export AWS_PROFILE="$candidate"
+  fi
+fi
+
 # ANSI color shorthand only when stdout is a terminal — keep it plain for tools.
 if [ -t 1 ]; then
   C_GREEN=$'\033[32m'; C_YELLOW=$'\033[33m'; C_RED=$'\033[31m'
@@ -78,12 +89,23 @@ if ! command -v aws >/dev/null 2>&1; then
   print_summary_and_exit
 fi
 
+# If the active profile is SSO-configured, proactively refresh the cached
+# token so we don't fail later just because it expired. `aws sso login` is a
+# no-op when the token is still fresh (no browser window), so it's safe to
+# run on every invocation.
+sso_url="$(aws configure get sso_start_url --profile "${AWS_PROFILE:-default}" 2>/dev/null || true)"
+if [ -n "$sso_url" ]; then
+  if ! aws sso login --profile "$AWS_PROFILE" >/dev/null 2>&1; then
+    note "  (sso login attempt failed — continuing with whatever cached creds exist)"
+  fi
+fi
+
 if ! aws sts get-caller-identity --region "$AWS_REGION" >/dev/null 2>&1; then
-  warn "aws CLI not configured — run 'aws configure' or set AWS_PROFILE / AWS_REGION"
+  warn "aws CLI not authenticated — try 'aws sso login --profile $AWS_PROFILE' manually, or set AWS_PROFILE to a working profile"
   note "Skipping ECS and CloudWatch checks."
   print_summary_and_exit
 fi
-ok "credentials resolved (region: $AWS_REGION)"
+ok "credentials resolved (region: $AWS_REGION, profile: ${AWS_PROFILE:-default})"
 
 # ── 3. ECS service status ────────────────────────────────────────────────────
 section "ECS service ($ECS_CLUSTER / $ECS_SERVICE)"
@@ -121,7 +143,9 @@ if not deps:
     print("no deployments")
 else:
     p=deps[0]
-    print(f"{p.get(\"status\",\"?\")} (rollout {p.get(\"rolloutState\",\"?\")})")
+    status = p.get("status", "?")
+    rollout = p.get("rolloutState", "?")
+    print(status + " (rollout " + rollout + ")")
 ' 2>/dev/null || echo "?")"
   last_event="$(printf "%s" "$ecs_json" | python3 -c '
 import json, sys
@@ -130,8 +154,9 @@ s=(d.get("services") or [{}])[0]
 ev=s.get("events") or []
 if ev:
     e=ev[0]
-    msg=(e.get("message") or "").strip()
-    print(f"{e.get(\"createdAt\",\"\")} :: {msg}")
+    msg = (e.get("message") or "").strip()
+    created = e.get("createdAt", "")
+    print(str(created) + " :: " + msg)
 else:
     print("(no events)")
 ' 2>/dev/null || echo "(unavailable)")"
