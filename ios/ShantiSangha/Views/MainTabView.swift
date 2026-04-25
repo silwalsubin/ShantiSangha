@@ -86,7 +86,7 @@ struct MainTabView: View {
                     FriendsTabView()
                 }
                 .tabItem {
-                    Image(systemName: "person.2")
+                    Image("tab.union")
                     Text("Friends")
                 }
                 .tag(3)
