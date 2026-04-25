@@ -16,8 +16,10 @@
 	<string>ShantiSangha records your meditation check-ins as mindful minutes so they show up alongside your other practices in the Apple Health app.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>ShantiSangha uses your location to set your home base and read today's weather so your reflection can sense the sky you're living under.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>ShantiSangha uses your camera when you choose to take a profile photo for friends to recognize you.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>ShantiSangha needs access to your photo library so you can attach images to messages you send to friends.</string>
+	<string>ShantiSangha needs access to your photo library so you can choose a profile photo and attach images to messages you send to friends.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

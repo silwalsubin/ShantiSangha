@@ -1,10 +1,11 @@
 import SwiftUI
 import PhotosUI
+import UIKit
 
 /// Form body for the profile-picture gate. Shows a circular preview of the
-/// pick (or a placeholder with the user's initials), a PhotosPicker to
-/// choose / re-choose, and a Continue button that compresses the image to
-/// a reasonable JPEG and uploads via `ProfileService.uploadAvatar`.
+/// pick (or a placeholder with the user's initials), lets the user choose
+/// from the library or camera, and exports the adjusted circular crop to a
+/// reasonable JPEG before uploading via `ProfileService.uploadAvatar`.
 ///
 /// Compression: scaled to fit a 512-pt square (largest dimension), exported
 /// as JPEG at 0.7 quality. Keeps the average upload under ~200 KB without
@@ -13,9 +14,16 @@ import PhotosUI
 struct ProfilePictureGateBody: View {
     @EnvironmentObject private var profile: ProfileService
 
+    let submitLabel: String
+    let onSaved: (() -> Void)?
+
     @State private var pickerItem: PhotosPickerItem?
-    @State private var pickedData: Data?
-    @State private var pickedImage: UIImage?
+    @State private var sourceImage: UIImage?
+    @State private var cropScale: CGFloat = 1
+    @State private var lastCropScale: CGFloat = 1
+    @State private var cropOffset: CGSize = .zero
+    @State private var lastCropOffset: CGSize = .zero
+    @State private var showingCamera = false
     @State private var saving = false
     @State private var errorMessage: String?
 
@@ -23,19 +31,20 @@ struct ProfilePictureGateBody: View {
     private let jpegQuality: CGFloat = 0.7
     private let avatarSize: CGFloat = 160
 
+    init(submitLabel: String = "Continue", onSaved: (() -> Void)? = nil) {
+        self.submitLabel = submitLabel
+        self.onSaved = onSaved
+    }
+
     var body: some View {
         VStack(spacing: SacredSpacing.l) {
             avatarPreview
 
-            PhotosPicker(
-                selection: $pickerItem,
-                matching: .images,
-                photoLibrary: .shared()
-            ) {
-                Text(pickedImage == nil ? "Choose photo" : "Pick a different one")
-                    .font(.sacredButtonLabel)
-                    .foregroundColor(.sacredGold)
+            if sourceImage != nil {
+                zoomControls
             }
+
+            sourceControls
 
             if let errorMessage {
                 Text(errorMessage)
@@ -45,9 +54,9 @@ struct ProfilePictureGateBody: View {
             }
 
             SacredPrimaryButton(
-                "Continue",
+                submitLabel,
                 style: .commit,
-                isDisabled: pickedData == nil,
+                isDisabled: sourceImage == nil,
                 isLoading: saving
             ) {
                 Task { await submit() }
@@ -55,7 +64,12 @@ struct ProfilePictureGateBody: View {
         }
         .onChange(of: pickerItem) { _, newItem in
             guard let newItem else { return }
-            Task { await loadAndCompress(newItem) }
+            Task { await load(newItem) }
+        }
+        .fullScreenCover(isPresented: $showingCamera) {
+            CameraPicker { image in
+                setSourceImage(image)
+            }
         }
     }
 
@@ -64,26 +78,91 @@ struct ProfilePictureGateBody: View {
     @ViewBuilder
     private var avatarPreview: some View {
         ZStack {
-            Circle()
-                .fill(LinearGradient.sacredGoldShinyVertical)
-                .frame(width: avatarSize, height: avatarSize)
-
-            if let image = pickedImage {
+            if let image = sourceImage {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
                     .frame(width: avatarSize, height: avatarSize)
+                    .scaleEffect(cropScale)
+                    .offset(cropOffset)
                     .clipShape(Circle())
+                    .contentShape(Circle())
+                    .gesture(cropDragGesture.simultaneously(with: cropZoomGesture))
             } else {
+                Circle()
+                    .fill(LinearGradient.sacredGoldShinyVertical)
+                    .frame(width: avatarSize, height: avatarSize)
+
                 Text(initials)
                     .font(.system(size: 48, weight: .semibold, design: .serif))
                     .foregroundColor(.white)
             }
         }
+        .frame(width: avatarSize, height: avatarSize)
         .overlay(
             Circle().stroke(Color.sacredGoldDark.opacity(0.25), lineWidth: 1)
         )
         .sacredCardShadow()
+    }
+
+    private var sourceControls: some View {
+        HStack(spacing: SacredSpacing.m) {
+            PhotosPicker(
+                selection: $pickerItem,
+                matching: .images,
+                photoLibrary: .shared()
+            ) {
+                Text(sourceImage == nil ? "Choose photo" : "Choose another")
+                    .font(.sacredButtonLabel)
+                    .foregroundColor(.sacredGold)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+
+            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                Button {
+                    showingCamera = true
+                } label: {
+                    Text("Take photo")
+                        .font(.sacredButtonLabel)
+                        .foregroundColor(.sacredGold)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var zoomControls: some View {
+        VStack(spacing: SacredSpacing.xs) {
+            HStack {
+                Text("Zoom")
+                    .font(.sacredSmallSemibold)
+                    .foregroundColor(.sacredTextSecondary)
+
+                Spacer()
+
+                Button("Reset") {
+                    resetCrop()
+                }
+                .font(.sacredSmallSemibold)
+                .foregroundColor(.sacredMuted)
+                .buttonStyle(.plain)
+            }
+
+            Slider(
+                value: Binding(
+                    get: { Double(cropScale) },
+                    set: { newValue in
+                        cropScale = CGFloat(newValue)
+                        lastCropScale = cropScale
+                        cropOffset = clampedOffset(cropOffset, scale: cropScale)
+                        lastCropOffset = cropOffset
+                    }
+                ),
+                in: 1...3
+            )
+            .tint(.sacredGold)
+        }
     }
 
     private var initials: String {
@@ -93,9 +172,59 @@ struct ProfilePictureGateBody: View {
         return parts.prefix(2).joined().uppercased()
     }
 
+    // MARK: - Crop handling
+
+    private var cropDragGesture: some Gesture {
+        DragGesture()
+            .onChanged { value in
+                let proposed = CGSize(
+                    width: lastCropOffset.width + value.translation.width,
+                    height: lastCropOffset.height + value.translation.height
+                )
+                cropOffset = clampedOffset(proposed, scale: cropScale)
+            }
+            .onEnded { _ in
+                lastCropOffset = cropOffset
+            }
+    }
+
+    private var cropZoomGesture: some Gesture {
+        MagnificationGesture()
+            .onChanged { value in
+                cropScale = min(max(lastCropScale * value, 1), 3)
+                cropOffset = clampedOffset(cropOffset, scale: cropScale)
+            }
+            .onEnded { _ in
+                lastCropScale = cropScale
+                lastCropOffset = cropOffset
+            }
+    }
+
+    private func clampedOffset(_ offset: CGSize, scale: CGFloat) -> CGSize {
+        guard let image = sourceImage else { return .zero }
+        let baseScale = max(avatarSize / image.size.width, avatarSize / image.size.height)
+        let displayedSize = CGSize(
+            width: image.size.width * baseScale * scale,
+            height: image.size.height * baseScale * scale
+        )
+        let horizontalLimit = max((displayedSize.width - avatarSize) / 2, 0)
+        let verticalLimit = max((displayedSize.height - avatarSize) / 2, 0)
+        return CGSize(
+            width: min(max(offset.width, -horizontalLimit), horizontalLimit),
+            height: min(max(offset.height, -verticalLimit), verticalLimit)
+        )
+    }
+
+    private func resetCrop() {
+        cropScale = 1
+        lastCropScale = 1
+        cropOffset = .zero
+        lastCropOffset = .zero
+    }
+
     // MARK: - Picker handling
 
-    private func loadAndCompress(_ item: PhotosPickerItem) async {
+    private func load(_ item: PhotosPickerItem) async {
         errorMessage = nil
         do {
             guard let raw = try await item.loadTransferable(type: Data.self),
@@ -103,16 +232,17 @@ struct ProfilePictureGateBody: View {
                 errorMessage = "We couldn't read that image. Try a different one."
                 return
             }
-            let resized = resize(original, maxDimension: maxDimension)
-            guard let jpeg = resized.jpegData(compressionQuality: jpegQuality) else {
-                errorMessage = "We couldn't process that image. Try a different one."
-                return
-            }
-            pickedImage = resized
-            pickedData = jpeg
+            setSourceImage(original)
         } catch {
             errorMessage = "We couldn't load that image. Try a different one."
         }
+    }
+
+    private func setSourceImage(_ image: UIImage) {
+        sourceImage = image.normalizedForAvatar()
+        pickerItem = nil
+        errorMessage = nil
+        resetCrop()
     }
 
     /// Aspect-fit downscale to a max bounding square. Skips the scale step
@@ -132,18 +262,100 @@ struct ProfilePictureGateBody: View {
         }
     }
 
+    private func crop(_ image: UIImage) -> UIImage? {
+        let size = image.size
+        let baseScale = max(avatarSize / size.width, avatarSize / size.height)
+        let totalScale = baseScale * cropScale
+        let displayedSize = CGSize(width: size.width * totalScale, height: size.height * totalScale)
+
+        let origin = CGPoint(
+            x: ((displayedSize.width - avatarSize) / 2 - cropOffset.width) / totalScale,
+            y: ((displayedSize.height - avatarSize) / 2 - cropOffset.height) / totalScale
+        )
+        let side = avatarSize / totalScale
+        let cropRect = CGRect(x: origin.x, y: origin.y, width: side, height: side)
+            .intersection(CGRect(origin: .zero, size: size))
+
+        guard let cgImage = image.cgImage?.cropping(to: cropRect.applying(.init(scaleX: image.scale, y: image.scale))) else {
+            return nil
+        }
+        return UIImage(cgImage: cgImage, scale: image.scale, orientation: .up)
+    }
+
     // MARK: - Submit
 
     private func submit() async {
-        guard let data = pickedData, !saving else { return }
+        guard let sourceImage, !saving else { return }
+        guard let cropped = crop(sourceImage),
+              let data = resize(cropped, maxDimension: maxDimension).jpegData(compressionQuality: jpegQuality) else {
+            errorMessage = "We couldn't process that image. Try a different one."
+            return
+        }
         saving = true
         errorMessage = nil
         defer { saving = false }
         do {
             try await profile.uploadAvatar(jpegData: data)
+            onSaved?()
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription
                 ?? "We couldn't upload your photo. Try again."
+        }
+    }
+}
+
+private struct CameraPicker: UIViewControllerRepresentable {
+    let onImage: (UIImage) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.cameraCaptureMode = .photo
+        picker.allowsEditing = false
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onImage: onImage, dismiss: dismiss)
+    }
+
+    final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        let onImage: (UIImage) -> Void
+        let dismiss: DismissAction
+
+        init(onImage: @escaping (UIImage) -> Void, dismiss: DismissAction) {
+            self.onImage = onImage
+            self.dismiss = dismiss
+        }
+
+        func imagePickerController(
+            _ picker: UIImagePickerController,
+            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+        ) {
+            if let image = info[.originalImage] as? UIImage {
+                onImage(image)
+            }
+            dismiss()
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            dismiss()
+        }
+    }
+}
+
+private extension UIImage {
+    func normalizedForAvatar() -> UIImage {
+        guard imageOrientation != .up else { return self }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = scale
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
+        return renderer.image { _ in
+            draw(in: CGRect(origin: .zero, size: size))
         }
     }
 }

@@ -9,6 +9,9 @@ import CoreLocation
 struct LocationGateBody: View {
     @EnvironmentObject private var profile: ProfileService
 
+    let submitLabel: String
+    let onSaved: (() -> Void)?
+
     @State private var searchText: String = ""
     @State private var searching: Bool = false
     @State private var searchResults: [MKMapItem] = []
@@ -20,6 +23,11 @@ struct LocationGateBody: View {
     @State private var errorMessage: String?
 
     @StateObject private var locationFetcher = OneShotLocationFetcher()
+
+    init(submitLabel: String = "Continue", onSaved: (() -> Void)? = nil) {
+        self.submitLabel = submitLabel
+        self.onSaved = onSaved
+    }
 
     var body: some View {
         VStack(spacing: SacredSpacing.m) {
@@ -43,7 +51,7 @@ struct LocationGateBody: View {
             }
 
             SacredPrimaryButton(
-                "Continue",
+                submitLabel,
                 style: .commit,
                 isDisabled: selection == nil,
                 isLoading: saving
@@ -293,6 +301,7 @@ struct LocationGateBody: View {
                 state: selection.state,
                 city: selection.city
             ))
+            onSaved?()
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription
                 ?? "We couldn't save that. Try again."

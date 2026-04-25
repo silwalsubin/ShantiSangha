@@ -4,14 +4,13 @@ import SwiftUI
 /// background, step counter, progress dots, title + subtitle, sign-out
 /// link in the footer. Each gate supplies only its body via `makeBody()`.
 ///
-/// The step number reflects each gate's position in the registered list
-/// (1-indexed), not just unfinished gates. A returning user hit by a
-/// brand-new gate sees `STEP 2 OF 2` with the first dot already filled —
-/// "picking up where you left off" instead of "starting over".
+/// The step number reflects only the gates still unfinished in this pass.
+/// Already-satisfied gates stay out of the chrome, so a returning user with
+/// one missing field gets a quiet single-step flow instead of `STEP 3 OF 3`.
 struct RequiredDataGateView: View {
     let gate: any RequiredGate
-    let stepIndex: Int        // 0-based position of the active gate in the array
-    let totalSteps: Int       // total registered gates
+    let stepIndex: Int        // 0-based position among unfinished gates
+    let totalSteps: Int       // total unfinished gates
     @EnvironmentObject private var auth: AuthService
 
     var body: some View {

@@ -8,9 +8,17 @@ struct DisplayNameGateBody: View {
     @EnvironmentObject private var auth: AuthService
     @FocusState private var nameFieldFocused: Bool
 
+    let submitLabel: String
+    let onSaved: (() -> Void)?
+
     @State private var name: String = ""
     @State private var saving = false
     @State private var errorMessage: String?
+
+    init(submitLabel: String = "Continue", onSaved: (() -> Void)? = nil) {
+        self.submitLabel = submitLabel
+        self.onSaved = onSaved
+    }
 
     var body: some View {
         VStack(spacing: SacredSpacing.m) {
@@ -34,7 +42,7 @@ struct DisplayNameGateBody: View {
             }
 
             SacredPrimaryButton(
-                "Continue",
+                submitLabel,
                 style: .commit,
                 isDisabled: trimmedName.isEmpty,
                 isLoading: saving
@@ -72,6 +80,7 @@ struct DisplayNameGateBody: View {
         defer { saving = false }
         do {
             try await profile.setDisplayName(trimmedName)
+            onSaved?()
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription
                 ?? "We couldn't save that. Try again."

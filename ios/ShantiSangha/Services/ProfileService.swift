@@ -117,21 +117,29 @@ final class ProfileService: ObservableObject {
     /// an empty profile so they all fire. Better to over-prompt than slip
     /// the user through to the main app with missing data.
     var requiredGate: (any RequiredGate)? {
-        let snapshot = profile ?? ProfileResponse.empty
-        return Self.gates.first { !$0.isSatisfied(snapshot) }
+        unsatisfiedGates.first
     }
 
-    /// Position of the active gate in the registered array (0-based).
+    /// Position of the active gate among currently unfinished gates (0-based).
     /// Drives the wizard chrome's "STEP N OF M" counter and progress dots.
+    /// Because `requiredGate` is always the first unfinished gate, this is
+    /// usually 0; keeping the value explicit lets the chrome stay honest if
+    /// the gate picker ever becomes non-linear.
     /// Returns 0 when no gate is active.
     var requiredGateIndex: Int {
         guard let gate = requiredGate else { return 0 }
-        return Self.gates.firstIndex(where: { $0.id == gate.id }) ?? 0
+        return unsatisfiedGates.firstIndex(where: { $0.id == gate.id }) ?? 0
     }
 
-    /// Total number of gates the app *defines* — every step the user might
-    /// see across their lifetime as a member, not just unfinished ones.
-    var totalGates: Int { Self.gates.count }
+    /// Total number of gates the user still needs to complete in this pass.
+    /// Already-satisfied gates are omitted so a returning user with only one
+    /// missing field does not see misleading chrome like `STEP 3 OF 3`.
+    var totalGates: Int { unsatisfiedGates.count }
+
+    private var unsatisfiedGates: [any RequiredGate] {
+        let snapshot = profile ?? ProfileResponse.empty
+        return Self.gates.filter { !$0.isSatisfied(snapshot) }
+    }
 
     /// Ordered list of gates. Add new gates here — earlier gates take
     /// priority and run first. Each gate is one self-contained file in
