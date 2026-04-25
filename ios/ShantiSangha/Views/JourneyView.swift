@@ -311,7 +311,7 @@ struct JourneyView: View {
             .padding(16)
             .padding(.bottom, 40)
         }
-        .background(Color.sacredBg.ignoresSafeArea())
+        .sacredBackground()
         .refreshable { await loadAll() }
         .navigationTitle("Journey")
         .navigationBarTitleDisplayMode(.inline)

@@ -64,7 +64,7 @@ struct LogsView: View {
                 }
             }
         }
-        .background(Color.sacredBg.ignoresSafeArea())
+        .sacredBackground()
         .navigationTitle("Logs")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

@@ -82,8 +82,7 @@ struct GoalDetailView: View {
                                         .foregroundColor(.sacredMuted)
                                 }
                                 .padding(14)
-                                .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
-                                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
+                                .luxCardChrome()
                             }
                             .buttonStyle(.plain)
                         }
@@ -121,8 +120,7 @@ struct GoalDetailView: View {
                             }
                         }
                         .padding(16)
-                        .background(RoundedRectangle(cornerRadius: 20).fill(.ultraThinMaterial))
-                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredGold.opacity(0.08)))
+                        .luxCardChrome()
                     }
                     .buttonStyle(.plain)
 
@@ -152,8 +150,7 @@ struct GoalDetailView: View {
                                     .foregroundColor(.sacredMuted)
                             }
                             .padding(16)
-                            .background(RoundedRectangle(cornerRadius: 20).fill(.ultraThinMaterial))
-                            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredGold.opacity(0.08)))
+                            .luxCardChrome()
                         }
                         .buttonStyle(.plain)
                     } else {
@@ -184,8 +181,7 @@ struct GoalDetailView: View {
                             }
                         }
                         .padding(16)
-                        .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
-                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
+                        .luxCardChrome()
                     }
 
                     // Delete button — bottom, quiet, destructive
@@ -214,7 +210,7 @@ struct GoalDetailView: View {
                     .frame(maxWidth: .infinity, minHeight: 200)
             }
         }
-        .background(Color.sacredBg.ignoresSafeArea())
+        .sacredBackground()
         .sacredToast($toastMessage)
         .navigationDestination(isPresented: $navigateToDueDate) {
             if let goal = goal, goal.type == .oneTime {
@@ -282,7 +278,7 @@ struct GoalDetailView: View {
 
                     Spacer()
                 }
-                .background(Color.sacredBg.ignoresSafeArea())
+                .sacredBackground()
                 .navigationTitle("Rename")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -314,13 +310,12 @@ struct GoalDetailView: View {
                         .scrollContentBackground(.hidden)
                         .frame(minHeight: 120)
                         .padding(12)
-                        .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
-                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
+                        .luxCardChrome()
 
                     Spacer()
                 }
                 .padding(16)
-                .background(Color.sacredBg.ignoresSafeArea())
+                .sacredBackground()
                 .navigationTitle("The Deeper Why")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -607,8 +602,7 @@ struct GoalDetailView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
-        .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
+        .luxCardChrome()
     }
 
     private func formatDate(_ dateStr: String) -> String {

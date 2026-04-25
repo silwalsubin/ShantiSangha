@@ -21,7 +21,7 @@ struct PlanetDetailView: View {
             .padding(16)
             .padding(.bottom, 40)
         }
-        .background(Color.sacredBg.ignoresSafeArea())
+        .sacredBackground()
         .navigationTitle(planet.name)
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -197,9 +197,7 @@ struct PlanetDetailView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.sacredBgCard)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
+        .luxCardChrome()
     }
 
     private func positionRow(_ label: String, _ value: String,

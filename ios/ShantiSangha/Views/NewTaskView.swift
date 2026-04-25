@@ -96,7 +96,7 @@ struct NewTaskView: View {
             }
             .padding(.horizontal, 16)
         }
-        .background(Color.sacredBg.ignoresSafeArea())
+        .sacredBackground()
         .navigationBarTitleDisplayMode(.inline)
     }
 

@@ -18,14 +18,13 @@ struct GoalCalendarBrowseView: View {
             VStack(spacing: 0) {
                 fullMonthCalendar
                     .padding(16)
-                    .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
-                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
+                    .luxCardChrome()
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
             }
             .padding(.bottom, 40)
         }
-        .background(Color.sacredBg.ignoresSafeArea())
+        .sacredBackground()
         .navigationTitle("Calendar")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(isPresented: $showDateGoals) {

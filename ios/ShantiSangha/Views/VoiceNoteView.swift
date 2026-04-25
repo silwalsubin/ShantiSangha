@@ -137,7 +137,7 @@ struct VoiceNoteView: View {
             Spacer()
                 .frame(height: 40)
         }
-        .background(Color.sacredBg.ignoresSafeArea())
+        .sacredBackground()
         .navigationTitle("Voice Note")
         .navigationBarTitleDisplayMode(.inline)
         .alert("Microphone Access Required", isPresented: $permissionDenied) {

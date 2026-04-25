@@ -111,10 +111,10 @@ struct JournalEditorView: View {
                     Spacer()
                 }
                 .padding(.horizontal, 16).padding(.vertical, 8)
-                .background(Color.sacredBg)
+                .background(.ultraThinMaterial)
             }
         }
-        .background(Color.sacredBg.ignoresSafeArea())
+        .sacredBackground()
         .navigationTitle(isNew ? "New Entry" : "Journal")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

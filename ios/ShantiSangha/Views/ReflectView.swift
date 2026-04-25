@@ -75,13 +75,22 @@ struct ReflectView: View {
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
+            SacredBackground()
+                .ignoresSafeArea()
+
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     if loading {
                         ProgressView()
                             .frame(maxWidth: .infinity, minHeight: 200)
                     } else if timelineItems.isEmpty {
-                        emptyState
+                        SacredEmptyState(
+                            icon: "leaf",
+                            title: "Your reflections will appear here.",
+                            subtitle: "Begin once. Let the form follow.",
+                            actionLabel: "Begin reflection",
+                            action: { showBeginReflection = true }
+                        )
                     } else {
                         ForEach(groupedTimeline, id: \.0) { group in
                             let (label, items) = group
@@ -89,35 +98,35 @@ struct ReflectView: View {
                             Text(label)
                                 .font(.sacredTitle)
                                 .foregroundColor(.sacredText)
-                                .padding(.top, 24)
-                                .padding(.bottom, 12)
+                                .padding(.top, SacredSpacing.l)
+                                .padding(.bottom, SacredSpacing.s)
 
-                            VStack(spacing: 0) {
-                                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                                    timelineRow(item, section: label)
-                                        .contextMenu {
-                                            Button(role: .destructive) {
-                                                Task { await deleteItem(item) }
-                                            } label: {
-                                                Label("Delete", systemImage: "trash")
+                            SacredListCard {
+                                VStack(spacing: 0) {
+                                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                        timelineRow(item, section: label)
+                                            .contextMenu {
+                                                Button(role: .destructive) {
+                                                    Task { await deleteItem(item) }
+                                                } label: {
+                                                    Label("Delete", systemImage: "trash")
+                                                }
                                             }
-                                        }
 
-                                    if index < items.count - 1 {
-                                        Divider()
-                                            .padding(.leading, 48)
+                                        if index < items.count - 1 {
+                                            Divider()
+                                                .padding(.leading, 48)
+                                        }
                                     }
                                 }
                             }
-                            .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
-                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
                         }
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 100)
+                .padding(.horizontal, SacredSpacing.m)
+                .padding(.bottom, SacredSpacing.tabBarSafe)
             }
-            .background(Color.sacredBg.ignoresSafeArea())
+            .background(Color.clear)
             .refreshable { await loadAll() }
             .navigationTitle("Reflect")
             .navigationBarTitleDisplayMode(.inline)
@@ -130,8 +139,11 @@ struct ReflectView: View {
                 }
             }
 
-            // Floating action menu
-            reflectFAB
+            SacredFAB(icon: "square.and.pencil") {
+                showBeginReflection = true
+            }
+            .padding(.trailing, 20)
+            .padding(.bottom, 20)
         }
         .navigationDestination(item: $pendingNavigation) { dest in
             switch dest {
@@ -160,38 +172,6 @@ struct ReflectView: View {
             )
         }
         .sacredToast($toastMessage)
-    }
-
-    // MARK: - Empty state
-
-    private var emptyState: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "leaf")
-                .font(.sacredHero)
-                .foregroundColor(.sacredMutedLight)
-            Text("Your reflections will appear here.")
-                .font(.sacredText)
-                .foregroundColor(.sacredTextSecondary)
-            Text("Begin once. Let the form follow.")
-                .font(.sacredSmall)
-                .foregroundColor(.sacredMuted)
-                .multilineTextAlignment(.center)
-            Button {
-                showBeginReflection = true
-            } label: {
-                Text("Begin reflection")
-                    .font(.sacredSmallSemibold)
-                    .foregroundColor(.white)
-                    .frame(minHeight: 44)
-                    .padding(.horizontal, 18)
-                    .background(LinearGradient.sacredGoldShinyVertical)
-                    .clipShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 6)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
     }
 
     // MARK: - Timeline row
@@ -251,24 +231,6 @@ struct ReflectView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    // MARK: - FAB with menu
-
-    private var reflectFAB: some View {
-        Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            showBeginReflection = true
-        } label: {
-            Image(systemName: "square.and.pencil")
-                .font(.sacredHeading)
-                .foregroundColor(.white)
-                .frame(width: 56, height: 56)
-                .goldShine()
-                .clipShape(Circle())
-        }
-        .padding(.trailing, 20)
-        .padding(.bottom, 20)
     }
 
     // MARK: - Helpers
@@ -434,29 +396,33 @@ private struct BeginReflectionSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Choose the shape this reflection wants.")
-                    .font(.sacredText)
-                    .foregroundColor(.sacredTextSecondary)
-                    .lineSpacing(4)
+            ZStack {
+                SacredBackground()
+                    .ignoresSafeArea()
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Choose the shape this reflection wants.")
+                        .font(.sacredText)
+                        .foregroundColor(.sacredTextSecondary)
+                        .lineSpacing(4)
+                        .padding(.horizontal, 20)
+                        .padding(.top, SacredSpacing.s)
+                        .padding(.bottom, SacredSpacing.l)
+
+                    SacredListCard {
+                        VStack(spacing: 0) {
+                            reflectionRow(icon: "doc.text", title: "Write", action: onJournal)
+                            Divider().padding(.leading, 56)
+                            reflectionRow(icon: "bubble.left", title: "Talk", action: onChat)
+                            Divider().padding(.leading, 56)
+                            reflectionRow(icon: "mic", title: "Speak", action: onVoice)
+                        }
+                    }
                     .padding(.horizontal, 20)
-                    .padding(.top, 12)
-                    .padding(.bottom, 20)
 
-                VStack(spacing: 0) {
-                    reflectionRow(icon: "doc.text", title: "Write", action: onJournal)
-                    Divider().padding(.leading, 56)
-                    reflectionRow(icon: "bubble.left", title: "Talk", action: onChat)
-                    Divider().padding(.leading, 56)
-                    reflectionRow(icon: "mic", title: "Speak", action: onVoice)
+                    Spacer()
                 }
-                .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
-                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
-                .padding(.horizontal, 20)
-
-                Spacer()
             }
-            .background(Color.sacredBg.ignoresSafeArea())
             .navigationTitle("Begin Reflection")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -475,23 +441,7 @@ private struct BeginReflectionSheet: View {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             action()
         } label: {
-            HStack(spacing: 14) {
-                Image(systemName: icon)
-                    .font(.sacredText)
-                    .foregroundColor(.sacredGold)
-                    .frame(width: 24)
-                Text(title)
-                    .font(.sacredTextMedium)
-                    .foregroundColor(.sacredText)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.sacredMicro)
-                    .foregroundColor(.sacredMuted.opacity(0.55))
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 16)
-            .frame(minHeight: 56)
-            .contentShape(Rectangle())
+            SacredMenuRow(icon: icon, title: title)
         }
         .buttonStyle(.plain)
     }

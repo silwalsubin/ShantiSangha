@@ -228,7 +228,7 @@ struct SettingsView: View {
             }
             .padding(.horizontal, 16)
         }
-        .background(Color.sacredBg.ignoresSafeArea())
+        .sacredBackground()
         .refreshable {
             serverStatus = .loading
             // Run in a detached task so the network request isn't cancelled
@@ -294,7 +294,7 @@ struct SettingsView: View {
                 .datePickerStyle(.wheel)
                 .labelsHidden()
                 .padding()
-                .background(Color.sacredBg.ignoresSafeArea())
+                .sacredBackground()
                 .navigationTitle("Remind me at")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -330,79 +330,79 @@ struct SettingsView: View {
     }
 
     private func debugRow(icon: String, label: String, badge: String?) -> some View {
-        HStack {
-            Image(systemName: icon)
-                .font(.sacredSmall)
-                .foregroundColor(.sacredMuted)
-            Text(label)
-                .font(.sacredText)
-                .foregroundColor(.sacredText)
-            Spacer()
-            if let badge {
-                Text(badge)
-                    .font(.sacredSmallSemibold)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 2)
-                    .background(Capsule().fill(Color.sacredRed))
+        LuxCard {
+            HStack {
+                Image(systemName: icon)
+                    .font(.sacredSmall)
+                    .foregroundColor(.sacredMuted)
+                Text(label)
+                    .font(.sacredText)
+                    .foregroundColor(.sacredText)
+                Spacer()
+                if let badge {
+                    Text(badge)
+                        .font(.sacredSmallSemibold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(Color.sacredRed))
+                }
+                Image(systemName: "chevron.right")
+                    .font(.sacredSmall)
+                    .foregroundColor(.sacredMuted)
             }
-            Image(systemName: "chevron.right")
-                .font(.sacredSmall)
-                .foregroundColor(.sacredMuted)
+            .padding(SacredSpacing.m)
         }
-        .padding(16)
-        .background(RoundedRectangle(cornerRadius: 20).fill(.ultraThinMaterial))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredGold.opacity(0.08)))
     }
     #endif
 
     private var serverCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                statusDot
-                Text("APP SERVER")
-                    .font(.sacredSectionLabel)
-                    .tracking(3)
-                    .foregroundColor(.sacredLabel)
-            }
+        LuxCard {
+            VStack(alignment: .leading, spacing: SacredSpacing.s) {
+                HStack(spacing: SacredSpacing.xs) {
+                    statusDot
+                    Text("APP SERVER")
+                        .font(.sacredSectionLabel)
+                        .tracking(3)
+                        .foregroundColor(.sacredLabel)
+                }
 
-            switch serverStatus {
-            case .loading:
-                ProgressView()
-                    .frame(maxWidth: .infinity)
-            case .connected(let sv):
-                infoRow(icon: "server.rack", label: "Git hash", value: sv.gitHash)
-                infoRow(icon: "clock", label: "Built", value: formatBuildTime(sv.buildTime))
-            case .unreachable:
-                VStack(spacing: 8) {
-                    Text("Unable to reach server")
-                        .font(.sacredSmall)
-                        .foregroundColor(.sacredRed)
-                    HStack(spacing: 16) {
-                        Button {
-                            serverStatus = .loading
-                            Task { await fetchServerVersion() }
-                        } label: {
-                            Text("Retry")
-                                .font(.sacredSmallSemibold)
-                                .foregroundColor(.sacredGold)
-                        }
-                        Button {
-                            showErrorDetail = true
-                        } label: {
-                            Text("View Error")
-                                .font(.sacredSmallSemibold)
-                                .foregroundColor(.sacredMuted)
+                switch serverStatus {
+                case .loading:
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                case .connected(let sv):
+                    infoRow(icon: "server.rack", label: "Git hash", value: sv.gitHash)
+                    infoRow(icon: "clock", label: "Built", value: formatBuildTime(sv.buildTime))
+                case .unreachable:
+                    VStack(spacing: SacredSpacing.xs) {
+                        Text("Unable to reach server")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredRed)
+                        HStack(spacing: SacredSpacing.m) {
+                            Button {
+                                serverStatus = .loading
+                                Task { await fetchServerVersion() }
+                            } label: {
+                                Text("Retry")
+                                    .font(.sacredSmallSemibold)
+                                    .foregroundColor(.sacredGold)
+                            }
+                            Button {
+                                showErrorDetail = true
+                            } label: {
+                                Text("View Error")
+                                    .font(.sacredSmallSemibold)
+                                    .foregroundColor(.sacredMuted)
+                            }
                         }
                     }
+                    .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: .infinity)
             }
+            .padding(SacredSpacing.m)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 20).fill(.ultraThinMaterial))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredGold.opacity(0.08)))
     }
 
     @ViewBuilder
@@ -461,18 +461,10 @@ struct SettingsView: View {
         }
     }
 
-    private func settingsCard<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.sacredSectionLabel)
-                .tracking(3)
-                .foregroundColor(.sacredLabel)
+    private func settingsCard<Content: View>(title: String, @ViewBuilder content: @escaping () -> Content) -> some View {
+        SacredCard(title) {
             content()
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 20).fill(.ultraThinMaterial))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredGold.opacity(0.08)))
     }
 
     private func infoRow(icon: String, label: String, value: String) -> some View {

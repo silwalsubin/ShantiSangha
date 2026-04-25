@@ -54,6 +54,106 @@ struct ShantiSanghaProvider: TimelineProvider {
 
 }
 
+// MARK: - Sacred widget background
+//
+// Mirrors `SacredBackground` + `LuxCard` chrome from the main app, scaled for
+// the widget canvas. The widget itself acts as the lux card on the home
+// screen — parchment fill, soft gold corner radials, and a diagonal
+// gold-gradient highlight that gives the surface a subtle metallic feel.
+// Duplicated here (rather than imported) because widget extensions can't
+// link main-app code.
+private struct SacredWidgetBackground: View {
+    var body: some View {
+        ZStack {
+            sacredBg
+
+            // Top-down golden warmth
+            LinearGradient(
+                colors: [sacredGoldShine.opacity(0.16), sacredBg.opacity(0)],
+                startPoint: .top,
+                endPoint: .center
+            )
+
+            // Top-left soft gold halo
+            RadialGradient(
+                colors: [sacredGold.opacity(0.11), .clear],
+                center: .topLeading,
+                startRadius: 8,
+                endRadius: 140
+            )
+
+            // Bottom-right deeper gold
+            RadialGradient(
+                colors: [sacredGoldDark.opacity(0.06), .clear],
+                center: .bottomTrailing,
+                startRadius: 4,
+                endRadius: 150
+            )
+
+            // LuxCard diagonal highlight — gives a metallic shimmer
+            LinearGradient(
+                colors: [
+                    sacredGoldShine.opacity(0.1),
+                    .clear,
+                    sacredGoldDark.opacity(0.04)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
+}
+
+// MARK: - Sacred progress ring
+//
+// Matches the gradient-stroked ring used in `SacredProgressRing` on Home.
+// Sized for the widget canvas (52pt vs 118pt on Home).
+private struct SacredWidgetRing: View {
+    let done: Int
+    let total: Int
+    var size: CGFloat = 52
+    var lineWidth: CGFloat = 5
+
+    var body: some View {
+        let progress = total > 0 ? Double(done) / Double(total) : 0
+
+        ZStack {
+            // Track
+            Circle()
+                .stroke(sacredMuted.opacity(0.12), lineWidth: lineWidth)
+
+            // Progress arc — gradient-stroked, matching SacredProgressRing
+            if done > 0 {
+                Circle()
+                    .trim(from: 0, to: progress)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                sacredGold.opacity(0.7),
+                                sacredGold,
+                                sacredGold.opacity(0.8)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+            }
+
+            VStack(spacing: 0) {
+                Text("\(done)")
+                    .font(.system(size: 18, weight: .bold, design: .serif))
+                    .foregroundColor(done > 0 ? sacredGold : sacredMuted)
+                Text("of \(total)")
+                    .font(.system(size: 8, design: .serif))
+                    .foregroundColor(sacredMuted)
+            }
+        }
+        .frame(width: size, height: size)
+    }
+}
+
 // MARK: - Small Widget (Reflection only)
 
 struct ReflectionWidgetView: View {
@@ -94,34 +194,12 @@ struct DashboardWidgetView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 12) {
-                // Progress circle + label
                 VStack(spacing: 4) {
-                ZStack {
-                    Circle()
-                        .stroke(sacredMuted.opacity(0.12), lineWidth: 5)
-                    if entry.practicesTotal > 0 {
-                        Circle()
-                            .trim(from: 0, to: Double(entry.practicesDone) / Double(entry.practicesTotal))
-                            .stroke(
-                                sacredGold,
-                                style: StrokeStyle(lineWidth: 5, lineCap: .round)
-                            )
-                            .rotationEffect(.degrees(-90))
-                    }
-                    VStack(spacing: 0) {
-                        Text("\(entry.practicesDone)")
-                            .font(.system(size: 18, weight: .bold, design: .serif))
-                            .foregroundColor(sacredGold)
-                        Text("of \(entry.practicesTotal)")
-                            .font(.system(size: 8, design: .serif))
-                            .foregroundColor(sacredMuted)
-                    }
-                }
-                .frame(width: 52, height: 52)
+                    SacredWidgetRing(done: entry.practicesDone, total: entry.practicesTotal)
 
-                Text("Practices")
-                    .font(.system(size: 9, weight: .semibold, design: .serif))
-                    .foregroundColor(sacredTextSecondary)
+                    Text("Practices")
+                        .font(.system(size: 9, weight: .semibold, design: .serif))
+                        .foregroundColor(sacredTextSecondary)
                 }
 
                 // Reflection — takes remaining space. Hard-cap to 5 lines and
@@ -174,11 +252,11 @@ struct ShantiSanghaReflectionWidget: Widget {
             if #available(iOS 17.0, *) {
                 ReflectionWidgetView(entry: entry)
                     .containerBackground(for: .widget) {
-                        sacredBg
+                        SacredWidgetBackground()
                     }
             } else {
                 ReflectionWidgetView(entry: entry)
-                    .background(sacredBg)
+                    .background(SacredWidgetBackground())
             }
         }
         .configurationDisplayName("Daily Reflection")
@@ -195,11 +273,11 @@ struct ShantiSanghaDashboardWidget: Widget {
             if #available(iOS 17.0, *) {
                 DashboardWidgetView(entry: entry)
                     .containerBackground(for: .widget) {
-                        sacredBg
+                        SacredWidgetBackground()
                     }
             } else {
                 DashboardWidgetView(entry: entry)
-                    .background(sacredBg)
+                    .background(SacredWidgetBackground())
             }
         }
         .configurationDisplayName("Today's Practice")
@@ -218,7 +296,11 @@ struct ShantiSanghaWidgetBundle: WidgetBundle {
     }
 }
 
-// MARK: - Color helpers (adaptive for light/dark mode)
+// MARK: - Sacred tokens (adaptive for light/dark mode)
+//
+// Widget extensions can't link to the main app target's `DesignTokens.swift`,
+// so the same hex values are duplicated here. Keep them in sync with
+// `ios/ShantiSangha/Models/DesignTokens.swift` if the palette ever shifts.
 
 private let sacredBg = Color(UIColor { traits in
     traits.userInterfaceStyle == .dark ? UIColor(hex: "#1a1410") : UIColor(hex: "#faf5ed")
@@ -237,6 +319,8 @@ private let sacredMuted = Color(UIColor { traits in
 })
 
 private let sacredGold = Color(hex: "#c4873b")
+private let sacredGoldDark = Color(hex: "#8b5a1b")
+private let sacredGoldShine = Color(hex: "#e8c47a")
 
 private extension Color {
     init(hex: String) {

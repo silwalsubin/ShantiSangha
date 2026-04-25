@@ -34,7 +34,7 @@ struct BirthPlacePickerView: View {
                     resultsList
                 }
             }
-            .background(Color.sacredBg.ignoresSafeArea())
+            .sacredBackground()
             .navigationTitle("Place of birth")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

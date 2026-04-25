@@ -72,7 +72,7 @@ struct DeleteTaskView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 20)
         }
-        .background(Color.sacredBg.ignoresSafeArea())
+        .sacredBackground()
         .navigationTitle("Delete Task")
         .navigationBarTitleDisplayMode(.inline)
     }

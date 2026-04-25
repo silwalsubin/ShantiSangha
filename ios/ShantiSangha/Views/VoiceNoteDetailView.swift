@@ -145,7 +145,7 @@ struct VoiceNoteDetailView: View {
             }
             .padding(16)
         }
-        .background(Color.sacredBg.ignoresSafeArea())
+        .sacredBackground()
         .sacredToast($toastMessage)
         .refreshable { await loadEntry() }
         .navigationTitle("Voice Note")
@@ -216,14 +216,9 @@ struct VoiceNoteDetailView: View {
                     .monospacedDigit()
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, SacredSpacing.m)
         .padding(.vertical, 14)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.sacredGold.opacity(0.06))
-                .overlay(RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.sacredGold.opacity(0.12)))
-        )
+        .luxCardChrome()
     }
 
     // MARK: - Helpers

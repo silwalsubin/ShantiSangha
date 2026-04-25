@@ -60,7 +60,7 @@ struct DateGoalsView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 40)
         }
-        .background(Color.sacredBg.ignoresSafeArea())
+        .sacredBackground()
         .navigationTitle(navigationTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

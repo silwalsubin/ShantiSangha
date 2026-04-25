@@ -69,7 +69,7 @@ struct QuickAddGoalView: View {
             Spacer()
         }
         .padding(.horizontal, 16)
-        .background(Color.sacredBg.ignoresSafeArea())
+        .sacredBackground()
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { focused = true }
     }

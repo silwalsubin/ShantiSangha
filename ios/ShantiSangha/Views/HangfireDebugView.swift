@@ -42,7 +42,7 @@ struct HangfireDebugView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 40)
         }
-        .background(Color.sacredBg.ignoresSafeArea())
+        .sacredBackground()
         .navigationTitle("Hangfire Jobs")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -246,8 +246,7 @@ struct HangfireDebugView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 16).fill(.ultraThinMaterial))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.08)))
+        .luxCardChrome()
     }
 
     private func jobRow(type: String?, method: String?, detail: String, color: Color = .sacredText) -> some View {

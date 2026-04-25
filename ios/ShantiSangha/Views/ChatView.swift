@@ -26,106 +26,120 @@ struct ChatView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Messages
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 16) {
-                        if loading {
-                            ProgressView()
-                                .frame(maxWidth: .infinity)
-                                .padding(.top, 80)
-                        } else if messages.isEmpty {
-                            openingCard
-                        }
+        ZStack {
+            SacredBackground()
+                .ignoresSafeArea()
 
-                        ForEach(Array(messages.enumerated()), id: \.element.id) { index, msg in
-                            // Date divider when date changes between messages
-                            if let label = dateDividerLabel(at: index) {
-                                Text(label)
-                                    .font(.sacredSmallSemibold)
-                                    .foregroundColor(.sacredMuted)
+            VStack(spacing: 0) {
+                // Messages
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: SacredSpacing.m) {
+                            if loading {
+                                ProgressView()
                                     .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 4)
+                                    .padding(.top, 80)
+                            } else if messages.isEmpty {
+                                SacredOpeningCard(
+                                    icon: "sparkle",
+                                    prompt: openingPrompt,
+                                    subtitle: initialText != nil
+                                        ? "Your note is ready below if you want to begin there."
+                                        : nil
+                                )
+                                .padding(.top, 40)
                             }
 
-                            // Hide empty assistant placeholder — typing indicator replaces it
-                            if !(msg.role == "assistant" && msg.content.isEmpty && sending) {
-                                messageBubble(msg)
-                                    .id(msg.id)
+                            ForEach(Array(messages.enumerated()), id: \.element.id) { index, msg in
+                                if let label = dateDividerLabel(at: index) {
+                                    Text(label)
+                                        .font(.sacredSmallSemibold)
+                                        .foregroundColor(.sacredMuted)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, SacredSpacing.xxs)
+                                }
+
+                                // Hide empty assistant placeholder — typing indicator replaces it
+                                if !(msg.role == "assistant" && msg.content.isEmpty && sending) {
+                                    messageBubble(msg)
+                                        .id(msg.id)
+                                }
                             }
-                        }
 
-                        // Typing indicator
-                        if sending, let last = messages.last, last.role == "assistant", last.content.isEmpty {
-                            typingIndicator
-                                .id("typing")
-                        }
-                        // Bottom anchor
-                        Color.clear
-                            .frame(height: 1)
-                            .id("bottom")
-                    }
-                    .padding(16)
-                    .padding(.bottom, 60)
-                }
-                .onChange(of: messages.count) {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo("bottom") }
-                    }
-                }
-                .onChange(of: messages.last?.content) {
-                    proxy.scrollTo("bottom")
-                }
-            }
+                            if sending, let last = messages.last, last.role == "assistant", last.content.isEmpty {
+                                typingIndicator
+                                    .id("typing")
+                            }
 
-            // Retry strip
-            if let failedSendText {
-                HStack(spacing: 10) {
-                    Text("Message did not send.")
-                        .font(.sacredSmall)
-                        .foregroundColor(.sacredMuted)
-                    Spacer()
+                            Color.clear
+                                .frame(height: 1)
+                                .id("bottom")
+                        }
+                        .padding(SacredSpacing.m)
+                        .padding(.bottom, 60)
+                    }
+                    .scrollDismissesKeyboard(.interactively)
+                    .onChange(of: messages.count) {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo("bottom") }
+                        }
+                    }
+                    .onChange(of: messages.last?.content) {
+                        proxy.scrollTo("bottom")
+                    }
+                }
+
+                if let failedSendText {
+                    HStack(spacing: 10) {
+                        Text("Message did not send.")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
+                        Spacer()
+                        Button {
+                            Task { await retryMessage(failedSendText) }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "arrow.clockwise")
+                                Text("Try again")
+                            }
+                            .font(.sacredSmallSemibold)
+                            .foregroundColor(.sacredGold)
+                            .frame(minHeight: 44)
+                        }
+                    }
+                    .padding(.horizontal, SacredSpacing.m)
+                    .padding(.top, SacredSpacing.xs)
+                    .background(.ultraThinMaterial)
+                }
+
+                HStack(spacing: SacredSpacing.s) {
+                    TextField("Share what's on your mind...", text: $inputText, axis: .vertical)
+                        .font(.sacredText)
+                        .lineLimit(1...4)
+                        .padding(SacredSpacing.s)
+                        .background(
+                            RoundedRectangle(cornerRadius: SacredRadius.card)
+                                .fill(Color.sacredBgCard.opacity(0.6))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: SacredRadius.card)
+                                .stroke(Color.sacredMuted.opacity(0.15))
+                        )
+
                     Button {
-                        Task { await retryMessage(failedSendText) }
+                        Task { await sendMessage() }
                     } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "arrow.clockwise")
-                            Text("Try again")
-                        }
-                        .font(.sacredSmallSemibold)
-                        .foregroundColor(.sacredGold)
-                        .frame(minHeight: 44)
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.sacredIconLarge)
+                            .foregroundColor(inputText.trimmingCharacters(in: .whitespaces).isEmpty || sending ? .sacredMuted.opacity(0.3) : .sacredGold)
                     }
+                    .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty || sending)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .background(Color.sacredBg)
+                .padding(.horizontal, SacredSpacing.m)
+                .padding(.vertical, SacredSpacing.s)
+                .background(.ultraThinMaterial)
             }
-
-            // Input
-            HStack(spacing: 12) {
-                TextField("Share what's on your mind...", text: $inputText, axis: .vertical)
-                    .font(.sacredText)
-                    .lineLimit(1...4)
-                    .padding(12)
-                    .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredBg))
-                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.15)))
-
-                Button {
-                    Task { await sendMessage() }
-                } label: {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.sacredIconLarge)
-                        .foregroundColor(inputText.trimmingCharacters(in: .whitespaces).isEmpty || sending ? .sacredMuted.opacity(0.3) : .sacredGold)
-                }
-                .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty || sending)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Color.sacredBg)
         }
-        .background(Color.sacredBg.ignoresSafeArea())
         .navigationTitle(displayTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -165,11 +179,11 @@ struct ChatView: View {
                 Text(msg.content)
                     .font(.sacredText)
                     .foregroundColor(msg.role == "user" ? .white : .sacredText)
-                    .padding(msg.role == "user" ? 12 : 0)
+                    .padding(msg.role == "user" ? SacredSpacing.s : 0)
                     .background(
                         Group {
                             if msg.role == "user" {
-                                RoundedRectangle(cornerRadius: 16)
+                                RoundedRectangle(cornerRadius: SacredRadius.card)
                                     .fill(LinearGradient.sacredGoldShiny)
                             }
                         }
@@ -196,31 +210,6 @@ struct ChatView: View {
                 .padding(.vertical, 8)
             Spacer()
         }
-    }
-
-    private var openingCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Image(systemName: "sparkle")
-                .font(.sacredSmall)
-                .foregroundColor(.sacredGold)
-            Text(openingPrompt)
-                .font(.sacredBody)
-                .italic()
-                .foregroundColor(.sacredText)
-                .lineSpacing(5)
-            if initialText != nil {
-                Text("Your note is ready below if you want to begin there.")
-                    .font(.sacredSmall)
-                    .foregroundColor(.sacredMuted)
-            }
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.sacredGold.opacity(0.05))
-                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredGold.opacity(0.1), lineWidth: 1))
-        )
-        .padding(.top, 40)
     }
 
     // MARK: - Date dividers

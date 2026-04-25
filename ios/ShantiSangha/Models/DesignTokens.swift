@@ -47,6 +47,53 @@ extension Font {
     /// 9pt serif bold — section labels ("ACCOUNT", "YOUR DHARMA")
     /// Use with .tracking(3) and .foregroundColor(.sacredLabel)
     static let sacredSectionLabel = Font.system(size: 9, weight: .bold, design: .serif)
+    /// 26pt serif semibold — home greeting ("Good evening, Subin")
+    static let sacredGreeting = Font.system(size: 26, weight: .semibold, design: .serif)
+    /// 36pt serif bold — large display number inside progress rings
+    static let sacredProgressNumber = Font.system(size: 36, weight: .bold, design: .serif)
+    /// 13pt serif semibold — small inline glyphs (checkmark inside rings)
+    static let sacredGlyph = Font.system(size: 13, weight: .semibold, design: .serif)
+}
+
+/// Sacred spacing scale — semantic vertical and horizontal rhythm tokens.
+/// Use these instead of raw CGFloats in padding / spacing modifiers.
+enum SacredSpacing {
+    /// 4pt — hairline gap inside rows
+    static let xxs: CGFloat = 4
+    /// 8pt — tight inline spacing
+    static let xs: CGFloat = 8
+    /// 12pt — comfortable inline spacing
+    static let s: CGFloat = 12
+    /// 16pt — standard horizontal page padding, card padding
+    static let m: CGFloat = 16
+    /// 18pt — luxe card internal padding
+    static let lux: CGFloat = 18
+    /// 22pt — luxe card vertical padding
+    static let luxe: CGFloat = 22
+    /// 24pt — section gap (between hero blocks)
+    static let l: CGFloat = 24
+    /// 32pt — top of-page breathing room
+    static let xl: CGFloat = 32
+    /// 100pt — bottom inset to clear the floating tab bar
+    static let tabBarSafe: CGFloat = 100
+}
+
+/// Sacred corner radius scale.
+enum SacredRadius {
+    /// 12pt — pills, chips
+    static let pill: CGFloat = 12
+    /// 16pt — standard cards (`SacredCard`)
+    static let card: CGFloat = 16
+    /// 22pt — luxe parchment cards (`LuxCard`)
+    static let lux: CGFloat = 22
+}
+
+extension View {
+    /// Warm, lifted shadow used by `LuxCard`. Centralized so every luxe card
+    /// shares the same elevation cue.
+    func sacredCardShadow() -> some View {
+        shadow(color: .sacredMuted.opacity(0.1), radius: 20, y: 10)
+    }
 }
 
 /// Sacred design tokens — single source of truth for colors.

@@ -76,7 +76,7 @@ struct VedicChartView: View {
                 .padding(16)
                 .padding(.bottom, 100)
             }
-            .background(Color.sacredBg.ignoresSafeArea())
+            .sacredBackground()
             .refreshable { await refreshAll(force: true) }
             .sacredToast($toastMessage)
 
@@ -275,7 +275,7 @@ struct VedicChartView: View {
             .datePickerStyle(.wheel)
             .labelsHidden()
             .padding()
-            .background(Color.sacredBg.ignoresSafeArea())
+            .sacredBackground()
             .navigationTitle("Date of birth")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -306,7 +306,7 @@ struct VedicChartView: View {
             .datePickerStyle(.wheel)
             .labelsHidden()
             .padding()
-            .background(Color.sacredBg.ignoresSafeArea())
+            .sacredBackground()
             .navigationTitle("Time of birth")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

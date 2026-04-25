@@ -185,12 +185,11 @@ struct GoalCalendarView: View {
                     .padding(.top, 8)
                 }
                 .padding(16)
-                .background(RoundedRectangle(cornerRadius: 20).fill(.ultraThinMaterial))
-                .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredGold.opacity(0.08)))
+                .luxCardChrome()
             }
             .padding(16)
         }
-        .background(Color.sacredBg.ignoresSafeArea())
+        .sacredBackground()
         .navigationTitle(goalTitle)
         .navigationBarTitleDisplayMode(.inline)
         .alert("Check All", isPresented: $showCheckAllConfirm) {

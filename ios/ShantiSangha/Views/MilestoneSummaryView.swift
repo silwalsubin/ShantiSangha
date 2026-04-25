@@ -70,7 +70,7 @@ struct MilestoneSummaryView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 40)
         }
-        .background(Color.sacredBg.ignoresSafeArea())
+        .sacredBackground()
         .navigationTitle("Goals")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

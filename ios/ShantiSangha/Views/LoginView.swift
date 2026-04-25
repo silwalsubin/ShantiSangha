@@ -69,6 +69,6 @@ struct LoginView: View {
             Spacer()
                 .frame(height: 60)
         }
-        .background(Color.sacredBg.ignoresSafeArea())
+        .sacredBackground()
     }
 }

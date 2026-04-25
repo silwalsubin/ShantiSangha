@@ -45,7 +45,7 @@ struct AboutView: View {
             }
             .padding(16)
         }
-        .background(Color.sacredBg.ignoresSafeArea())
+        .sacredBackground()
         .navigationTitle("About")
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -55,18 +55,10 @@ struct AboutView: View {
         }
     }
 
-    private func infoCard<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.sacredSectionLabel)
-                .tracking(3)
-                .foregroundColor(.sacredLabel)
+    private func infoCard<Content: View>(title: String, @ViewBuilder content: @escaping () -> Content) -> some View {
+        SacredCard(title) {
             content()
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 20).fill(.ultraThinMaterial))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.sacredGold.opacity(0.08)))
     }
 
     private func infoRow(_ label: String, _ value: String) -> some View {
