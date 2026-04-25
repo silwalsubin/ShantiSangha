@@ -1,21 +1,22 @@
 #!/usr/bin/env bash
 # app-health-check — production diagnostic for ShantiSangha API.
-# Read-only. Exits 0=green, 1=yellow (running with errors), 2=red (down).
+# Read-only. Exits 0=green, 1=yellow (running with issues), 2=red (down).
+#
+# Bash handles the public /health curl, AWS profile auto-discovery, and
+# SSO refresh. Deeper checks (ECS service, ECR/task image freshness, per-task
+# health, CloudWatch error grouping) live in scripts/deep_checks.py since
+# JSON parsing and message-pattern bucketing are cleaner in Python.
 
 set -u
 set -o pipefail
 
 HEALTH_URL="${HEALTH_URL:-https://shantisangha.com/health}"
-ECS_CLUSTER="${ECS_CLUSTER:-shantisangha-cluster}"
-ECS_SERVICE="${ECS_SERVICE:-shantisangha-api}"
-LOG_GROUP="${LOG_GROUP:-/ecs/shantisangha-api}"
-WINDOW_MIN="${WINDOW_MIN:-30}"
 AWS_REGION="${AWS_REGION:-us-east-1}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# If AWS_PROFILE isn't already exported, pick the first non-default profile
-# the user has configured. This is almost always the SSO profile (the user's
-# `default` profile usually has stale static keys). Falls through cleanly to
-# the no-credentials path if no profile is found.
+# Auto-discover an SSO-configured profile if AWS_PROFILE isn't already set.
+# Almost always picks the actual user profile; the literal `default` profile
+# usually has stale static keys and is the wrong choice.
 if [ -z "${AWS_PROFILE:-}" ] && command -v aws >/dev/null 2>&1; then
   candidate="$(aws configure list-profiles 2>/dev/null | grep -v '^default$' | head -1)"
   if [ -n "$candidate" ]; then
@@ -23,7 +24,6 @@ if [ -z "${AWS_PROFILE:-}" ] && command -v aws >/dev/null 2>&1; then
   fi
 fi
 
-# ANSI color shorthand only when stdout is a terminal — keep it plain for tools.
 if [ -t 1 ]; then
   C_GREEN=$'\033[32m'; C_YELLOW=$'\033[33m'; C_RED=$'\033[31m'
   C_DIM=$'\033[2m';   C_BOLD=$'\033[1m';   C_RESET=$'\033[0m'
@@ -31,7 +31,8 @@ else
   C_GREEN=""; C_YELLOW=""; C_RED=""; C_DIM=""; C_BOLD=""; C_RESET=""
 fi
 
-verdict_green=0
+# Combined verdict across the bash and python phases. Python prints its own
+# `VERDICT:<color>` line which we merge into ours below.
 verdict_yellow=0
 verdict_red=0
 
@@ -79,20 +80,17 @@ else
 fi
 
 # ── 2. AWS CLI availability ──────────────────────────────────────────────────
-# Note: missing or unconfigured AWS CLI is a warn, not a fail — it just means
-# we can't see deeper than the public health endpoint. The backend itself
-# may still be perfectly fine (and the /health check above will say so).
+# Missing/unconfigured AWS CLI is a warn, not a fail — backend may still be
+# perfectly fine, we just can't see deeper than the public health endpoint.
 section "AWS CLI"
 if ! command -v aws >/dev/null 2>&1; then
   warn "aws CLI not installed — install with: brew install awscli"
-  note "Skipping ECS and CloudWatch checks."
+  note "Skipping ECS, ECR, and CloudWatch checks."
   print_summary_and_exit
 fi
 
-# If the active profile is SSO-configured, proactively refresh the cached
-# token so we don't fail later just because it expired. `aws sso login` is a
-# no-op when the token is still fresh (no browser window), so it's safe to
-# run on every invocation.
+# Proactively refresh the SSO token — no-op when the cached token is already
+# fresh, only opens a browser when it's actually expired.
 sso_url="$(aws configure get sso_start_url --profile "${AWS_PROFILE:-default}" 2>/dev/null || true)"
 if [ -n "$sso_url" ]; then
   if ! aws sso login --profile "$AWS_PROFILE" >/dev/null 2>&1; then
@@ -102,114 +100,28 @@ fi
 
 if ! aws sts get-caller-identity --region "$AWS_REGION" >/dev/null 2>&1; then
   warn "aws CLI not authenticated — try 'aws sso login --profile $AWS_PROFILE' manually, or set AWS_PROFILE to a working profile"
-  note "Skipping ECS and CloudWatch checks."
+  note "Skipping ECS, ECR, and CloudWatch checks."
   print_summary_and_exit
 fi
 ok "credentials resolved (region: $AWS_REGION, profile: ${AWS_PROFILE:-default})"
 
-# ── 3. ECS service status ────────────────────────────────────────────────────
-section "ECS service ($ECS_CLUSTER / $ECS_SERVICE)"
-ecs_json="$(aws ecs describe-services \
-  --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
-  --region "$AWS_REGION" --output json 2>/dev/null || true)"
-
-if [ -z "$ecs_json" ] || ! printf "%s" "$ecs_json" | grep -q '"services"'; then
-  fail "Could not describe ECS service (check cluster/service names or IAM)"
-else
-  running="$(printf "%s" "$ecs_json" | python3 -c '
-import json, sys
-d=json.load(sys.stdin)
-s=(d.get("services") or [{}])[0]
-print(s.get("runningCount", "?"))
-' 2>/dev/null || echo "?")"
-  desired="$(printf "%s" "$ecs_json" | python3 -c '
-import json, sys
-d=json.load(sys.stdin)
-s=(d.get("services") or [{}])[0]
-print(s.get("desiredCount", "?"))
-' 2>/dev/null || echo "?")"
-  pending="$(printf "%s" "$ecs_json" | python3 -c '
-import json, sys
-d=json.load(sys.stdin)
-s=(d.get("services") or [{}])[0]
-print(s.get("pendingCount", 0))
-' 2>/dev/null || echo "0")"
-  deploy="$(printf "%s" "$ecs_json" | python3 -c '
-import json, sys
-d=json.load(sys.stdin)
-s=(d.get("services") or [{}])[0]
-deps=s.get("deployments") or []
-if not deps:
-    print("no deployments")
-else:
-    p=deps[0]
-    status = p.get("status", "?")
-    rollout = p.get("rolloutState", "?")
-    print(status + " (rollout " + rollout + ")")
-' 2>/dev/null || echo "?")"
-  last_event="$(printf "%s" "$ecs_json" | python3 -c '
-import json, sys
-d=json.load(sys.stdin)
-s=(d.get("services") or [{}])[0]
-ev=s.get("events") or []
-if ev:
-    e=ev[0]
-    msg = (e.get("message") or "").strip()
-    created = e.get("createdAt", "")
-    print(str(created) + " :: " + msg)
-else:
-    print("(no events)")
-' 2>/dev/null || echo "(unavailable)")"
-
-  if [ "$running" = "$desired" ] && [ "$pending" = "0" ] && [ "$desired" != "0" ]; then
-    ok "$running/$desired tasks running, deployment: $deploy"
-  elif [ "$running" = "0" ] && [ "$desired" != "0" ]; then
-    fail "0/$desired tasks running, deployment: $deploy"
-  else
-    warn "$running/$desired tasks running ($pending pending), deployment: $deploy"
-  fi
-  note "  last event: $last_event"
+# ── 3. Deep checks (delegated to Python for JSON parsing + grouping) ────────
+if ! command -v python3 >/dev/null 2>&1; then
+  warn "python3 not found — skipping deep checks"
+  print_summary_and_exit
 fi
 
-# ── 4. CloudWatch errors in the last $WINDOW_MIN minutes ─────────────────────
-section "CloudWatch errors (last ${WINDOW_MIN}m of $LOG_GROUP)"
-start_ms=$(( ( $(date +%s) - WINDOW_MIN * 60 ) * 1000 ))
-log_json="$(aws logs filter-log-events \
-  --log-group-name "$LOG_GROUP" \
-  --start-time "$start_ms" \
-  --filter-pattern '?"[ERR]" ?"[FTL]"' \
-  --max-items 25 \
-  --region "$AWS_REGION" \
-  --output json 2>/dev/null || true)"
+# Pipe through tee so we both stream output to the user AND capture it for the
+# VERDICT line. Python script's exit code is also informative.
+deep_out="$(python3 "$SCRIPT_DIR/deep_checks.py" 2>&1; echo "RC:$?")"
+deep_rc="${deep_out##*RC:}"
+deep_text="${deep_out%RC:*}"
+printf "%s" "$deep_text"
 
-if [ -z "$log_json" ] || ! printf "%s" "$log_json" | grep -q '"events"'; then
-  warn "Could not query CloudWatch (log group missing or IAM denial?)"
-else
-  count="$(printf "%s" "$log_json" | python3 -c '
-import json, sys
-d=json.load(sys.stdin)
-print(len(d.get("events") or []))
-' 2>/dev/null || echo "?")"
-  if [ "$count" = "0" ]; then
-    ok "no [ERR] or [FTL] entries in the last ${WINDOW_MIN}m"
-  else
-    warn "$count error/fatal log entries in the last ${WINDOW_MIN}m"
-    printf "%s" "$log_json" | python3 -c '
-import json, sys
-d=json.load(sys.stdin)
-events=d.get("events") or []
-shown=events[-3:]   # last (most recent) up to 3 entries
-for e in shown:
-    msg=(e.get("message") or "").strip().replace("\n", " ")
-    if len(msg) > 240:
-        msg = msg[:240] + "…"
-    print(f"  · {msg}")
-' 2>/dev/null || true
-    if [ "$count" -gt 3 ] 2>/dev/null; then
-      note "  (showing 3 most recent of $count)"
-    fi
-  fi
-fi
+# Merge Python's verdict into the combined verdict.
+case "$(printf "%s" "$deep_text" | grep -E '^VERDICT:' | tail -1 | cut -d: -f2)" in
+  red)    verdict_red=1 ;;
+  yellow) verdict_yellow=1 ;;
+esac
 
-# ── Summary ──────────────────────────────────────────────────────────────────
 print_summary_and_exit
