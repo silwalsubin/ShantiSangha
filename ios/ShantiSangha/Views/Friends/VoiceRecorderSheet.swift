@@ -96,7 +96,7 @@ final class AudioRecorder: ObservableObject {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.playAndRecord, mode: .default, options: .defaultToSpeaker)
             try session.setActive(true)
-            session.requestRecordPermission { _ in }
+            AVAudioApplication.requestRecordPermission { _ in }
 
             let url = FileManager.default.temporaryDirectory.appendingPathComponent("voice-\(UUID().uuidString).m4a")
             let settings: [String: Any] = [
