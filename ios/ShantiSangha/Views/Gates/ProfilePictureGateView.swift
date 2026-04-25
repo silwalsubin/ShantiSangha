@@ -23,6 +23,7 @@ struct ProfilePictureGateBody: View {
     @State private var lastCropScale: CGFloat = 1
     @State private var cropOffset: CGSize = .zero
     @State private var lastCropOffset: CGSize = .zero
+    @State private var loadedAvatarUrl: String?
     @State private var showingCamera = false
     @State private var saving = false
     @State private var errorMessage: String?
@@ -65,6 +66,9 @@ struct ProfilePictureGateBody: View {
         .onChange(of: pickerItem) { _, newItem in
             guard let newItem else { return }
             Task { await load(newItem) }
+        }
+        .task(id: profile.profile?.avatarUrl) {
+            await loadExistingAvatarIfNeeded()
         }
         .fullScreenCover(isPresented: $showingCamera) {
             CameraPicker { image in
@@ -235,6 +239,24 @@ struct ProfilePictureGateBody: View {
             setSourceImage(original)
         } catch {
             errorMessage = "We couldn't load that image. Try a different one."
+        }
+    }
+
+    private func loadExistingAvatarIfNeeded() async {
+        guard sourceImage == nil,
+              let rawUrl = profile.profile?.avatarUrl,
+              loadedAvatarUrl != rawUrl,
+              let url = URL(string: rawUrl) else {
+            return
+        }
+
+        loadedAvatarUrl = rawUrl
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            guard sourceImage == nil, let image = UIImage(data: data) else { return }
+            setSourceImage(image)
+        } catch {
+            // Keep the initials fallback quiet; choosing a new photo still works.
         }
     }
 

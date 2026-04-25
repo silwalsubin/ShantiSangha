@@ -98,21 +98,15 @@ struct HomeView: View {
             }
             .background(Color.clear)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { showProfileMenu = true } label: {
-                        Circle()
-                            .fill(RadialGradient.sacredGoldShiny)
-                            .frame(width: 30, height: 30)
-                            .overlay(
-                                Text(profileInitial)
-                                    .font(.system(size: 13, weight: .semibold, design: .serif))
-                                    .foregroundColor(.white)
-                            )
-                            .overlay(
-                                Circle().stroke(Color.sacredGold.opacity(0.3), lineWidth: 0.5)
-                            )
+                if #available(iOS 26.0, *) {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        profileMenuButton
                     }
-                    .accessibilityLabel("Profile menu")
+                    .sharedBackgroundVisibility(.hidden)
+                } else {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        profileMenuButton
+                    }
                 }
             }
             .fullScreenCover(isPresented: $showProfileMenu) {
@@ -335,7 +329,7 @@ struct HomeView: View {
 
     /// First word of the user's chosen display name when set, falling back
     /// to the Firebase displayName from Google Sign-In. Used by the
-    /// greeting, the profile-initial avatar, and the widget's user name.
+    /// greeting and the widget's user name.
     private var preferredFirstName: String? {
         let chosen = profile.profile?.displayName?
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -455,6 +449,54 @@ struct HomeView: View {
 
     // MARK: - Profile
 
+    private var profileMenuButton: some View {
+        Button {
+            showProfileMenu = true
+        } label: {
+            profileMenuAvatar
+        }
+        .buttonStyle(.plain)
+        .fixedSize()
+        .accessibilityLabel("Profile menu")
+    }
+
+    @ViewBuilder
+    private var profileMenuAvatar: some View {
+        Group {
+            if let rawUrl = profile.profile?.avatarUrl,
+               let url = URL(string: rawUrl) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    default:
+                        profileInitialAvatar
+                    }
+                }
+            } else {
+                profileInitialAvatar
+            }
+        }
+        .frame(width: 36, height: 36)
+        .clipShape(Circle())
+        .overlay(Circle().stroke(Color.sacredGold.opacity(0.42), lineWidth: 2))
+        .shadow(color: Color.black.opacity(0.24), radius: 8, x: 0, y: 5)
+        .frame(width: 44, height: 44)
+        .contentShape(Circle())
+    }
+
+    private var profileInitialAvatar: some View {
+        Circle()
+            .fill(RadialGradient.sacredGoldShiny)
+            .overlay(
+                Text(profileInitial)
+                    .font(.system(size: 13, weight: .semibold, design: .serif))
+                    .foregroundColor(.white)
+            )
+    }
+
     private var profileInitial: String {
         String(preferredInitialSource.prefix(1)).uppercased()
     }
@@ -504,13 +546,15 @@ struct ProfileMenuSheet: View {
     @EnvironmentObject var auth: AuthService
     @EnvironmentObject var profile: ProfileService
     @Environment(\.dismiss) private var dismiss
+    @State private var activeAccountEdit: AccountEdit?
     @State private var showSignOutConfirmation = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 28) {
-                    header
+                VStack(spacing: 20) {
+                    accountTitle
+                    accountAvatarButton
                     menuList
                     signOutButton
                 }
@@ -534,48 +578,169 @@ struct ProfileMenuSheet: View {
                 Button("Sign Out", role: .destructive) { auth.signOut() }
                 Button("Cancel", role: .cancel) {}
             }
+            .sheet(item: $activeAccountEdit) { edit in
+                NavigationStack {
+                    accountEditSheet(edit)
+                        .padding(.horizontal, SacredSpacing.l)
+                        .padding(.top, SacredSpacing.l)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .sacredBackground()
+                        .navigationTitle(edit.title)
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Cancel") {
+                                    activeAccountEdit = nil
+                                }
+                                .foregroundColor(.sacredMuted)
+                            }
+                        }
+                }
+                .presentationDetents([edit.detent])
+            }
         }
     }
 
-    private var header: some View {
-        VStack(spacing: 12) {
-            Circle()
-                .fill(RadialGradient.sacredGoldShiny)
-                .frame(width: 72, height: 72)
-                .overlay(
-                    Text(initial)
-                        .font(.system(size: 28, weight: .semibold, design: .serif))
-                        .foregroundColor(.white)
-                )
-                .overlay(Circle().stroke(Color.sacredGold.opacity(0.3), lineWidth: 0.5))
-            if let email = auth.user?.email {
-                Text(email)
-                    .font(.sacredSmall)
-                    .foregroundColor(.sacredMuted)
-            }
+    private var accountTitle: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("ACCOUNT")
+                .font(.sacredSectionLabel)
+                .tracking(3)
+                .foregroundColor(.sacredLabel)
+            Text("Your sacred space")
+                .font(.sacredTitle)
+                .foregroundColor(.sacredText)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func accountHeader(email: String) -> some View {
+        menuRow(icon: "envelope", label: "Email", subtitle: email, showsChevron: false)
+    }
+
+    @ViewBuilder
+    private var accountAvatarButton: some View {
+        Button {
+            activeAccountEdit = .profilePicture
+        } label: {
+            accountAvatar
+        }
+        .buttonStyle(.plain)
         .frame(maxWidth: .infinity)
-        .padding(.top, 16)
+        .accessibilityLabel("Change profile picture")
+    }
+
+    @ViewBuilder
+    private var accountAvatar: some View {
+        ZStack(alignment: .bottomTrailing) {
+            Group {
+                if let rawUrl = profile.profile?.avatarUrl,
+                   let url = URL(string: rawUrl) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        default:
+                            avatarInitials
+                        }
+                    }
+                } else {
+                    avatarInitials
+                }
+            }
+            .frame(width: 104, height: 104)
+            .clipShape(Circle())
+            .overlay(Circle().stroke(Color.sacredGold.opacity(0.42), lineWidth: 2))
+            .shadow(color: Color.black.opacity(0.24), radius: 8, x: 0, y: 5)
+
+            Image(systemName: "pencil")
+                .font(.system(size: 13, weight: .bold, design: .serif))
+                .foregroundColor(.white)
+                .frame(width: 28, height: 28)
+                .background(Circle().fill(Color.sacredGold))
+                .overlay(Circle().stroke(Color.sacredBg, lineWidth: 2))
+                .offset(x: 2, y: 2)
+        }
+        .frame(width: 112, height: 112)
+    }
+
+    private var avatarInitials: some View {
+        Circle()
+            .fill(RadialGradient.sacredGoldShiny)
+            .shimmer()
+            .overlay(
+                Text(accountInitials)
+                    .font(.system(size: 38, weight: .semibold, design: .serif))
+                    .foregroundColor(.white)
+            )
+    }
+
+    @ViewBuilder
+    private func accountEditSheet(_ edit: AccountEdit) -> some View {
+        switch edit {
+        case .displayName:
+            DisplayNameGateBody(submitLabel: "Save") {
+                activeAccountEdit = nil
+            }
+            .environmentObject(auth)
+            .environmentObject(profile)
+        case .location:
+            LocationGateBody(submitLabel: "Save") {
+                activeAccountEdit = nil
+            }
+            .environmentObject(profile)
+        case .profilePicture:
+            ProfilePictureGateBody(submitLabel: "Save") {
+                activeAccountEdit = nil
+            }
+            .environmentObject(profile)
+        }
     }
 
     private var menuList: some View {
         VStack(spacing: 0) {
+            if let email = auth.user?.email {
+                accountHeader(email: email)
+
+                Divider().padding(.leading, 52)
+            }
+
+            Button {
+                activeAccountEdit = .displayName
+            } label: {
+                menuRow(icon: "person.text.rectangle", label: "Display name", subtitle: displayNameValue)
+            }
+            .buttonStyle(.plain)
+
+            Divider().padding(.leading, 52)
+
+            Button {
+                activeAccountEdit = .location
+            } label: {
+                menuRow(icon: "mappin.circle", label: "Location", subtitle: locationValue)
+            }
+            .buttonStyle(.plain)
+
+            Divider().padding(.leading, 52)
+
             NavigationLink(destination: VedicChartView()) {
-                menuRow(icon: "moon.stars", label: "Birth chart", subtitle: "Your Jyotish context")
+                menuRow(icon: "moon.stars", label: "Birth chart", subtitle: "Your Vedic Astrological Analysis")
             }
             .buttonStyle(.plain)
 
             Divider().padding(.leading, 52)
 
             NavigationLink(destination: SettingsView()) {
-                menuRow(icon: "gearshape", label: "Settings", subtitle: "Your sacred space")
+                menuRow(icon: "gearshape", label: "Settings", subtitle: "Preferences")
             }
             .buttonStyle(.plain)
         }
         .luxCardChrome()
     }
 
-    private func menuRow(icon: String, label: String, subtitle: String) -> some View {
+    private func menuRow(icon: String, label: String, subtitle: String, showsChevron: Bool = true) -> some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
                 .font(.system(size: 16, weight: .regular))
@@ -585,14 +750,19 @@ struct ProfileMenuSheet: View {
                 Text(label)
                     .font(.sacredTextMedium)
                     .foregroundColor(.sacredText)
+                    .lineLimit(1)
                 Text(subtitle)
                     .font(.sacredMicro)
                     .foregroundColor(.sacredMuted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             }
             Spacer()
-            Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .regular))
-                .foregroundColor(.sacredMuted.opacity(0.5))
+            if showsChevron {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundColor(.sacredMuted.opacity(0.5))
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
@@ -614,14 +784,59 @@ struct ProfileMenuSheet: View {
         }
     }
 
-    private var initial: String {
-        let chosen = profile.profile?.displayName?.trimmingCharacters(in: .whitespaces)
-        if let chosen, !chosen.isEmpty {
-            return String(chosen.prefix(1)).uppercased()
+    private var displayNameValue: String {
+        profile.profile?.displayName?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+            ?? "Add"
+    }
+
+    private var locationValue: String {
+        guard let profile = profile.profile,
+              let city = profile.city?.nonEmpty,
+              let state = profile.state?.nonEmpty
+        else { return "Add" }
+        return "\(city), \(state)"
+    }
+
+    private var accountInitials: String {
+        if let name = profile.profile?.displayName?.nonEmpty {
+            let parts = name.split(separator: " ").compactMap(\.first).map(String.init)
+            let initials = parts.prefix(2).joined().uppercased()
+            if !initials.isEmpty { return initials }
         }
-        let source = auth.user?.displayName?.trimmingCharacters(in: .whitespaces)
-            ?? auth.user?.email
-            ?? "?"
-        return String(source.prefix(1)).uppercased()
+        if let email = auth.user?.email?.nonEmpty {
+            return String(email.prefix(1)).uppercased()
+        }
+        return "·"
+    }
+}
+
+private enum AccountEdit: String, Identifiable {
+    case displayName
+    case location
+    case profilePicture
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .displayName: return "Display name"
+        case .location: return "Location"
+        case .profilePicture: return "Profile picture"
+        }
+    }
+
+    var detent: PresentationDetent {
+        switch self {
+        case .displayName: return .height(260)
+        case .location: return .large
+        case .profilePicture: return .height(560)
+        }
+    }
+}
+
+private extension String {
+    var nonEmpty: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 }
