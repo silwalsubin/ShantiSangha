@@ -10,6 +10,7 @@ struct FriendChatView: View {
     @State private var showRecorder = false
     @State private var showEndConfirm = false
     @State private var actionTarget: FriendMessage?
+    @State private var imagePreview: PreviewedImage?
     @Environment(\.dismiss) private var dismiss
 
     init(friend: FriendSummary) {
@@ -96,6 +97,9 @@ struct FriendChatView: View {
                 Task { await vm.sendVoice(data: data, contentType: contentType, durationMs: durationMs) }
             }
         }
+        .fullScreenCover(item: $imagePreview) { item in
+            ChatImageViewer(url: item.url)
+        }
     }
 
     private var actionTargetBinding: Binding<Bool> {
@@ -120,7 +124,10 @@ struct FriendChatView: View {
                 } else {
                     LazyVStack(spacing: 6) {
                         ForEach(vm.messages) { msg in
-                            MessageBubble(message: msg, fromFriend: vm.isFromFriend(msg))
+                            MessageBubble(
+                                message: msg,
+                                fromFriend: vm.isFromFriend(msg),
+                                onTapImage: { url in imagePreview = PreviewedImage(url: url) })
                                 .id(msg.id)
                                 .onLongPressGesture {
                                     if vm.canEdit(msg) || vm.canDelete(msg) {
@@ -278,9 +285,16 @@ struct FriendChatView: View {
     }
 }
 
+/// Identifiable wrapper for `.fullScreenCover(item:)` driven by a URL.
+private struct PreviewedImage: Identifiable {
+    let url: URL
+    var id: String { url.absoluteString }
+}
+
 private struct MessageBubble: View {
     let message: FriendMessage
     let fromFriend: Bool
+    let onTapImage: (URL) -> Void
 
     var body: some View {
         HStack {
@@ -329,6 +343,8 @@ private struct MessageBubble: View {
                     }
                     .frame(maxWidth: 240, maxHeight: 320)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .contentShape(Rectangle())
+                    .onTapGesture { onTapImage(url) }
                 }
             case .voice:
                 VoicePlayerView(url: message.mediaUrl, durationMs: message.durationMs, fromFriend: fromFriend)
