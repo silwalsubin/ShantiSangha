@@ -458,24 +458,40 @@ struct HomeView: View {
         .accessibilityLabel("Profile menu")
     }
 
-    /// Bell-icon entry to the in-app notifications inbox. Shows a small
-    /// gold dot when there's at least one unread notification — count is
-    /// driven by NotificationsViewModel and refreshes on appear, on push
-    /// receipt (via the silent-push handler), and on app foreground.
+    /// Bell-icon entry to the in-app notifications inbox.
+    ///
+    /// Two visual states, driven by content:
+    ///   - empty inbox: outlined bell, calm and restrained (doesn't pull
+    ///     the eye away from the daily rhythm card or compete with the
+    ///     profile avatar)
+    ///   - unread > 0: filled bell + bindi-like gold dot. The icon
+    ///     literally fills *because* there's something waiting, instead
+    ///     of an iOS-style red badge. This is the sacred move: design
+    ///     that responds to content, not chrome.
+    ///
+    /// 44×44 touch frame matches the profile avatar's hit area (mobile-
+    /// first 44pt minimum) and visual size; 19pt medium-weight glyph
+    /// gives the bell enough presence to balance the avatar's mass
+    /// without becoming loud.
     private var notificationsBellButton: some View {
         NavigationLink(destination: NotificationsView()) {
             ZStack(alignment: .topTrailing) {
-                Image(systemName: "bell")
-                    .font(.system(size: 17, weight: .regular))
+                Image(systemName: notifications.unreadCount > 0 ? "bell.fill" : "bell")
+                    .font(.system(size: 19, weight: .medium))
                     .foregroundColor(.sacredGold)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
 
                 if notifications.unreadCount > 0 {
+                    // Bindi-like sacred dot — warm gold gradient + soft
+                    // outer glow so it reads "something gentle is here"
+                    // rather than "red alert".
                     Circle()
                         .fill(LinearGradient.sacredGoldShinyVertical)
-                        .frame(width: 9, height: 9)
-                        .overlay(Circle().stroke(Color.sacredBg, lineWidth: 1.5))
-                        .offset(x: -8, y: 6)
+                        .frame(width: 10, height: 10)
+                        .overlay(Circle().stroke(Color.sacredBg, lineWidth: 2))
+                        .shadow(color: .sacredGold.opacity(0.45), radius: 3)
+                        .offset(x: -8, y: 8)
                 }
             }
         }
