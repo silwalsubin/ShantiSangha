@@ -23,6 +23,16 @@ struct FriendsTabView: View {
                         ProgressView()
                             .padding(.top, SacredSpacing.xl * 2)
                     } else if vm.friends.isEmpty && vm.pendingInvitations.isEmpty
+                        && vm.outgoingRequests.isEmpty && vm.incomingRequests.isEmpty
+                        && vm.errorMessage != nil {
+                        // Refresh failed and we have nothing to show. Tell
+                        // the user the truth instead of "Walking solo for
+                        // now" — that lie made a transient API/auth
+                        // failure look like an empty friend list.
+                        loadFailureState
+                            .padding(.horizontal, SacredSpacing.m)
+                            .padding(.top, SacredSpacing.xl)
+                    } else if vm.friends.isEmpty && vm.pendingInvitations.isEmpty
                         && vm.outgoingRequests.isEmpty && vm.incomingRequests.isEmpty {
                         emptyState
                             .padding(.horizontal, SacredSpacing.m)
@@ -114,6 +124,19 @@ struct FriendsTabView: View {
                 subtitle: "Invite someone you trust to message inside this private space.",
                 actionLabel: "Invite a friend"
             ) { Task { await onInvite() } }
+        }
+    }
+
+    /// Shown when refresh failed and there's nothing in the lists. The
+    /// emptyState would otherwise lie that the user has no friends.
+    private var loadFailureState: some View {
+        SacredCard {
+            SacredEmptyState(
+                icon: "wifi.slash",
+                title: "Couldn't load your friends.",
+                subtitle: vm.errorMessage ?? "Pull to refresh, or check your connection.",
+                actionLabel: "Try again"
+            ) { Task { await vm.refresh() } }
         }
     }
 
