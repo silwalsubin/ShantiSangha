@@ -109,6 +109,18 @@ struct FriendChatView: View {
         )
     }
 
+    /// Show the friend's avatar only on the first message of a
+    /// consecutive run from them — repeating the same avatar on every
+    /// bubble becomes visual noise. The slot is still reserved (empty)
+    /// on continuation rows so bubbles stay vertically aligned.
+    private func shouldShowAvatar(at index: Int) -> Bool {
+        let msg = vm.messages[index]
+        guard vm.isFromFriend(msg) else { return false }
+        if index == 0 { return true }
+        let prev = vm.messages[index - 1]
+        return prev.senderUserId != msg.senderUserId
+    }
+
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -123,10 +135,13 @@ struct FriendChatView: View {
                     .padding(.top, SacredSpacing.xl)
                 } else {
                     LazyVStack(spacing: 6) {
-                        ForEach(vm.messages) { msg in
+                        ForEach(Array(vm.messages.enumerated()), id: \.element.id) { idx, msg in
                             MessageBubble(
                                 message: msg,
                                 fromFriend: vm.isFromFriend(msg),
+                                friendDisplayName: friend.displayName,
+                                friendAvatarUrl: friend.avatarUrl,
+                                showAvatar: shouldShowAvatar(at: idx),
                                 onTapImage: { url in imagePreview = PreviewedImage(url: url) })
                                 .id(msg.id)
                                 .onLongPressGesture {
@@ -294,11 +309,31 @@ private struct PreviewedImage: Identifiable {
 private struct MessageBubble: View {
     let message: FriendMessage
     let fromFriend: Bool
+    let friendDisplayName: String
+    let friendAvatarUrl: String?
+    let showAvatar: Bool
     let onTapImage: (URL) -> Void
 
+    /// Reserved width for the avatar gutter on the friend's side. Even
+    /// on continuation rows (where we hide the avatar), the slot stays
+    /// so successive bubbles in a run align vertically with the first.
+    private let avatarSize: CGFloat = 28
+    private let avatarGap: CGFloat = 6
+
     var body: some View {
-        HStack {
-            if !fromFriend { Spacer(minLength: 32) }
+        HStack(alignment: .bottom, spacing: avatarGap) {
+            if fromFriend {
+                if showAvatar {
+                    SacredAvatar(
+                        displayName: friendDisplayName,
+                        avatarUrl: friendAvatarUrl,
+                        size: avatarSize)
+                } else {
+                    Color.clear.frame(width: avatarSize, height: avatarSize)
+                }
+            } else {
+                Spacer(minLength: 32)
+            }
 
             VStack(alignment: fromFriend ? .leading : .trailing, spacing: 2) {
                 content
