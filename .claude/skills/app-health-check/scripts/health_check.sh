@@ -89,12 +89,26 @@ if ! command -v aws >/dev/null 2>&1; then
   print_summary_and_exit
 fi
 
-# Proactively refresh the SSO token — no-op when the cached token is already
-# fresh, only opens a browser when it's actually expired.
+# SSO refresh strategy: check first whether existing creds work; only run
+# `aws sso login` when they don't. The login is run with stdout/stderr
+# attached so the user sees the browser prompt (or device-code fallback)
+# instead of staring at a silently-failing health check.
+#
+# Modern SSO profiles use `sso_session = <name>` indirectly (the start
+# URL lives under a sibling `[sso-session ...]` block), while older
+# profiles set `sso_start_url` directly on the profile. Either is a
+# signal that this is an SSO profile and `aws sso login` is the right
+# refresh command to run.
 sso_url="$(aws configure get sso_start_url --profile "${AWS_PROFILE:-default}" 2>/dev/null || true)"
-if [ -n "$sso_url" ]; then
-  if ! aws sso login --profile "$AWS_PROFILE" >/dev/null 2>&1; then
-    note "  (sso login attempt failed — continuing with whatever cached creds exist)"
+sso_session="$(aws configure get sso_session --profile "${AWS_PROFILE:-default}" 2>/dev/null || true)"
+if ! aws sts get-caller-identity --region "$AWS_REGION" >/dev/null 2>&1; then
+  if [ -n "$sso_url" ] || [ -n "$sso_session" ]; then
+    note "  cached SSO token expired — running 'aws sso login --profile $AWS_PROFILE'"
+    if ! aws sso login --profile "$AWS_PROFILE"; then
+      warn "aws sso login failed — try running it manually: aws sso login --profile $AWS_PROFILE"
+      note "Skipping ECS, ECR, and CloudWatch checks."
+      print_summary_and_exit
+    fi
   fi
 fi
 
