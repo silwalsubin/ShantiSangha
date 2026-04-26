@@ -13,6 +13,7 @@ using ShantiSangha.Api;
 using ShantiSangha.Chat;
 using ShantiSangha.Chat.AI;
 using ShantiSangha.Friends;
+using ShantiSangha.Friends.Realtime;
 using ShantiSangha.Identity;
 using ShantiSangha.Goals;
 using ShantiSangha.Insights;
@@ -189,6 +190,23 @@ try
                         context.Request.Path, context.Exception.Message);
                     return Task.CompletedTask;
                 },
+                // The WebSocket upgrade handshake doesn't let clients set
+                // arbitrary headers, so the realtime chat socket passes
+                // its bearer token via `?token=...`. Lifted here so the
+                // standard JWT middleware authenticates the request.
+                OnMessageReceived = context =>
+                {
+                    var path = context.Request.Path;
+                    if (path.StartsWithSegments("/api/chat/realtime"))
+                    {
+                        var token = context.Request.Query["token"].ToString();
+                        if (!string.IsNullOrEmpty(token))
+                        {
+                            context.Token = token;
+                        }
+                    }
+                    return Task.CompletedTask;
+                },
             };
         });
     builder.Services.AddAuthorization();
@@ -309,8 +327,15 @@ try
     app.UseAuthentication();
     app.UseAuthorization();
 
+    // WebSocket middleware — required before any endpoint that calls
+    // `context.WebSockets.AcceptWebSocketAsync()`.
+    app.UseWebSockets();
+
     // Controllers from domain projects handle all /api/* routes
     app.MapControllers();
+
+    // Realtime chat WebSocket — auth + membership handled inside.
+    app.MapChatRealtime();
 
     // Server version info (keep as minimal API — host-level concern)
     var serverGitHash = builder.Configuration["GIT_HASH"] ?? "dev";

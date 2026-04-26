@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using ShantiSangha.Friends.Contracts;
 using ShantiSangha.Friends.Data;
 using ShantiSangha.Friends.Models;
+using ShantiSangha.Friends.Realtime;
 using ShantiSangha.Friends.Storage;
 using ShantiSangha.Shared.Interfaces;
 
@@ -13,6 +14,7 @@ public class FriendMessagesService(
     FriendsMediaStorage storage,
     IProfileQueryService profileQuery,
     IPushNotificationService push,
+    IChatRealtimeHub realtime,
     ILogger<FriendMessagesService> logger) : IFriendMessagesService
 {
     private static readonly TimeSpan UploadUrlLifetime = TimeSpan.FromMinutes(15);
@@ -75,9 +77,13 @@ public class FriendMessagesService(
         db.Messages.Add(msg);
         await db.SaveChangesAsync(ct);
 
+        var dto = await MaterializeOneAsync(msg);
+        // Realtime broadcast for both-online instant delivery; APNs push
+        // remains the offline / app-backgrounded fallback.
+        await BroadcastSafelyAsync("message_received", f.Id, new { conversationId = f.Id, message = dto }, ct);
         await NotifyRecipientAsync(f, userId, msg, ct);
 
-        return await MaterializeOneAsync(msg);
+        return dto;
     }
 
     public async Task<CreateMediaUploadResponse?> CreateImageUploadAsync(
@@ -143,9 +149,11 @@ public class FriendMessagesService(
         db.Messages.Add(msg);
         await db.SaveChangesAsync(ct);
 
+        var dto = await MaterializeOneAsync(msg);
+        await BroadcastSafelyAsync("message_received", f.Id, new { conversationId = f.Id, message = dto }, ct);
         await NotifyRecipientAsync(f, userId, msg, ct);
 
-        return await MaterializeOneAsync(msg);
+        return dto;
     }
 
     public async Task<bool> MarkReadAsync(
@@ -162,7 +170,111 @@ public class FriendMessagesService(
 
         msg.ReadAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
+
+        // Tell the original sender (over realtime) that their message
+        // was read so the iOS bubble can flip from single → double check.
+        await BroadcastSafelyAsync("messages_read", f.Id, new
+        {
+            conversationId = f.Id,
+            readByUserId = userId,
+            lastMessageId = msg.Id,
+            readAt = msg.ReadAt
+        }, ct);
+
         return true;
+    }
+
+    private static readonly TimeSpan EditWindow = TimeSpan.FromMinutes(15);
+
+    public async Task<FriendMessageResponse?> EditTextAsync(
+        Guid userId, Guid friendshipId, Guid messageId, string newBody, CancellationToken ct = default)
+    {
+        var f = await GetFriendshipAsync(friendshipId, userId, ct);
+        if (f is null) return null;
+
+        if (string.IsNullOrWhiteSpace(newBody))
+            throw new FriendsServiceException("empty_message", "Message can't be empty.");
+        if (newBody.Length > MaxTextLength)
+            throw new FriendsServiceException("too_long", $"Message exceeds {MaxTextLength} characters.");
+
+        var msg = await db.Messages.FirstOrDefaultAsync(
+            m => m.Id == messageId && m.FriendshipId == f.Id, ct);
+        if (msg is null)
+            throw new FriendsServiceException("not_found", "Message not found.");
+        if (msg.SenderUserId != userId)
+            throw new FriendsServiceException("forbidden", "Only the sender can edit a message.");
+        if (msg.Kind != FriendMessageKind.Text)
+            throw new FriendsServiceException("wrong_kind", "Only text messages can be edited.");
+        if (msg.DeletedAt is not null)
+            throw new FriendsServiceException("already_deleted", "This message was deleted.");
+        if (DateTime.UtcNow - msg.SentAt > EditWindow)
+            throw new FriendsServiceException("edit_window_expired",
+                $"Messages can only be edited within {EditWindow.TotalMinutes:F0} minutes of sending.");
+
+        msg.Body = newBody.Trim();
+        msg.EditedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        var dto = await MaterializeOneAsync(msg);
+        await BroadcastSafelyAsync("message_edited", f.Id, new { conversationId = f.Id, message = dto }, ct);
+        return dto;
+    }
+
+    public async Task<FriendMessageResponse?> DeleteAsync(
+        Guid userId, Guid friendshipId, Guid messageId, CancellationToken ct = default)
+    {
+        var f = await GetFriendshipAsync(friendshipId, userId, ct);
+        if (f is null) return null;
+
+        var msg = await db.Messages.FirstOrDefaultAsync(
+            m => m.Id == messageId && m.FriendshipId == f.Id, ct);
+        if (msg is null) return null;
+        if (msg.SenderUserId != userId)
+            throw new FriendsServiceException("forbidden", "Only the sender can delete a message.");
+
+        // Idempotent — already-deleted just returns the row as-is.
+        if (msg.DeletedAt is not null)
+            return await MaterializeOneAsync(msg);
+
+        // Capture media key before clearing; remove the S3 object after
+        // SaveChanges so a failed S3 delete doesn't roll back the row.
+        var mediaKey = msg.StorageKey;
+
+        msg.DeletedAt = DateTime.UtcNow;
+        msg.Body = null;
+        msg.StorageKey = null;
+        msg.DurationMs = null;
+        await db.SaveChangesAsync(ct);
+
+        if (!string.IsNullOrEmpty(mediaKey))
+        {
+            try { await storage.DeleteAsync(mediaKey); }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to delete media for soft-deleted message {MessageId}", msg.Id);
+            }
+        }
+
+        var dto = await MaterializeOneAsync(msg);
+        await BroadcastSafelyAsync("message_deleted", f.Id, new
+        {
+            conversationId = f.Id,
+            messageId = msg.Id
+        }, ct);
+        return dto;
+    }
+
+    /// <summary>Wrap broadcasts so a hub failure (network blip, missing
+    /// recipient, serialization edge case) never blocks the persisted
+    /// state change. The REST response is the source of truth; the
+    /// realtime event is a best-effort accelerator.</summary>
+    private async Task BroadcastSafelyAsync(string kind, Guid conversationId, object payload, CancellationToken ct)
+    {
+        try { await realtime.PublishAsync(conversationId, kind, payload, ct); }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Realtime broadcast of {Kind} failed for conversation {ConversationId}", kind, conversationId);
+        }
     }
 
     private async Task NotifyRecipientAsync(Friendship f, Guid senderId, FriendMessage msg, CancellationToken ct)
@@ -221,10 +333,27 @@ public class FriendMessagesService(
             }
         }
 
+        // Don't leak the original body of a deleted message — clients
+        // render a placeholder bubble for `DeletedAt != null`. Same for
+        // media: presigning a URL after the S3 object is gone would
+        // produce a 404, so skip that path entirely.
+        var isDeleted = m.DeletedAt.HasValue;
+        var safeBody = isDeleted ? null : m.Body;
+        var safeMediaUrl = isDeleted ? null : mediaUrl;
+
         return new FriendMessageResponse(
-            m.Id, m.FriendshipId, m.SenderUserId,
-            m.Kind.ToString(), m.Body, mediaUrl, m.DurationMs,
-            m.SentAt, m.ReadAt);
+            m.Id,
+            m.FriendshipId,
+            m.FriendshipId,         // ConversationId == FriendshipId for 1:1
+            m.SenderUserId,
+            m.Kind.ToString(),
+            safeBody,
+            safeMediaUrl,
+            m.DurationMs,
+            m.SentAt,
+            m.ReadAt,
+            m.EditedAt,
+            m.DeletedAt);
     }
 
     private static string ExtensionForImage(string contentType) => contentType.ToLowerInvariant() switch

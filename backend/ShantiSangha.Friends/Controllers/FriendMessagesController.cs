@@ -137,6 +137,62 @@ public class FriendMessagesController(
         var ok = await service.MarkReadAsync(user.Id, friendshipId, messageId, ct);
         return ok ? NoContent() : NotFound();
     }
+
+    [HttpPut("{messageId:guid}")]
+    public async Task<IActionResult> EditText(
+        Guid friendshipId,
+        Guid messageId,
+        [FromBody] EditTextMessageRequest body,
+        CancellationToken ct)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+
+        try
+        {
+            var result = await service.EditTextAsync(user.Id, friendshipId, messageId, body.Body, ct);
+            return result is null ? NotFound() : Ok(result);
+        }
+        catch (FriendsServiceException ex)
+        {
+            // 422 for the time-window case so the client can render a
+            // friendly "edit window expired" message; other policy errors
+            // (forbidden, wrong_kind, already_deleted) also surface here
+            // with their machine-readable code.
+            return ex.Code switch
+            {
+                "not_found"            => NotFound(new { error = ex.Code, message = ex.Message }),
+                "forbidden"            => StatusCode(403, new { error = ex.Code, message = ex.Message }),
+                "edit_window_expired"  => UnprocessableEntity(new { error = ex.Code, message = ex.Message }),
+                _                      => BadRequest(new { error = ex.Code, message = ex.Message }),
+            };
+        }
+    }
+
+    [HttpDelete("{messageId:guid}")]
+    public async Task<IActionResult> Delete(
+        Guid friendshipId,
+        Guid messageId,
+        CancellationToken ct)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+
+        try
+        {
+            var result = await service.DeleteAsync(user.Id, friendshipId, messageId, ct);
+            return result is null ? NotFound() : Ok(result);
+        }
+        catch (FriendsServiceException ex)
+        {
+            return ex.Code switch
+            {
+                "not_found" => NotFound(new { error = ex.Code, message = ex.Message }),
+                "forbidden" => StatusCode(403, new { error = ex.Code, message = ex.Message }),
+                _           => BadRequest(new { error = ex.Code, message = ex.Message }),
+            };
+        }
+    }
 }
 
 public record UploadUrlRequest(string ContentType);

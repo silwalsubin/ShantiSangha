@@ -38,15 +38,19 @@ public record AcceptInvitationRequest(string Token);
 public record FriendMessageResponse(
     Guid Id,
     Guid FriendshipId,
+    Guid ConversationId,           // group-ready alias; equals FriendshipId for 1:1
     Guid SenderUserId,
     string Kind,
     string? Body,
     string? MediaUrl,
     int? DurationMs,
     DateTime SentAt,
-    DateTime? ReadAt);
+    DateTime? ReadAt,
+    DateTime? EditedAt,
+    DateTime? DeletedAt);
 
 public record SendTextMessageRequest(string Body);
+public record EditTextMessageRequest(string Body);
 
 public record CreateMediaUploadResponse(
     string ObjectKey,

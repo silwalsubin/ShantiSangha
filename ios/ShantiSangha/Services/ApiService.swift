@@ -41,6 +41,17 @@ actor ApiService {
         self.tokenProvider = provider
     }
 
+    /// Exposed so non-HTTP transports (the chat WebSocket) can build a
+    /// URL against the same origin without duplicating config.
+    func getBaseURL() -> String { baseURL }
+
+    /// Resolve a fresh (cache-aware) bearer token. Used by the chat
+    /// WebSocket which puts the token in `?token=` because the upgrade
+    /// handshake doesn't accept arbitrary headers.
+    func currentToken() async -> String? {
+        await resolveToken()
+    }
+
     /// Invalidate the cached token (e.g. on sign-out).
     func clearTokenCache() {
         cachedToken = nil
@@ -61,8 +72,19 @@ actor ApiService {
         try await request("PATCH", path: path, body: body)
     }
 
+    func put<T: Decodable>(_ path: String, body: Encodable? = nil) async throws -> T {
+        try await request("PUT", path: path, body: body)
+    }
+
     func delete(_ path: String) async throws {
         let _: EmptyResponse = try await request("DELETE", path: path)
+    }
+
+    /// DELETE that decodes a response body. Used by soft-delete endpoints
+    /// that return the updated row (with `deletedAt` set) so the caller
+    /// can update local state without a follow-up fetch.
+    func deleteReturning<T: Decodable>(_ path: String) async throws -> T {
+        try await request("DELETE", path: path)
     }
 
     /// POST with raw Data body (for sync queue)

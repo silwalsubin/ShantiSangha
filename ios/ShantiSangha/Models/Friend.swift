@@ -27,6 +27,10 @@ enum FriendMessageKind: String, Codable {
 struct FriendMessage: Codable, Identifiable, Equatable {
     let id: UUID
     let friendshipId: UUID
+    /// Group-ready alias; equals `friendshipId` for 1:1 chat. Future
+    /// group messages will keep the same wire shape, just with a
+    /// different `conversationId` namespace.
+    let conversationId: UUID
     let senderUserId: UUID
     let kind: FriendMessageKind
     let body: String?
@@ -34,6 +38,11 @@ struct FriendMessage: Codable, Identifiable, Equatable {
     let durationMs: Int?
     let sentAt: String
     let readAt: String?
+    let editedAt: String?
+    let deletedAt: String?
+
+    var isDeleted: Bool { deletedAt != nil }
+    var isEdited:  Bool { editedAt != nil && deletedAt == nil }
 }
 
 struct CreateInvitationResponse: Codable {

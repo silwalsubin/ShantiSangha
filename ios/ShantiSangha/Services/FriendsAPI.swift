@@ -84,6 +84,24 @@ enum FriendsAPI {
             "/friends/\(friendshipId.uuidString.lowercased())/messages/\(messageId.uuidString.lowercased())/read")
     }
 
+    struct EditTextBody: Encodable { let body: String }
+    /// Sender-only edit, Text only, within 15 minutes of send. Backend
+    /// rejects with 422 + `error: "edit_window_expired"` past the window;
+    /// the caller is expected to gate the UI affordance, but this enforces
+    /// it server-side.
+    static func editText(friendshipId: UUID, messageId: UUID, body: String) async throws -> FriendMessage {
+        try await ApiService.shared.put(
+            "/friends/\(friendshipId.uuidString.lowercased())/messages/\(messageId.uuidString.lowercased())",
+            body: EditTextBody(body: body))
+    }
+
+    /// Sender-only soft delete. Idempotent — re-deleting returns the
+    /// existing row (with `deletedAt` set, body blanked, media removed).
+    static func deleteMessage(friendshipId: UUID, messageId: UUID) async throws -> FriendMessage {
+        try await ApiService.shared.deleteReturning(
+            "/friends/\(friendshipId.uuidString.lowercased())/messages/\(messageId.uuidString.lowercased())")
+    }
+
     /// Direct PUT upload of binary data to a presigned S3 URL — used by image
     /// and voice attachment flows. Returns when the upload is complete; throws
     /// on non-2xx.
