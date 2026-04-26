@@ -18,10 +18,10 @@ struct FriendsTabView: View {
                         .padding(.horizontal, SacredSpacing.m)
                         .padding(.top, SacredSpacing.m)
 
-                    if vm.loading && vm.friends.isEmpty && vm.pendingInvitations.isEmpty {
+                    if vm.loading && vm.friends.isEmpty && vm.pendingInvitations.isEmpty && vm.outgoingRequests.isEmpty {
                         ProgressView()
                             .padding(.top, SacredSpacing.xl * 2)
-                    } else if vm.friends.isEmpty && vm.pendingInvitations.isEmpty {
+                    } else if vm.friends.isEmpty && vm.pendingInvitations.isEmpty && vm.outgoingRequests.isEmpty {
                         emptyState
                             .padding(.horizontal, SacredSpacing.m)
                             .padding(.top, SacredSpacing.xl)
@@ -37,6 +37,19 @@ struct FriendsTabView: View {
                             }
                             .padding(.horizontal, SacredSpacing.m)
                             .padding(.top, SacredSpacing.l)
+                        }
+
+                        if !vm.outgoingRequests.isEmpty {
+                            SacredCard("REQUESTS YOU SENT") {
+                                VStack(spacing: SacredSpacing.s) {
+                                    ForEach(vm.outgoingRequests) { req in
+                                        OutgoingRequestRow(
+                                            request: req,
+                                            onCancel: { Task { await vm.cancelOutgoingRequest(req.id) } })
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, SacredSpacing.m)
                         }
 
                         if !vm.pendingInvitations.isEmpty {
@@ -118,7 +131,7 @@ struct FriendsTabView: View {
     /// empty state is the message at that point. Surface errors only when the
     /// user is mid-action or has loaded data and a follow-up call failed.
     private var shouldHideError: Bool {
-        vm.friends.isEmpty && vm.pendingInvitations.isEmpty
+        vm.friends.isEmpty && vm.pendingInvitations.isEmpty && vm.outgoingRequests.isEmpty
     }
 
     private func onInvite() async {
@@ -222,6 +235,42 @@ private struct PendingInviteRow: View {
         if days <= 0 { return "Expires today" }
         if days == 1 { return "Expires tomorrow" }
         return "Expires in \(days) days"
+    }
+}
+
+
+private struct OutgoingRequestRow: View {
+    let request: FriendRequestSummary
+    let onCancel: () -> Void
+
+    var body: some View {
+        HStack(spacing: SacredSpacing.s) {
+            SacredAvatar(
+                displayName: request.otherUserDisplayName,
+                avatarUrl: request.otherUserAvatarUrl,
+                size: 36)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(request.otherUserDisplayName)
+                    .font(.sacredTextSemibold)
+                    .foregroundColor(.sacredText)
+                Text(sentAgo)
+                    .font(.sacredMicro)
+                    .foregroundColor(.sacredMuted)
+            }
+            Spacer()
+            Button("Cancel") { onCancel() }
+                .font(.sacredSmallSemibold)
+                .foregroundColor(.sacredRed)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var sentAgo: String {
+        guard let sent = FriendsDates.parse(request.createdAt) else { return "Sent" }
+        let days = Calendar.current.dateComponents([.day], from: sent, to: Date()).day ?? 0
+        if days <= 0 { return "Sent today" }
+        if days == 1 { return "Sent yesterday" }
+        return "Sent \(days) days ago"
     }
 }
 

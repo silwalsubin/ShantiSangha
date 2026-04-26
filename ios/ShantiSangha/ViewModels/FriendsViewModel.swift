@@ -6,6 +6,10 @@ import SwiftUI
 final class FriendsViewModel: ObservableObject {
     @Published var friends: [FriendSummary] = []
     @Published var pendingInvitations: [PendingInvitation] = []
+    /// Direct friend requests this user has sent that are still
+    /// awaiting a response. Distinct from `pendingInvitations` (which
+    /// are token-based share links not yet redeemed).
+    @Published var outgoingRequests: [FriendRequestSummary] = []
     @Published var loading = false
     @Published var errorMessage: String?
 
@@ -43,6 +47,12 @@ final class FriendsViewModel: ObservableObject {
             if !error.isCancellation, loadError == nil { loadError = error }
         }
 
+        do {
+            outgoingRequests = try await NotificationsAPI.listOutgoingRequests()
+        } catch {
+            if !error.isCancellation, loadError == nil { loadError = error }
+        }
+
         if let loadError {
             errorMessage = friendlyMessage(for: loadError)
         } else {
@@ -66,6 +76,20 @@ final class FriendsViewModel: ObservableObject {
             try await FriendsAPI.revokeInvitation(invitationId)
             await refresh()
         } catch {
+            errorMessage = friendlyMessage(for: error)
+        }
+    }
+
+    /// Cancel a direct friend request the user previously sent. Drops
+    /// the row optimistically; the next refresh reconciles in case the
+    /// call failed silently.
+    func cancelOutgoingRequest(_ requestId: UUID) async {
+        let prev = outgoingRequests
+        outgoingRequests.removeAll { $0.id == requestId }
+        do {
+            try await NotificationsAPI.cancelRequest(requestId)
+        } catch {
+            outgoingRequests = prev
             errorMessage = friendlyMessage(for: error)
         }
     }
