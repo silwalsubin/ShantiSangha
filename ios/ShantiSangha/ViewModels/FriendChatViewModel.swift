@@ -7,7 +7,15 @@ final class FriendChatViewModel: ObservableObject {
     let friendUserId: UUID
     let friendDisplayName: String
 
-    @Published var messages: [FriendMessage] = []
+    @Published var messages: [FriendMessage] = [] {
+        didSet {
+            // Persist every mutation to the on-disk thread cache. Saves
+            // are async on a background queue; the didSet call here is
+            // non-blocking. Ensures cold-open paints instantly from
+            // cache and recent history is readable offline.
+            ChatCache.save(friendshipId: friendshipId, messages: messages)
+        }
+    }
     @Published var loading = false
     @Published var loadingOlder = false
     @Published var sending = false
@@ -46,6 +54,11 @@ final class FriendChatViewModel: ObservableObject {
         self.friendshipId = friendshipId
         self.friendUserId = friendUserId
         self.friendDisplayName = friendDisplayName
+        // Hydrate from disk synchronously so the first SwiftUI render
+        // shows the last-known thread instead of a flash of empty.
+        // The .task-driven refresh() upserts whatever's newer from the
+        // API on top of this baseline.
+        self.messages = ChatCache.load(friendshipId: friendshipId)
         observer = NotificationCenter.default.addObserver(
             forName: .friendMessageReceived,
             object: nil,
@@ -69,14 +82,34 @@ final class FriendChatViewModel: ObservableObject {
         defer { loading = false }
         do {
             let loaded = try await FriendsAPI.listMessages(friendshipId: friendshipId, limit: 50)
-            messages = loaded
+            // Upsert into the cache-hydrated baseline rather than
+            // replacing it: a thread the user has paginated deeper on
+            // still has those older rows in `messages` from disk; we
+            // don't want a foreground refresh to truncate them back to
+            // the latest 50.
+            mergeFetched(loaded)
             errorMessage = nil
             await markUnreadAsRead()
         } catch {
-            if !error.isCancellation {
+            // Network failure with cached messages on screen is fine —
+            // user can still read history. Surface the error only if
+            // we have nothing to show.
+            if !error.isCancellation, messages.isEmpty {
                 errorMessage = error.localizedDescription
             }
         }
+    }
+
+    /// Merge a freshly-fetched API page into `messages`, replacing any
+    /// existing rows by id and preserving older cached rows the page
+    /// didn't include. Sort by sentAt at the end so out-of-order arrivals
+    /// land in the right place.
+    private func mergeFetched(_ fetched: [FriendMessage]) {
+        var byId = Dictionary(uniqueKeysWithValues: messages.map { ($0.id, $0) })
+        for msg in fetched {
+            byId[msg.id] = msg
+        }
+        messages = byId.values.sorted { $0.sentAt < $1.sentAt }
     }
 
     func loadOlder() async {
@@ -88,7 +121,9 @@ final class FriendChatViewModel: ObservableObject {
         do {
             let older = try await FriendsAPI.listMessages(friendshipId: friendshipId, before: oldestDate, limit: 50)
             if older.isEmpty { loadedAll = true; return }
-            messages = older + messages
+            // Merge by id so a partial overlap with the existing range
+            // doesn't duplicate rows in the cache.
+            mergeFetched(older)
         } catch {
             // silent; the caller can retry
         }
