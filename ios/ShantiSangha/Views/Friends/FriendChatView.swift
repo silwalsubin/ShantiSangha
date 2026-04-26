@@ -188,6 +188,12 @@ struct FriendChatView: View {
                         .padding(.horizontal, SacredSpacing.m)
                 }
             }
+            // Anchor the initial layout to the bottom of the content,
+            // so opening a chat lands on the latest message instead of
+            // wherever SwiftUI's default scroll position happened to
+            // settle. The onChange handlers below take over for live
+            // appends so they keep auto-scrolling on new arrivals.
+            .defaultScrollAnchor(.bottom)
             .onChange(of: vm.messages.last?.id) { _, _ in
                 if let last = vm.messages.last {
                     withAnimation(.easeOut(duration: 0.2)) {
