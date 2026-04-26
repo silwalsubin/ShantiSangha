@@ -64,7 +64,9 @@
       "Bash(tar -xf bundle.tar)",
       "Bash(xcodebuild -project ShantiSangha.xcodeproj -scheme ShantiSangha -sdk iphonesimulator -configuration Debug -destination 'generic/platform=iOS Simulator' build)",
       "Bash(git fetch *)",
-      "Bash(git ls-tree *)"
+      "Bash(git ls-tree *)",
+      "Bash(bash /Users/subinsilwal/Desktop/code/maiself/.claude/skills/app-health-check/scripts/health_check.sh)",
+      "Edit(/.claude/skills/app-health-check/**)"
     ],
     "additionalDirectories": [
       "/Users/subinsilwal/Desktop/code/maiself/.claude",

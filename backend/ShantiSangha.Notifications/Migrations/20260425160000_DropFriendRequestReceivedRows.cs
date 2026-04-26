@@ -16,7 +16,7 @@ public partial class DropFriendRequestReceivedRows : Migration
     protected override void Up(MigrationBuilder migrationBuilder)
     {
         migrationBuilder.Sql(@"
-            DELETE FROM ""Notifications""
+            DELETE FROM ""AppNotifications""
             WHERE ""Type"" = 'friend_request_received';
         ");
     }
