@@ -24,7 +24,7 @@ struct NotificationsView: View {
                         SacredEmptyState(
                             icon: "bell",
                             title: "Quiet here.",
-                            subtitle: "Updates about your connections will land here.")
+                            subtitle: "Anything worth knowing about will land here.")
                             .padding(.horizontal, SacredSpacing.m)
                             .padding(.top, SacredSpacing.xl)
                     } else {
