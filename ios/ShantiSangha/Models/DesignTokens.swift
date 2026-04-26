@@ -186,114 +186,27 @@ extension View {
     }
 }
 
-/// Radial shiny gold — for circular elements (avatars, FAB).
+/// Flat radial gold — soft amber center fading to a darker amber edge.
+/// Name kept for source-compat with the previous metallic-shine variant
+/// that this replaces; nothing in the design system should look shiny.
 extension RadialGradient {
     static let sacredGoldShiny = RadialGradient(
-        stops: [
-            .init(color: .sacredGoldShine, location: 0),
-            .init(color: .sacredGold, location: 0.45),
-            .init(color: .sacredGoldDark, location: 1),
-        ],
+        colors: [.sacredGold, .sacredGoldDark],
         center: .init(x: 0.35, y: 0.35),
         startRadius: 0,
         endRadius: 40
     )
 }
 
-/// Cymbal-textured gold — concentric rings like a brushed metal cymbal.
-/// Use on circular FAB buttons for a tactile, sacred-instrument feel.
-struct CymbalGoldModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .background(
-                ZStack {
-                    // Bright golden base
-                    RadialGradient(
-                        stops: [
-                            .init(color: .sacredGoldShine, location: 0),
-                            .init(color: .sacredGold, location: 0.5),
-                            .init(color: .sacredGoldDark, location: 1),
-                        ],
-                        center: .center,
-                        startRadius: 0,
-                        endRadius: 40
-                    )
-
-                    // Concentric ring grooves — centered
-                    Canvas { ctx, size in
-                        let center = CGPoint(x: size.width * 0.5, y: size.height * 0.5)
-                        let maxRadius = min(size.width, size.height) * 0.5
-                        let ringCount = 16
-
-                        for i in 0..<ringCount {
-                            let t = CGFloat(i + 2) / CGFloat(ringCount + 2)
-                            let radius = maxRadius * t
-                            let rect = CGRect(
-                                x: center.x - radius,
-                                y: center.y - radius,
-                                width: radius * 2,
-                                height: radius * 2
-                            )
-                            let ring = Path(ellipseIn: rect)
-                            let bright = (i % 2 == 0)
-                            ctx.stroke(
-                                ring,
-                                with: .color(bright ? .white.opacity(0.18) : .black.opacity(0.1)),
-                                lineWidth: 0.15
-                            )
-                        }
-                    }
-
-                    // Highlight sheen — top-left
-                    RadialGradient(
-                        stops: [
-                            .init(color: .white.opacity(0.3), location: 0),
-                            .init(color: .white.opacity(0.05), location: 0.4),
-                            .init(color: .clear, location: 0.7),
-                        ],
-                        center: .init(x: 0.35, y: 0.3),
-                        startRadius: 0,
-                        endRadius: 25
-                    )
-                }
-            )
-    }
-}
-
-extension View {
-    func cymbalGold() -> some View {
-        modifier(CymbalGoldModifier())
-    }
-}
-
-/// Simple gold background with a motion-reactive shine highlight.
-/// Clean and flat — no concentric rings or cymbal texture.
+/// `goldShine()` retained as a no-op-style modifier that simply paints
+/// a flat amber gradient. The previous motion-reactive metallic
+/// highlight has been removed from the design system — nothing in the
+/// app should look shiny — but the modifier name stays so the existing
+/// call sites (FAB, voice-note tiles, vedic-chart accents) keep
+/// rendering with the right warm gold backdrop.
 struct GoldShineModifier: ViewModifier {
-    @ObservedObject private var motion = MotionManager.shared
-
     func body(content: Content) -> some View {
-        content
-            .background(
-                ZStack {
-                    Color.sacredGold
-
-                    // Motion shine — follows device tilt
-                    GeometryReader { geo in
-                        let cx = (1 + motion.shineX) / 2 * geo.size.width
-                        let cy = (1 - motion.shineY) / 2 * geo.size.height
-                        RadialGradient(
-                            stops: [
-                                .init(color: .white.opacity(0.45), location: 0),
-                                .init(color: .sacredGoldShine.opacity(0.25), location: 0.35),
-                                .init(color: .clear, location: 0.7),
-                            ],
-                            center: UnitPoint(x: cx / geo.size.width, y: cy / geo.size.height),
-                            startRadius: 0,
-                            endRadius: max(geo.size.width, geo.size.height) * 0.6
-                        )
-                    }
-                }
-            )
+        content.background(LinearGradient.sacredGoldShinyVertical)
     }
 }
 
@@ -303,30 +216,18 @@ extension View {
     }
 }
 
-/// Reusable shiny gold gradients — metallic highlight for sacred elements.
+/// Flat amber gradients — `sacredGold` to `sacredGoldDark`. No mid-stop
+/// highlight, no metallic band. Names kept so existing call sites
+/// don't need to change; the visual is now just a warm two-stop fill.
 extension LinearGradient {
-    /// Shiny gold — horizontal with center highlight band
     static let sacredGoldShiny = LinearGradient(
-        stops: [
-            .init(color: .sacredGoldDark, location: 0),
-            .init(color: .sacredGold, location: 0.3),
-            .init(color: .sacredGoldShine, location: 0.5),
-            .init(color: .sacredGold, location: 0.7),
-            .init(color: .sacredGoldDark, location: 1),
-        ],
+        colors: [.sacredGold, .sacredGoldDark],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
 
-    /// Shiny gold — vertical variant for buttons
     static let sacredGoldShinyVertical = LinearGradient(
-        stops: [
-            .init(color: .sacredGoldDark, location: 0),
-            .init(color: .sacredGold, location: 0.25),
-            .init(color: .sacredGoldShine, location: 0.45),
-            .init(color: .sacredGold, location: 0.7),
-            .init(color: .sacredGoldDark, location: 1),
-        ],
+        colors: [.sacredGold, .sacredGoldDark],
         startPoint: .top,
         endPoint: .bottom
     )
