@@ -488,18 +488,17 @@ struct HomeView: View {
             ZStack(alignment: .topTrailing) {
                 Circle()
                     .fill(Color.sacredBgCard.opacity(0.72))
-                    .frame(width: 36, height: 36)
-                    .overlay(Circle().stroke(Color.sacredGold.opacity(0.42), lineWidth: 2))
                     .overlay(
                         Image(systemName: notifications.unreadCount > 0 ? "bell.fill" : "bell")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.sacredGold)
                     )
-                    // Same drop shadow as ProfileAvatarShadow so the chip
-                    // matches the avatar's elevation. Lifts the bell off
-                    // the dark gradient backdrop the same way the avatar
-                    // floats above it.
-                    .shadow(color: Color.black.opacity(0.24), radius: 8, x: 0, y: 5)
+                    .frame(width: 36, height: 36)
+                    // Shared chrome — gold ring + drop shadow. Same
+                    // modifier ProfileAvatarImage uses, so if the chip
+                    // geometry ever changes there's only one place to
+                    // update.
+                    .sacredCircularChrome()
                     .frame(width: 44, height: 44)   // 44pt touch target
 
                 if notifications.unreadCount > 0 {

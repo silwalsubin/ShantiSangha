@@ -45,9 +45,14 @@ struct ProfileAvatarImage: View {
             }
         }
         .frame(width: size, height: size)
-        .clipShape(Circle())
-        .overlay(Circle().stroke(Color.sacredGold.opacity(borderOpacity), lineWidth: borderWidth))
-        .modifier(ProfileAvatarShadow(active: shadow))
+        // Shared chrome — clip-to-circle, gold ring, optional drop shadow.
+        // Defined in `SacredCircularChrome.swift` so the bell button and
+        // any future toolbar circle pick up identical geometry without
+        // duplicating numbers.
+        .sacredCircularChrome(
+            borderOpacity: borderOpacity,
+            borderWidth: borderWidth,
+            shadow: shadow)
         .task(id: rawUrl) {
             await loadImageIfNeeded()
         }
@@ -96,14 +101,3 @@ struct ProfileAvatarImage: View {
     }
 }
 
-private struct ProfileAvatarShadow: ViewModifier {
-    let active: Bool
-
-    func body(content: Content) -> some View {
-        if active {
-            content.shadow(color: Color.black.opacity(0.24), radius: 8, x: 0, y: 5)
-        } else {
-            content
-        }
-    }
-}
