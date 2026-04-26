@@ -495,6 +495,11 @@ struct HomeView: View {
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.sacredGold)
                     )
+                    // Same drop shadow as ProfileAvatarShadow so the chip
+                    // matches the avatar's elevation. Lifts the bell off
+                    // the dark gradient backdrop the same way the avatar
+                    // floats above it.
+                    .shadow(color: Color.black.opacity(0.24), radius: 8, x: 0, y: 5)
                     .frame(width: 44, height: 44)   // 44pt touch target
 
                 if notifications.unreadCount > 0 {
