@@ -102,7 +102,7 @@ try
     builder.Services.AddWellnessModule(connStr, appConfig.VoiceBucketName);
     builder.Services.AddInsightsModule(vectorDataSource);
     builder.Services.AddJyotishModule(vectorDataSource);
-    builder.Services.AddFriendsModule(connStr, appConfig.FriendsMediaBucketName);
+    builder.Services.AddFriendsModule(connStr, appConfig.FriendsMediaBucketName, appConfig.RedisUrl);
     builder.Services.AddNotificationsModule(connStr);
 
     // ── Controller discovery from domain assemblies ─────────────────────

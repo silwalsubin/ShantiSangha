@@ -33,7 +33,7 @@ public static class ChatWebSocketEndpoint
         ICurrentUser currentUser,
         IConversationMembershipService membership,
         IChatRealtimeHub hub,
-        ILogger<InMemoryChatRealtimeHub> logger)
+        ILogger<RedisChatRealtimeHub> logger)
     {
         if (!context.WebSockets.IsWebSocketRequest)
         {
