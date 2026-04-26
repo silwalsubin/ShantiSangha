@@ -21,6 +21,8 @@ struct SacredAvatar: View {
     let avatarUrl: String?
     let size: CGFloat
 
+    @State private var loadedImage: UIImage?
+
     /// Icon scales with size — at 40 pt avatar we want ~22 pt icon, at
     /// 120 pt we want ~64 pt. Linear ratio works.
     private var iconFontSize: CGFloat {
@@ -29,27 +31,16 @@ struct SacredAvatar: View {
 
     var body: some View {
         ZStack {
-            // Always draw the gold-gradient placeholder underneath so a
-            // slow / failed AsyncImage load reveals it rather than a blank
-            // circle.
+            // Gold-gradient placeholder underneath so any frame in
+            // which the image hasn't resolved still renders as a warm
+            // circle rather than a blank.
             Circle()
                 .fill(LinearGradient.sacredGoldShinyVertical)
 
-            if let urlString = avatarUrl,
-               !urlString.isEmpty,
-               let url = URL(string: urlString) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .empty, .failure:
-                        defaultIcon
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    @unknown default:
-                        defaultIcon
-                    }
-                }
+            if let img = loadedImage {
+                Image(uiImage: img)
+                    .resizable()
+                    .scaledToFill()
             } else {
                 defaultIcon
             }
@@ -57,6 +48,20 @@ struct SacredAvatar: View {
         .frame(width: size, height: size)
         .clipShape(Circle())
         .overlay(Circle().stroke(Color.sacredGoldDark.opacity(0.18), lineWidth: 0.75))
+        // Re-fetch when the URL changes (presigned avatars rotate every
+        // refresh). Routed through AvatarImageCache so every SacredAvatar
+        // for the same URL on screen shares one fetched copy — fixes the
+        // bug where the 12pt read-receipt rendered while the 28pt gutter
+        // avatar fell into a failed AsyncImage state.
+        .task(id: avatarUrl) {
+            guard let urlString = avatarUrl,
+                  !urlString.isEmpty,
+                  let url = URL(string: urlString) else {
+                loadedImage = nil
+                return
+            }
+            loadedImage = await AvatarImageCache.shared.image(for: url)
+        }
     }
 
     private var defaultIcon: some View {
