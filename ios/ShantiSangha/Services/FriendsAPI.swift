@@ -50,9 +50,14 @@ enum FriendsAPI {
         return try await ApiService.shared.get(path)
     }
 
-    struct SendTextBody: Encodable { let body: String }
-    static func sendText(friendshipId: UUID, body: String) async throws -> FriendMessage {
-        try await ApiService.shared.post("/friends/\(friendshipId.uuidString.lowercased())/messages", body: SendTextBody(body: body))
+    struct SendTextBody: Encodable {
+        let body: String
+        let replyToMessageId: UUID?
+    }
+    static func sendText(friendshipId: UUID, body: String, replyToMessageId: UUID? = nil) async throws -> FriendMessage {
+        try await ApiService.shared.post(
+            "/friends/\(friendshipId.uuidString.lowercased())/messages",
+            body: SendTextBody(body: body, replyToMessageId: replyToMessageId))
     }
 
     struct UploadUrlBody: Encodable { let contentType: String }
@@ -69,19 +74,27 @@ enum FriendsAPI {
     struct CommitMediaBody: Encodable {
         let objectKey: String
         let durationMs: Int?
+        let replyToMessageId: UUID?
     }
-    static func commitImage(friendshipId: UUID, objectKey: String) async throws -> FriendMessage {
+    static func commitImage(friendshipId: UUID, objectKey: String, replyToMessageId: UUID? = nil) async throws -> FriendMessage {
         try await ApiService.shared.post("/friends/\(friendshipId.uuidString.lowercased())/messages/image",
-                                          body: CommitMediaBody(objectKey: objectKey, durationMs: nil))
+                                          body: CommitMediaBody(objectKey: objectKey, durationMs: nil, replyToMessageId: replyToMessageId))
     }
-    static func commitVoice(friendshipId: UUID, objectKey: String, durationMs: Int) async throws -> FriendMessage {
+    static func commitVoice(friendshipId: UUID, objectKey: String, durationMs: Int, replyToMessageId: UUID? = nil) async throws -> FriendMessage {
         try await ApiService.shared.post("/friends/\(friendshipId.uuidString.lowercased())/messages/voice",
-                                          body: CommitMediaBody(objectKey: objectKey, durationMs: durationMs))
+                                          body: CommitMediaBody(objectKey: objectKey, durationMs: durationMs, replyToMessageId: replyToMessageId))
     }
 
     static func markRead(friendshipId: UUID, messageId: UUID) async throws {
         let _: EmptyResponse = try await ApiService.shared.post(
             "/friends/\(friendshipId.uuidString.lowercased())/messages/\(messageId.uuidString.lowercased())/read")
+    }
+
+    struct MarkReadThroughBody: Encodable { let lastMessageId: UUID }
+    static func markReadThrough(friendshipId: UUID, lastMessageId: UUID) async throws {
+        let _: EmptyResponse = try await ApiService.shared.post(
+            "/friends/\(friendshipId.uuidString.lowercased())/messages/read-through",
+            body: MarkReadThroughBody(lastMessageId: lastMessageId))
     }
 
     struct EditTextBody: Encodable { let body: String }

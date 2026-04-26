@@ -8,7 +8,7 @@ public interface IFriendMessagesService
         Guid userId, Guid friendshipId, DateTime? before, int limit, CancellationToken ct = default);
 
     Task<FriendMessageResponse?> SendTextAsync(
-        Guid userId, Guid friendshipId, string body, CancellationToken ct = default);
+        Guid userId, Guid friendshipId, string body, Guid? replyToMessageId = null, CancellationToken ct = default);
 
     Task<CreateMediaUploadResponse?> CreateImageUploadAsync(
         Guid userId, Guid friendshipId, string contentType, CancellationToken ct = default);
@@ -24,6 +24,9 @@ public interface IFriendMessagesService
 
     Task<bool> MarkReadAsync(
         Guid userId, Guid friendshipId, Guid messageId, CancellationToken ct = default);
+
+    Task<bool> MarkReadThroughAsync(
+        Guid userId, Guid friendshipId, Guid lastMessageId, CancellationToken ct = default);
 
     /// <summary>Sender-only edit of a Text message within 15 min of send.
     /// Throws FriendsServiceException with code:

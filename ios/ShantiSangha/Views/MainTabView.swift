@@ -90,7 +90,7 @@ struct MainTabView: View {
                     Image("tab.union")
                     Text("Friends")
                 }
-                .badge(friendsBadge.pendingIncomingCount)
+                .badge(friendsBadge.count)
                 .tag(3)
             }
             .tint(.sacredGold)

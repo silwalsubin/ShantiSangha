@@ -12,6 +12,7 @@ public class FriendMessage
     /// group chats land.</summary>
     public Guid FriendshipId { get; set; }
     public Guid SenderUserId { get; set; }
+    public Guid? ReplyToMessageId { get; set; }
     public FriendMessageKind Kind { get; set; }
     public string? Body { get; set; }
     public string? StorageKey { get; set; }

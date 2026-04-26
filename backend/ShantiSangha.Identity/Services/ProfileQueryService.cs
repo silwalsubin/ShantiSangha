@@ -58,6 +58,16 @@ public class ProfileQueryService(
         return new UserBirthInfo(profile?.BirthDate, profile?.BirthTime, profile?.BirthPlace);
     }
 
+    public async Task<bool> GetFriendMessageNotificationsEnabledAsync(Guid userId, CancellationToken ct = default)
+    {
+        var enabled = await db.Profiles
+            .Where(p => p.UserId == userId)
+            .Select(p => (bool?)p.NotifyOnFriendMessages)
+            .FirstOrDefaultAsync(ct);
+
+        return enabled ?? true;
+    }
+
     public async Task<IReadOnlyList<UserTimezoneInfo>> GetAllUserTimezonesAsync(CancellationToken ct = default)
     {
         return await db.Profiles

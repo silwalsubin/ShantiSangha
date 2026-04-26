@@ -38,7 +38,7 @@ public class FriendMessagesController(
 
         try
         {
-            var result = await service.SendTextAsync(user.Id, friendshipId, body.Body, ct);
+            var result = await service.SendTextAsync(user.Id, friendshipId, body.Body, body.ReplyToMessageId, ct);
             return result is null ? NotFound() : Created($"/api/friends/{friendshipId}/messages/{result.Id}", result);
         }
         catch (FriendsServiceException ex)
@@ -135,6 +135,19 @@ public class FriendMessagesController(
         if (user is null) return Unauthorized();
 
         var ok = await service.MarkReadAsync(user.Id, friendshipId, messageId, ct);
+        return ok ? NoContent() : NotFound();
+    }
+
+    [HttpPost("read-through")]
+    public async Task<IActionResult> MarkReadThrough(
+        Guid friendshipId,
+        [FromBody] MarkMessagesReadRequest body,
+        CancellationToken ct)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+
+        var ok = await service.MarkReadThroughAsync(user.Id, friendshipId, body.LastMessageId, ct);
         return ok ? NoContent() : NotFound();
     }
 

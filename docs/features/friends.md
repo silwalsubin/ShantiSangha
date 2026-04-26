@@ -13,7 +13,7 @@ Connect with people you trust and message them inside the app — text, images, 
 - The invite is shared via the iOS share sheet (iMessage, Mail, etc.) — Universal Link or `shantisangha://invite/{token}`
 - The recipient taps the link, sees a preview of who invited them, and accepts
 - Once connected, both users see each other in their Friends list and can open a 1:1 chat
-- Chat supports text, images, and voice messages
+- Chat supports text, images, voice messages, and replies to specific messages
 - New messages produce a push notification when the app is backgrounded
 - Either side can end the friendship at any time — the message thread and all media are hard-deleted on both sides
 
@@ -29,7 +29,7 @@ Connect with people you trust and message them inside the app — text, images, 
 - Display Name is required before inviting
 
 ## Notifications
-- Push alert on new friend message when app is backgrounded — body shows sender Display Name and a short preview of the message
+- Push alert on new friend message when app is backgrounded — body shows sender Display Name with a generic message preview for privacy
 - Configurable via Settings: a single toggle "Notify me when friends message" (default ON)
 
 ## Surface
@@ -53,6 +53,11 @@ The app gains a 4th tab — Friends. The first three tabs (Home, Reflect, Journe
 - `DELETE /api/friends/{friendshipId}` — end friendship (hard-delete thread + media)
 - `GET /api/friends/{friendshipId}/messages?before={cursor}&limit={n}` — paginated message list
 - `POST /api/friends/{friendshipId}/messages` — send a text message
-- `POST /api/friends/{friendshipId}/messages/image` — multipart upload of an image message
-- `POST /api/friends/{friendshipId}/messages/voice` — multipart upload of a voice message
+- `POST /api/friends/{friendshipId}/messages/image/upload-url` — create a presigned image upload URL
+- `POST /api/friends/{friendshipId}/messages/image` — commit an uploaded image message
+- `POST /api/friends/{friendshipId}/messages/voice/upload-url` — create a presigned voice upload URL
+- `POST /api/friends/{friendshipId}/messages/voice` — commit an uploaded voice message
 - `POST /api/friends/{friendshipId}/messages/{messageId}/read` — mark a message as read
+- `POST /api/friends/{friendshipId}/messages/read-through` — mark incoming messages through a cursor as read
+
+Text and media send/commit requests may include `replyToMessageId`; responses include `replyPreview` so the client can render the parent context even if the original message is outside the loaded page.

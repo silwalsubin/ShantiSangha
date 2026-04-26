@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @EnvironmentObject var auth: AuthService
+    @EnvironmentObject var profile: ProfileService
     @StateObject private var notifications = NotificationService.shared
     @StateObject private var health = HealthKitService.shared
     @StateObject private var weather = WeatherService.shared
@@ -11,6 +12,7 @@ struct SettingsView: View {
     @State private var serverStatus: ServerStatus = .loading
     @State private var healthPermissionDenied = false
     @State private var weatherPermissionDenied = false
+    @State private var friendMessageAlerts = true
 
     private let api = ApiService.shared
 
@@ -79,6 +81,24 @@ struct SettingsView: View {
                             }
                         }
                         .buttonStyle(.plain)
+                    }
+
+                    Divider()
+                        .background(Color.sacredGold.opacity(0.12))
+
+                    Toggle(isOn: $friendMessageAlerts) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "message")
+                                .font(.sacredSmall)
+                                .foregroundColor(.sacredMuted)
+                            Text("Friend message alerts")
+                                .font(.sacredText)
+                                .foregroundColor(.sacredText)
+                        }
+                    }
+                    .tint(.sacredGold)
+                    .onChange(of: friendMessageAlerts) { _, enabled in
+                        Task { await updateFriendMessageAlerts(enabled) }
                     }
                 }
 
@@ -212,9 +232,13 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            friendMessageAlerts = profile.profile?.notifyOnFriendMessages ?? true
             await fetchServerVersion()
             if health.isEnabled { await health.refreshTodayMinutes() }
             if weather.isEnabled { await weather.refreshIfStale() }
+        }
+        .onChange(of: profile.profile?.notifyOnFriendMessages) { _, enabled in
+            friendMessageAlerts = enabled ?? true
         }
         .alert("Server Error", isPresented: $showErrorDetail) {
             Button("OK", role: .cancel) {}
@@ -432,6 +456,25 @@ struct SettingsView: View {
             // URLSession cancellation — same reason, don't report as unreachable
         } catch {
             serverStatus = .unreachable(error.localizedDescription)
+        }
+    }
+
+    private func updateFriendMessageAlerts(_ enabled: Bool) async {
+        if enabled {
+            let granted = await notifications.checkPermission()
+            if !granted {
+                let result = await notifications.requestPermission()
+                if !result {
+                    friendMessageAlerts = false
+                    return
+                }
+            }
+        }
+
+        do {
+            try await profile.update(UpdateMeRequest(notifyOnFriendMessages: enabled))
+        } catch {
+            friendMessageAlerts = profile.profile?.notifyOnFriendMessages ?? true
         }
     }
 

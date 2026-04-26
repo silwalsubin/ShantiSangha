@@ -10,6 +10,7 @@ struct ProfileResponse: Codable, Equatable {
     let displayName: String?
     let timezone: String?
     let reminderHour: Int?
+    let notifyOnFriendMessages: Bool
     let onboardingCompleted: Bool
     let birthDate: String?
     let birthTime: String?
@@ -32,6 +33,7 @@ struct ProfileResponse: Codable, Equatable {
         displayName: nil,
         timezone: nil,
         reminderHour: nil,
+        notifyOnFriendMessages: true,
         onboardingCompleted: false,
         birthDate: nil,
         birthTime: nil,
@@ -56,6 +58,7 @@ struct UpdateMeRequest: Encodable {
     var displayName: String? = nil
     var timezone: String? = nil
     var reminderHour: Int? = nil
+    var notifyOnFriendMessages: Bool? = nil
     var onboardingCompleted: Bool? = nil
     var clearReminderHour: Bool? = nil
     var birthDate: String? = nil

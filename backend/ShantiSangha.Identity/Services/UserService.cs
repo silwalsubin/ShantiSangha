@@ -49,6 +49,7 @@ public class UserService(
                 user.Profile.DisplayName,
                 user.Profile.Timezone,
                 user.Profile.ReminderHour,
+                user.Profile.NotifyOnFriendMessages,
                 user.Profile.OnboardingCompleted,
                 user.Profile.BirthDate?.ToString("yyyy-MM-dd"),
                 user.Profile.BirthTime,
@@ -90,6 +91,7 @@ public class UserService(
         if (request.DisplayName is not null) user.Profile.DisplayName = request.DisplayName;
         if (request.Timezone is not null) user.Profile.Timezone = request.Timezone;
         if (request.ReminderHour is not null) user.Profile.ReminderHour = Math.Clamp(request.ReminderHour.Value, 0, 23);
+        if (request.NotifyOnFriendMessages is not null) user.Profile.NotifyOnFriendMessages = request.NotifyOnFriendMessages.Value;
         if (request.ClearReminderHour == true) user.Profile.ReminderHour = null;
         if (request.OnboardingCompleted is not null) user.Profile.OnboardingCompleted = request.OnboardingCompleted.Value;
         if (request.BirthDate is not null && DateOnly.TryParse(request.BirthDate, out var parsedBirthDate))

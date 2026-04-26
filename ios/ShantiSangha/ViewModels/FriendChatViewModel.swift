@@ -9,6 +9,7 @@ final class FriendChatViewModel: ObservableObject {
 
     @Published var messages: [FriendMessage] = []
     @Published var loading = false
+    @Published var loadingOlder = false
     @Published var sending = false
     @Published var errorMessage: String?
 
@@ -23,6 +24,7 @@ final class FriendChatViewModel: ObservableObject {
     /// instead of POST.
     @Published var editingMessageId: UUID?
     @Published var editingDraft: String = ""
+    @Published var replyTarget: FriendMessage?
 
     private var observer: NSObjectProtocol?
     private var loadedAll = false
@@ -79,7 +81,10 @@ final class FriendChatViewModel: ObservableObject {
 
     func loadOlder() async {
         guard !loadedAll, let oldest = messages.first,
-              let oldestDate = FriendsDates.parse(oldest.sentAt) else { return }
+              let oldestDate = FriendsDates.parse(oldest.sentAt),
+              !loadingOlder else { return }
+        loadingOlder = true
+        defer { loadingOlder = false }
         do {
             let older = try await FriendsAPI.listMessages(friendshipId: friendshipId, before: oldestDate, limit: 50)
             if older.isEmpty { loadedAll = true; return }
@@ -98,11 +103,16 @@ final class FriendChatViewModel: ObservableObject {
         sending = true
         defer { sending = false }
         do {
-            let msg = try await FriendsAPI.sendText(friendshipId: friendshipId, body: trimmed)
+            let replyToMessageId = replyTarget?.id
+            let msg = try await FriendsAPI.sendText(
+                friendshipId: friendshipId,
+                body: trimmed,
+                replyToMessageId: replyToMessageId)
             // The realtime broadcast will also fire `message_received`
             // which would dedupe — append now so the UI feels instant
             // and let the broadcast harmlessly upsert if it arrives.
             upsertMessage(msg)
+            replyTarget = nil
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -115,8 +125,12 @@ final class FriendChatViewModel: ObservableObject {
         do {
             let upload = try await FriendsAPI.createImageUpload(friendshipId: friendshipId, contentType: contentType)
             try await FriendsAPI.uploadMedia(uploadUrl: upload.uploadUrl, contentType: contentType, data: data)
-            let msg = try await FriendsAPI.commitImage(friendshipId: friendshipId, objectKey: upload.objectKey)
+            let msg = try await FriendsAPI.commitImage(
+                friendshipId: friendshipId,
+                objectKey: upload.objectKey,
+                replyToMessageId: replyTarget?.id)
             upsertMessage(msg)
+            replyTarget = nil
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -132,8 +146,10 @@ final class FriendChatViewModel: ObservableObject {
             let msg = try await FriendsAPI.commitVoice(
                 friendshipId: friendshipId,
                 objectKey: upload.objectKey,
-                durationMs: durationMs)
+                durationMs: durationMs,
+                replyToMessageId: replyTarget?.id)
             upsertMessage(msg)
+            replyTarget = nil
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -141,9 +157,11 @@ final class FriendChatViewModel: ObservableObject {
     }
 
     private func markUnreadAsRead() async {
-        for m in messages where m.readAt == nil && m.senderUserId == friendUserId {
-            try? await FriendsAPI.markRead(friendshipId: friendshipId, messageId: m.id)
+        guard let lastUnread = messages.last(where: { $0.readAt == nil && $0.senderUserId == friendUserId }) else {
+            return
         }
+        try? await FriendsAPI.markReadThrough(friendshipId: friendshipId, lastMessageId: lastUnread.id)
+        NotificationCenter.default.post(name: .friendsUpdated, object: nil)
     }
 
     func isFromFriend(_ message: FriendMessage) -> Bool {
@@ -171,11 +189,22 @@ final class FriendChatViewModel: ObservableObject {
         guard canEdit(message) else { return }
         editingMessageId = message.id
         editingDraft = message.body ?? ""
+        replyTarget = nil
     }
 
     func cancelEdit() {
         editingMessageId = nil
         editingDraft = ""
+    }
+
+    func beginReply(_ message: FriendMessage) {
+        guard !message.isDeleted else { return }
+        cancelEdit()
+        replyTarget = message
+    }
+
+    func cancelReply() {
+        replyTarget = nil
     }
 
     /// Submit the in-flight edit. The realtime broadcast will replace
@@ -227,7 +256,8 @@ final class FriendChatViewModel: ObservableObject {
                     // mark it read immediately so the sender sees the receipt
                     // without a refetch round-trip.
                     if msg.senderUserId == self.friendUserId, msg.readAt == nil {
-                        try? await FriendsAPI.markRead(friendshipId: self.friendshipId, messageId: msg.id)
+                        try? await FriendsAPI.markReadThrough(friendshipId: self.friendshipId, lastMessageId: msg.id)
+                        NotificationCenter.default.post(name: .friendsUpdated, object: nil)
                     }
                 }
             }
@@ -318,6 +348,8 @@ final class FriendChatViewModel: ObservableObject {
             friendshipId: m.friendshipId,
             conversationId: m.conversationId,
             senderUserId: m.senderUserId,
+            replyToMessageId: m.replyToMessageId,
+            replyPreview: m.replyPreview,
             kind: m.kind,
             body: nil,
             mediaUrl: nil,
@@ -347,6 +379,8 @@ final class FriendChatViewModel: ObservableObject {
                 friendshipId: m.friendshipId,
                 conversationId: m.conversationId,
                 senderUserId: m.senderUserId,
+                replyToMessageId: m.replyToMessageId,
+                replyPreview: m.replyPreview,
                 kind: m.kind,
                 body: m.body,
                 mediaUrl: m.mediaUrl,

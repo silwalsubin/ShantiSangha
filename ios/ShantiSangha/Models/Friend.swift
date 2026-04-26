@@ -32,6 +32,8 @@ struct FriendMessage: Codable, Identifiable, Equatable {
     /// different `conversationId` namespace.
     let conversationId: UUID
     let senderUserId: UUID
+    let replyToMessageId: UUID?
+    let replyPreview: FriendMessageReplyPreview?
     let kind: FriendMessageKind
     let body: String?
     let mediaUrl: String?
@@ -43,6 +45,14 @@ struct FriendMessage: Codable, Identifiable, Equatable {
 
     var isDeleted: Bool { deletedAt != nil }
     var isEdited:  Bool { editedAt != nil && deletedAt == nil }
+}
+
+struct FriendMessageReplyPreview: Codable, Equatable {
+    let id: UUID
+    let senderUserId: UUID
+    let kind: FriendMessageKind
+    let body: String?
+    let isDeleted: Bool
 }
 
 struct CreateInvitationResponse: Codable {

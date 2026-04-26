@@ -1,14 +1,14 @@
 import Foundation
 import SwiftUI
 
-/// App-wide badge count for the Friends tab. Mirrors the count of
-/// pending incoming friend requests so the user sees a dot on the tab
+/// App-wide badge count for the Friends tab. Mirrors pending incoming
+/// friend requests plus unread friend messages so the user sees a dot
 /// no matter where they are in the app.
 ///
-/// Source of truth is `/friends/requests/incoming`. Pending friend
-/// requests deliberately do NOT live in the bell-icon notifications
-/// inbox (the inbox carries terminal events only); this service is the
-/// indicator surface for them.
+/// Sources of truth are `/friends/requests/incoming` and `/friends`.
+/// Pending friend requests deliberately do NOT live in the bell-icon
+/// notifications inbox (the inbox carries terminal events only); this
+/// service is the indicator surface for them and message unread counts.
 ///
 /// Refresh triggers:
 ///   - `friendsUpdated` — posted when a friendship changes (accept,
@@ -21,7 +21,7 @@ import SwiftUI
 final class FriendsBadgeService: ObservableObject {
     static let shared = FriendsBadgeService()
 
-    @Published private(set) var pendingIncomingCount: Int = 0
+    @Published private(set) var count: Int = 0
 
     private var observers: [NSObjectProtocol] = []
 
@@ -44,8 +44,11 @@ final class FriendsBadgeService: ObservableObject {
 
     func refresh() async {
         do {
-            let rows = try await NotificationsAPI.listIncomingRequests()
-            pendingIncomingCount = rows.count
+            async let requests = NotificationsAPI.listIncomingRequests()
+            async let friends = FriendsAPI.listFriends()
+            let requestRows = try await requests
+            let friendRows = try await friends
+            count = requestRows.count + friendRows.reduce(0) { $0 + $1.unreadCount }
         } catch {
             // Silent — a stale badge is better than a noisy error in
             // a passive tab indicator. The next refresh trigger will

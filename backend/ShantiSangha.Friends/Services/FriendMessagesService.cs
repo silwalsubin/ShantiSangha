@@ -22,7 +22,7 @@ public class FriendMessagesService(
 
     private static readonly HashSet<string> AllowedImageTypes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "image/jpeg", "image/jpg", "image/png", "image/heic", "image/webp"
+        "image/jpeg", "image/jpg", "image/png", "image/webp"
     };
 
     private static readonly HashSet<string> AllowedVoiceTypes = new(StringComparer.OrdinalIgnoreCase)
@@ -33,6 +33,10 @@ public class FriendMessagesService(
     private const int MaxTextLength = 4000;
     private const int DefaultPageSize = 50;
     private const int MaxPageSize = 200;
+    private const long MaxImageBytes = 8 * 1024 * 1024;
+    private const long MaxVoiceBytes = 15 * 1024 * 1024;
+    private const int MaxImageDimensionPx = 6000;
+    private const int MaxVoiceDurationMs = 10 * 60 * 1000;
 
     public async Task<List<FriendMessageResponse>?> ListMessagesAsync(
         Guid userId, Guid friendshipId, DateTime? before, int limit, CancellationToken ct = default)
@@ -55,7 +59,7 @@ public class FriendMessagesService(
     }
 
     public async Task<FriendMessageResponse?> SendTextAsync(
-        Guid userId, Guid friendshipId, string body, CancellationToken ct = default)
+        Guid userId, Guid friendshipId, string body, Guid? replyToMessageId = null, CancellationToken ct = default)
     {
         var f = await GetFriendshipAsync(friendshipId, userId, ct);
         if (f is null) return null;
@@ -65,11 +69,14 @@ public class FriendMessagesService(
         if (body.Length > MaxTextLength)
             throw new FriendsServiceException("too_long", $"Message exceeds {MaxTextLength} characters.");
 
+        await ValidateReplyTargetAsync(f.Id, replyToMessageId, ct);
+
         var msg = new FriendMessage
         {
             Id = Guid.NewGuid(),
             FriendshipId = f.Id,
             SenderUserId = userId,
+            ReplyToMessageId = replyToMessageId,
             Kind = FriendMessageKind.Text,
             Body = body.Trim(),
             SentAt = DateTime.UtcNow
@@ -136,11 +143,15 @@ public class FriendMessagesService(
         if (!req.ObjectKey.StartsWith(prefix, StringComparison.Ordinal))
             throw new FriendsServiceException("invalid_key", "Object key does not belong to this friendship.");
 
+        await ValidateReplyTargetAsync(f.Id, req.ReplyToMessageId, ct);
+        await ValidateCommittedMediaAsync(kind, req, ct);
+
         var msg = new FriendMessage
         {
             Id = Guid.NewGuid(),
             FriendshipId = f.Id,
             SenderUserId = userId,
+            ReplyToMessageId = req.ReplyToMessageId,
             Kind = kind,
             StorageKey = req.ObjectKey,
             DurationMs = kind == FriendMessageKind.Voice ? req.DurationMs : null,
@@ -179,6 +190,43 @@ public class FriendMessagesService(
             readByUserId = userId,
             lastMessageId = msg.Id,
             readAt = msg.ReadAt
+        }, ct);
+
+        return true;
+    }
+
+    public async Task<bool> MarkReadThroughAsync(
+        Guid userId, Guid friendshipId, Guid lastMessageId, CancellationToken ct = default)
+    {
+        var f = await GetFriendshipAsync(friendshipId, userId, ct);
+        if (f is null) return false;
+
+        var last = await db.Messages.FirstOrDefaultAsync(
+            m => m.Id == lastMessageId && m.FriendshipId == f.Id, ct);
+        if (last is null) return false;
+        if (last.SenderUserId == userId) return true;
+
+        var readAt = DateTime.UtcNow;
+        var rows = await db.Messages
+            .Where(m => m.FriendshipId == f.Id
+                && m.SenderUserId != userId
+                && m.ReadAt == null
+                && m.SentAt <= last.SentAt)
+            .ToListAsync(ct);
+
+        if (rows.Count == 0) return true;
+
+        foreach (var row in rows)
+            row.ReadAt = readAt;
+
+        await db.SaveChangesAsync(ct);
+
+        await BroadcastSafelyAsync("messages_read", f.Id, new
+        {
+            conversationId = f.Id,
+            readByUserId = userId,
+            lastMessageId,
+            readAt
         }, ct);
 
         return true;
@@ -282,12 +330,15 @@ public class FriendMessagesService(
         try
         {
             var recipientId = f.UserAId == senderId ? f.UserBId : f.UserAId;
+            if (!await profileQuery.GetFriendMessageNotificationsEnabledAsync(recipientId, ct))
+                return;
+
             var senderName = await profileQuery.GetDisplayNameAsync(senderId, ct) ?? "A friend";
             var preview = msg.Kind switch
             {
                 FriendMessageKind.Text => string.IsNullOrWhiteSpace(msg.Body)
                     ? "sent a message"
-                    : (msg.Body!.Length > 120 ? msg.Body![..120] + "…" : msg.Body!),
+                    : "sent you a message",
                 FriendMessageKind.Image => "sent a photo",
                 FriendMessageKind.Voice => "sent a voice message",
                 _ => "sent a message"
@@ -323,6 +374,24 @@ public class FriendMessagesService(
 
     private async Task<FriendMessageResponse> MaterializeOneAsync(FriendMessage m)
     {
+        FriendMessageReplyPreview? replyPreview = null;
+        if (m.ReplyToMessageId is { } replyId)
+        {
+            var reply = await db.Messages
+                .AsNoTracking()
+                .FirstOrDefaultAsync(r => r.Id == replyId && r.FriendshipId == m.FriendshipId);
+
+            if (reply is not null)
+            {
+                replyPreview = new FriendMessageReplyPreview(
+                    reply.Id,
+                    reply.SenderUserId,
+                    reply.Kind.ToString(),
+                    reply.DeletedAt.HasValue ? null : BuildReplyPreview(reply),
+                    reply.DeletedAt.HasValue);
+            }
+        }
+
         string? mediaUrl = null;
         if (m.StorageKey is not null)
         {
@@ -346,6 +415,8 @@ public class FriendMessagesService(
             m.FriendshipId,
             m.FriendshipId,         // ConversationId == FriendshipId for 1:1
             m.SenderUserId,
+            m.ReplyToMessageId,
+            replyPreview,
             m.Kind.ToString(),
             safeBody,
             safeMediaUrl,
@@ -365,6 +436,26 @@ public class FriendMessagesService(
         _ => ".bin"
     };
 
+    private static string BuildReplyPreview(FriendMessage m) => m.Kind switch
+    {
+        FriendMessageKind.Text => string.IsNullOrWhiteSpace(m.Body)
+            ? "Message"
+            : (m.Body.Length > 120 ? m.Body[..120] + "…" : m.Body),
+        FriendMessageKind.Image => "Photo",
+        FriendMessageKind.Voice => "Voice message",
+        _ => "Message"
+    };
+
+    private async Task ValidateReplyTargetAsync(Guid friendshipId, Guid? replyToMessageId, CancellationToken ct)
+    {
+        if (replyToMessageId is null) return;
+
+        var exists = await db.Messages.AnyAsync(
+            m => m.Id == replyToMessageId.Value && m.FriendshipId == friendshipId, ct);
+        if (!exists)
+            throw new FriendsServiceException("invalid_reply", "Reply target does not belong to this chat.");
+    }
+
     private static string ExtensionForVoice(string contentType) => contentType.ToLowerInvariant() switch
     {
         "audio/mp4" or "audio/m4a" or "audio/x-m4a" => ".m4a",
@@ -373,4 +464,119 @@ public class FriendMessagesService(
         "audio/wav" => ".wav",
         _ => ".bin"
     };
+
+    private async Task ValidateCommittedMediaAsync(
+        FriendMessageKind kind, CommitMediaMessageRequest req, CancellationToken ct)
+    {
+        var info = await storage.GetObjectInfoAsync(req.ObjectKey)
+            ?? throw new FriendsServiceException("missing_object", "Uploaded media was not found.");
+
+        var contentType = info.ContentType ?? "";
+        if (kind == FriendMessageKind.Image)
+        {
+            if (!AllowedImageTypes.Contains(contentType))
+                throw new FriendsServiceException("unsupported_type", "Uploaded image type is not supported.");
+            if (info.ContentLength <= 0 || info.ContentLength > MaxImageBytes)
+                throw new FriendsServiceException("file_too_large", $"Images must be under {MaxImageBytes / 1024 / 1024} MB.");
+
+            var prefix = await storage.ReadPrefixAsync(req.ObjectKey, 64 * 1024);
+            var dimensions = TryReadImageDimensions(prefix, contentType);
+            if (dimensions is null)
+                throw new FriendsServiceException("invalid_image", "Uploaded image could not be validated.");
+            if (dimensions.Value.Width > MaxImageDimensionPx || dimensions.Value.Height > MaxImageDimensionPx)
+                throw new FriendsServiceException("image_too_large", $"Images must be at most {MaxImageDimensionPx}px wide or tall.");
+        }
+        else if (kind == FriendMessageKind.Voice)
+        {
+            if (!AllowedVoiceTypes.Contains(contentType))
+                throw new FriendsServiceException("unsupported_type", "Uploaded voice type is not supported.");
+            if (info.ContentLength <= 0 || info.ContentLength > MaxVoiceBytes)
+                throw new FriendsServiceException("file_too_large", $"Voice messages must be under {MaxVoiceBytes / 1024 / 1024} MB.");
+            if (req.DurationMs is null or <= 0 or > MaxVoiceDurationMs)
+                throw new FriendsServiceException("invalid_duration", "Voice message duration is not valid.");
+        }
+    }
+
+    private static (int Width, int Height)? TryReadImageDimensions(byte[] bytes, string contentType)
+    {
+        if (bytes.Length >= 24 &&
+            bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47)
+        {
+            return (ReadBigEndianInt32(bytes, 16), ReadBigEndianInt32(bytes, 20));
+        }
+
+        if (bytes.Length >= 12 &&
+            bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 &&
+            bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50)
+        {
+            return TryReadWebpDimensions(bytes);
+        }
+
+        if (bytes.Length >= 4 && bytes[0] == 0xFF && bytes[1] == 0xD8)
+        {
+            return TryReadJpegDimensions(bytes);
+        }
+
+        return null;
+    }
+
+    private static (int Width, int Height)? TryReadJpegDimensions(byte[] bytes)
+    {
+        var i = 2;
+        while (i + 9 < bytes.Length)
+        {
+            if (bytes[i] != 0xFF) { i++; continue; }
+            while (i < bytes.Length && bytes[i] == 0xFF) i++;
+            if (i >= bytes.Length) return null;
+            var marker = bytes[i++];
+            if (marker == 0xD9 || marker == 0xDA) return null;
+            if (i + 1 >= bytes.Length) return null;
+            var length = (bytes[i] << 8) + bytes[i + 1];
+            if (length < 2 || i + length > bytes.Length) return null;
+
+            if (marker is >= 0xC0 and <= 0xC3 or >= 0xC5 and <= 0xC7 or >= 0xC9 and <= 0xCB or >= 0xCD and <= 0xCF)
+            {
+                if (i + 7 >= bytes.Length) return null;
+                var height = (bytes[i + 3] << 8) + bytes[i + 4];
+                var width = (bytes[i + 5] << 8) + bytes[i + 6];
+                return (width, height);
+            }
+
+            i += length;
+        }
+
+        return null;
+    }
+
+    private static (int Width, int Height)? TryReadWebpDimensions(byte[] bytes)
+    {
+        if (bytes.Length < 30) return null;
+        var chunk = System.Text.Encoding.ASCII.GetString(bytes, 12, 4);
+        if (chunk == "VP8X" && bytes.Length >= 30)
+        {
+            var width = 1 + bytes[24] + (bytes[25] << 8) + (bytes[26] << 16);
+            var height = 1 + bytes[27] + (bytes[28] << 8) + (bytes[29] << 16);
+            return (width, height);
+        }
+        if (chunk == "VP8 " && bytes.Length >= 30)
+        {
+            var width = bytes[26] + ((bytes[27] & 0x3F) << 8);
+            var height = bytes[28] + ((bytes[29] & 0x3F) << 8);
+            return (width, height);
+        }
+        if (chunk == "VP8L" && bytes.Length >= 25)
+        {
+            var b0 = bytes[21];
+            var b1 = bytes[22];
+            var b2 = bytes[23];
+            var b3 = bytes[24];
+            var width = 1 + (((b1 & 0x3F) << 8) | b0);
+            var height = 1 + (((b3 & 0x0F) << 10) | (b2 << 2) | ((b1 & 0xC0) >> 6));
+            return (width, height);
+        }
+        return null;
+    }
+
+    private static int ReadBigEndianInt32(byte[] bytes, int offset) =>
+        (bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3];
 }

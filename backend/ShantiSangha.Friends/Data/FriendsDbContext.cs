@@ -40,6 +40,7 @@ public class FriendsDbContext(DbContextOptions<FriendsDbContext> options) : DbCo
             e.Property(m => m.Kind).HasConversion<string>();
             e.HasIndex(m => new { m.FriendshipId, m.SentAt });
             e.HasIndex(m => m.SenderUserId);
+            e.HasIndex(m => m.ReplyToMessageId);
         });
 
         mb.Entity<FriendRequest>(e =>

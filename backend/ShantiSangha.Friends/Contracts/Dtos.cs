@@ -40,6 +40,8 @@ public record FriendMessageResponse(
     Guid FriendshipId,
     Guid ConversationId,           // group-ready alias; equals FriendshipId for 1:1
     Guid SenderUserId,
+    Guid? ReplyToMessageId,
+    FriendMessageReplyPreview? ReplyPreview,
     string Kind,
     string? Body,
     string? MediaUrl,
@@ -49,7 +51,14 @@ public record FriendMessageResponse(
     DateTime? EditedAt,
     DateTime? DeletedAt);
 
-public record SendTextMessageRequest(string Body);
+public record FriendMessageReplyPreview(
+    Guid Id,
+    Guid SenderUserId,
+    string Kind,
+    string? Body,
+    bool IsDeleted);
+
+public record SendTextMessageRequest(string Body, Guid? ReplyToMessageId = null);
 public record EditTextMessageRequest(string Body);
 
 public record CreateMediaUploadResponse(
@@ -59,7 +68,10 @@ public record CreateMediaUploadResponse(
 
 public record CommitMediaMessageRequest(
     string ObjectKey,
-    int? DurationMs);
+    int? DurationMs,
+    Guid? ReplyToMessageId = null);
+
+public record MarkMessagesReadRequest(Guid LastMessageId);
 
 // ── FriendRequest (direct in-app, distinct from token-based FriendInvitation) ──
 

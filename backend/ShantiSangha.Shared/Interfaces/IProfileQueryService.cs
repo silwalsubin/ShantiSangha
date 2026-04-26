@@ -36,6 +36,13 @@ public interface IProfileQueryService
     Task<UserBirthInfo> GetBirthInfoAsync(Guid userId, CancellationToken ct = default);
 
     /// <summary>
+    /// Whether the user wants visible push alerts for friend messages.
+    /// Missing profiles and legacy rows default to true so existing users
+    /// keep the documented behavior until they opt out in Settings.
+    /// </summary>
+    Task<bool> GetFriendMessageNotificationsEnabledAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>
     /// Returns all user profiles with their timezone (may be null).
     /// Used by scheduled jobs that need to act per-user-local-time.
     /// </summary>

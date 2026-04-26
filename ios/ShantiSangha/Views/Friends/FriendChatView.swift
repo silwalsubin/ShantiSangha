@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import UIKit
 
 /// 1:1 chat with a friend — text, image, and voice messages.
 struct FriendChatView: View {
@@ -63,6 +64,11 @@ struct FriendChatView: View {
             titleVisibility: .hidden,
             presenting: actionTarget
         ) { target in
+            if !target.isDeleted {
+                Button("Reply") {
+                    vm.beginReply(target)
+                }
+            }
             if vm.canEdit(target) {
                 Button("Edit") {
                     vm.beginEdit(target)
@@ -135,6 +141,11 @@ struct FriendChatView: View {
                     .padding(.top, SacredSpacing.xl)
                 } else {
                     LazyVStack(spacing: 6) {
+                        if vm.loadingOlder {
+                            ProgressView()
+                                .padding(.vertical, SacredSpacing.s)
+                        }
+
                         ForEach(Array(vm.messages.enumerated()), id: \.element.id) { idx, msg in
                             MessageBubble(
                                 message: msg,
@@ -147,6 +158,11 @@ struct FriendChatView: View {
                                 .onLongPressGesture {
                                     if vm.canEdit(msg) || vm.canDelete(msg) {
                                         actionTarget = msg
+                                    }
+                                }
+                                .onAppear {
+                                    if idx == 0 {
+                                        Task { await vm.loadOlder() }
                                     }
                                 }
                         }
@@ -208,6 +224,9 @@ struct FriendChatView: View {
             if vm.editingMessageId != nil {
                 editBanner
             }
+            if let reply = vm.replyTarget {
+                replyBanner(reply)
+            }
 
             HStack(alignment: .bottom, spacing: 8) {
                 if vm.editingMessageId == nil {
@@ -267,6 +286,29 @@ struct FriendChatView: View {
         }
     }
 
+    private func replyBanner(_ message: FriendMessage) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "arrowshape.turn.up.left")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.sacredGold)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Replying to \(vm.isFromFriend(message) ? friend.displayName : "you")")
+                    .font(.sacredMicroBold)
+                    .foregroundColor(.sacredTextSecondary)
+                Text(replyPreviewText(for: message))
+                    .font(.sacredMicro)
+                    .foregroundColor(.sacredMuted)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Button("Cancel") {
+                vm.cancelReply()
+            }
+            .font(.sacredMicroBold)
+            .foregroundColor(.sacredGold)
+        }
+    }
+
     private func submitDraft() {
         let text = draft
         if vm.editingMessageId != nil {
@@ -286,7 +328,42 @@ struct FriendChatView: View {
     private func sendPickedImage(_ item: PhotosPickerItem) async {
         defer { photoSelection = nil }
         guard let data = try? await item.loadTransferable(type: Data.self) else { return }
-        await vm.sendImage(data: data, contentType: "image/jpeg")
+        guard let prepared = Self.prepareImageForUpload(data) else {
+            vm.errorMessage = "Could not prepare that image."
+            return
+        }
+        await vm.sendImage(data: prepared, contentType: "image/jpeg")
+    }
+
+    private func replyPreviewText(for message: FriendMessage) -> String {
+        if message.isDeleted { return "Message deleted" }
+        switch message.kind {
+        case .text:
+            return message.body ?? "Message"
+        case .image:
+            return "Photo"
+        case .voice:
+            return "Voice message"
+        }
+    }
+
+    private static func prepareImageForUpload(_ data: Data) -> Data? {
+        guard let image = UIImage(data: data) else { return nil }
+        let maxSide: CGFloat = 2048
+        let size = image.size
+        let scale = min(1, maxSide / max(size.width, size.height))
+        let target = CGSize(width: size.width * scale, height: size.height * scale)
+
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        let renderer = UIGraphicsImageRenderer(size: target, format: format)
+        let flattened = renderer.image { context in
+            UIColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: target))
+            image.draw(in: CGRect(origin: .zero, size: target))
+        }
+        return flattened.jpegData(compressionQuality: 0.82)
     }
 
     private func endFriendship() async {
@@ -336,11 +413,46 @@ private struct MessageBubble: View {
             }
 
             VStack(alignment: fromFriend ? .leading : .trailing, spacing: 2) {
+                if let reply = message.replyPreview {
+                    replyPreview(reply)
+                }
                 content
                 metaLine
             }
 
             if fromFriend { Spacer(minLength: 32) }
+        }
+    }
+
+    private func replyPreview(_ reply: FriendMessageReplyPreview) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(reply.senderUserId == message.senderUserId ? "Replying to themselves" : "Replying")
+                .font(.sacredMicroBold)
+                .foregroundColor(.sacredGold)
+            Text(replyText(reply))
+                .font(.sacredMicro)
+                .foregroundColor(.sacredMuted)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .frame(maxWidth: 240, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color.sacredBgCard.opacity(0.7)))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.sacredGold.opacity(0.16), lineWidth: 1)
+        )
+    }
+
+    private func replyText(_ reply: FriendMessageReplyPreview) -> String {
+        if reply.isDeleted { return "Message deleted" }
+        switch reply.kind {
+        case .text:
+            return reply.body ?? "Message"
+        case .image:
+            return "Photo"
+        case .voice:
+            return "Voice message"
         }
     }
 

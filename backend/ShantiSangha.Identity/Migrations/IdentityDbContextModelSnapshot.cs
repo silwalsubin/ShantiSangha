@@ -85,6 +85,9 @@ namespace ShantiSangha.Identity.Migrations
                     b.Property<bool>("OnboardingCompleted")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("NotifyOnFriendMessages")
+                        .HasColumnType("boolean");
+
                     b.Property<int?>("ReminderHour")
                         .HasColumnType("integer");
 

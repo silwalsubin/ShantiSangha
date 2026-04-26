@@ -8,6 +8,7 @@ public class Profile
     public string? Timezone { get; set; }
     /// <summary>Local-time hour (0–23) at which the user wants their morning reflection push. Null = no morning push.</summary>
     public int? ReminderHour { get; set; }
+    public bool NotifyOnFriendMessages { get; set; } = true;
     public bool OnboardingCompleted { get; set; }
 
     // Birth details — used for invisible Vedic astrology context in reflections and chat.

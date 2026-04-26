@@ -43,6 +43,36 @@ public class FriendsMediaStorage : IDisposable
         return await _client.GetPreSignedURLAsync(request);
     }
 
+    public async Task<FriendsMediaObjectInfo?> GetObjectInfoAsync(string objectKey)
+    {
+        try
+        {
+            var response = await _client.GetObjectMetadataAsync(_bucket, objectKey);
+            return new FriendsMediaObjectInfo(
+                response.ContentLength,
+                response.Headers.ContentType ?? response.ContentType);
+        }
+        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+    }
+
+    public async Task<byte[]> ReadPrefixAsync(string objectKey, long bytes)
+    {
+        var request = new GetObjectRequest
+        {
+            BucketName = _bucket,
+            Key = objectKey,
+            ByteRange = new ByteRange(0, bytes - 1)
+        };
+
+        using var response = await _client.GetObjectAsync(request);
+        using var ms = new MemoryStream();
+        await response.ResponseStream.CopyToAsync(ms);
+        return ms.ToArray();
+    }
+
     public async Task DeleteAsync(string objectKey)
     {
         await _client.DeleteObjectAsync(_bucket, objectKey);
@@ -70,3 +100,5 @@ public class FriendsMediaStorage : IDisposable
 
     public void Dispose() => _client.Dispose();
 }
+
+public record FriendsMediaObjectInfo(long ContentLength, string? ContentType);
