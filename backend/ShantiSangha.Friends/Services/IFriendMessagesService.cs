@@ -47,4 +47,19 @@ public interface IFriendMessagesService
     /// and broadcasts a `message_deleted` realtime event.</summary>
     Task<FriendMessageResponse?> DeleteAsync(
         Guid userId, Guid friendshipId, Guid messageId, CancellationToken ct = default);
+
+    /// <summary>Set or replace the caller's reaction emoji on a message.
+    /// Composite PK on (MessageId, UserId) means re-reacting with a new
+    /// emoji upserts to that emoji — one reaction per user per message.
+    /// Idempotent: reacting with the same emoji again is a no-op.
+    /// Broadcasts a `message_reactions_changed` realtime event with the
+    /// updated reaction list.</summary>
+    Task<FriendMessageResponse?> ReactAsync(
+        Guid userId, Guid friendshipId, Guid messageId, string emoji, CancellationToken ct = default);
+
+    /// <summary>Remove the caller's reaction from a message. Idempotent:
+    /// removing a reaction that doesn't exist is a no-op. Broadcasts a
+    /// `message_reactions_changed` event when something actually changed.</summary>
+    Task<FriendMessageResponse?> UnreactAsync(
+        Guid userId, Guid friendshipId, Guid messageId, CancellationToken ct = default);
 }

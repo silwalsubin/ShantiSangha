@@ -182,6 +182,45 @@ public class FriendMessagesController(
         }
     }
 
+    [HttpPost("{messageId:guid}/reactions")]
+    public async Task<IActionResult> React(
+        Guid friendshipId,
+        Guid messageId,
+        [FromBody] AddReactionRequest body,
+        CancellationToken ct)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+
+        try
+        {
+            var result = await service.ReactAsync(user.Id, friendshipId, messageId, body.Emoji, ct);
+            return result is null ? NotFound() : Ok(result);
+        }
+        catch (FriendsServiceException ex)
+        {
+            return ex.Code switch
+            {
+                "not_found"        => NotFound(new { error = ex.Code, message = ex.Message }),
+                "already_deleted"  => UnprocessableEntity(new { error = ex.Code, message = ex.Message }),
+                _                  => BadRequest(new { error = ex.Code, message = ex.Message }),
+            };
+        }
+    }
+
+    [HttpDelete("{messageId:guid}/reactions")]
+    public async Task<IActionResult> Unreact(
+        Guid friendshipId,
+        Guid messageId,
+        CancellationToken ct)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+
+        var result = await service.UnreactAsync(user.Id, friendshipId, messageId, ct);
+        return result is null ? NotFound() : Ok(result);
+    }
+
     [HttpDelete("{messageId:guid}")]
     public async Task<IActionResult> Delete(
         Guid friendshipId,

@@ -11,8 +11,10 @@ struct FriendChatView: View {
     @State private var showRecorder = false
     @State private var showEndConfirm = false
     @State private var actionTarget: FriendMessage?
+    @State private var reactionPickerTarget: FriendMessage?
     @State private var imagePreview: PreviewedImage?
     @State private var didInitialScroll = false
+    @EnvironmentObject var profile: ProfileService
     @Environment(\.dismiss) private var dismiss
 
     init(friend: FriendSummary) {
@@ -66,6 +68,9 @@ struct FriendChatView: View {
             presenting: actionTarget
         ) { target in
             if !target.isDeleted {
+                Button("React") {
+                    reactionPickerTarget = target
+                }
                 Button("Reply") {
                     vm.beginReply(target)
                 }
@@ -82,6 +87,17 @@ struct FriendChatView: View {
                 }
             }
             Button("Cancel", role: .cancel) {}
+        }
+        .sheet(item: $reactionPickerTarget) { target in
+            ReactionPickerSheet(
+                onPick: { emoji in
+                    reactionPickerTarget = nil
+                    if let me = profile.currentUserId {
+                        Task { await vm.toggleReaction(emoji, on: target.id, currentUserId: me) }
+                    }
+                })
+                .presentationDetents([.height(140)])
+                .presentationDragIndicator(.visible)
         }
         .task {
             await vm.refresh()
@@ -173,7 +189,13 @@ struct FriendChatView: View {
                                 friendDisplayName: friend.displayName,
                                 friendAvatarUrl: friend.avatarUrl,
                                 showAvatar: shouldShowAvatar(at: idx),
-                                onTapImage: { url in imagePreview = PreviewedImage(url: url, messageId: msg.id) })
+                                currentUserId: profile.currentUserId,
+                                onTapImage: { url in imagePreview = PreviewedImage(url: url, messageId: msg.id) },
+                                onTapReaction: { emoji in
+                                    if let me = profile.currentUserId {
+                                        Task { await vm.toggleReaction(emoji, on: msg.id, currentUserId: me) }
+                                    }
+                                })
                                 .id(msg.id)
                                 .onLongPressGesture {
                                     if vm.canEdit(msg) || vm.canDelete(msg) {
@@ -521,7 +543,9 @@ private struct MessageBubble: View {
     let friendDisplayName: String
     let friendAvatarUrl: String?
     let showAvatar: Bool
+    let currentUserId: UUID?
     let onTapImage: (URL) -> Void
+    let onTapReaction: (String) -> Void
 
     /// Reserved width for the avatar gutter on the friend's side. Even
     /// on continuation rows (where we hide the avatar), the slot stays
@@ -549,6 +573,7 @@ private struct MessageBubble: View {
                     replyPreview(reply)
                 }
                 content
+                reactionRow
                 metaLine
             }
 
@@ -634,6 +659,44 @@ private struct MessageBubble: View {
 
     /// Timestamp + "edited" marker + read-receipt checkmarks. Kept on
     /// one row so a long bubble doesn't get a tall metadata footer.
+    /// Inline reaction pills below the bubble. Tap your own pill to
+    /// remove it; tap a non-mine pill to react with that emoji yourself
+    /// (the view model handles upsert vs replace under the hood).
+    @ViewBuilder
+    private var reactionRow: some View {
+        let rows = (message.reactions ?? []).filter { !$0.byUserIds.isEmpty }
+        if !rows.isEmpty {
+            HStack(spacing: 4) {
+                ForEach(rows) { row in
+                    let mine = row.isMine(currentUserId: currentUserId)
+                    Button { onTapReaction(row.emoji) } label: {
+                        HStack(spacing: 3) {
+                            Text(row.emoji).font(.system(size: 12))
+                            if row.count > 1 {
+                                Text("\(row.count)")
+                                    .font(.sacredMicroBold)
+                                    .foregroundColor(mine ? .sacredGoldDark : .sacredMuted)
+                            }
+                        }
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule().fill(mine
+                                ? Color.sacredGold.opacity(0.18)
+                                : Color.sacredBgCard))
+                        .overlay(
+                            Capsule().stroke(mine
+                                ? Color.sacredGold.opacity(0.5)
+                                : Color.sacredMuted.opacity(0.15),
+                                lineWidth: 0.5))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.top, 2)
+        }
+    }
+
     private var metaLine: some View {
         HStack(spacing: 4) {
             if message.isEdited && !message.isDeleted {
@@ -676,5 +739,41 @@ private struct MessageBubble: View {
         f.dateStyle = .none
         f.timeStyle = .short
         return f.string(from: d)
+    }
+}
+
+/// Quick-emoji picker shown after the long-press dialog's "React"
+/// option. Six fixed emojis cover the common acknowledgement set —
+/// fancy full-emoji pickers can come later if anyone asks.
+private struct ReactionPickerSheet: View {
+    let onPick: (String) -> Void
+
+    private let emojis = ["❤️", "👍", "😂", "🙏", "😢", "🔥"]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Text("React")
+                .font(.sacredSectionLabel)
+                .foregroundColor(.sacredLabel)
+                .padding(.top, 18)
+                .padding(.bottom, 12)
+
+            HStack(spacing: 14) {
+                ForEach(emojis, id: \.self) { emoji in
+                    Button { onPick(emoji) } label: {
+                        Text(emoji)
+                            .font(.system(size: 32))
+                            .frame(width: 44, height: 44)
+                            .background(Circle().fill(Color.sacredBgCard))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, SacredSpacing.m)
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity)
+        .background(Color.sacredBg.ignoresSafeArea())
     }
 }

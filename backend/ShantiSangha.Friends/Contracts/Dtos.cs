@@ -49,7 +49,19 @@ public record FriendMessageResponse(
     DateTime SentAt,
     DateTime? ReadAt,
     DateTime? EditedAt,
-    DateTime? DeletedAt);
+    DateTime? DeletedAt,
+    List<FriendMessageReactionSummary> Reactions);
+
+/// <summary>One emoji's roll-up for a message: who reacted, by user
+/// id. Clients derive `Count` from the list and check membership of
+/// their own user id to flag whether the caller's pill should render
+/// as "mine". Same payload serves REST + realtime broadcast (the hub
+/// fans the same JSON to every subscriber).</summary>
+public record FriendMessageReactionSummary(
+    string Emoji,
+    List<Guid> ByUserIds);
+
+public record AddReactionRequest(string Emoji);
 
 public record FriendMessageReplyPreview(
     Guid Id,

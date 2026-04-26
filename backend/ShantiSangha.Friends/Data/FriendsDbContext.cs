@@ -15,6 +15,7 @@ public class FriendsDbContext(DbContextOptions<FriendsDbContext> options) : DbCo
     public DbSet<FriendInvitation> Invitations => Set<FriendInvitation>();
     public DbSet<FriendMessage> Messages => Set<FriendMessage>();
     public DbSet<FriendRequest> Requests => Set<FriendRequest>();
+    public DbSet<FriendMessageReaction> MessageReactions => Set<FriendMessageReaction>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -41,6 +42,17 @@ public class FriendsDbContext(DbContextOptions<FriendsDbContext> options) : DbCo
             e.HasIndex(m => new { m.FriendshipId, m.SentAt });
             e.HasIndex(m => m.SenderUserId);
             e.HasIndex(m => m.ReplyToMessageId);
+        });
+
+        mb.Entity<FriendMessageReaction>(e =>
+        {
+            e.ToTable("FriendMessageReactions");
+            // One reaction per user per message — the upsert path on
+            // change relies on this composite primary key.
+            e.HasKey(r => new { r.MessageId, r.UserId });
+            // Materialization joins from FriendMessages → reactions by
+            // MessageId; the PK already covers it.
+            e.Property(r => r.Emoji).IsRequired();
         });
 
         mb.Entity<FriendRequest>(e =>

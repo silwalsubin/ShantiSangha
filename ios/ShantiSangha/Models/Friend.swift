@@ -42,9 +42,25 @@ struct FriendMessage: Codable, Identifiable, Equatable {
     let readAt: String?
     let editedAt: String?
     let deletedAt: String?
+    /// Reaction roll-ups by emoji. Optional so older cached payloads
+    /// (saved before reactions shipped) decode cleanly.
+    let reactions: [FriendMessageReactionSummary]?
 
     var isDeleted: Bool { deletedAt != nil }
     var isEdited:  Bool { editedAt != nil && deletedAt == nil }
+}
+
+struct FriendMessageReactionSummary: Codable, Equatable, Identifiable {
+    let emoji: String
+    let byUserIds: [UUID]
+
+    var count: Int { byUserIds.count }
+    var id: String { emoji }
+
+    func isMine(currentUserId: UUID?) -> Bool {
+        guard let me = currentUserId else { return false }
+        return byUserIds.contains(me)
+    }
 }
 
 struct FriendMessageReplyPreview: Codable, Equatable {

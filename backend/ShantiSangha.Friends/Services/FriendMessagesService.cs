@@ -312,6 +312,88 @@ public class FriendMessagesService(
         return dto;
     }
 
+    public async Task<FriendMessageResponse?> ReactAsync(
+        Guid userId, Guid friendshipId, Guid messageId, string emoji, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(emoji) || emoji.Length > 16)
+            throw new FriendsServiceException("invalid_emoji", "Reaction must be a single emoji.");
+
+        var f = await GetFriendshipAsync(friendshipId, userId, ct);
+        if (f is null) return null;
+
+        var msg = await db.Messages.FirstOrDefaultAsync(
+            m => m.Id == messageId && m.FriendshipId == f.Id, ct);
+        if (msg is null) return null;
+        if (msg.DeletedAt is not null)
+            throw new FriendsServiceException("already_deleted", "Can't react to a deleted message.");
+
+        var existing = await db.MessageReactions.FirstOrDefaultAsync(
+            r => r.MessageId == messageId && r.UserId == userId, ct);
+
+        if (existing is not null)
+        {
+            // Idempotent: same emoji is a no-op (still re-broadcast the
+            // current state so a UI that's out of sync can recover).
+            if (existing.Emoji != emoji)
+            {
+                existing.Emoji = emoji;
+                existing.CreatedAt = DateTime.UtcNow;
+                await db.SaveChangesAsync(ct);
+            }
+        }
+        else
+        {
+            db.MessageReactions.Add(new FriendMessageReaction
+            {
+                MessageId = messageId,
+                UserId = userId,
+                Emoji = emoji,
+                CreatedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync(ct);
+        }
+
+        var dto = await MaterializeOneAsync(msg);
+        await BroadcastSafelyAsync("message_reactions_changed", f.Id, new
+        {
+            conversationId = f.Id,
+            messageId = msg.Id,
+            reactions = dto.Reactions
+        }, ct);
+        return dto;
+    }
+
+    public async Task<FriendMessageResponse?> UnreactAsync(
+        Guid userId, Guid friendshipId, Guid messageId, CancellationToken ct = default)
+    {
+        var f = await GetFriendshipAsync(friendshipId, userId, ct);
+        if (f is null) return null;
+
+        var msg = await db.Messages.FirstOrDefaultAsync(
+            m => m.Id == messageId && m.FriendshipId == f.Id, ct);
+        if (msg is null) return null;
+
+        var existing = await db.MessageReactions.FirstOrDefaultAsync(
+            r => r.MessageId == messageId && r.UserId == userId, ct);
+        if (existing is null)
+        {
+            // Idempotent: nothing to remove. Return the current state.
+            return await MaterializeOneAsync(msg);
+        }
+
+        db.MessageReactions.Remove(existing);
+        await db.SaveChangesAsync(ct);
+
+        var dto = await MaterializeOneAsync(msg);
+        await BroadcastSafelyAsync("message_reactions_changed", f.Id, new
+        {
+            conversationId = f.Id,
+            messageId = msg.Id,
+            reactions = dto.Reactions
+        }, ct);
+        return dto;
+    }
+
     /// <summary>Wrap broadcasts so a hub failure (network blip, missing
     /// recipient, serialization edge case) never blocks the persisted
     /// state change. The REST response is the source of truth; the
@@ -410,6 +492,30 @@ public class FriendMessagesService(
         var safeBody = isDeleted ? null : m.Body;
         var safeMediaUrl = isDeleted ? null : mediaUrl;
 
+        // Reactions: gather every (UserId, Emoji) row for this message
+        // and roll up by emoji. Ordered by emoji so the iOS pill row is
+        // stable across renders. Deleted messages drop reactions —
+        // the bubble is replaced by a placeholder anyway.
+        List<FriendMessageReactionSummary> reactions;
+        if (isDeleted)
+        {
+            reactions = new List<FriendMessageReactionSummary>();
+        }
+        else
+        {
+            var rows = await db.MessageReactions
+                .AsNoTracking()
+                .Where(r => r.MessageId == m.Id)
+                .ToListAsync();
+            reactions = rows
+                .GroupBy(r => r.Emoji)
+                .OrderBy(g => g.Key)
+                .Select(g => new FriendMessageReactionSummary(
+                    g.Key,
+                    g.Select(r => r.UserId).ToList()))
+                .ToList();
+        }
+
         return new FriendMessageResponse(
             m.Id,
             m.FriendshipId,
@@ -424,7 +530,8 @@ public class FriendMessagesService(
             m.SentAt,
             m.ReadAt,
             m.EditedAt,
-            m.DeletedAt);
+            m.DeletedAt,
+            reactions);
     }
 
     private static string ExtensionForImage(string contentType) => contentType.ToLowerInvariant() switch

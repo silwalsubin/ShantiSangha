@@ -115,6 +115,21 @@ enum FriendsAPI {
             "/friends/\(friendshipId.uuidString.lowercased())/messages/\(messageId.uuidString.lowercased())")
     }
 
+    struct ReactBody: Encodable { let emoji: String }
+    /// Set or replace the caller's reaction on a message. One reaction
+    /// per user — re-reacting with a different emoji upserts.
+    static func reactToMessage(friendshipId: UUID, messageId: UUID, emoji: String) async throws -> FriendMessage {
+        try await ApiService.shared.post(
+            "/friends/\(friendshipId.uuidString.lowercased())/messages/\(messageId.uuidString.lowercased())/reactions",
+            body: ReactBody(emoji: emoji))
+    }
+
+    /// Remove the caller's reaction from a message. Idempotent.
+    static func unreactToMessage(friendshipId: UUID, messageId: UUID) async throws -> FriendMessage {
+        try await ApiService.shared.deleteReturning(
+            "/friends/\(friendshipId.uuidString.lowercased())/messages/\(messageId.uuidString.lowercased())/reactions")
+    }
+
     /// Direct PUT upload of binary data to a presigned S3 URL — used by image
     /// and voice attachment flows. Returns when the upload is complete; throws
     /// on non-2xx.

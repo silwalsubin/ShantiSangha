@@ -379,6 +379,102 @@ final class FriendChatViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Reactions
+
+    /// Set the caller's reaction on `messageId`. If the same emoji is
+    /// already mine, this acts as a toggle-off via `unreact`. Optimistic:
+    /// updates local state immediately; the realtime broadcast (or the
+    /// server response) reconciles on success.
+    func toggleReaction(_ emoji: String, on messageId: UUID, currentUserId: UUID) async {
+        guard let i = messages.firstIndex(where: { $0.id == messageId }) else { return }
+        let existing = messages[i].reactions ?? []
+        let mineRow = existing.first(where: { $0.byUserIds.contains(currentUserId) })
+
+        if mineRow?.emoji == emoji {
+            // Same emoji — treat as remove.
+            await removeReaction(on: messageId, currentUserId: currentUserId)
+            return
+        }
+
+        // Optimistic upsert: drop any existing "mine" reaction; add the
+        // new emoji with my user id appended.
+        var optimistic = existing.map { row -> FriendMessageReactionSummary in
+            FriendMessageReactionSummary(
+                emoji: row.emoji,
+                byUserIds: row.byUserIds.filter { $0 != currentUserId })
+        }.filter { !$0.byUserIds.isEmpty }
+
+        if let idx = optimistic.firstIndex(where: { $0.emoji == emoji }) {
+            var updated = optimistic[idx]
+            updated = FriendMessageReactionSummary(
+                emoji: emoji,
+                byUserIds: updated.byUserIds + [currentUserId])
+            optimistic[idx] = updated
+        } else {
+            optimistic.append(FriendMessageReactionSummary(emoji: emoji, byUserIds: [currentUserId]))
+        }
+        replaceReactions(at: i, with: optimistic)
+
+        do {
+            let updated = try await FriendsAPI.reactToMessage(
+                friendshipId: friendshipId, messageId: messageId, emoji: emoji)
+            upsertMessage(updated)
+        } catch {
+            // Revert on failure — restore the original reactions.
+            replaceReactions(at: i, with: existing)
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func removeReaction(on messageId: UUID, currentUserId: UUID) async {
+        guard let i = messages.firstIndex(where: { $0.id == messageId }) else { return }
+        let original = messages[i].reactions ?? []
+
+        // Optimistic: drop me from every emoji bucket; collapse empties.
+        let optimistic = original.map { row -> FriendMessageReactionSummary in
+            FriendMessageReactionSummary(
+                emoji: row.emoji,
+                byUserIds: row.byUserIds.filter { $0 != currentUserId })
+        }.filter { !$0.byUserIds.isEmpty }
+        replaceReactions(at: i, with: optimistic)
+
+        do {
+            let updated = try await FriendsAPI.unreactToMessage(
+                friendshipId: friendshipId, messageId: messageId)
+            upsertMessage(updated)
+        } catch {
+            replaceReactions(at: i, with: original)
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func replaceReactions(at index: Int, with reactions: [FriendMessageReactionSummary]) {
+        let m = messages[index]
+        messages[index] = FriendMessage(
+            id: m.id,
+            friendshipId: m.friendshipId,
+            conversationId: m.conversationId,
+            senderUserId: m.senderUserId,
+            replyToMessageId: m.replyToMessageId,
+            replyPreview: m.replyPreview,
+            kind: m.kind,
+            body: m.body,
+            mediaUrl: m.mediaUrl,
+            durationMs: m.durationMs,
+            sentAt: m.sentAt,
+            readAt: m.readAt,
+            editedAt: m.editedAt,
+            deletedAt: m.deletedAt,
+            reactions: reactions)
+    }
+
+    /// Apply a `message_reactions_changed` realtime event — replace the
+    /// row's reactions with whatever the server now considers canonical.
+    private func applyReactionsChanged(messageId: UUID, reactions: [FriendMessageReactionSummary]) {
+        guard let i = messages.firstIndex(where: { $0.id == messageId }) else { return }
+        replaceReactions(at: i, with: reactions)
+    }
+
     // MARK: - Realtime lifecycle
 
     /// Connect the per-conversation WebSocket. Idempotent — repeated
@@ -419,6 +515,11 @@ final class FriendChatViewModel: ObservableObject {
             client.onTyping = { [weak self] from, isTyping in
                 Task { @MainActor [weak self] in
                     self?.applyTyping(fromUserId: from, isTyping: isTyping)
+                }
+            }
+            client.onReactionsChanged = { [weak self] msgId, reactions in
+                Task { @MainActor [weak self] in
+                    self?.applyReactionsChanged(messageId: msgId, reactions: reactions)
                 }
             }
 
@@ -513,7 +614,8 @@ final class FriendChatViewModel: ObservableObject {
             sentAt: m.sentAt,
             readAt: m.readAt,
             editedAt: m.editedAt,
-            deletedAt: ISO8601DateFormatter().string(from: Date()))
+            deletedAt: ISO8601DateFormatter().string(from: Date()),
+            reactions: nil)
     }
 
     /// `messages_read` from the friend means everything we sent up to
@@ -544,7 +646,8 @@ final class FriendChatViewModel: ObservableObject {
                 sentAt: m.sentAt,
                 readAt: readAt,
                 editedAt: m.editedAt,
-                deletedAt: m.deletedAt)
+                deletedAt: m.deletedAt,
+                reactions: m.reactions)
         }
     }
 

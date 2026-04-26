@@ -23,6 +23,7 @@ final class ChatRealtimeClient {
     var onMessageDeleted:  ((UUID /* messageId */) -> Void)?
     var onMessagesRead:    ((_ readByUserId: UUID, _ lastMessageId: UUID, _ readAt: String) -> Void)?
     var onTyping:          ((_ fromUserId: UUID, _ isTyping: Bool) -> Void)?
+    var onReactionsChanged: ((_ messageId: UUID, _ reactions: [FriendMessageReactionSummary]) -> Void)?
 
     private let tokenProvider: TokenProvider
     private let baseURL: String
@@ -177,6 +178,13 @@ final class ChatRealtimeClient {
             if let from = (envelope["fromUserId"] as? String).flatMap(UUID.init(uuidString:)) {
                 let isTyping = (envelope["isTyping"] as? Bool) ?? false
                 onTyping?(from, isTyping)
+            }
+        case "message_reactions_changed":
+            if let id = (envelope["messageId"] as? String).flatMap(UUID.init(uuidString:)),
+               let rawReactions = envelope["reactions"] as? [Any],
+               let data = try? JSONSerialization.data(withJSONObject: rawReactions),
+               let reactions = try? Self.decoder.decode([FriendMessageReactionSummary].self, from: data) {
+                onReactionsChanged?(id, reactions)
             }
         default:
             break

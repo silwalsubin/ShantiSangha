@@ -46,9 +46,12 @@ struct ProfileResponse: Codable, Equatable {
     )
 }
 
-/// Wrapper around the backend `UserResponse` — we only care about `profile`
-/// here. The user identity (id, email) comes from Firebase, not this DTO.
+/// Wrapper around the backend `UserResponse`. We pull the `id` for
+/// features that need to compare against ids returned in other DTOs
+/// (e.g., reaction `byUserIds` to highlight the caller's own pill).
+/// Email comes from Firebase, not this DTO.
 private struct MeEnvelope: Decodable {
+    let id: UUID?
     let profile: ProfileResponse?
 }
 
@@ -110,6 +113,11 @@ final class ProfileService: ObservableObject {
     }
 
     @Published private(set) var profile: ProfileResponse?
+    /// The backend user id for the signed-in account. Persists across
+    /// `/me` refreshes; cleared on sign-out. Surfaces here so chat
+    /// reaction logic can compare against `byUserIds` to flag the
+    /// caller's own pill.
+    @Published private(set) var currentUserId: UUID?
     @Published private(set) var loadState: LoadState = .idle
 
     /// The first unsatisfied gate, in priority order. `nil` when every gate
@@ -214,6 +222,7 @@ final class ProfileService: ObservableObject {
 
     private func handleSignOut() {
         profile = nil
+        currentUserId = nil
         loadState = .idle
         lastLoadedUserId = nil
         didStampOnboardingCompleted = false
@@ -229,6 +238,7 @@ final class ProfileService: ObservableObject {
         do {
             let envelope: MeEnvelope = try await ApiService.shared.get("/me")
             apply(envelope.profile)
+            currentUserId = envelope.id
             loadState = .loaded
             await stampOnboardingCompletedIfReady()
         } catch {
