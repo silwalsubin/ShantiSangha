@@ -10,10 +10,11 @@ struct FriendChatView: View {
     @State private var photoSelection: PhotosPickerItem?
     @State private var showRecorder = false
     @State private var showEndConfirm = false
-    @State private var actionTarget: FriendMessage?
     @State private var reactionPickerTarget: FriendMessage?
     @State private var imagePreview: PreviewedImage?
     @State private var didInitialScroll = false
+    @State private var jumpToMessageId: UUID?
+    @State private var highlightedMessageId: UUID?
     @EnvironmentObject var profile: ProfileService
     @Environment(\.dismiss) private var dismiss
 
@@ -61,42 +62,26 @@ struct FriendChatView: View {
         } message: {
             Text("Your message thread and any media will be deleted on both sides. This can't be undone.")
         }
-        .confirmationDialog(
-            "Message",
-            isPresented: actionTargetBinding,
-            titleVisibility: .hidden,
-            presenting: actionTarget
-        ) { target in
-            if !target.isDeleted {
-                Button("React") {
-                    reactionPickerTarget = target
-                }
-                Button("Reply") {
-                    vm.beginReply(target)
-                }
-            }
-            if vm.canEdit(target) {
-                Button("Edit") {
-                    vm.beginEdit(target)
-                    draft = target.body ?? ""
-                }
-            }
-            if vm.canDelete(target) {
-                Button("Delete", role: .destructive) {
-                    Task { await vm.deleteMessage(target) }
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        }
         .sheet(item: $reactionPickerTarget) { target in
             ReactionPickerSheet(
+                canEdit: vm.canEdit(target),
+                canDelete: vm.canDelete(target),
                 onPick: { emoji in
                     reactionPickerTarget = nil
                     if let me = profile.currentUserId {
                         Task { await vm.toggleReaction(emoji, on: target.id, currentUserId: me) }
                     }
+                },
+                onEdit: {
+                    reactionPickerTarget = nil
+                    vm.beginEdit(target)
+                    draft = target.body ?? ""
+                },
+                onDelete: {
+                    reactionPickerTarget = nil
+                    Task { await vm.deleteMessage(target) }
                 })
-                .presentationDetents([.height(140)])
+                .presentationDetents([.height(vm.canEdit(target) || vm.canDelete(target) ? 200 : 140)])
                 .presentationDragIndicator(.visible)
         }
         .task {
@@ -123,13 +108,6 @@ struct FriendChatView: View {
         .fullScreenCover(item: $imagePreview) { item in
             ChatImageViewer(url: item.url, messageId: item.messageId)
         }
-    }
-
-    private var actionTargetBinding: Binding<Bool> {
-        Binding(
-            get: { actionTarget != nil },
-            set: { if !$0 { actionTarget = nil } }
-        )
     }
 
     /// Snap the scroll view to the latest message (or pending bubble
@@ -183,30 +161,36 @@ struct FriendChatView: View {
                         }
 
                         ForEach(Array(vm.messages.enumerated()), id: \.element.id) { idx, msg in
-                            MessageBubble(
-                                message: msg,
-                                fromFriend: vm.isFromFriend(msg),
-                                friendDisplayName: friend.displayName,
-                                friendAvatarUrl: friend.avatarUrl,
-                                showAvatar: shouldShowAvatar(at: idx),
-                                currentUserId: profile.currentUserId,
-                                onTapImage: { url in imagePreview = PreviewedImage(url: url, messageId: msg.id) },
-                                onTapReaction: { emoji in
-                                    if let me = profile.currentUserId {
-                                        Task { await vm.toggleReaction(emoji, on: msg.id, currentUserId: me) }
-                                    }
-                                })
-                                .id(msg.id)
-                                .onLongPressGesture {
-                                    if vm.canEdit(msg) || vm.canDelete(msg) {
-                                        actionTarget = msg
-                                    }
+                            SwipeToReplyRow(enabled: !msg.isDeleted) {
+                                vm.beginReply(msg)
+                            } content: {
+                                MessageBubble(
+                                    message: msg,
+                                    fromFriend: vm.isFromFriend(msg),
+                                    friendDisplayName: friend.displayName,
+                                    friendAvatarUrl: friend.avatarUrl,
+                                    showAvatar: shouldShowAvatar(at: idx),
+                                    currentUserId: profile.currentUserId,
+                                    isHighlighted: highlightedMessageId == msg.id,
+                                    onTapImage: { url in imagePreview = PreviewedImage(url: url, messageId: msg.id) },
+                                    onTapReaction: { emoji in
+                                        if let me = profile.currentUserId {
+                                            Task { await vm.toggleReaction(emoji, on: msg.id, currentUserId: me) }
+                                        }
+                                    },
+                                    onTapReplyPreview: { parentId in jumpToMessage(parentId) })
+                            }
+                            .id(msg.id)
+                            .onLongPressGesture {
+                                if !msg.isDeleted {
+                                    reactionPickerTarget = msg
                                 }
-                                .onAppear {
-                                    if idx == 0 {
-                                        Task { await vm.loadOlder() }
-                                    }
+                            }
+                            .onAppear {
+                                if idx == 0 {
+                                    Task { await vm.loadOlder() }
                                 }
+                            }
                         }
 
                         // Pending sends — text-only for v1 — render
@@ -259,6 +243,33 @@ struct FriendChatView: View {
                     withAnimation(.easeOut(duration: 0.2)) {
                         proxy.scrollTo(lastPending.id, anchor: .bottom)
                     }
+                }
+            }
+            .onChange(of: jumpToMessageId) { _, target in
+                guard let target else { return }
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    proxy.scrollTo(target, anchor: .center)
+                }
+                jumpToMessageId = nil
+            }
+        }
+    }
+
+    /// Scroll to and briefly highlight the message with the given id —
+    /// the destination of a tapped reply preview. Highlight clears
+    /// itself after a beat so the user sees the landing without a
+    /// permanent visual marker.
+    private func jumpToMessage(_ id: UUID) {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        jumpToMessageId = id
+        withAnimation(.easeInOut(duration: 0.2)) {
+            highlightedMessageId = id
+        }
+        Task {
+            try? await Task.sleep(nanoseconds: 900_000_000)
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.4)) {
+                    if highlightedMessageId == id { highlightedMessageId = nil }
                 }
             }
         }
@@ -544,14 +555,20 @@ private struct MessageBubble: View {
     let friendAvatarUrl: String?
     let showAvatar: Bool
     let currentUserId: UUID?
+    let isHighlighted: Bool
     let onTapImage: (URL) -> Void
     let onTapReaction: (String) -> Void
+    let onTapReplyPreview: (UUID) -> Void
 
     /// Reserved width for the avatar gutter on the friend's side. Even
     /// on continuation rows (where we hide the avatar), the slot stays
     /// so successive bubbles in a run align vertically with the first.
     private let avatarSize: CGFloat = 28
     private let avatarGap: CGFloat = 6
+
+    private var hasReactions: Bool {
+        (message.reactions ?? []).contains { !$0.byUserIds.isEmpty }
+    }
 
     var body: some View {
         HStack(alignment: .bottom, spacing: avatarGap) {
@@ -573,32 +590,46 @@ private struct MessageBubble: View {
                     replyPreview(reply)
                 }
                 content
-                reactionRow
+                    .overlay(alignment: .bottomTrailing) {
+                        reactionRow
+                            .offset(x: 14, y: 10)
+                    }
+                    .padding(.bottom, hasReactions ? 12 : 0)
+                    .padding(.trailing, hasReactions ? 4 : 0)
                 metaLine
             }
+            .padding(.vertical, 4)
+            .padding(.horizontal, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color.sacredGold.opacity(isHighlighted ? 0.16 : 0))
+            )
 
             if fromFriend { Spacer(minLength: 32) }
         }
     }
 
     private func replyPreview(_ reply: FriendMessageReplyPreview) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(reply.senderUserId == message.senderUserId ? "Replying to themselves" : "Replying")
-                .font(.sacredMicroBold)
-                .foregroundColor(.sacredGold)
-            Text(replyText(reply))
-                .font(.sacredMicro)
-                .foregroundColor(.sacredMuted)
-                .lineLimit(1)
+        Button { onTapReplyPreview(reply.id) } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(reply.senderUserId == message.senderUserId ? "Replying to themselves" : "Replying")
+                    .font(.sacredMicroBold)
+                    .foregroundColor(.sacredGold)
+                Text(replyText(reply))
+                    .font(.sacredMicro)
+                    .foregroundColor(.sacredMuted)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .frame(maxWidth: 240, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 12).fill(Color.sacredBgCard.opacity(0.7)))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.sacredGold.opacity(0.16), lineWidth: 1)
+            )
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .frame(maxWidth: 240, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.sacredBgCard.opacity(0.7)))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.sacredGold.opacity(0.16), lineWidth: 1)
-        )
+        .buttonStyle(.plain)
     }
 
     private func replyText(_ reply: FriendMessageReplyPreview) -> String {
@@ -671,15 +702,15 @@ private struct MessageBubble: View {
                     let mine = row.isMine(currentUserId: currentUserId)
                     Button { onTapReaction(row.emoji) } label: {
                         HStack(spacing: 3) {
-                            Text(row.emoji).font(.system(size: 12))
+                            Text(row.emoji).font(.system(size: 11))
                             if row.count > 1 {
                                 Text("\(row.count)")
                                     .font(.sacredMicroBold)
                                     .foregroundColor(mine ? .sacredGoldDark : .sacredMuted)
                             }
                         }
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
                         .background(
                             Capsule().fill(mine
                                 ? Color.sacredGold.opacity(0.18)
@@ -742,22 +773,21 @@ private struct MessageBubble: View {
     }
 }
 
-/// Quick-emoji picker shown after the long-press dialog's "React"
-/// option. Six fixed emojis cover the common acknowledgement set —
-/// fancy full-emoji pickers can come later if anyone asks.
+/// Quick-emoji picker shown by long-press on a message. Six fixed
+/// emojis cover the common acknowledgement set — fancy full-emoji
+/// pickers can come later if anyone asks. For the user's own messages
+/// the sheet also surfaces Edit / Delete below the emoji row.
 private struct ReactionPickerSheet: View {
+    let canEdit: Bool
+    let canDelete: Bool
     let onPick: (String) -> Void
+    let onEdit: () -> Void
+    let onDelete: () -> Void
 
     private let emojis = ["❤️", "👍", "😂", "🙏", "😢", "🔥"]
 
     var body: some View {
         VStack(spacing: 0) {
-            Text("React")
-                .font(.sacredSectionLabel)
-                .foregroundColor(.sacredLabel)
-                .padding(.top, 18)
-                .padding(.bottom, 12)
-
             HStack(spacing: 14) {
                 ForEach(emojis, id: \.self) { emoji in
                     Button { onPick(emoji) } label: {
@@ -769,11 +799,92 @@ private struct ReactionPickerSheet: View {
                     .buttonStyle(.plain)
                 }
             }
+            .padding(.top, 24)
             .padding(.horizontal, SacredSpacing.m)
+
+            if canEdit || canDelete {
+                Divider()
+                    .background(Color.sacredGold.opacity(0.15))
+                    .padding(.top, 18)
+                    .padding(.horizontal, SacredSpacing.m)
+
+                HStack(spacing: 24) {
+                    if canEdit {
+                        Button(action: onEdit) {
+                            Label("Edit", systemImage: "pencil")
+                                .font(.sacredText)
+                                .foregroundColor(.sacredGold)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    if canDelete {
+                        Button(action: onDelete) {
+                            Label("Delete", systemImage: "trash")
+                                .font(.sacredText)
+                                .foregroundColor(.sacredRed)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.top, 14)
+            }
 
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity)
         .background(Color.sacredBg.ignoresSafeArea())
+    }
+}
+
+/// Drag a row to the right to start a reply. The icon on the leading
+/// edge fades and scales in as the drag progresses; crossing the
+/// threshold fires a haptic and triggers `onReply` on release. Only
+/// horizontal-dominant drags engage so vertical scrolling is preserved.
+private struct SwipeToReplyRow<Content: View>: View {
+    let enabled: Bool
+    let onReply: () -> Void
+    @ViewBuilder var content: () -> Content
+
+    @State private var dragX: CGFloat = 0
+    @State private var didFireHaptic = false
+
+    private let threshold: CGFloat = 60
+    private let maxDrag: CGFloat = 90
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            Image(systemName: "arrow.turn.up.left")
+                .font(.system(size: 18, weight: .light))
+                .foregroundColor(.sacredGold)
+                .opacity(min(Double(dragX / threshold), 1.0))
+                .scaleEffect(min(max(dragX / threshold, 0.4), 1.0))
+                .padding(.leading, 12)
+
+            content()
+                .offset(x: min(dragX, maxDrag))
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 12)
+                        .onChanged { value in
+                            guard enabled else { return }
+                            // Horizontal-dominant only — let the ScrollView keep vertical drags.
+                            guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                            let x = max(0, value.translation.width)
+                            dragX = x
+                            if !didFireHaptic && x >= threshold {
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                didFireHaptic = true
+                            }
+                        }
+                        .onEnded { _ in
+                            if enabled && dragX >= threshold {
+                                onReply()
+                            }
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+                                dragX = 0
+                            }
+                            didFireHaptic = false
+                        }
+                )
+        }
     }
 }
