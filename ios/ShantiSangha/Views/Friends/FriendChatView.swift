@@ -5,7 +5,6 @@ import PhotosUI
 struct FriendChatView: View {
     let friend: FriendSummary
     @StateObject private var vm: FriendChatViewModel
-    @EnvironmentObject var profile: ProfileService
     @State private var draft: String = ""
     @State private var photoSelection: PhotosPickerItem?
     @State private var showRecorder = false
@@ -110,13 +109,13 @@ struct FriendChatView: View {
         )
     }
 
-    /// Show an avatar (either the friend's or the user's own) only on
-    /// the first message of a consecutive run from the same sender —
-    /// repeating the same avatar on every bubble becomes visual noise.
-    /// The slot is still reserved (empty) on continuation rows so
-    /// bubbles stay vertically aligned.
+    /// Show the friend's avatar only on the first message of a
+    /// consecutive run from them — repeating the same avatar on every
+    /// bubble becomes visual noise. The slot is still reserved (empty)
+    /// on continuation rows so bubbles stay vertically aligned.
     private func shouldShowAvatar(at index: Int) -> Bool {
         let msg = vm.messages[index]
+        guard vm.isFromFriend(msg) else { return false }
         if index == 0 { return true }
         let prev = vm.messages[index - 1]
         return prev.senderUserId != msg.senderUserId
@@ -142,8 +141,6 @@ struct FriendChatView: View {
                                 fromFriend: vm.isFromFriend(msg),
                                 friendDisplayName: friend.displayName,
                                 friendAvatarUrl: friend.avatarUrl,
-                                myDisplayName: profile.profile?.displayName ?? "You",
-                                myAvatarUrl: profile.profile?.avatarUrl,
                                 showAvatar: shouldShowAvatar(at: idx),
                                 onTapImage: { url in imagePreview = PreviewedImage(url: url) })
                                 .id(msg.id)
@@ -314,12 +311,10 @@ private struct MessageBubble: View {
     let fromFriend: Bool
     let friendDisplayName: String
     let friendAvatarUrl: String?
-    let myDisplayName: String
-    let myAvatarUrl: String?
     let showAvatar: Bool
     let onTapImage: (URL) -> Void
 
-    /// Reserved width for the avatar gutter on the sender's side. Even
+    /// Reserved width for the avatar gutter on the friend's side. Even
     /// on continuation rows (where we hide the avatar), the slot stays
     /// so successive bubbles in a run align vertically with the first.
     private let avatarSize: CGFloat = 28
@@ -328,7 +323,14 @@ private struct MessageBubble: View {
     var body: some View {
         HStack(alignment: .bottom, spacing: avatarGap) {
             if fromFriend {
-                avatarSlot(displayName: friendDisplayName, avatarUrl: friendAvatarUrl)
+                if showAvatar {
+                    SacredAvatar(
+                        displayName: friendDisplayName,
+                        avatarUrl: friendAvatarUrl,
+                        size: avatarSize)
+                } else {
+                    Color.clear.frame(width: avatarSize, height: avatarSize)
+                }
             } else {
                 Spacer(minLength: 32)
             }
@@ -338,20 +340,7 @@ private struct MessageBubble: View {
                 metaLine
             }
 
-            if fromFriend {
-                Spacer(minLength: 32)
-            } else {
-                avatarSlot(displayName: myDisplayName, avatarUrl: myAvatarUrl)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func avatarSlot(displayName: String, avatarUrl: String?) -> some View {
-        if showAvatar {
-            SacredAvatar(displayName: displayName, avatarUrl: avatarUrl, size: avatarSize)
-        } else {
-            Color.clear.frame(width: avatarSize, height: avatarSize)
+            if fromFriend { Spacer(minLength: 32) }
         }
     }
 
