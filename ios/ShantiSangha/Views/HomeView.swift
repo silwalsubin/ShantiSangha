@@ -471,38 +471,42 @@ struct HomeView: View {
 
     /// Bell-icon entry to the in-app notifications inbox.
     ///
-    /// Two visual states, driven by content:
-    ///   - empty inbox: outlined bell, calm and restrained (doesn't pull
-    ///     the eye away from the daily rhythm card or compete with the
-    ///     profile avatar)
-    ///   - unread > 0: filled bell + bindi-like gold dot. The icon
-    ///     literally fills *because* there's something waiting, instead
-    ///     of an iOS-style red badge. This is the sacred move: design
-    ///     that responds to content, not chrome.
+    /// The bell sits inside a circular parchment chip whose geometry
+    /// (36pt diameter, 2pt sacredGold-opacity-0.42 stroke) is identical
+    /// to the profile avatar — so the two toolbar elements read as a
+    /// paired set of circles, not "outline glyph next to filled image".
+    /// The avatar carries a face, the bell carries a glyph; same form,
+    /// different content.
     ///
-    /// 44×44 touch frame matches the profile avatar's hit area (mobile-
-    /// first 44pt minimum) and visual size; 19pt medium-weight glyph
-    /// gives the bell enough presence to balance the avatar's mass
-    /// without becoming loud.
+    /// Two visual states, driven by content:
+    ///   - empty inbox: outlined bell, calm and restrained
+    ///   - unread > 0: filled bell + bindi-like gold dot anchored to
+    ///     the chip's rim. The icon literally fills *because* there's
+    ///     something waiting — no iOS-style red badge.
     private var notificationsBellButton: some View {
         NavigationLink(destination: NotificationsView()) {
             ZStack(alignment: .topTrailing) {
-                Image(systemName: notifications.unreadCount > 0 ? "bell.fill" : "bell")
-                    .font(.system(size: 19, weight: .medium))
-                    .foregroundColor(.sacredGold)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Circle())
+                Circle()
+                    .fill(Color.sacredBgCard.opacity(0.72))
+                    .frame(width: 36, height: 36)
+                    .overlay(Circle().stroke(Color.sacredGold.opacity(0.42), lineWidth: 2))
+                    .overlay(
+                        Image(systemName: notifications.unreadCount > 0 ? "bell.fill" : "bell")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.sacredGold)
+                    )
+                    .frame(width: 44, height: 44)   // 44pt touch target
 
                 if notifications.unreadCount > 0 {
-                    // Bindi-like sacred dot — warm gold gradient + soft
-                    // outer glow so it reads "something gentle is here"
-                    // rather than "red alert".
+                    // Bindi-like sacred dot now sits ON the chip's rim,
+                    // not floating in space. Offset places it at the
+                    // chip's ~1:30 position, overlapping the gold border.
                     Circle()
                         .fill(LinearGradient.sacredGoldShinyVertical)
                         .frame(width: 10, height: 10)
                         .overlay(Circle().stroke(Color.sacredBg, lineWidth: 2))
                         .shadow(color: .sacredGold.opacity(0.45), radius: 3)
-                        .offset(x: -8, y: 8)
+                        .offset(x: -4, y: 4)
                 }
             }
         }
