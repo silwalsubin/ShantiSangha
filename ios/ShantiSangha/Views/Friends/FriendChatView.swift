@@ -130,9 +130,9 @@ struct FriendChatView: View {
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                if vm.loading && vm.messages.isEmpty {
+                if vm.loading && vm.messages.isEmpty && vm.outbox.isEmpty {
                     ProgressView().padding(.top, SacredSpacing.xl)
-                } else if vm.messages.isEmpty {
+                } else if vm.messages.isEmpty && vm.outbox.isEmpty {
                     SacredEmptyState(
                         icon: "ellipsis.message",
                         title: "Say hello.",
@@ -166,6 +166,16 @@ struct FriendChatView: View {
                                     }
                                 }
                         }
+
+                        // Pending sends — text-only for v1 — render
+                        // after the real thread so they always appear
+                        // at the bottom while in flight.
+                        ForEach(vm.outbox) { pending in
+                            PendingBubble(
+                                pending: pending,
+                                onRetry: { Task { await vm.retryPending(pending.id) } },
+                                onDelete: { vm.deletePending(pending.id) })
+                        }
                     }
                     .padding(.horizontal, SacredSpacing.m)
                     .padding(.vertical, SacredSpacing.m)
@@ -182,6 +192,15 @@ struct FriendChatView: View {
                 if let last = vm.messages.last {
                     withAnimation(.easeOut(duration: 0.2)) {
                         proxy.scrollTo(last.id, anchor: .bottom)
+                    }
+                }
+            }
+            .onChange(of: vm.outbox.last?.id) { _, _ in
+                // Keep the pending bubble in view while in flight so the
+                // user can see the "sending" → "failed" transition.
+                if let lastPending = vm.outbox.last {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        proxy.scrollTo(lastPending.id, anchor: .bottom)
                     }
                 }
             }
@@ -381,6 +400,83 @@ struct FriendChatView: View {
 private struct PreviewedImage: Identifiable {
     let url: URL
     var id: String { url.absoluteString }
+}
+
+/// Outgoing-bubble shape for an outbox entry that hasn't reached the
+/// server yet. Visually mirrors a real outgoing bubble (right-aligned,
+/// gold gradient) but with a status badge instead of a timestamp:
+///   - `Sending…` while in flight
+///   - `Failed — tap to retry` when the last attempt errored
+/// Long-press exposes Retry / Delete so the user can drop a stuck send.
+private struct PendingBubble: View {
+    let pending: PendingMessage
+    let onRetry: () -> Void
+    let onDelete: () -> Void
+
+    @State private var showActions = false
+
+    var body: some View {
+        HStack {
+            Spacer(minLength: 32)
+
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(pending.body)
+                    .font(.sacredText)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(LinearGradient.sacredGoldShinyVertical)
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    .opacity(pending.lastError == nil ? 0.7 : 1.0)
+
+                statusLine
+            }
+
+            // Reserve the same right-side gutter as outgoing bubbles
+            // so the pending bubble visually aligns with the real ones.
+            Spacer().frame(width: 28)
+        }
+        .id(pending.id)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // Tap on a failed bubble retries directly (matches the
+            // "tap to retry" badge copy). Successful in-flight bubbles
+            // ignore the tap — wait or long-press to delete.
+            if pending.lastError != nil { onRetry() }
+        }
+        .onLongPressGesture { showActions = true }
+        .confirmationDialog("Pending message", isPresented: $showActions) {
+            if pending.lastError != nil {
+                Button("Retry") { onRetry() }
+            }
+            Button("Delete", role: .destructive) { onDelete() }
+            Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    @ViewBuilder
+    private var statusLine: some View {
+        if let err = pending.lastError {
+            HStack(spacing: 4) {
+                Image(systemName: "exclamationmark.circle")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.sacredRed)
+                Text("Failed — tap to retry")
+                    .font(.sacredMicro)
+                    .foregroundColor(.sacredRed)
+            }
+            .accessibilityLabel("Send failed: \(err)")
+        } else {
+            HStack(spacing: 4) {
+                ProgressView()
+                    .controlSize(.mini)
+                    .tint(.sacredMuted)
+                Text("Sending…")
+                    .font(.sacredMicro)
+                    .foregroundColor(.sacredMuted)
+            }
+        }
+    }
 }
 
 private struct MessageBubble: View {

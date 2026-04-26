@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import Combine
 
 @MainActor
 final class FriendChatViewModel: ObservableObject {
@@ -34,8 +35,20 @@ final class FriendChatViewModel: ObservableObject {
     @Published var editingDraft: String = ""
     @Published var replyTarget: FriendMessage?
 
+    /// Text sends that haven't reached the server yet (failed on first
+    /// attempt or fired while offline). Rendered after `messages` in
+    /// the chat view with a "sending" / "failed — tap to retry" badge.
+    /// Persists to disk so a kill-and-relaunch doesn't lose the text.
+    @Published var outbox: [PendingMessage] = [] {
+        didSet {
+            ChatOutbox.save(friendshipId: friendshipId, items: outbox)
+        }
+    }
+
     private var observer: NSObjectProtocol?
     private var loadedAll = false
+    private var cancellables: Set<AnyCancellable> = []
+    private var flushTask: Task<Void, Never>?
 
     /// Per-member auto-clear timers so a stale `typing: true` from a
     /// dropped or backgrounded peer eventually fades. Refreshed on each
@@ -59,6 +72,18 @@ final class FriendChatViewModel: ObservableObject {
         // The .task-driven refresh() upserts whatever's newer from the
         // API on top of this baseline.
         self.messages = ChatCache.load(friendshipId: friendshipId)
+        self.outbox = ChatOutbox.load(friendshipId: friendshipId)
+
+        // Auto-flush whenever the network becomes reachable. The
+        // initial true → true case is also handled below so a cold-open
+        // already-online doesn't need a network change to drain.
+        NetworkMonitor.shared.$isConnected
+            .removeDuplicates()
+            .sink { [weak self] connected in
+                if connected { Task { await self?.flushOutbox() } }
+            }
+            .store(in: &cancellables)
+
         observer = NotificationCenter.default.addObserver(
             forName: .friendMessageReceived,
             object: nil,
@@ -135,23 +160,107 @@ final class FriendChatViewModel: ObservableObject {
         // Clear our own typing-on signal as soon as we send, otherwise
         // the recipient sees a stale "typing…" while reading the message.
         await flushTyping(false)
+
+        let pending = PendingMessage(
+            body: trimmed,
+            replyToMessageId: replyTarget?.id)
+        // Optimistically push the pending row into the outbox so the
+        // bubble renders right away (with a "sending" badge), then
+        // attempt the actual send. On success we drop it from the
+        // outbox and replace with the server-issued FriendMessage; on
+        // failure it stays in the outbox for reconnect-flush or manual
+        // retry.
+        outbox.append(pending)
+        replyTarget = nil
+        await attemptSend(pending)
+    }
+
+    /// Attempt one outbox entry. Updates the entry's `lastError` on
+    /// failure (so the bubble can render "Tap to retry") and removes it
+    /// on success. Treats network errors as transient (clears any
+    /// previous lastError) — they'll retry automatically on reconnect;
+    /// HTTP errors as non-transient — they need user action.
+    private func attemptSend(_ pending: PendingMessage) async {
         sending = true
         defer { sending = false }
         do {
-            let replyToMessageId = replyTarget?.id
             let msg = try await FriendsAPI.sendText(
                 friendshipId: friendshipId,
-                body: trimmed,
-                replyToMessageId: replyToMessageId)
+                body: pending.body,
+                replyToMessageId: pending.replyToMessageId)
             // The realtime broadcast will also fire `message_received`
             // which would dedupe — append now so the UI feels instant
             // and let the broadcast harmlessly upsert if it arrives.
             upsertMessage(msg)
-            replyTarget = nil
+            outbox.removeAll { $0.id == pending.id }
             errorMessage = nil
         } catch {
-            errorMessage = error.localizedDescription
+            if isTransient(error) {
+                // Stay in the outbox without a visible error; reconnect
+                // will retry. Clear any stale failure label.
+                if let i = outbox.firstIndex(where: { $0.id == pending.id }) {
+                    outbox[i].lastError = nil
+                }
+            } else {
+                if let i = outbox.firstIndex(where: { $0.id == pending.id }) {
+                    outbox[i].lastError = error.localizedDescription
+                }
+                errorMessage = error.localizedDescription
+            }
         }
+    }
+
+    /// Re-attempt every pending outbox entry. Called automatically on
+    /// network reconnect and explicitly by the manual "retry" tap.
+    func flushOutbox() async {
+        // Coalesce concurrent flush requests — multiple isConnected →
+        // true edits or rapid retry taps shouldn't all fire send loops.
+        flushTask?.cancel()
+        let snapshot = outbox
+        flushTask = Task {
+            for pending in snapshot {
+                if Task.isCancelled { return }
+                // Pick the live row (lastError may have been cleared
+                // since the snapshot was taken).
+                guard outbox.contains(where: { $0.id == pending.id }) else { continue }
+                await attemptSend(pending)
+            }
+        }
+        await flushTask?.value
+    }
+
+    /// Manual retry from a long-press on a failed bubble. Clears the
+    /// error label first so the UI flips back to "sending".
+    func retryPending(_ id: UUID) async {
+        guard let i = outbox.firstIndex(where: { $0.id == id }) else { return }
+        outbox[i].lastError = nil
+        let pending = outbox[i]
+        await attemptSend(pending)
+    }
+
+    func deletePending(_ id: UUID) {
+        outbox.removeAll { $0.id == id }
+    }
+
+    /// Heuristic: treat URLSession-level errors and 5xx as transient
+    /// (worth retrying on reconnect); 4xx as permanent (user action
+    /// needed). The chat send is a tiny POST so timeouts also fall in
+    /// the transient bucket.
+    private func isTransient(_ error: Error) -> Bool {
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet, .networkConnectionLost,
+                 .timedOut, .cannotConnectToHost, .cannotFindHost,
+                 .dnsLookupFailed, .resourceUnavailable:
+                return true
+            default:
+                return false
+            }
+        }
+        if let api = error as? ApiError, case .httpError(let code, _) = api {
+            return code >= 500
+        }
+        return false
     }
 
     func sendImage(data: Data, contentType: String) async {
