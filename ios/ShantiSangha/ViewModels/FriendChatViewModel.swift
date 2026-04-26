@@ -482,11 +482,23 @@ final class FriendChatViewModel: ObservableObject {
             messages.append(msg)
             messages.sort { ($0.sentAt) < ($1.sentAt) }
         }
+        // Clean up cached media if a refresh or realtime edit reveals
+        // the message was deleted on another device — `applyDeleted`
+        // handles the live-event case but cross-device merges land here.
+        if msg.isDeleted, msg.kind == .image || msg.kind == .voice {
+            Task { await ChatMediaCache.shared.purge(messageId: msg.id) }
+        }
     }
 
     private func applyDeleted(_ id: UUID) {
         guard let i = messages.firstIndex(where: { $0.id == id }) else { return }
         let m = messages[i]
+        // Drop any cached binary — the bubble flips to "Message
+        // deleted" so the file is no longer renderable, and we don't
+        // want stale media taking disk budget away from active chats.
+        if m.kind == .image || m.kind == .voice {
+            Task { await ChatMediaCache.shared.purge(messageId: id) }
+        }
         messages[i] = FriendMessage(
             id: m.id,
             friendshipId: m.friendshipId,

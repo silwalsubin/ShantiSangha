@@ -104,7 +104,7 @@ struct FriendChatView: View {
             }
         }
         .fullScreenCover(item: $imagePreview) { item in
-            ChatImageViewer(url: item.url)
+            ChatImageViewer(url: item.url, messageId: item.messageId)
         }
     }
 
@@ -153,7 +153,7 @@ struct FriendChatView: View {
                                 friendDisplayName: friend.displayName,
                                 friendAvatarUrl: friend.avatarUrl,
                                 showAvatar: shouldShowAvatar(at: idx),
-                                onTapImage: { url in imagePreview = PreviewedImage(url: url) })
+                                onTapImage: { url in imagePreview = PreviewedImage(url: url, messageId: msg.id) })
                                 .id(msg.id)
                                 .onLongPressGesture {
                                     if vm.canEdit(msg) || vm.canDelete(msg) {
@@ -399,6 +399,7 @@ struct FriendChatView: View {
 /// Identifiable wrapper for `.fullScreenCover(item:)` driven by a URL.
 private struct PreviewedImage: Identifiable {
     let url: URL
+    let messageId: UUID?
     var id: String { url.absoluteString }
 }
 
@@ -576,21 +577,18 @@ private struct MessageBubble: View {
                     .clipShape(RoundedRectangle(cornerRadius: 18))
             case .image:
                 if let urlStr = message.mediaUrl, let url = URL(string: urlStr) {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .empty: ProgressView().frame(width: 200, height: 200)
-                        case .success(let image): image.resizable().scaledToFit()
-                        case .failure: Image(systemName: "photo").foregroundColor(.sacredMuted)
-                        @unknown default: EmptyView()
-                        }
-                    }
-                    .frame(maxWidth: 240, maxHeight: 320)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .contentShape(Rectangle())
-                    .onTapGesture { onTapImage(url) }
+                    CachedAsyncImage(messageId: message.id, remoteUrl: url)
+                        .frame(maxWidth: 240, maxHeight: 320)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .contentShape(Rectangle())
+                        .onTapGesture { onTapImage(url) }
                 }
             case .voice:
-                VoicePlayerView(url: message.mediaUrl, durationMs: message.durationMs, fromFriend: fromFriend)
+                VoicePlayerView(
+                    messageId: message.id,
+                    url: message.mediaUrl,
+                    durationMs: message.durationMs,
+                    fromFriend: fromFriend)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
                     .background(bubbleBackground)

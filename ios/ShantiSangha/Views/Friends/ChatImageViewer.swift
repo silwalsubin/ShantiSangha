@@ -11,6 +11,10 @@ import SwiftUI
 /// other UIImage-specific share targets wouldn't show up.
 struct ChatImageViewer: View {
     let url: URL
+    /// Stable message id used to consult `ChatMediaCache` so opening
+    /// an already-cached image is instant. nil for fullscreen previews
+    /// not tied to a chat message.
+    let messageId: UUID?
     @Environment(\.dismiss) private var dismiss
 
     @State private var image: UIImage?
@@ -166,6 +170,14 @@ struct ChatImageViewer: View {
     }
 
     private func loadImage() async {
+        // Prefer the on-disk cached binary when we have a message id —
+        // the bubble already downloaded it once, no point fetching again.
+        if let messageId,
+           let local = await ChatMediaCache.shared.cachedURL(messageId: messageId, remoteUrl: url),
+           let img = UIImage(contentsOfFile: local.path) {
+            image = img
+            return
+        }
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             if let img = UIImage(data: data) {

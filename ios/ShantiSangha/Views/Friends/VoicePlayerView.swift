@@ -1,9 +1,11 @@
 import SwiftUI
 import AVFoundation
 
-/// Inline voice-message playback control for chat bubbles. Streams audio
-/// directly from the presigned S3 URL provided by the backend.
+/// Inline voice-message playback control for chat bubbles. Plays from
+/// the on-disk media cache when a copy is available (instant, works
+/// offline); falls back to streaming the presigned S3 URL otherwise.
 struct VoicePlayerView: View {
+    let messageId: UUID
     let url: String?
     let durationMs: Int?
     let fromFriend: Bool
@@ -12,7 +14,7 @@ struct VoicePlayerView: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Button { toggle() } label: {
+            Button { Task { await toggle() } } label: {
                 Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 16))
                     .foregroundColor(fromFriend ? .sacredGold : .white)
@@ -28,9 +30,14 @@ struct VoicePlayerView: View {
         }
     }
 
-    private func toggle() {
-        guard let url = url, let parsed = URL(string: url) else { return }
-        if player.isPlaying { player.pause() } else { player.play(url: parsed) }
+    private func toggle() async {
+        if player.isPlaying { player.pause(); return }
+        guard let urlStr = url, let remote = URL(string: urlStr) else { return }
+        // Prefer cached local file — also primes the cache the first
+        // time the user plays a voice message they've never opened.
+        let playable = await ChatMediaCache.shared.cachedURL(
+            messageId: messageId, remoteUrl: remote) ?? remote
+        player.play(url: playable)
     }
 
     private var durationLabel: String {
