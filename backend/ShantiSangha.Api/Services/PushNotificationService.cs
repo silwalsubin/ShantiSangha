@@ -65,7 +65,13 @@ public class PushNotificationService(
         }
     }
 
-    public async Task SendAlertPushAsync(Guid userId, string title, string body, Dictionary<string, string>? data = null, CancellationToken ct = default)
+    public async Task SendAlertPushAsync(
+        Guid userId,
+        string title,
+        string body,
+        Dictionary<string, string>? data = null,
+        int? badge = null,
+        CancellationToken ct = default)
     {
         var tokens = await db.DeviceTokens
             .Where(d => d.UserId == userId)
@@ -97,14 +103,20 @@ public class PushNotificationService(
                         Aps = new Aps
                         {
                             Alert = new ApsAlert { Title = title, Body = body },
-                            Sound = "default"
+                            Sound = "default",
+                            // null leaves the home-screen badge alone; an
+                            // integer (including 0) sets it to that exact
+                            // count. Callers pass the recipient's current
+                            // inbox unread count to keep the icon in sync
+                            // with the in-app bell badge.
+                            Badge = badge
                         }
                     }
                 };
 
                 await FirebaseMessaging.DefaultInstance.SendAsync(message, ct);
-                logger.LogInformation("Alert push sent to user {UserId} device {DeviceId} type={Type}",
-                    userId, device.Id, data?.GetValueOrDefault("type") ?? "none");
+                logger.LogInformation("Alert push sent to user {UserId} device {DeviceId} type={Type} badge={Badge}",
+                    userId, device.Id, data?.GetValueOrDefault("type") ?? "none", badge?.ToString() ?? "none");
             }
             catch (FirebaseMessagingException ex) when (ex.MessagingErrorCode == MessagingErrorCode.Unregistered)
             {

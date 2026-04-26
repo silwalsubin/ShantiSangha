@@ -24,6 +24,7 @@ struct HomeView: View {
     @State private var ringPulse = false
     @State private var showProfileMenu = false
     @StateObject private var notifications = NotificationsViewModel()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -138,6 +139,16 @@ struct HomeView: View {
             }
             .onChange(of: vm.doneRecurring) { updateWidgetData() }
             .onChange(of: vm.doneMilestones) { updateWidgetData() }
+            // Foreground refresh — pull truth from server when the app
+            // returns from background. The `.task` modifier above only
+            // fires when HomeView is mounted; foregrounding doesn't
+            // re-run it, so the bell badge would otherwise drift while
+            // pushes-while-backgrounded bumped the home-screen icon.
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase == .active {
+                    Task { await notifications.refreshUnreadCount() }
+                }
+            }
             .onChange(of: reflection) { _, _ in syncReflectionDismissedFlag() }
             .onChange(of: vm.allPracticesDone) { _, allDone in
                 if allDone {

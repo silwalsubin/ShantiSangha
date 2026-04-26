@@ -1,14 +1,33 @@
 import Foundation
 import SwiftUI
+import UserNotifications
 
 /// Drives the bell-icon badge on Home AND the inbox screen. One source
 /// of truth so a friend_request_received push that lands while you're on
 /// Home flips the badge AND populates the inbox without a duplicate
 /// fetch when you tap into it.
+///
+/// Home-screen icon badge sync: every assignment to `unreadCount`
+/// mirrors itself onto `UNUserNotificationCenter.setBadgeCount`. Using
+/// didSet rather than calling at every assignment site means new code
+/// paths (future notification types, optimistic clears, refresh after
+/// push) automatically keep the home-screen icon honest without anyone
+/// having to remember.
 @MainActor
 final class NotificationsViewModel: ObservableObject {
     @Published private(set) var notifications: [AppNotification] = []
-    @Published private(set) var unreadCount: Int = 0
+    @Published private(set) var unreadCount: Int = 0 {
+        didSet {
+            guard oldValue != unreadCount else { return }
+            // Fire-and-forget — `try?` swallows the "user denied
+            // notification permission" error path; in that case the
+            // home-screen badge simply doesn't update and the in-app
+            // bell badge keeps working on its own.
+            Task {
+                try? await UNUserNotificationCenter.current().setBadgeCount(unreadCount)
+            }
+        }
+    }
     @Published private(set) var loading = false
     @Published private(set) var errorMessage: String?
 

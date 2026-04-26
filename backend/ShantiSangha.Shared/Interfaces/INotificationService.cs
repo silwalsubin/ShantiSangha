@@ -23,4 +23,13 @@ public interface INotificationService
         string type,
         object? payload = null,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Count of unviewed notifications for a user. Used by cross-module
+    /// callers (e.g. FriendRequestsService) to compute the APNs badge
+    /// value to send alongside a notification-shaped push, keeping the
+    /// home-screen icon and the in-app bell badge in sync. Pattern: call
+    /// AFTER `EnqueueAsync` so the new row is included in the count.
+    /// </summary>
+    Task<int> GetUnreadCountAsync(Guid userId, CancellationToken ct = default);
 }

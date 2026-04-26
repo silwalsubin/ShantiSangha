@@ -86,8 +86,16 @@ public class FriendRequestsService(
         // Lock-screen push so the recipient sees something even when the
         // app is closed. Tapping the push opens the app and (eventually,
         // via deep-link routing) lands on the inbox.
+        // The badge count comes from the recipient's CURRENT unread count
+        // — querying after EnqueueAsync ensures the just-created row is
+        // included, so the home-screen icon and the in-app bell badge land
+        // on the same number.
         try
         {
+            int badge;
+            try { badge = await notifications.GetUnreadCountAsync(toUserId, ct); }
+            catch { badge = 1; }   // can't read; pretend at least this one
+
             await push.SendAlertPushAsync(
                 userId: toUserId,
                 title: "New friend request",
@@ -97,6 +105,7 @@ public class FriendRequestsService(
                     ["type"] = "friend_request_received",
                     ["requestId"] = request.Id.ToString()
                 },
+                badge: badge,
                 ct: ct);
         }
         catch (Exception ex)
@@ -196,6 +205,14 @@ public class FriendRequestsService(
                 },
                 ct: ct);
 
+            // Badge for the original sender — current unread count after
+            // the new accepted-row was just enqueued. Same pattern as the
+            // friend_request_received path: query AFTER enqueue so the new
+            // row is included, keeping home-screen + bell badges aligned.
+            int senderBadge;
+            try { senderBadge = await notifications.GetUnreadCountAsync(request.FromUserId, ct); }
+            catch { senderBadge = 1; }
+
             await push.SendAlertPushAsync(
                 userId: request.FromUserId,
                 title: "New friend",
@@ -205,6 +222,7 @@ public class FriendRequestsService(
                     ["type"] = "friend_request_accepted",
                     ["friendshipId"] = friendship.Id.ToString()
                 },
+                badge: senderBadge,
                 ct: ct);
         }
         catch (Exception ex)
