@@ -18,10 +18,12 @@ struct FriendsTabView: View {
                         .padding(.horizontal, SacredSpacing.m)
                         .padding(.top, SacredSpacing.m)
 
-                    if vm.loading && vm.friends.isEmpty && vm.pendingInvitations.isEmpty && vm.outgoingRequests.isEmpty {
+                    if vm.loading && vm.friends.isEmpty && vm.pendingInvitations.isEmpty
+                        && vm.outgoingRequests.isEmpty && vm.incomingRequests.isEmpty {
                         ProgressView()
                             .padding(.top, SacredSpacing.xl * 2)
-                    } else if vm.friends.isEmpty && vm.pendingInvitations.isEmpty && vm.outgoingRequests.isEmpty {
+                    } else if vm.friends.isEmpty && vm.pendingInvitations.isEmpty
+                        && vm.outgoingRequests.isEmpty && vm.incomingRequests.isEmpty {
                         emptyState
                             .padding(.horizontal, SacredSpacing.m)
                             .padding(.top, SacredSpacing.xl)
@@ -39,8 +41,22 @@ struct FriendsTabView: View {
                             .padding(.top, SacredSpacing.l)
                         }
 
+                        if !vm.incomingRequests.isEmpty {
+                            SacredCard("REQUESTS RECEIVED") {
+                                VStack(spacing: SacredSpacing.s) {
+                                    ForEach(vm.incomingRequests) { req in
+                                        IncomingRequestRow(
+                                            request: req,
+                                            onAccept: { Task { await vm.acceptIncomingRequest(req.id) } },
+                                            onDecline: { Task { await vm.declineIncomingRequest(req.id) } })
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, SacredSpacing.m)
+                        }
+
                         if !vm.outgoingRequests.isEmpty {
-                            SacredCard("REQUESTS YOU SENT") {
+                            SacredCard("AWAITING REPLY") {
                                 VStack(spacing: SacredSpacing.s) {
                                     ForEach(vm.outgoingRequests) { req in
                                         OutgoingRequestRow(
@@ -131,7 +147,8 @@ struct FriendsTabView: View {
     /// empty state is the message at that point. Surface errors only when the
     /// user is mid-action or has loaded data and a follow-up call failed.
     private var shouldHideError: Bool {
-        vm.friends.isEmpty && vm.pendingInvitations.isEmpty && vm.outgoingRequests.isEmpty
+        vm.friends.isEmpty && vm.pendingInvitations.isEmpty
+            && vm.outgoingRequests.isEmpty && vm.incomingRequests.isEmpty
     }
 
     private func onInvite() async {
@@ -238,6 +255,37 @@ private struct PendingInviteRow: View {
     }
 }
 
+
+private struct IncomingRequestRow: View {
+    let request: FriendRequestSummary
+    let onAccept: () -> Void
+    let onDecline: () -> Void
+
+    var body: some View {
+        HStack(spacing: SacredSpacing.s) {
+            SacredAvatar(
+                displayName: request.otherUserDisplayName,
+                avatarUrl: request.otherUserAvatarUrl,
+                size: 36)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(request.otherUserDisplayName)
+                    .font(.sacredTextSemibold)
+                    .foregroundColor(.sacredText)
+                Text("Wants to connect")
+                    .font(.sacredMicro)
+                    .foregroundColor(.sacredMuted)
+            }
+            Spacer()
+            Button("Decline") { onDecline() }
+                .font(.sacredSmallSemibold)
+                .foregroundColor(.sacredMuted)
+            Button("Accept") { onAccept() }
+                .font(.sacredSmallSemibold)
+                .foregroundColor(.sacredGold)
+        }
+        .padding(.vertical, 4)
+    }
+}
 
 private struct OutgoingRequestRow: View {
     let request: FriendRequestSummary

@@ -10,6 +10,11 @@ final class FriendsViewModel: ObservableObject {
     /// awaiting a response. Distinct from `pendingInvitations` (which
     /// are token-based share links not yet redeemed).
     @Published var outgoingRequests: [FriendRequestSummary] = []
+    /// Direct friend requests sent TO this user that are still pending.
+    /// Mirrored to the bell-icon notifications inbox; surfaced here too
+    /// so the Friends tab is a durable "where do I stand with each
+    /// person" view (the bell inbox is transient).
+    @Published var incomingRequests: [FriendRequestSummary] = []
     @Published var loading = false
     @Published var errorMessage: String?
 
@@ -53,6 +58,12 @@ final class FriendsViewModel: ObservableObject {
             if !error.isCancellation, loadError == nil { loadError = error }
         }
 
+        do {
+            incomingRequests = try await NotificationsAPI.listIncomingRequests()
+        } catch {
+            if !error.isCancellation, loadError == nil { loadError = error }
+        }
+
         if let loadError {
             errorMessage = friendlyMessage(for: loadError)
         } else {
@@ -90,6 +101,36 @@ final class FriendsViewModel: ObservableObject {
             try await NotificationsAPI.cancelRequest(requestId)
         } catch {
             outgoingRequests = prev
+            errorMessage = friendlyMessage(for: error)
+        }
+    }
+
+    /// Accept an incoming friend request. The new friendship lands in
+    /// `friends` on next refresh; we drop the row optimistically and
+    /// rely on the post-call refresh to surface it. The bell-inbox copy
+    /// of this notification is dismissed via the standard refresh.
+    func acceptIncomingRequest(_ requestId: UUID) async {
+        let prev = incomingRequests
+        incomingRequests.removeAll { $0.id == requestId }
+        do {
+            _ = try await NotificationsAPI.acceptRequest(requestId)
+            await refresh()
+            // Notify other surfaces (bell inbox) that the request resolved.
+            NotificationCenter.default.post(name: .notificationsRefreshNeeded, object: nil)
+        } catch {
+            incomingRequests = prev
+            errorMessage = friendlyMessage(for: error)
+        }
+    }
+
+    func declineIncomingRequest(_ requestId: UUID) async {
+        let prev = incomingRequests
+        incomingRequests.removeAll { $0.id == requestId }
+        do {
+            try await NotificationsAPI.declineRequest(requestId)
+            NotificationCenter.default.post(name: .notificationsRefreshNeeded, object: nil)
+        } catch {
+            incomingRequests = prev
             errorMessage = friendlyMessage(for: error)
         }
     }
