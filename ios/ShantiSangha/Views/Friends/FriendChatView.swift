@@ -12,6 +12,7 @@ struct FriendChatView: View {
     @State private var showEndConfirm = false
     @State private var actionTarget: FriendMessage?
     @State private var imagePreview: PreviewedImage?
+    @State private var didInitialScroll = false
     @Environment(\.dismiss) private var dismiss
 
     init(friend: FriendSummary) {
@@ -115,6 +116,25 @@ struct FriendChatView: View {
         )
     }
 
+    /// Snap the scroll view to the latest message (or pending bubble
+    /// if outbox isn't empty). Waits a couple of run-loop ticks so the
+    /// LazyVStack has time to size its items — without this, scrollTo
+    /// can overshoot or undershoot the target. One-shot via the
+    /// `didInitialScroll` flag so re-renders don't re-snap mid-thread
+    /// when the user has scrolled up to read history.
+    private func initialScrollIfNeeded(proxy: ScrollViewProxy) async {
+        guard !didInitialScroll else { return }
+        guard let target = vm.outbox.last?.id ?? vm.messages.last?.id else { return }
+        // Two short sleeps: the first lets SwiftUI commit the initial
+        // layout; the second covers the case where the cache hydrate
+        // raced ahead of LazyVStack's first measurement pass.
+        try? await Task.sleep(nanoseconds: 80_000_000)
+        proxy.scrollTo(target, anchor: .bottom)
+        try? await Task.sleep(nanoseconds: 120_000_000)
+        proxy.scrollTo(target, anchor: .bottom)
+        didInitialScroll = true
+    }
+
     /// Show the friend's avatar only on the first message of a
     /// consecutive run from them — repeating the same avatar on every
     /// bubble becomes visual noise. The slot is still reserved (empty)
@@ -188,12 +208,21 @@ struct FriendChatView: View {
                         .padding(.horizontal, SacredSpacing.m)
                 }
             }
-            // Anchor the initial layout to the bottom of the content,
-            // so opening a chat lands on the latest message instead of
-            // wherever SwiftUI's default scroll position happened to
-            // settle. The onChange handlers below take over for live
-            // appends so they keep auto-scrolling on new arrivals.
-            .defaultScrollAnchor(.bottom)
+            // Initial scroll-to-bottom. `defaultScrollAnchor(.bottom)`
+            // doesn't reliably re-anchor after LazyVStack reflows
+            // (especially with image bubbles resizing after async
+            // load), so do an explicit jump on first appear and also
+            // any time messages get populated for the first time.
+            // No animation here so the chat opens AT the bottom rather
+            // than animating from the top.
+            .task {
+                await initialScrollIfNeeded(proxy: proxy)
+            }
+            .onChange(of: vm.messages.count) { _, _ in
+                if !didInitialScroll {
+                    Task { await initialScrollIfNeeded(proxy: proxy) }
+                }
+            }
             .onChange(of: vm.messages.last?.id) { _, _ in
                 if let last = vm.messages.last {
                     withAnimation(.easeOut(duration: 0.2)) {
