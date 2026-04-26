@@ -58,44 +58,21 @@ public class FriendRequestsService(
         await db.SaveChangesAsync(ct);
 
         var senderName = await profileQuery.GetDisplayNameAsync(fromUserId, ct) ?? "Someone";
-        var senderAvatar = await profileQuery.GetAvatarInfoAsync(fromUserId, ct);
 
-        // In-app notification for the recipient — drives the bell-icon
-        // badge and the inbox row. Payload carries everything iOS needs to
-        // render the row + accept/decline buttons without a follow-up
-        // request lookup.
+        // Pending friend requests intentionally do NOT land in the bell
+        // inbox — the Friends tab's "REQUESTS RECEIVED" card is the one
+        // source of truth, queried via /friends/requests/incoming. This
+        // avoids duplicate inbox rows when a request is cancelled and
+        // re-sent (the inbox would carry orphan rows it has no way to
+        // resolve). Terminal events like `friend_request_accepted` still
+        // do go through the inbox.
+        //
+        // Lock-screen push still fires so the recipient sees something
+        // when the app is closed. The silent-push variant tells iOS to
+        // refresh the Friends-tab badge service (FriendsBadgeService),
+        // not the bell inbox.
         try
         {
-            await notifications.EnqueueAsync(
-                recipientUserId: toUserId,
-                type: "friend_request_received",
-                payload: new
-                {
-                    requestId = request.Id,
-                    fromUserId = fromUserId,
-                    fromDisplayName = senderName,
-                    fromAvatarUrl = senderAvatar.AvatarUrl
-                },
-                ct: ct);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Failed to enqueue friend_request_received notification for user {UserId}", toUserId);
-        }
-
-        // Lock-screen push so the recipient sees something even when the
-        // app is closed. Tapping the push opens the app and (eventually,
-        // via deep-link routing) lands on the inbox.
-        // The badge count comes from the recipient's CURRENT unread count
-        // — querying after EnqueueAsync ensures the just-created row is
-        // included, so the home-screen icon and the in-app bell badge land
-        // on the same number.
-        try
-        {
-            int badge;
-            try { badge = await notifications.GetUnreadCountAsync(toUserId, ct); }
-            catch { badge = 1; }   // can't read; pretend at least this one
-
             await push.SendAlertPushAsync(
                 userId: toUserId,
                 title: "New friend request",
@@ -105,7 +82,7 @@ public class FriendRequestsService(
                     ["type"] = "friend_request_received",
                     ["requestId"] = request.Id.ToString()
                 },
-                badge: badge,
+                badge: null,
                 ct: ct);
         }
         catch (Exception ex)

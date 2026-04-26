@@ -3,9 +3,13 @@ import SwiftUI
 import UserNotifications
 
 /// Drives the bell-icon badge on Home AND the inbox screen. One source
-/// of truth so a friend_request_received push that lands while you're on
+/// of truth so a notification-shaped push that lands while you're on
 /// Home flips the badge AND populates the inbox without a duplicate
 /// fetch when you tap into it.
+///
+/// Pending friend requests are not part of this surface — they live on
+/// the Friends tab "REQUESTS RECEIVED" card and are tracked separately
+/// by `FriendsBadgeService`. The bell inbox is for terminal events.
 ///
 /// Home-screen icon badge sync: every assignment to `unreadCount`
 /// mirrors itself onto `UNUserNotificationCenter.setBadgeCount`. Using
@@ -94,32 +98,6 @@ final class NotificationsViewModel: ObservableObject {
         }
     }
 
-    /// Accept a friend-request notification's underlying request. On
-    /// success, drops the row from the inbox (it's resolved) and returns
-    /// the resulting FriendSummary so the caller can route to the chat
-    /// view. Caller is expected to be the recipient.
-    func acceptRequest(_ requestId: UUID, removingNotification notificationId: UUID) async -> FriendSummary? {
-        do {
-            let summary = try await NotificationsAPI.acceptRequest(requestId)
-            notifications.removeAll { $0.id == notificationId }
-            // Friends list will need a refresh next time it's shown.
-            NotificationCenter.default.post(name: .friendsUpdated, object: nil)
-            return summary
-        } catch {
-            errorMessage = error.localizedDescription
-            return nil
-        }
-    }
-
-    /// Decline a friend-request notification's underlying request.
-    func declineRequest(_ requestId: UUID, removingNotification notificationId: UUID) async {
-        do {
-            try await NotificationsAPI.declineRequest(requestId)
-            notifications.removeAll { $0.id == notificationId }
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
 }
 
 extension Notification.Name {

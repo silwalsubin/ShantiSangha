@@ -22,15 +22,6 @@ struct UnreadCountResponse: Codable, Equatable {
 
 // MARK: - Per-type payload shapes
 
-/// Payload of `type == "friend_request_received"`. Carries everything the
-/// inbox row needs to render avatar + name + accept/decline buttons.
-struct FriendRequestReceivedPayload: Codable {
-    let requestId: UUID
-    let fromUserId: UUID
-    let fromDisplayName: String
-    let fromAvatarUrl: String?
-}
-
 /// Payload of `type == "friend_request_accepted"`. Lets the sender's
 /// inbox surface "X accepted your request" with a tap-through to the
 /// new friendship's chat.

@@ -7,6 +7,7 @@ struct MainTabView: View {
     @StateObject private var network = NetworkMonitor.shared
     @StateObject private var syncStatus = SyncStatus.shared
     @StateObject private var deepLinks = DeepLinkRouter.shared
+    @StateObject private var friendsBadge = FriendsBadgeService.shared
     @State private var selectedTab = 0
 
     init() {
@@ -89,9 +90,11 @@ struct MainTabView: View {
                     Image("tab.union")
                     Text("Friends")
                 }
+                .badge(friendsBadge.pendingIncomingCount)
                 .tag(3)
             }
             .tint(.sacredGold)
+            .task { await friendsBadge.refresh() }
             .sheet(item: deepLinkBinding) { token in
                 AcceptInvitationView(token: token.value) { _ in
                     selectedTab = 3

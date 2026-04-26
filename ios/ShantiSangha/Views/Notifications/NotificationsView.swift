@@ -1,13 +1,14 @@
 import SwiftUI
 
 /// The in-app notification inbox. Pushed from the bell icon on Home.
-/// Auto-marks all notifications as viewed when the view appears (clears
-/// the bell badge) but rows stay visible — for friend requests, the row
-/// itself carries Accept/Decline buttons that resolve the underlying
-/// FriendRequest entity.
+/// Auto-marks all notifications as viewed when the view appears.
+///
+/// Pending friend requests deliberately do NOT live here — they belong
+/// to the Friends tab "REQUESTS RECEIVED" card, which queries the
+/// canonical `/friends/requests/incoming` endpoint and is always in sync.
+/// The bell inbox carries terminal events only (request accepted, etc.).
 struct NotificationsView: View {
     @StateObject private var vm = NotificationsViewModel()
-    @State private var pushedFriendship: FriendSummary?
 
     var body: some View {
         ZStack {
@@ -23,23 +24,12 @@ struct NotificationsView: View {
                         SacredEmptyState(
                             icon: "bell",
                             title: "Quiet here.",
-                            subtitle: "Notifications about friend requests and accepted connections will land here.")
+                            subtitle: "Updates about your connections will land here.")
                             .padding(.horizontal, SacredSpacing.m)
                             .padding(.top, SacredSpacing.xl)
                     } else {
                         ForEach(vm.notifications) { notification in
-                            NotificationRow(
-                                notification: notification,
-                                onAccept: { requestId in
-                                    Task {
-                                        if let summary = await vm.acceptRequest(requestId, removingNotification: notification.id) {
-                                            pushedFriendship = summary
-                                        }
-                                    }
-                                },
-                                onDecline: { requestId in
-                                    Task { await vm.declineRequest(requestId, removingNotification: notification.id) }
-                                })
+                            NotificationRow(notification: notification)
                         }
                         .padding(.horizontal, SacredSpacing.m)
                     }
@@ -65,29 +55,14 @@ struct NotificationsView: View {
             await vm.markAllViewedOnView()
         }
         .refreshable { await vm.refresh() }
-        .navigationDestination(item: $pushedFriendship) { friendship in
-            FriendChatView(friend: friendship)
-        }
     }
 }
 
 private struct NotificationRow: View {
     let notification: AppNotification
-    let onAccept: (UUID) -> Void
-    let onDecline: (UUID) -> Void
 
     var body: some View {
         switch notification.type {
-        case "friend_request_received":
-            if let payload = decode(FriendRequestReceivedPayload.self) {
-                FriendRequestReceivedRow(
-                    notification: notification,
-                    payload: payload,
-                    onAccept: { onAccept(payload.requestId) },
-                    onDecline: { onDecline(payload.requestId) })
-            } else {
-                fallbackRow
-            }
         case "friend_request_accepted":
             if let payload = decode(FriendRequestAcceptedPayload.self) {
                 FriendRequestAcceptedRow(notification: notification, payload: payload)
@@ -126,56 +101,6 @@ private struct NotificationRow: View {
     private func decode<T: Decodable>(_ type: T.Type) -> T? {
         guard let data = notification.payload.data(using: .utf8) else { return nil }
         return try? JSONDecoder().decode(T.self, from: data)
-    }
-}
-
-private struct FriendRequestReceivedRow: View {
-    let notification: AppNotification
-    let payload: FriendRequestReceivedPayload
-    let onAccept: () -> Void
-    let onDecline: () -> Void
-
-    var body: some View {
-        VStack(spacing: SacredSpacing.s) {
-            HStack(spacing: SacredSpacing.s) {
-                SacredAvatar(
-                    displayName: payload.fromDisplayName,
-                    avatarUrl: payload.fromAvatarUrl,
-                    size: 40)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(payload.fromDisplayName)
-                        .font(.sacredTextSemibold)
-                        .foregroundColor(.sacredText)
-                    Text("wants to be friends")
-                        .font(.sacredSmall)
-                        .foregroundColor(.sacredMuted)
-                }
-
-                Spacer()
-
-                Text(relativeTime(from: notification.createdAt))
-                    .font(.sacredMicro)
-                    .foregroundColor(.sacredMuted)
-            }
-
-            HStack(spacing: SacredSpacing.s) {
-                Button("Decline") { onDecline() }
-                    .font(.sacredSmallSemibold)
-                    .foregroundColor(.sacredMuted)
-                    .frame(maxWidth: .infinity, minHeight: 36)
-                    .background(Capsule().fill(Color.sacredBgCard))
-
-                Button("Accept") { onAccept() }
-                    .font(.sacredSmallSemibold)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity, minHeight: 36)
-                    .background(Capsule().fill(LinearGradient.sacredGoldShinyVertical))
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(SacredSpacing.s)
-        .luxCardChrome()
     }
 }
 
