@@ -44,6 +44,22 @@ enum SilentPushHandler {
             await MainActor.run {
                 NotificationCenter.default.post(name: .friendsUpdated, object: nil)
             }
+        case "friend_request_received":
+            // New incoming friend request. Tell the inbox + bell badge to
+            // refresh; if the user is on Home or in the inbox right now,
+            // both will repaint without them having to do anything.
+            await MainActor.run {
+                NotificationCenter.default.post(name: .notificationsRefreshNeeded, object: nil)
+            }
+        case "friend_request_accepted":
+            // Sender just got their request accepted. Refresh the inbox
+            // (so the "X accepted you" row appears) AND the friends list
+            // (so the new friendship is in scope) without forcing them to
+            // pull-to-refresh either surface.
+            await MainActor.run {
+                NotificationCenter.default.post(name: .notificationsRefreshNeeded, object: nil)
+                NotificationCenter.default.post(name: .friendsUpdated, object: nil)
+            }
         default:
             break
         }

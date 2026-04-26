@@ -23,6 +23,7 @@ struct HomeView: View {
     @State private var practicesCompleted = false
     @State private var ringPulse = false
     @State private var showProfileMenu = false
+    @StateObject private var notifications = NotificationsViewModel()
 
     var body: some View {
         ZStack {
@@ -100,12 +101,18 @@ struct HomeView: View {
             .toolbar {
                 if #available(iOS 26.0, *) {
                     ToolbarItem(placement: .topBarTrailing) {
-                        profileMenuButton
+                        HStack(spacing: 14) {
+                            notificationsBellButton
+                            profileMenuButton
+                        }
                     }
                     .sharedBackgroundVisibility(.hidden)
                 } else {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        profileMenuButton
+                        HStack(spacing: 14) {
+                            notificationsBellButton
+                            profileMenuButton
+                        }
                     }
                 }
             }
@@ -127,6 +134,7 @@ struct HomeView: View {
                 // Sync completion state on initial load (no haptic)
                 practicesCompleted = vm.allPracticesDone
                 await refreshWholeDayContext()
+                await notifications.refreshUnreadCount()
             }
             .onChange(of: vm.doneRecurring) { updateWidgetData() }
             .onChange(of: vm.doneMilestones) { updateWidgetData() }
@@ -448,6 +456,35 @@ struct HomeView: View {
         .buttonStyle(.plain)
         .fixedSize()
         .accessibilityLabel("Profile menu")
+    }
+
+    /// Bell-icon entry to the in-app notifications inbox. Shows a small
+    /// gold dot when there's at least one unread notification — count is
+    /// driven by NotificationsViewModel and refreshes on appear, on push
+    /// receipt (via the silent-push handler), and on app foreground.
+    private var notificationsBellButton: some View {
+        NavigationLink(destination: NotificationsView()) {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: "bell")
+                    .font(.system(size: 17, weight: .regular))
+                    .foregroundColor(.sacredGold)
+                    .frame(width: 36, height: 36)
+
+                if notifications.unreadCount > 0 {
+                    Circle()
+                        .fill(LinearGradient.sacredGoldShinyVertical)
+                        .frame(width: 9, height: 9)
+                        .overlay(Circle().stroke(Color.sacredBg, lineWidth: 1.5))
+                        .offset(x: -8, y: 6)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            notifications.unreadCount > 0
+                ? "Notifications, \(notifications.unreadCount) unread"
+                : "Notifications"
+        )
     }
 
     @ViewBuilder

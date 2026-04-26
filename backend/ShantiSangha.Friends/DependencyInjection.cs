@@ -28,6 +28,7 @@ public static class DependencyInjection
         services.AddScoped<IFriendsService, FriendsService>();
         services.AddScoped<IFriendMessagesService, FriendMessagesService>();
         services.AddScoped<IFriendsQueryService, FriendsQueryService>();
+        services.AddScoped<IFriendRequestsService, FriendRequestsService>();
 
         return services;
     }

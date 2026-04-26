@@ -27,6 +27,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShantiSangha.AiEval.Tests",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShantiSangha.Friends", "ShantiSangha.Friends\ShantiSangha.Friends.csproj", "{6D8B4E70-F5A9-4D33-9F3B-7C02E5B72A9D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShantiSangha.Notifications", "ShantiSangha.Notifications\ShantiSangha.Notifications.csproj", "{8FA5D3B7-2C81-4E2A-9C6F-1D72C9A4E8B0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -84,5 +86,9 @@ Global
 		{6D8B4E70-F5A9-4D33-9F3B-7C02E5B72A9D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6D8B4E70-F5A9-4D33-9F3B-7C02E5B72A9D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6D8B4E70-F5A9-4D33-9F3B-7C02E5B72A9D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8FA5D3B7-2C81-4E2A-9C6F-1D72C9A4E8B0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8FA5D3B7-2C81-4E2A-9C6F-1D72C9A4E8B0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8FA5D3B7-2C81-4E2A-9C6F-1D72C9A4E8B0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8FA5D3B7-2C81-4E2A-9C6F-1D72C9A4E8B0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

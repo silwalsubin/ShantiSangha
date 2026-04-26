@@ -1,6 +1,6 @@
 import Foundation
 
-struct FriendSummary: Codable, Identifiable, Equatable {
+struct FriendSummary: Codable, Identifiable, Equatable, Hashable {
     let friendshipId: UUID
     let friendUserId: UUID
     let displayName: String

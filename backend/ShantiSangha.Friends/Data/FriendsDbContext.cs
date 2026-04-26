@@ -14,6 +14,7 @@ public class FriendsDbContext(DbContextOptions<FriendsDbContext> options) : DbCo
     public DbSet<Friendship> Friendships => Set<Friendship>();
     public DbSet<FriendInvitation> Invitations => Set<FriendInvitation>();
     public DbSet<FriendMessage> Messages => Set<FriendMessage>();
+    public DbSet<FriendRequest> Requests => Set<FriendRequest>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -39,6 +40,23 @@ public class FriendsDbContext(DbContextOptions<FriendsDbContext> options) : DbCo
             e.Property(m => m.Kind).HasConversion<string>();
             e.HasIndex(m => new { m.FriendshipId, m.SentAt });
             e.HasIndex(m => m.SenderUserId);
+        });
+
+        mb.Entity<FriendRequest>(e =>
+        {
+            e.ToTable("FriendRequests");
+            e.Property(r => r.Status).HasConversion<string>();
+            // Recipient inbox query — list pending requests for a user,
+            // newest first. Status filter narrows it tight.
+            e.HasIndex(r => new { r.ToUserId, r.Status, r.CreatedAt });
+            // Sender's outgoing list. Same shape, different role.
+            e.HasIndex(r => new { r.FromUserId, r.Status, r.CreatedAt });
+            // Duplicate-prevention check: "is there already a pending
+            // request from A to B?" — covered by the (FromUserId, ...)
+            // index above plus a service-layer guard. We don't put a
+            // unique index on (From, To) because we want to allow re-sends
+            // after a decline (Pending becomes Declined → user can send
+            // a new Pending row).
         });
     }
 }

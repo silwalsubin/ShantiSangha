@@ -56,3 +56,18 @@ public record CreateMediaUploadResponse(
 public record CommitMediaMessageRequest(
     string ObjectKey,
     int? DurationMs);
+
+// ── FriendRequest (direct in-app, distinct from token-based FriendInvitation) ──
+
+public record SendFriendRequestRequest(Guid ToUserId);
+
+public record FriendRequestResponse(
+    Guid Id,
+    Guid FromUserId,
+    Guid ToUserId,
+    string Status,
+    DateTime CreatedAt,
+    DateTime? RespondedAt,
+    string OtherUserDisplayName,
+    string? OtherUserAvatarKey,
+    string? OtherUserAvatarUrl);

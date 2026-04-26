@@ -1,12 +1,26 @@
 import SwiftUI
 
-/// Read-only preview sheet shown when the user taps a search result. v1
-/// surfaces the same fields search exposes (display name, avatar, location)
-/// and stubs the action button — when the deferred action design lands,
-/// "Connect" swaps to a real send-friend-request call.
+/// Preview sheet shown when the user taps a search result. Surfaces the
+/// fields search exposes (display name, avatar, location) and lets the
+/// viewer send an in-app friend request directly. Outcomes:
+///   - .idle           — nothing yet, "Connect" enabled
+///   - .sending        — request in flight, button shows spinner
+///   - .sent           — success, button swaps to "Request sent"
+///   - .alreadyFriends — server told us we're already friends, route to chat
+///   - .failed         — server rejected (e.g. user_not_found), show inline error
 struct UserProfilePreviewSheet: View {
     let result: UserSearchResult
     @Environment(\.dismiss) private var dismiss
+    @State private var state: SendState = .idle
+    @State private var errorMessage: String?
+
+    enum SendState: Equatable {
+        case idle
+        case sending
+        case sent
+        case alreadyFriends
+        case failed
+    }
 
     var body: some View {
         VStack(spacing: SacredSpacing.l) {
@@ -29,15 +43,17 @@ struct UserProfilePreviewSheet: View {
                 }
             }
 
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.sacredSmall)
+                    .foregroundColor(.sacredRed)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, SacredSpacing.m)
+            }
+
             Spacer(minLength: SacredSpacing.l)
 
-            // Action stubbed for v1. Swap to a real send-friend-request
-            // call when the deferred design lands.
-            SacredPrimaryButton(
-                "Connect (coming soon)",
-                style: .commit,
-                isDisabled: true
-            ) { }
+            primaryAction
 
             Button("Close") { dismiss() }
                 .font(.sacredText)
@@ -48,5 +64,56 @@ struct UserProfilePreviewSheet: View {
         .frame(maxWidth: .infinity, alignment: .top)
         .background(Color.sacredBg.ignoresSafeArea())
         .presentationDetents([.medium, .large])
+    }
+
+    @ViewBuilder
+    private var primaryAction: some View {
+        switch state {
+        case .idle, .failed:
+            SacredPrimaryButton("Send friend request", style: .commit) {
+                Task { await send() }
+            }
+        case .sending:
+            SacredPrimaryButton("Sending…", style: .commit, isLoading: true) { }
+        case .sent:
+            SacredPrimaryButton("Request sent", style: .commit, isDisabled: true) { }
+        case .alreadyFriends:
+            SacredPrimaryButton("You're already friends", style: .commit, isDisabled: true) { }
+        }
+    }
+
+    private func send() async {
+        state = .sending
+        errorMessage = nil
+        do {
+            _ = try await NotificationsAPI.sendFriendRequest(toUserId: result.userId)
+            state = .sent
+        } catch let api as ApiError {
+            // Translate backend error codes into clean local state.
+            switch api {
+            case .httpError(409, let data):
+                let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                let code = (body?["error"] as? String) ?? ""
+                if code == "already_friends" {
+                    state = .alreadyFriends
+                    errorMessage = nil
+                } else if code == "already_pending" {
+                    state = .sent
+                    errorMessage = "You've already sent them a request."
+                } else {
+                    state = .failed
+                    errorMessage = (body?["message"] as? String) ?? "Couldn't send the request."
+                }
+            case .httpError(404, _):
+                state = .failed
+                errorMessage = "We couldn't find that user any more."
+            default:
+                state = .failed
+                errorMessage = "Couldn't send the request. Try again."
+            }
+        } catch {
+            state = .failed
+            errorMessage = "Couldn't send the request. Try again."
+        }
     }
 }
