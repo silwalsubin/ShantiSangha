@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreLocation
+import MapKit
 
 /// Detailed Vedic birth chart — nakshatra attributes, lagna, 9 planets with
 /// rashi/degree/house/nakshatra/pada, current dasha. Reached from Home's
@@ -950,14 +951,16 @@ struct VedicChartView: View {
                 let parts = place.split(separator: ",")
                 if parts.count == 2, let lat = Double(parts[0]), let lng = Double(parts[1]) {
                     let location = CLLocation(latitude: lat, longitude: lng)
-                    if let placemark = try? await CLGeocoder().reverseGeocodeLocation(location).first {
-                        let derived = [placemark.locality, placemark.country]
-                            .compactMap { $0 }
-                            .joined(separator: ", ")
+                    // iOS 26 — `CLGeocoder` is deprecated. Use MapKit's
+                    // `MKReverseGeocodingRequest` and pull a formatted
+                    // string from `MKAddress.shortAddress`.
+                    let request = MKReverseGeocodingRequest(location: location)
+                    if let mapItems = try? await request?.mapItems,
+                       let derived = mapItems.first?.address?.shortAddress,
+                       !derived.isEmpty
+                    {
                         birthPlaceQuery = derived
-                        if !derived.isEmpty {
-                            cachePlaceName(coords: place, name: derived)
-                        }
+                        cachePlaceName(coords: place, name: derived)
                     }
                 }
             }

@@ -248,7 +248,9 @@ struct BirthPlacePickerView: View {
     // MARK: - Selection
 
     private func selectItem(_ item: MKMapItem) {
-        let coord = item.placemark.coordinate
+        // iOS 26 — `item.location.coordinate` replaces the deprecated
+        // `item.placemark.coordinate`. CLLocation is non-deprecated.
+        let coord = item.location.coordinate
         let name = displayName(for: item)
 
         selectedCoordinate = coord
@@ -266,30 +268,14 @@ struct BirthPlacePickerView: View {
     // MARK: - Display helpers
 
     private func primaryName(for item: MKMapItem) -> String {
-        if let locality = item.placemark.locality, !locality.isEmpty {
-            return locality
-        }
-        if let subLocality = item.placemark.subLocality, !subLocality.isEmpty {
-            return subLocality
-        }
-        if let admin = item.placemark.administrativeArea, !admin.isEmpty {
-            return admin
-        }
-        return item.name ?? "Unknown"
+        // iOS 26 — `MKMapItem.placemark` is deprecated. `item.name` is
+        // typically the city / place name from search results, with
+        // `MKAddress.shortAddress` as a fallback formatted string.
+        item.name ?? item.address?.shortAddress ?? "Unknown"
     }
 
     private func subtitleLine(for item: MKMapItem) -> String {
-        var parts: [String] = []
-        let primary = primaryName(for: item)
-        if let admin = item.placemark.administrativeArea,
-           !admin.isEmpty,
-           admin != primary {
-            parts.append(admin)
-        }
-        if let country = item.placemark.country, !country.isEmpty {
-            parts.append(country)
-        }
-        return parts.joined(separator: ", ")
+        item.address?.shortAddress ?? ""
     }
 
     private func displayName(for item: MKMapItem) -> String {

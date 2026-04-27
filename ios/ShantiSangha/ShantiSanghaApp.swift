@@ -30,11 +30,11 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
         return true
     }
 
-    func application(_ app: UIApplication,
-                     open url: URL,
-                     options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
-        return GIDSignIn.sharedInstance.handle(url)
-    }
+    // URL handling moved to the SwiftUI App body's `.onOpenURL` modifier
+    // — iOS 26 deprecated `OpenURLOptionsKey` on the AppDelegate path.
+    // The body's onOpenURL already calls `GIDSignIn.sharedInstance.handle(url)`
+    // before falling through to DeepLinkRouter, so this delegate method
+    // was redundant.
 
     // MARK: - APNs token forwarded to FCM (manual, swizzling OFF)
 

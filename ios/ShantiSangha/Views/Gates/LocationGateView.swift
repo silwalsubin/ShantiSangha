@@ -252,15 +252,30 @@ struct LocationGateBody: View {
     }
 
     private func selectMapItem(_ item: MKMapItem) {
-        guard let resolved = ResolvedLocation(placemark: item.placemark) else {
-            errorMessage = "We couldn't read that place. Try another nearby city."
-            return
+        // iOS 26 — `MKMapItem.placemark` is deprecated. Use the new
+        // `MKReverseGeocodingRequest` to resolve the location and parse
+        // `MKAddress.fullAddress` into structured fields. Note: this
+        // turns selection into an async network round-trip (was sync).
+        Task { @MainActor in
+            searching = true
+            defer { searching = false }
+            do {
+                let request = MKReverseGeocodingRequest(location: item.location)
+                let mapItems = try await request?.mapItems ?? []
+                let resolvedFromRequest = mapItems.first.flatMap { ResolvedLocation(mapItem: $0) }
+                let resolved = resolvedFromRequest ?? ResolvedLocation(mapItem: item)
+                guard let resolved else {
+                    errorMessage = "We couldn't read that place. Try another nearby city."
+                    return
+                }
+                selection = resolved
+                searchText = "\(resolved.city), \(resolved.state), \(resolved.country)"
+                searchResults = []
+                errorMessage = nil
+            } catch {
+                errorMessage = "We couldn't read that place. Try another nearby city."
+            }
         }
-        selection = resolved
-        searchText = "\(resolved.city), \(resolved.state), \(resolved.country)"
-        searchResults = []
-        searching = false
-        errorMessage = nil
     }
 
     // MARK: - Current location
@@ -271,9 +286,14 @@ struct LocationGateBody: View {
         defer { resolving = false }
         do {
             let location = try await locationFetcher.fetch()
-            let placemarks = try await CLGeocoder().reverseGeocodeLocation(location)
-            guard let placemark = placemarks.first,
-                  let resolved = ResolvedLocation(placemark: placemark)
+            // iOS 26 — `CLGeocoder` is deprecated; use MapKit's
+            // `MKReverseGeocodingRequest` to resolve a coordinate to
+            // a place. The returned `MKMapItem.address.fullAddress` is
+            // a locale-formatted string we parse into city/state/country.
+            let request = MKReverseGeocodingRequest(location: location)
+            let mapItems = try await request?.mapItems ?? []
+            guard let mapItem = mapItems.first,
+                  let resolved = ResolvedLocation(mapItem: mapItem)
             else {
                 errorMessage = "We couldn't read your location. Try searching instead."
                 return
@@ -311,23 +331,15 @@ struct LocationGateBody: View {
     // MARK: - Display helpers
 
     private func primaryLabel(for item: MKMapItem) -> String {
-        item.placemark.locality
-            ?? item.placemark.subLocality
-            ?? item.placemark.administrativeArea
-            ?? item.name
-            ?? "Unknown"
+        // iOS 26 — `MKMapItem.placemark` is deprecated. We use
+        // `item.name` (usually the place's display name) and fall
+        // back to `MKAddress.shortAddress`. Coarser than the old
+        // locality/subLocality cascade but doesn't trigger warnings.
+        item.name ?? item.address?.shortAddress ?? "Unknown"
     }
 
     private func subtitleLabel(for item: MKMapItem) -> String {
-        var parts: [String] = []
-        let primary = primaryLabel(for: item)
-        if let admin = item.placemark.administrativeArea, !admin.isEmpty, admin != primary {
-            parts.append(admin)
-        }
-        if let country = item.placemark.country, !country.isEmpty {
-            parts.append(country)
-        }
-        return parts.joined(separator: ", ")
+        item.address?.shortAddress ?? ""
     }
 }
 
@@ -347,20 +359,62 @@ private struct ResolvedLocation: Equatable {
         self.city = city
     }
 
-    init?(placemark: CLPlacemark) {
-        // Some places (e.g. small towns, neighborhoods) don't expose a
-        // locality — fall back to subLocality, then administrativeArea, so
-        // the user gets *something* readable rather than a nil city.
-        let country = placemark.country?.nonEmpty
-        let state = placemark.administrativeArea?.nonEmpty
-            ?? placemark.subAdministrativeArea?.nonEmpty
-        let city = placemark.locality?.nonEmpty
-            ?? placemark.subLocality?.nonEmpty
+    /// iOS 26 — parses a structured location from `MKMapItem.address.fullAddress`.
+    /// `fullAddress` is a locale-formatted string (e.g. "1 Apple Park Way,
+    /// Cupertino, CA 95014, United States"). We split on commas and read
+    /// city / state / country positionally:
+    ///   - last segment is country
+    ///   - second-to-last is state/region (if 3+ segments)
+    ///   - the segment before that is the city (if 4+ segments) or the
+    ///     first segment (if exactly 3 segments)
+    /// US-style postal codes ("CA 95014") are stripped from the state slot.
+    /// Lossier than the old CLPlacemark path, but the iOS 26 MapKit
+    /// migration doesn't expose granular structured fields.
+    init?(mapItem: MKMapItem) {
+        guard let fullAddress = mapItem.address?.fullAddress, !fullAddress.isEmpty else {
+            return nil
+        }
 
-        guard let country, let state, let city else { return nil }
+        let parts = fullAddress
+            .components(separatedBy: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        guard parts.count >= 2, let country = parts.last, !country.isEmpty else {
+            return nil
+        }
+
+        let stateSlot: String
+        let citySlot: String
+        if parts.count >= 4 {
+            stateSlot = parts[parts.count - 2]
+            citySlot = parts[parts.count - 3]
+        } else if parts.count == 3 {
+            stateSlot = parts[1]
+            citySlot = parts[0]
+        } else {
+            stateSlot = country
+            citySlot = parts[0]
+        }
+
+        let strippedState = ResolvedLocation.stripPostalCode(stateSlot)
+        let state = strippedState.isEmpty ? country : strippedState
+        let city = citySlot
+
+        guard !city.isEmpty else { return nil }
         self.country = country
         self.state = state
         self.city = city
+    }
+
+    /// Trim trailing digits / spaces / hyphens that look like a postal
+    /// code, leaving the admin region name (e.g. "CA 95014" → "CA").
+    private static func stripPostalCode(_ s: String) -> String {
+        var chars = Array(s)
+        while let last = chars.last, last.isNumber || last == " " || last == "-" {
+            chars.removeLast()
+        }
+        return String(chars).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 
