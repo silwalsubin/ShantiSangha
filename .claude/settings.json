@@ -75,7 +75,8 @@
       "Bash(grep -rn \"MagnificationGesture\\\\|MagnifyGesture\" SolarSystem/ CircleSolarSystemView.swift)",
       "Bash(grep -rn \"withAnimation\\(.spring\" SolarSystem/ CircleSolarSystemView.swift)",
       "Bash(grep -rn \"value\\\\.translation\\\\.width\\\\|value\\\\.translation\\\\.height\\\\|value\\\\.scale\" SolarSystem/ CircleSolarSystemView.swift)",
-      "Bash(grep -rn \"isRealWorldProxy\\\\|TextureResource\\(image:\" SolarSystem/)"
+      "Bash(grep -rn \"isRealWorldProxy\\\\|TextureResource\\(image:\" SolarSystem/)",
+      "Bash(killall -9 SourceKitService SKAgent SwiftPM-Helper XCBBuildService)"
     ],
     "additionalDirectories": [
       "/Users/subinsilwal/Desktop/code/maiself/.claude",

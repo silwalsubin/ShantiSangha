@@ -3,6 +3,7 @@ import SwiftUI
 /// Root of the Friends tab. Lists existing friendships, surfaces pending
 /// invites, and offers the "invite a friend" flow.
 struct FriendsTabView: View {
+    @EnvironmentObject private var profile: ProfileService
     /// Pending invites + incoming/outgoing requests still live here.
     /// The main connection list moved to `circleVM`.
     @StateObject private var vm = FriendsViewModel()
@@ -44,51 +45,63 @@ struct FriendsTabView: View {
     var body: some View {
         let displayedConnections = filteredConnections
 
-        GeometryReader { viewport in
-            ZStack {
-                // Solar mode is a fully cosmic experience — the page
-                // bleeds to pure black so the RealityView sky dome and
-                // the surrounding chrome read as one continuous
-                // backdrop, rather than a black rectangle floating on
-                // a brown SacredBackground gradient.
-                if viewMode == .solar {
-                    Color.black.ignoresSafeArea()
-                } else {
-                    SacredBackground()
-                        .ignoresSafeArea()
-                }
+        ZStack {
+            // Solar mode is a fully cosmic experience — the page bleeds
+            // to pure black so the SpriteKit scene and the surrounding
+            // chrome read as one continuous backdrop, rather than a
+            // black rectangle floating on a brown SacredBackground
+            // gradient.
+            if viewMode == .solar {
+                Color.black.ignoresSafeArea()
+            } else {
+                SacredBackground()
+                    .ignoresSafeArea()
+            }
 
+            // Solar with at least one connection goes full-bleed —
+            // the SpriteView fills the viewport edge-to-edge, scope
+            // pill overlays at the top, requests/invites are reachable
+            // by toggling back to list. Everything else (loading,
+            // empty, error, list mode, list-mode-with-no-connections)
+            // routes through the existing scroll view.
+            if viewMode == .solar && !circleVM.connections.isEmpty {
+                fullBleedSolar(
+                    connections: displayedConnections,
+                    totalCount: circleVM.connections.count)
+            } else {
                 ScrollView {
-                    LazyVStack(spacing: viewMode == .solar ? SacredSpacing.s : SacredSpacing.l) {
-                    if (circleVM.loading || vm.loading) && circleVM.connections.isEmpty
-                        && vm.pendingInvitations.isEmpty
-                        && vm.outgoingRequests.isEmpty && vm.incomingRequests.isEmpty {
-                        // LazyVStack shrinks to its sole child's intrinsic
-                        // width when nothing else stretches it — without
-                        // the explicit max-width the spinner ends up pinned
-                        // to the leading edge instead of centered.
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, SacredSpacing.xl * 2)
-                    } else if circleVM.connections.isEmpty && vm.pendingInvitations.isEmpty
-                        && vm.outgoingRequests.isEmpty && vm.incomingRequests.isEmpty
-                        && (circleVM.errorMessage != nil || vm.errorMessage != nil) {
-                        // Refresh failed and we have nothing to show. Tell
-                        // the user the truth instead of "Walking solo for
-                        // now" — that lie made a transient API/auth
-                        // failure look like an empty circle.
-                        loadFailureState
-                            .padding(.horizontal, SacredSpacing.m)
-                            .padding(.top, SacredSpacing.xl)
-                    } else if circleVM.connections.isEmpty && vm.pendingInvitations.isEmpty
-                        && vm.outgoingRequests.isEmpty && vm.incomingRequests.isEmpty {
-                        emptyState
-                            .padding(.horizontal, SacredSpacing.m)
-                            .padding(.top, SacredSpacing.xl)
-                    } else {
-                        if !circleVM.connections.isEmpty {
-                            switch viewMode {
-                            case .list:
+                    LazyVStack(spacing: SacredSpacing.l) {
+                        if (circleVM.loading || vm.loading) && circleVM.connections.isEmpty
+                            && vm.pendingInvitations.isEmpty
+                            && vm.outgoingRequests.isEmpty && vm.incomingRequests.isEmpty {
+                            // LazyVStack shrinks to its sole child's
+                            // intrinsic width when nothing else
+                            // stretches it — without the explicit
+                            // max-width the spinner ends up pinned to
+                            // the leading edge instead of centered.
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, SacredSpacing.xl * 2)
+                        } else if circleVM.connections.isEmpty && vm.pendingInvitations.isEmpty
+                                    && vm.outgoingRequests.isEmpty && vm.incomingRequests.isEmpty
+                                    && (circleVM.errorMessage != nil || vm.errorMessage != nil) {
+                            // Refresh failed and we have nothing to
+                            // show. Tell the user the truth instead of
+                            // "Walking solo for now" — that lie made a
+                            // transient API/auth failure look like an
+                            // empty circle.
+                            loadFailureState
+                                .padding(.horizontal, SacredSpacing.m)
+                                .padding(.top, SacredSpacing.xl)
+                        } else if circleVM.connections.isEmpty && vm.pendingInvitations.isEmpty
+                                    && vm.outgoingRequests.isEmpty && vm.incomingRequests.isEmpty {
+                            emptyState
+                                .padding(.horizontal, SacredSpacing.m)
+                                .padding(.top, SacredSpacing.xl)
+                        } else {
+                            if !circleVM.connections.isEmpty {
+                                // Solar branch handled above; this
+                                // path is list-only when reached.
                                 circleOverview(connections: circleVM.connections)
                                     .padding(.horizontal, SacredSpacing.m)
                                     .padding(.top, SacredSpacing.m)
@@ -100,68 +113,62 @@ struct FriendsTabView: View {
                                     .padding(.horizontal, SacredSpacing.m)
 
                                 circleDirectory(connections: displayedConnections)
-                            case .solar:
-                                solarStage(
-                                    connections: displayedConnections,
-                                    totalCount: circleVM.connections.count,
-                                    viewportHeight: viewport.size.height)
+                            } else {
+                                circleActions
+                                    .padding(.horizontal, SacredSpacing.m)
+                                    .padding(.top, SacredSpacing.m)
                             }
-                        } else {
-                            circleActions
+
+                            if !vm.incomingRequests.isEmpty {
+                                SacredCard("REQUESTS RECEIVED") {
+                                    VStack(spacing: SacredSpacing.s) {
+                                        ForEach(vm.incomingRequests) { req in
+                                            IncomingRequestRow(
+                                                request: req,
+                                                onAccept: { Task { await vm.acceptIncomingRequest(req.id) } },
+                                                onDecline: { Task { await vm.declineIncomingRequest(req.id) } })
+                                        }
+                                    }
+                                }
                                 .padding(.horizontal, SacredSpacing.m)
-                                .padding(.top, SacredSpacing.m)
-                        }
+                            }
 
-                        if !vm.incomingRequests.isEmpty {
-                            SacredCard("REQUESTS RECEIVED") {
-                                VStack(spacing: SacredSpacing.s) {
-                                    ForEach(vm.incomingRequests) { req in
-                                        IncomingRequestRow(
-                                            request: req,
-                                            onAccept: { Task { await vm.acceptIncomingRequest(req.id) } },
-                                            onDecline: { Task { await vm.declineIncomingRequest(req.id) } })
+                            if !vm.outgoingRequests.isEmpty {
+                                SacredCard("AWAITING REPLY") {
+                                    VStack(spacing: SacredSpacing.s) {
+                                        ForEach(vm.outgoingRequests) { req in
+                                            OutgoingRequestRow(
+                                                request: req,
+                                                onCancel: { Task { await vm.cancelOutgoingRequest(req.id) } })
+                                        }
                                     }
                                 }
+                                .padding(.horizontal, SacredSpacing.m)
                             }
-                            .padding(.horizontal, SacredSpacing.m)
-                        }
 
-                        if !vm.outgoingRequests.isEmpty {
-                            SacredCard("AWAITING REPLY") {
-                                VStack(spacing: SacredSpacing.s) {
-                                    ForEach(vm.outgoingRequests) { req in
-                                        OutgoingRequestRow(
-                                            request: req,
-                                            onCancel: { Task { await vm.cancelOutgoingRequest(req.id) } })
+                            if !vm.pendingInvitations.isEmpty {
+                                SacredCard("PENDING INVITES") {
+                                    VStack(spacing: SacredSpacing.s) {
+                                        ForEach(vm.pendingInvitations) { invite in
+                                            PendingInviteRow(
+                                                invite: invite,
+                                                onShare: { share(invite) },
+                                                onRevoke: { Task { await vm.revoke(invite.invitationId) } })
+                                        }
                                     }
                                 }
+                                .padding(.horizontal, SacredSpacing.m)
                             }
-                            .padding(.horizontal, SacredSpacing.m)
                         }
 
-                        if !vm.pendingInvitations.isEmpty {
-                            SacredCard("PENDING INVITES") {
-                                VStack(spacing: SacredSpacing.s) {
-                                    ForEach(vm.pendingInvitations) { invite in
-                                        PendingInviteRow(
-                                            invite: invite,
-                                            onShare: { share(invite) },
-                                            onRevoke: { Task { await vm.revoke(invite.invitationId) } })
-                                    }
-                                }
-                            }
-                            .padding(.horizontal, SacredSpacing.m)
+                        if let err = inlineErrorMessage, !shouldHideError {
+                            Text(err)
+                                .font(.sacredMicro)
+                                .foregroundColor(.sacredMuted)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, SacredSpacing.m)
                         }
                     }
-
-                    if let err = inlineErrorMessage, !shouldHideError {
-                        Text(err)
-                            .font(.sacredMicro)
-                            .foregroundColor(.sacredMuted)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, SacredSpacing.m)
-                    }
-                }
                     .padding(.bottom, SacredSpacing.tabBarSafe)
                 }
             }
@@ -181,7 +188,7 @@ struct FriendsTabView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
                         Image(systemName: viewMode == .list
-                              ? "globe"
+                              ? "atom"
                               : "list.bullet")
                             .foregroundColor(.sacredGold)
                     }
@@ -265,35 +272,41 @@ struct FriendsTabView: View {
         }
     }
 
+    /// Solar mode, full-bleed: SpriteView fills the entire viewport
+    /// (ignoring safe areas top + bottom so the cosmic feel runs into
+    /// nav and tab bars), with the scope pill floating on top when
+    /// the user has narrowed the circle by filter or search.
     @ViewBuilder
-    private func solarStage(
-        connections: [Connection],
-        totalCount: Int,
-        viewportHeight: CGFloat
-    ) -> some View {
-        if hasActiveCircleScope {
-            solarScopePill(shownCount: connections.count, totalCount: totalCount)
-                .padding(.horizontal, SacredSpacing.m)
-                .padding(.top, SacredSpacing.xs)
-        }
+    private func fullBleedSolar(connections: [Connection], totalCount: Int) -> some View {
+        ZStack(alignment: .top) {
+            if connections.isEmpty {
+                // Filter active but nothing matches.
+                VStack {
+                    Spacer()
+                    noMatchesState
+                        .padding(.horizontal, SacredSpacing.m)
+                    Spacer()
+                }
+            } else {
+                CircleSpriteSystemView(
+                    connections: connections,
+                    myAvatarUrl: profile.profile?.avatarUrl,
+                    myDisplayName: profile.profile?.displayName,
+                    onTap: { id in
+                        if let conn = circleVM.connections.first(where: { $0.id == id }) {
+                            navTarget = conn.messageable ? .chat(id) : .detail(id)
+                        } else {
+                            navTarget = .detail(id)
+                        }
+                    })
+                    .ignoresSafeArea()
+            }
 
-        if connections.isEmpty {
-            noMatchesState
-                .padding(.horizontal, SacredSpacing.m)
-                .padding(.top, SacredSpacing.s)
-        } else {
-            CircleSolarSystemView(
-                connections: connections,
-                onTap: { id in
-                    if let conn = circleVM.connections.first(where: { $0.id == id }) {
-                        navTarget = conn.messageable ? .chat(id) : .detail(id)
-                    } else {
-                        navTarget = .detail(id)
-                    }
-                })
-                .frame(height: solarHeight(for: connections.count, viewportHeight: viewportHeight))
-                .padding(.horizontal, SacredSpacing.xxs)
-                .padding(.top, hasActiveCircleScope ? 0 : -SacredSpacing.s)
+            if hasActiveCircleScope {
+                solarScopePill(shownCount: connections.count, totalCount: totalCount)
+                    .padding(.horizontal, SacredSpacing.m)
+                    .padding(.top, SacredSpacing.xs)
+            }
         }
     }
 
@@ -450,19 +463,6 @@ struct FriendsTabView: View {
                 title: "No one matches.",
                 subtitle: "Try another name, relation, or place.")
         }
-    }
-
-    private func solarHeight(for count: Int, viewportHeight: CGFloat) -> CGFloat {
-        let base: CGFloat = switch count {
-        case ...8: 460
-        case 9...80: 560
-        case 81...300: 680
-        default: 820
-        }
-
-        let chromeReserve: CGFloat = hasActiveCircleScope ? 156 : 96
-        let available = max(420, viewportHeight - SacredSpacing.tabBarSafe - chromeReserve)
-        return max(base, available)
     }
 
     // MARK: - Top summary and actions
