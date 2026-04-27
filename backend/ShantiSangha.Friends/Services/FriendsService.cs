@@ -126,7 +126,7 @@ public class FriendsService(
     {
         var displayName = await profileQuery.GetDisplayNameAsync(userId, ct);
         if (string.IsNullOrWhiteSpace(displayName))
-            throw new FriendsServiceException("display_name_required", "Set a display name before inviting friends.");
+            throw new FriendsServiceException("display_name_required", "Set a display name before inviting people to your circle.");
 
         var now = DateTime.UtcNow;
 
@@ -229,7 +229,7 @@ public class FriendsService(
             throw new FriendsServiceException("self", "You can't accept your own invite.");
 
         if (await ExistsFriendshipAsync(invite.InviterUserId, userId, ct))
-            throw new FriendsServiceException("already_friends", "You're already friends with this person.");
+            throw new FriendsServiceException("already_friends", "They're already in your circle.");
 
         var (a, b) = invite.InviterUserId.CompareTo(userId) < 0
             ? (invite.InviterUserId, userId)
@@ -253,7 +253,7 @@ public class FriendsService(
         }
         catch (DbUpdateException)
         {
-            throw new FriendsServiceException("already_friends", "You're already friends with this person.");
+            throw new FriendsServiceException("already_friends", "They're already in your circle.");
         }
         await tx.CommitAsync(ct);
 
@@ -263,16 +263,16 @@ public class FriendsService(
         try
         {
             await push.SendAlertPushAsync(invite.InviterUserId,
-                title: "New friend",
-                body: $"{accepterName} accepted your invite.",
+                title: "Joined your circle",
+                body: $"{accepterName} joined your circle.",
                 data: new Dictionary<string, string>
                 {
                     ["type"] = "friendship_created",
                     ["friendshipId"] = friendship.Id.ToString()
                 }, ct: ct);
             await push.SendAlertPushAsync(userId,
-                title: "New friend",
-                body: $"You and {inviterName} are now friends.",
+                title: "Joined your circle",
+                body: $"{inviterName} is now in your circle.",
                 data: new Dictionary<string, string>
                 {
                     ["type"] = "friendship_created",

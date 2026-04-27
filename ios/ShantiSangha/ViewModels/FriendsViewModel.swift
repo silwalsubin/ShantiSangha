@@ -176,7 +176,7 @@ final class FriendsViewModel: ObservableObject {
                let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let err = body["error"] as? String,
                err == "display_name_required" {
-                return "Set a display name in Settings before inviting friends."
+                return "Set a display name in Settings before inviting people to your circle."
             }
             if code == 429 {
                 return "You've created too many invites recently. Try again later."

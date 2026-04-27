@@ -109,7 +109,7 @@ struct FriendsTabView: View {
                             .padding(.horizontal, SacredSpacing.m)
                         }
 
-                        SacredPrimaryButton("Invite another friend", style: .pill, fullWidth: true) {
+                        SacredPrimaryButton("Invite to your circle", style: .pill, fullWidth: true) {
                             Task { await onInvite() }
                         }
                         .padding(.horizontal, SacredSpacing.m)
@@ -126,7 +126,7 @@ struct FriendsTabView: View {
                 .padding(.bottom, SacredSpacing.tabBarSafe)
             }
         }
-        .navigationTitle("Friends")
+        .navigationTitle("Circle")
         .navigationBarTitleDisplayMode(.inline)
         .task { await vm.refresh() }
         .refreshable { await vm.refresh() }
@@ -149,18 +149,18 @@ struct FriendsTabView: View {
                 icon: "person.2",
                 title: "Walking solo for now.",
                 subtitle: "Invite someone you trust to message inside this private space.",
-                actionLabel: "Invite a friend"
+                actionLabel: "Invite someone"
             ) { Task { await onInvite() } }
         }
     }
 
     /// Shown when refresh failed and there's nothing in the lists. The
-    /// emptyState would otherwise lie that the user has no friends.
+    /// emptyState would otherwise lie that the user has no circle.
     private var loadFailureState: some View {
         SacredCard {
             SacredEmptyState(
                 icon: "wifi.slash",
-                title: "Couldn't load your friends.",
+                title: "Couldn't load your circle.",
                 subtitle: vm.errorMessage ?? "Pull to refresh, or check your connection.",
                 actionLabel: "Try again"
             ) { Task { await vm.refresh() } }
@@ -211,7 +211,7 @@ struct FriendsTabView: View {
 
     private func share(_ link: ShareLink) {
         let url = URL(string: link.url) ?? URL(string: "https://shantisangha.com")!
-        let body = "I'm using ShantiSangha. Join me as a friend: \(link.url)"
+        let body = "I'm using ShantiSangha. Join me here: \(link.url)"
         shareItems = [body, url]
         showShare = true
     }

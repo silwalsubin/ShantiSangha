@@ -181,7 +181,7 @@ struct FriendProfileView: View {
                             .controlSize(.small)
                             .tint(.sacredRed)
                     }
-                    Text(ending ? "Ending…" : "End friendship")
+                    Text(ending ? "Removing…" : "Remove from circle")
                         .font(.sacredText)
                         .foregroundColor(.sacredRed)
                 }
@@ -196,11 +196,11 @@ struct FriendProfileView: View {
         }
         .padding(.top, SacredSpacing.l)
         .confirmationDialog(
-            "End friendship with \(friend.displayName)?",
+            "Remove \(friend.displayName) from your circle?",
             isPresented: $showEndConfirm,
             titleVisibility: .visible
         ) {
-            Button("End friendship", role: .destructive) {
+            Button("Remove", role: .destructive) {
                 Task { await endFriendship() }
             }
             Button("Cancel", role: .cancel) {}
@@ -275,7 +275,7 @@ struct FriendProfileView: View {
             // chat view picks up the missing friendshipId via vm.friends
             // and unwinds.
         } catch {
-            saveError = "Couldn't end the friendship. Try again."
+            saveError = "Couldn't remove. Try again."
         }
     }
 

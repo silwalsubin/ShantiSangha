@@ -119,7 +119,7 @@ private struct FriendRequestAcceptedRow: View {
                 Text(payload.byDisplayName)
                     .font(.sacredTextSemibold)
                     .foregroundColor(.sacredText)
-                Text("accepted your friend request")
+                Text("joined your circle")
                     .font(.sacredSmall)
                     .foregroundColor(.sacredMuted)
             }

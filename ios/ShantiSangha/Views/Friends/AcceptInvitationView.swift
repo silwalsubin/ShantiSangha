@@ -49,7 +49,7 @@ struct AcceptInvitationView: View {
             Text(p.inviterDisplayName)
                 .font(.sacredHero)
                 .foregroundColor(.sacredText)
-            Text("invites you to be friends inside ShantiSangha")
+            Text("invites you to their circle on ShantiSangha")
                 .font(.sacredText)
                 .foregroundColor(.sacredTextSecondary)
         }
@@ -75,7 +75,7 @@ struct AcceptInvitationView: View {
         } else if p.tokenAlreadyUsed {
             inlineError("This invite has already been used.")
         } else if p.alreadyFriends {
-            inlineError("You're already friends with \(p.inviterDisplayName).")
+            inlineError("\(p.inviterDisplayName) is already in your circle.")
         } else if p.isOwnInvite {
             inlineError("You can't accept your own invite.")
         } else if let err = errorMessage {

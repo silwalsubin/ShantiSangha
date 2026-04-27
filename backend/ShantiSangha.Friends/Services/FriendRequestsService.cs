@@ -17,7 +17,7 @@ public class FriendRequestsService(
     public async Task<FriendRequestResponse> SendAsync(Guid fromUserId, Guid toUserId, CancellationToken ct = default)
     {
         if (fromUserId == toUserId)
-            throw new FriendsServiceException("self", "You can't send a friend request to yourself.");
+            throw new FriendsServiceException("self", "You can't invite yourself.");
 
         // Recipient must exist — DisplayName check via the Identity
         // module's profile query is a cheap proxy for "user exists with a
@@ -33,7 +33,7 @@ public class FriendRequestsService(
             : (toUserId, fromUserId);
         var alreadyFriends = await db.Friendships.AnyAsync(f => f.UserAId == a && f.UserBId == b, ct);
         if (alreadyFriends)
-            throw new FriendsServiceException("already_friends", "You're already friends with that user.");
+            throw new FriendsServiceException("already_friends", "They're already in your circle.");
 
         // Already a Pending request from this sender to this recipient?
         // We allow re-sends after a Decline (the old row stays in the
@@ -44,7 +44,7 @@ public class FriendRequestsService(
                 && r.Status == FriendRequestStatus.Pending)
             .FirstOrDefaultAsync(ct);
         if (existing is not null)
-            throw new FriendsServiceException("already_pending", "You've already sent that user a request.");
+            throw new FriendsServiceException("already_pending", "You've already sent them an invite.");
 
         var request = new FriendRequest
         {
@@ -75,8 +75,8 @@ public class FriendRequestsService(
         {
             await push.SendAlertPushAsync(
                 userId: toUserId,
-                title: "New friend request",
-                body: $"{senderName} wants to be friends.",
+                title: "New invite",
+                body: $"{senderName} wants to join your circle.",
                 data: new Dictionary<string, string>
                 {
                     ["type"] = "friend_request_received",
@@ -124,7 +124,7 @@ public class FriendRequestsService(
         await using var tx = await db.Database.BeginTransactionAsync(ct);
 
         var request = await db.Requests.FirstOrDefaultAsync(r => r.Id == requestId, ct)
-            ?? throw new FriendsServiceException("not_found", "Friend request not found.");
+            ?? throw new FriendsServiceException("not_found", "Invite not found.");
 
         if (request.ToUserId != recipientUserId)
             throw new FriendsServiceException("forbidden", "Only the recipient can accept this request.");
@@ -192,8 +192,8 @@ public class FriendRequestsService(
 
             await push.SendAlertPushAsync(
                 userId: request.FromUserId,
-                title: "New friend",
-                body: $"{recipientName} accepted your request.",
+                title: "Joined your circle",
+                body: $"{recipientName} joined your circle.",
                 data: new Dictionary<string, string>
                 {
                     ["type"] = "friend_request_accepted",

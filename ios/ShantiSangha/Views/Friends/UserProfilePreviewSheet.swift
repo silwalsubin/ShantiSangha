@@ -70,15 +70,15 @@ struct UserProfilePreviewSheet: View {
     private var primaryAction: some View {
         switch state {
         case .idle, .failed:
-            SacredPrimaryButton("Send friend request", style: .commit) {
+            SacredPrimaryButton("Invite to your circle", style: .commit) {
                 Task { await send() }
             }
         case .sending:
             SacredPrimaryButton("Sending…", style: .commit, isLoading: true) { }
         case .sent:
-            SacredPrimaryButton("Request sent", style: .commit, isDisabled: true) { }
+            SacredPrimaryButton("Invite sent", style: .commit, isDisabled: true) { }
         case .alreadyFriends:
-            SacredPrimaryButton("You're already friends", style: .commit, isDisabled: true) { }
+            SacredPrimaryButton("Already in your circle", style: .commit, isDisabled: true) { }
         }
     }
 
@@ -99,21 +99,21 @@ struct UserProfilePreviewSheet: View {
                     errorMessage = nil
                 } else if code == "already_pending" {
                     state = .sent
-                    errorMessage = "You've already sent them a request."
+                    errorMessage = "You've already sent them an invite."
                 } else {
                     state = .failed
-                    errorMessage = (body?["message"] as? String) ?? "Couldn't send the request."
+                    errorMessage = (body?["message"] as? String) ?? "Couldn't send the invite."
                 }
             case .httpError(404, _):
                 state = .failed
-                errorMessage = "We couldn't find that user any more."
+                errorMessage = "We couldn't find that person any more."
             default:
                 state = .failed
-                errorMessage = "Couldn't send the request. Try again."
+                errorMessage = "Couldn't send the invite. Try again."
             }
         } catch {
             state = .failed
-            errorMessage = "Couldn't send the request. Try again."
+            errorMessage = "Couldn't send the invite. Try again."
         }
     }
 }

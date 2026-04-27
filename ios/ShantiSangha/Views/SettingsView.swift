@@ -91,7 +91,7 @@ struct SettingsView: View {
                             Image(systemName: "message")
                                 .font(.sacredSmall)
                                 .foregroundColor(.sacredMuted)
-                            Text("Friend message alerts")
+                            Text("Circle message alerts")
                                 .font(.sacredText)
                                 .foregroundColor(.sacredText)
                         }
