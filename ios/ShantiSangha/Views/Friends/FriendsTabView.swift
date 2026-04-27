@@ -11,6 +11,14 @@ struct FriendsTabView: View {
     @State private var shareItems: [Any] = []
     @State private var showAddLocal = false
     @State private var navTarget: FriendNavRoute?
+    /// String-backed because @AppStorage with custom enums needs a
+    /// `RawRepresentable<String>` plus default-handling boilerplate;
+    /// a tiny string compare is cheaper to read at the call site.
+    @AppStorage("circle_view_mode") private var viewModeRaw: String = CircleViewMode.list.rawValue
+
+    private var viewMode: CircleViewMode {
+        CircleViewMode(rawValue: viewModeRaw) ?? .list
+    }
 
     /// Programmatic navigation target — both the row body and the avatar
     /// are tappable but route to different destinations, so we need a
@@ -19,6 +27,10 @@ struct FriendsTabView: View {
     enum FriendNavRoute: Hashable {
         case chat(UUID)        // connection id
         case detail(UUID)      // connection id
+    }
+
+    enum CircleViewMode: String {
+        case list, mandala
     }
 
     var body: some View {
@@ -54,27 +66,42 @@ struct FriendsTabView: View {
                             .padding(.top, SacredSpacing.xl)
                     } else {
                         if !circleVM.connections.isEmpty {
-                            SacredListCard {
-                                VStack(spacing: 0) {
-                                    ForEach(Array(circleVM.connections.enumerated()), id: \.element.id) { index, conn in
-                                        ConnectionRow(
-                                            connection: conn,
-                                            onTapAvatar: { navTarget = .detail(conn.id) },
-                                            onTapBody: {
-                                                navTarget = conn.messageable
-                                                    ? .chat(conn.id)
-                                                    : .detail(conn.id)
-                                            })
+                            switch viewMode {
+                            case .list:
+                                SacredListCard {
+                                    VStack(spacing: 0) {
+                                        ForEach(Array(circleVM.connections.enumerated()), id: \.element.id) { index, conn in
+                                            ConnectionRow(
+                                                connection: conn,
+                                                onTapAvatar: { navTarget = .detail(conn.id) },
+                                                onTapBody: {
+                                                    navTarget = conn.messageable
+                                                        ? .chat(conn.id)
+                                                        : .detail(conn.id)
+                                                })
 
-                                        if index < circleVM.connections.count - 1 {
-                                            Divider()
-                                                .padding(.leading, 68)
+                                            if index < circleVM.connections.count - 1 {
+                                                Divider()
+                                                    .padding(.leading, 68)
+                                            }
                                         }
                                     }
                                 }
+                                .padding(.horizontal, SacredSpacing.m)
+                                .padding(.top, SacredSpacing.l)
+                            case .mandala:
+                                CircleMandalaView(
+                                    connections: circleVM.connections,
+                                    onTap: { id in
+                                        if let conn = circleVM.connections.first(where: { $0.id == id }) {
+                                            navTarget = conn.messageable ? .chat(id) : .detail(id)
+                                        } else {
+                                            navTarget = .detail(id)
+                                        }
+                                    })
+                                    .frame(height: 480)
+                                    .padding(.top, SacredSpacing.s)
                             }
-                            .padding(.horizontal, SacredSpacing.m)
-                            .padding(.top, SacredSpacing.l)
                         }
 
                         if !vm.incomingRequests.isEmpty {
@@ -151,6 +178,26 @@ struct FriendsTabView: View {
         }
         .navigationTitle("Circle")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            // Only surface the toggle once there's actually a circle
+            // to render — toggling between two empty states is noise.
+            if !circleVM.connections.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            viewModeRaw = (viewMode == .list ? CircleViewMode.mandala : .list).rawValue
+                        }
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } label: {
+                        Image(systemName: viewMode == .list
+                              ? "circle.grid.cross"
+                              : "list.bullet")
+                            .foregroundColor(.sacredGold)
+                    }
+                    .accessibilityLabel(viewMode == .list ? "Show mandala" : "Show list")
+                }
+            }
+        }
         .task {
             await vm.refresh()
             await circleVM.refresh()

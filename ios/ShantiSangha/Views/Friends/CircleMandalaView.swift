@@ -1,0 +1,295 @@
+import SwiftUI
+
+/// Visual mandala of the user's circle: you at the center, your
+/// connections placed in three concentric rings by relational
+/// closeness (inner = family, middle = close friends/siblings,
+/// outer = colleagues/other). Sub-pixel breathing keeps the
+/// composition feeling alive without being restless.
+///
+/// Renders pure SwiftUI shapes — no Canvas, no SpriteKit, no
+/// WebView, no third-party library. The node count is bounded by
+/// human relational reality (rarely > 100), so the diff cost stays
+/// trivial and hit-testing is just per-node Buttons.
+struct CircleMandalaView: View {
+    let connections: [Connection]
+    let onTap: (UUID) -> Void
+    @EnvironmentObject private var profile: ProfileService
+
+    var body: some View {
+        GeometryReader { geo in
+            let layout = MandalaLayout(size: geo.size, connections: connections)
+
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
+                let t = context.date.timeIntervalSinceReferenceDate
+
+                ZStack {
+                    background(layout: layout)
+                    spokes(layout: layout, t: t)
+                    ringLabels(layout: layout)
+                    ringNodes(layout: layout, t: t)
+                    centerYou(layout: layout)
+                }
+                .frame(width: geo.size.width, height: geo.size.height)
+            }
+        }
+    }
+
+    // MARK: - Layers
+
+    private func background(layout: MandalaLayout) -> some View {
+        // Soft saffron glow at the center, fading through the page
+        // background out to the edges. In dark mode this reads as a
+        // warm parchment halo against deep brown.
+        RadialGradient(
+            colors: [
+                Color.sacredGold.opacity(0.18),
+                Color.sacredBg.opacity(0.6),
+                Color.sacredBgCard.opacity(0.0)
+            ],
+            center: .center,
+            startRadius: 0,
+            endRadius: layout.outerRadius * 1.4)
+    }
+
+    private func spokes(layout: MandalaLayout, t: TimeInterval) -> some View {
+        Path { path in
+            for ring in MandalaRing.allCases {
+                let ringConnections = layout.connections(in: ring)
+                let radius = layout.radius(for: ring)
+                for (i, conn) in ringConnections.enumerated() {
+                    let angle = layout.angle(index: i, count: ringConnections.count)
+                    let breath = breathOffset(for: conn, angle: angle, t: t)
+                    let endX = layout.center.x + radius * cos(angle) + breath.dx
+                    let endY = layout.center.y + radius * sin(angle) + breath.dy
+                    path.move(to: layout.center)
+                    path.addLine(to: CGPoint(x: endX, y: endY))
+                }
+            }
+        }
+        .stroke(Color.sacredGold.opacity(0.12), lineWidth: 0.5)
+    }
+
+    private func ringLabels(layout: MandalaLayout) -> some View {
+        ForEach(MandalaRing.allCases, id: \.rawValue) { ring in
+            // Skip the label for empty rings — no orientation aid
+            // needed when there's nothing to orient toward.
+            if !layout.connections(in: ring).isEmpty {
+                Text(ring.label)
+                    .font(.sacredSectionLabel)
+                    .foregroundColor(.sacredLabel.opacity(0.5))
+                    .offset(x: 0, y: -(layout.radius(for: ring) + 26))
+            }
+        }
+    }
+
+    private func ringNodes(layout: MandalaLayout, t: TimeInterval) -> some View {
+        ZStack {
+            ForEach(MandalaRing.allCases, id: \.rawValue) { ring in
+                let ringConnections = layout.connections(in: ring)
+                let avatarSize = layout.avatarSize(forCount: ringConnections.count)
+                let radius = layout.radius(for: ring)
+                ForEach(Array(ringConnections.enumerated()), id: \.element.id) { i, conn in
+                    let angle = layout.angle(index: i, count: ringConnections.count)
+                    let breath = breathOffset(for: conn, angle: angle, t: t)
+                    let baseX = radius * cos(angle)
+                    let baseY = radius * sin(angle)
+
+                    Button { onTap(conn.id) } label: {
+                        nodeLabel(conn, ring: ring, avatarSize: avatarSize)
+                    }
+                    .buttonStyle(.plain)
+                    .position(
+                        x: layout.center.x + baseX + breath.dx,
+                        y: layout.center.y + baseY + breath.dy)
+                }
+            }
+        }
+    }
+
+    private func nodeLabel(_ conn: Connection, ring: MandalaRing, avatarSize: CGFloat) -> some View {
+        VStack(spacing: 4) {
+            SacredAvatar(
+                displayName: conn.displayLabel,
+                avatarUrl: conn.person.avatarUrl,
+                size: avatarSize)
+                .overlay(
+                    Circle().stroke(ringColor(ring: ring, recent: isRecent(conn)),
+                                    lineWidth: 1.5)
+                )
+            Text(conn.displayLabel)
+                .font(.sacredMicroBold)
+                .foregroundColor(.sacredText)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(width: max(avatarSize + 28, 60))
+        }
+    }
+
+    private func centerYou(layout: MandalaLayout) -> some View {
+        ZStack {
+            // Soft outer glow — concentric circles with falloff so the
+            // center has visual gravity without a hard edge.
+            Circle()
+                .fill(Color.sacredGold.opacity(0.14))
+                .frame(width: 110, height: 110)
+                .blur(radius: 16)
+            Circle()
+                .fill(Color.sacredGold.opacity(0.10))
+                .frame(width: 80, height: 80)
+                .blur(radius: 8)
+
+            SacredAvatar(
+                displayName: profile.profile?.displayName ?? "You",
+                avatarUrl: profile.profile?.avatarUrl,
+                size: 60)
+                .overlay(
+                    Circle().stroke(Color.sacredGold.opacity(0.7), lineWidth: 2)
+                )
+        }
+        .position(x: layout.center.x, y: layout.center.y)
+    }
+
+    // MARK: - Helpers
+
+    /// Per-node breathing offset. Each node oscillates radially (in
+    /// and out from the center) by ~1.5pt on a 10-second cycle, with
+    /// a stable phase derived from the connection id so they don't
+    /// move in unison. Stable across launches because it uses the
+    /// raw UUID bytes, not Swift's randomized String.hash.
+    private func breathOffset(for conn: Connection, angle: CGFloat, t: TimeInterval) -> (dx: CGFloat, dy: CGFloat) {
+        let phaseSeed = withUnsafeBytes(of: conn.id.uuid) { Double($0[0]) / 255.0 }
+        let phase = phaseSeed * .pi * 2
+        let breath = sin(t * 2 * .pi / 10.0 + phase) * 1.5
+        // Mostly-radial drift so the composition feels like a slow
+        // inhale/exhale rather than a swirl.
+        return (dx: CGFloat(breath) * cos(angle) * 0.7,
+                dy: CGFloat(breath) * sin(angle) * 0.7)
+    }
+
+    private func isRecent(_ conn: Connection) -> Bool {
+        guard let iso = conn.lastMessageAt else { return false }
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = f.date(from: iso) {
+            return Date().timeIntervalSince(d) < 48 * 60 * 60
+        }
+        // Fallback for timestamps without fractional seconds.
+        f.formatOptions = [.withInternetDateTime]
+        if let d = f.date(from: iso) {
+            return Date().timeIntervalSince(d) < 48 * 60 * 60
+        }
+        return false
+    }
+
+    /// Border color tightens (warmer, more opaque) for inner rings
+    /// and again for connections you've messaged in the last 48h.
+    /// Visual depth — closer feels warmer; alive feels alive.
+    private func ringColor(ring: MandalaRing, recent: Bool) -> Color {
+        let base: Double = switch ring {
+        case .inner:  0.6
+        case .middle: 0.4
+        case .outer:  0.25
+        }
+        return Color.sacredGold.opacity(recent ? min(base + 0.25, 0.95) : base)
+    }
+}
+
+// MARK: - Layout
+
+private struct MandalaLayout {
+    let size: CGSize
+
+    var center: CGPoint { CGPoint(x: size.width / 2, y: size.height / 2) }
+
+    var minDim: CGFloat { min(size.width, size.height) }
+
+    /// Hard ceiling so the outermost avatar circle never crosses the
+    /// screen edge, regardless of how much room the proportions ask for.
+    private var outerCap: CGFloat { minDim / 2 - 36 }
+
+    var innerRadius: CGFloat  { min(0.18 * minDim, outerCap - 120) }
+    var middleRadius: CGFloat { min(0.34 * minDim, outerCap - 60) }
+    var outerRadius: CGFloat  { min(0.50 * minDim, outerCap) }
+
+    func radius(for ring: MandalaRing) -> CGFloat {
+        switch ring {
+        case .inner:  return innerRadius
+        case .middle: return middleRadius
+        case .outer:  return outerRadius
+        }
+    }
+
+    /// Even angular distribution starting at the top (12 o'clock).
+    func angle(index: Int, count: Int) -> CGFloat {
+        guard count > 0 else { return -.pi / 2 }
+        return -.pi / 2 + (CGFloat(index) / CGFloat(count)) * .pi * 2
+    }
+
+    /// Connections sorted deterministically per ring so refreshes don't
+    /// shuffle positions. Sort by displayLabel then id — quiet and
+    /// stable.
+    let connections: [Connection]
+
+    init(size: CGSize, connections: [Connection] = []) {
+        self.size = size
+        self.connections = connections
+    }
+
+    /// Pre-bucketed and pre-sorted connections so the body recomputes
+    /// at most once per render. Sorted deterministically by displayLabel
+    /// then id so refreshes don't shuffle positions.
+    private var bucketedByRing: [MandalaRing: [Connection]] {
+        var buckets: [MandalaRing: [Connection]] = [:]
+        for ring in MandalaRing.allCases { buckets[ring] = [] }
+        for conn in connections {
+            let type = ConnectionType(rawValue: conn.relationType.lowercased()) ?? .other
+            buckets[MandalaRing.ring(for: type), default: []].append(conn)
+        }
+        for ring in MandalaRing.allCases {
+            buckets[ring]?.sort {
+                let cmp = $0.displayLabel.localizedCaseInsensitiveCompare($1.displayLabel)
+                if cmp != .orderedSame { return cmp == .orderedAscending }
+                return $0.id.uuidString < $1.id.uuidString
+            }
+        }
+        return buckets
+    }
+
+    func connections(in ring: MandalaRing) -> [Connection] {
+        bucketedByRing[ring] ?? []
+    }
+
+    /// Avatars shrink as a ring fills up so they don't crowd. Past 24
+    /// in a single ring we'd want pagination/clustering — punt to a
+    /// follow-up.
+    func avatarSize(forCount count: Int) -> CGFloat {
+        switch count {
+        case ...12: return 44
+        case 13...18: return 36
+        default: return 28
+        }
+    }
+}
+
+// MARK: - Ring taxonomy
+
+enum MandalaRing: Int, CaseIterable {
+    case inner = 0, middle, outer
+
+    static func ring(for type: ConnectionType) -> MandalaRing {
+        switch type {
+        case .spouse, .parent, .child: return .inner
+        case .sibling, .friend:        return .middle
+        case .colleague, .other:       return .outer
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .inner:  return "FAMILY"
+        case .middle: return "CLOSE"
+        case .outer:  return "BROADER"
+        }
+    }
+}
+
