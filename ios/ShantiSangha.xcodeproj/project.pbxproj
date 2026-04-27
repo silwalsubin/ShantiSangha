@@ -16,6 +16,7 @@
 		04546F7A2F8B19B30026D26F /* ShantiSanghaWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 04546F672F8B19B20026D26F /* ShantiSanghaWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		0456C3CF9D12840A26ECAA6C /* FeedbackServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95AD8709C353998FDE5BE52E /* FeedbackServiceTests.swift */; };
 		046FDCC62F8C0B11003AE52C /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 046FDCC52F8C0B11003AE52C /* FirebaseMessaging */; };
+		04BD037C2F9FFCA300DDECF4 /* SolarSystemAssets in Frameworks */ = {isa = PBXBuildFile; productRef = 04BD037B2F9FFCA300DDECF4 /* SolarSystemAssets */; };
 		1C6E8B19452EBF1F0FBF377F /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 608EE11F5A81C4476766F59E /* Foundation.framework */; };
 		244EBA0B449278CC7958DB5B /* TaskModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A09E248379299BAC76B4CF2 /* TaskModelTests.swift */; };
 /* End PBXBuildFile section */
@@ -101,6 +102,7 @@
 			files = (
 				045258ED2F7B107400A03634 /* GoogleSignIn in Frameworks */,
 				045258F22F7B118100A03634 /* FirebaseAuth in Frameworks */,
+				04BD037C2F9FFCA300DDECF4 /* SolarSystemAssets in Frameworks */,
 				046FDCC62F8C0B11003AE52C /* FirebaseMessaging in Frameworks */,
 				045258F42F7B118900A03634 /* FirebaseCore in Frameworks */,
 				045258EF2F7B107400A03634 /* GoogleSignInSwift in Frameworks */,
@@ -234,6 +236,7 @@
 				045258F12F7B118100A03634 /* FirebaseAuth */,
 				045258F32F7B118900A03634 /* FirebaseCore */,
 				046FDCC52F8C0B11003AE52C /* FirebaseMessaging */,
+				04BD037B2F9FFCA300DDECF4 /* SolarSystemAssets */,
 			);
 			productName = ShantiSangha;
 			productReference = 04A24D962F7AFC1400775F13 /* ShantiSangha.app */;
@@ -270,6 +273,7 @@
 			packageReferences = (
 				045258EA2F7B103200A03634 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				045258EB2F7B107400A03634 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+				04BD03782F9FF52D00DDECF4 /* XCLocalSwiftPackageReference "SolarSystemAssets" */,
 			);
 			productRefGroup = 04A24D972F7AFC1400775F13 /* Products */;
 			projectDirPath = "";
@@ -674,6 +678,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		04BD03782F9FF52D00DDECF4 /* XCLocalSwiftPackageReference "SolarSystemAssets" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = SolarSystemAssets;
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		045258EA2F7B103200A03634 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -718,6 +729,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 045258EA2F7B103200A03634 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseMessaging;
+		};
+		04BD037B2F9FFCA300DDECF4 /* SolarSystemAssets */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 04BD03782F9FF52D00DDECF4 /* XCLocalSwiftPackageReference "SolarSystemAssets" */;
+			productName = SolarSystemAssets;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

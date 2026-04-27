@@ -69,7 +69,13 @@
       "Edit(/.claude/skills/app-health-check/**)",
       "Bash(bash .claude/skills/app-health-check/scripts/health_check.sh)",
       "Bash(curl -sS -o /tmp/me_no_auth.json -w \"status=%{http_code}\\\\nsize=%{size_download}\\\\n\" https://shantisangha.com/api/me)",
-      "Bash(grep \"\\\\.cs$\")"
+      "Bash(grep \"\\\\.cs$\")",
+      "WebFetch(domain:rozengain.medium.com)",
+      "Bash(xcodebuild -resolvePackageDependencies -project /Users/subinsilwal/Desktop/code/maiself/ios/ShantiSangha.xcodeproj)",
+      "Bash(grep -rn \"MagnificationGesture\\\\|MagnifyGesture\" SolarSystem/ CircleSolarSystemView.swift)",
+      "Bash(grep -rn \"withAnimation\\(.spring\" SolarSystem/ CircleSolarSystemView.swift)",
+      "Bash(grep -rn \"value\\\\.translation\\\\.width\\\\|value\\\\.translation\\\\.height\\\\|value\\\\.scale\" SolarSystem/ CircleSolarSystemView.swift)",
+      "Bash(grep -rn \"isRealWorldProxy\\\\|TextureResource\\(image:\" SolarSystem/)"
     ],
     "additionalDirectories": [
       "/Users/subinsilwal/Desktop/code/maiself/.claude",

@@ -20,7 +20,12 @@ struct FriendsTabView: View {
     @AppStorage("circle_view_mode") private var viewModeRaw: String = CircleViewMode.list.rawValue
 
     private var viewMode: CircleViewMode {
-        CircleViewMode(rawValue: viewModeRaw) ?? .list
+        if let mode = CircleViewMode(rawValue: viewModeRaw) { return mode }
+        // Migrate the previous mandala raw value to its successor so
+        // anyone who had the visualization mode picked doesn't drop
+        // back to the list on upgrade.
+        if viewModeRaw == "mandala" { return .solar }
+        return .list
     }
 
     /// Programmatic navigation target — both the row body and the avatar
@@ -33,7 +38,7 @@ struct FriendsTabView: View {
     }
 
     enum CircleViewMode: String {
-        case list, mandala
+        case list, solar
     }
 
     var body: some View {
@@ -41,15 +46,29 @@ struct FriendsTabView: View {
 
         GeometryReader { viewport in
             ZStack {
-                SacredBackground()
-                    .ignoresSafeArea()
+                // Solar mode is a fully cosmic experience — the page
+                // bleeds to pure black so the RealityView sky dome and
+                // the surrounding chrome read as one continuous
+                // backdrop, rather than a black rectangle floating on
+                // a brown SacredBackground gradient.
+                if viewMode == .solar {
+                    Color.black.ignoresSafeArea()
+                } else {
+                    SacredBackground()
+                        .ignoresSafeArea()
+                }
 
                 ScrollView {
-                    LazyVStack(spacing: viewMode == .mandala ? SacredSpacing.s : SacredSpacing.l) {
+                    LazyVStack(spacing: viewMode == .solar ? SacredSpacing.s : SacredSpacing.l) {
                     if (circleVM.loading || vm.loading) && circleVM.connections.isEmpty
                         && vm.pendingInvitations.isEmpty
                         && vm.outgoingRequests.isEmpty && vm.incomingRequests.isEmpty {
+                        // LazyVStack shrinks to its sole child's intrinsic
+                        // width when nothing else stretches it — without
+                        // the explicit max-width the spinner ends up pinned
+                        // to the leading edge instead of centered.
                         ProgressView()
+                            .frame(maxWidth: .infinity)
                             .padding(.top, SacredSpacing.xl * 2)
                     } else if circleVM.connections.isEmpty && vm.pendingInvitations.isEmpty
                         && vm.outgoingRequests.isEmpty && vm.incomingRequests.isEmpty
@@ -81,8 +100,8 @@ struct FriendsTabView: View {
                                     .padding(.horizontal, SacredSpacing.m)
 
                                 circleDirectory(connections: displayedConnections)
-                            case .mandala:
-                                mandalaStage(
+                            case .solar:
+                                solarStage(
                                     connections: displayedConnections,
                                     totalCount: circleVM.connections.count,
                                     viewportHeight: viewport.size.height)
@@ -157,16 +176,16 @@ struct FriendsTabView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         withAnimation(.easeInOut(duration: 0.25)) {
-                            viewModeRaw = (viewMode == .list ? CircleViewMode.mandala : .list).rawValue
+                            viewModeRaw = (viewMode == .list ? CircleViewMode.solar : .list).rawValue
                         }
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
                         Image(systemName: viewMode == .list
-                              ? "circle.grid.cross"
+                              ? "globe"
                               : "list.bullet")
                             .foregroundColor(.sacredGold)
                     }
-                    .accessibilityLabel(viewMode == .list ? "Show mandala" : "Show list")
+                    .accessibilityLabel(viewMode == .list ? "Show solar" : "Show list")
                 }
             }
         }
@@ -247,13 +266,13 @@ struct FriendsTabView: View {
     }
 
     @ViewBuilder
-    private func mandalaStage(
+    private func solarStage(
         connections: [Connection],
         totalCount: Int,
         viewportHeight: CGFloat
     ) -> some View {
         if hasActiveCircleScope {
-            mandalaScopePill(shownCount: connections.count, totalCount: totalCount)
+            solarScopePill(shownCount: connections.count, totalCount: totalCount)
                 .padding(.horizontal, SacredSpacing.m)
                 .padding(.top, SacredSpacing.xs)
         }
@@ -263,7 +282,7 @@ struct FriendsTabView: View {
                 .padding(.horizontal, SacredSpacing.m)
                 .padding(.top, SacredSpacing.s)
         } else {
-            CircleMandalaView(
+            CircleSolarSystemView(
                 connections: connections,
                 onTap: { id in
                     if let conn = circleVM.connections.first(where: { $0.id == id }) {
@@ -272,7 +291,7 @@ struct FriendsTabView: View {
                         navTarget = .detail(id)
                     }
                 })
-                .frame(height: mandalaHeight(for: connections.count, viewportHeight: viewportHeight))
+                .frame(height: solarHeight(for: connections.count, viewportHeight: viewportHeight))
                 .padding(.horizontal, SacredSpacing.xxs)
                 .padding(.top, hasActiveCircleScope ? 0 : -SacredSpacing.s)
         }
@@ -282,14 +301,14 @@ struct FriendsTabView: View {
         selectedFilter != .all || !trimmedCircleSearch.isEmpty
     }
 
-    private var mandalaScopeLabel: String {
+    private var solarScopeLabel: String {
         var parts: [String] = []
         if selectedFilter != .all { parts.append(selectedFilter.label) }
         if !trimmedCircleSearch.isEmpty { parts.append(trimmedCircleSearch) }
         return parts.joined(separator: " · ")
     }
 
-    private func mandalaScopePill(shownCount: Int, totalCount: Int) -> some View {
+    private func solarScopePill(shownCount: Int, totalCount: Int) -> some View {
         HStack(spacing: SacredSpacing.s) {
             Text("\(shownCount.formatted()) of \(totalCount.formatted()) shown")
                 .font(.sacredSmallSemibold)
@@ -297,7 +316,7 @@ struct FriendsTabView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
 
-            Text(mandalaScopeLabel)
+            Text(solarScopeLabel)
                 .font(.sacredMicroBold)
                 .foregroundColor(.sacredGold)
                 .lineLimit(1)
@@ -433,7 +452,7 @@ struct FriendsTabView: View {
         }
     }
 
-    private func mandalaHeight(for count: Int, viewportHeight: CGFloat) -> CGFloat {
+    private func solarHeight(for count: Int, viewportHeight: CGFloat) -> CGFloat {
         let base: CGFloat = switch count {
         case ...8: 460
         case 9...80: 560
