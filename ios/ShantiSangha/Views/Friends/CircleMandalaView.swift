@@ -15,9 +15,26 @@ struct CircleMandalaView: View {
     let onTap: (UUID) -> Void
     @EnvironmentObject private var profile: ProfileService
 
+    /// Persisted across gestures. Pinch updates `magnification` live;
+    /// drag updates `dragOffset` live. On gesture-end we fold them
+    /// into `scale`/`offset` and clamp.
+    @State private var scale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @GestureState private var magnification: CGFloat = 1.0
+    @GestureState private var dragOffset: CGSize = .zero
+
+    private static let minScale: CGFloat = 1.0
+    private static let maxScale: CGFloat = 3.0
+
     var body: some View {
         GeometryReader { geo in
             let layout = MandalaLayout(size: geo.size, connections: connections)
+            let liveScale = clampScale(scale * magnification)
+            let liveOffset = clampOffset(
+                CGSize(width: offset.width + dragOffset.width,
+                       height: offset.height + dragOffset.height),
+                scale: liveScale,
+                size: geo.size)
 
             TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
                 let t = context.date.timeIntervalSinceReferenceDate
@@ -31,7 +48,74 @@ struct CircleMandalaView: View {
                 }
                 .frame(width: geo.size.width, height: geo.size.height)
             }
+            .scaleEffect(liveScale, anchor: .center)
+            .offset(liveOffset)
+            .clipped()
+            .contentShape(Rectangle())
+            .gesture(
+                MagnificationGesture()
+                    .updating($magnification) { value, state, _ in
+                        state = value
+                    }
+                    .onEnded { value in
+                        let newScale = clampScale(scale * value)
+                        scale = newScale
+                        // Re-clamp offset against the new scale —
+                        // zooming out should pull a panned mandala
+                        // back toward center so it doesn't strand
+                        // off-screen.
+                        offset = clampOffset(offset, scale: newScale, size: geo.size)
+                    }
+            )
+            .simultaneousGesture(
+                // Min distance > 0 keeps short presses from competing
+                // with node-tap Buttons inside. Drag only engages once
+                // the user is meaningfully zoomed in — no point
+                // panning a 1.0x mandala that already fits the frame.
+                DragGesture(minimumDistance: 12)
+                    .updating($dragOffset) { value, state, _ in
+                        guard scale > 1.01 else { return }
+                        state = value.translation
+                    }
+                    .onEnded { value in
+                        guard scale > 1.01 else { return }
+                        let proposed = CGSize(
+                            width: offset.width + value.translation.width,
+                            height: offset.height + value.translation.height)
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            offset = clampOffset(proposed, scale: scale, size: geo.size)
+                        }
+                    }
+            )
+            .onTapGesture(count: 2) {
+                // Quick reset — the discoverable escape hatch from a
+                // zoomed-in state. iMessage / Photos use the same
+                // double-tap convention.
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    scale = 1.0
+                    offset = .zero
+                }
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            }
         }
+    }
+
+    // MARK: - Zoom helpers
+
+    private func clampScale(_ s: CGFloat) -> CGFloat {
+        min(max(s, Self.minScale), Self.maxScale)
+    }
+
+    /// Bound the pan so the scaled content can't be dragged completely
+    /// off-screen. The accessible pan range is exactly half the extra
+    /// content created by scaling — beyond that, you'd just see the
+    /// page background.
+    private func clampOffset(_ proposed: CGSize, scale: CGFloat, size: CGSize) -> CGSize {
+        let maxX = max(0, (scale - 1) * size.width / 2)
+        let maxY = max(0, (scale - 1) * size.height / 2)
+        return CGSize(
+            width: min(max(proposed.width, -maxX), maxX),
+            height: min(max(proposed.height, -maxY), maxY))
     }
 
     // MARK: - Layers
