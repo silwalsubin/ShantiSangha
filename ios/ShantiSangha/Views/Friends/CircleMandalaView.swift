@@ -52,21 +52,70 @@ struct CircleMandalaView: View {
     }
 
     private func spokes(layout: MandalaLayout, t: TimeInterval) -> some View {
-        Path { path in
-            for ring in MandalaRing.allCases {
+        ZStack {
+            // Layer 1: regular spokes — single Path, uniform faint gold.
+            // Skips connections that are recently-messaged so layer 2
+            // doesn't double-stroke.
+            Path { path in
+                for ring in MandalaRing.allCases {
+                    let ringConnections = layout.connections(in: ring)
+                    let radius = layout.radius(for: ring)
+                    for (i, conn) in ringConnections.enumerated() where !isRecent(conn) {
+                        let angle = layout.angle(index: i, count: ringConnections.count)
+                        let breath = breathOffset(for: conn, angle: angle, t: t)
+                        let endX = layout.center.x + radius * cos(angle) + breath.dx
+                        let endY = layout.center.y + radius * sin(angle) + breath.dy
+                        path.move(to: layout.center)
+                        path.addLine(to: CGPoint(x: endX, y: endY))
+                    }
+                }
+            }
+            .stroke(Color.sacredGold.opacity(0.12), lineWidth: 0.5)
+
+            // Layer 2: recent spokes — one Shape per spoke so each can
+            // carry a directional LinearGradient (cool at center, warm
+            // at the connection). Per-spoke shape allocation only
+            // happens for the small set of recently-messaged rows.
+            ForEach(MandalaRing.allCases, id: \.rawValue) { ring in
                 let ringConnections = layout.connections(in: ring)
                 let radius = layout.radius(for: ring)
-                for (i, conn) in ringConnections.enumerated() {
-                    let angle = layout.angle(index: i, count: ringConnections.count)
-                    let breath = breathOffset(for: conn, angle: angle, t: t)
-                    let endX = layout.center.x + radius * cos(angle) + breath.dx
-                    let endY = layout.center.y + radius * sin(angle) + breath.dy
-                    path.move(to: layout.center)
-                    path.addLine(to: CGPoint(x: endX, y: endY))
+                ForEach(Array(ringConnections.enumerated()), id: \.element.id) { i, conn in
+                    if isRecent(conn) {
+                        let angle = layout.angle(index: i, count: ringConnections.count)
+                        let breath = breathOffset(for: conn, angle: angle, t: t)
+                        let end = CGPoint(
+                            x: layout.center.x + radius * cos(angle) + breath.dx,
+                            y: layout.center.y + radius * sin(angle) + breath.dy)
+                        SpokeLine(start: layout.center, end: end)
+                            .stroke(spokeGradient(start: layout.center, end: end),
+                                    lineWidth: 0.8)
+                    }
                 }
             }
         }
-        .stroke(Color.sacredGold.opacity(0.12), lineWidth: 0.5)
+    }
+
+    /// Gradient pointing along a single spoke from the center (cool)
+    /// out to the connection (warm). LinearGradient as a ShapeStyle is
+    /// bbox-relative, so we map both endpoints to bbox-local UnitPoints
+    /// — that's the only way the gradient direction matches the line's
+    /// actual direction across all four quadrants.
+    private func spokeGradient(start: CGPoint, end: CGPoint) -> LinearGradient {
+        let bboxMinX = min(start.x, end.x)
+        let bboxMinY = min(start.y, end.y)
+        let bboxW = max(abs(end.x - start.x), 0.001)
+        let bboxH = max(abs(end.y - start.y), 0.001)
+        return LinearGradient(
+            colors: [
+                Color.sacredGold.opacity(0.10),
+                Color.sacredGold.opacity(0.50)
+            ],
+            startPoint: UnitPoint(
+                x: (start.x - bboxMinX) / bboxW,
+                y: (start.y - bboxMinY) / bboxH),
+            endPoint: UnitPoint(
+                x: (end.x - bboxMinX) / bboxW,
+                y: (end.y - bboxMinY) / bboxH))
     }
 
     private func ringLabels(layout: MandalaLayout) -> some View {
@@ -107,7 +156,7 @@ struct CircleMandalaView: View {
     }
 
     private func nodeLabel(_ conn: Connection, ring: MandalaRing, avatarSize: CGFloat) -> some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 2) {
             SacredAvatar(
                 displayName: conn.displayLabel,
                 avatarUrl: conn.person.avatarUrl,
@@ -116,12 +165,23 @@ struct CircleMandalaView: View {
                     Circle().stroke(ringColor(ring: ring, recent: isRecent(conn)),
                                     lineWidth: 1.5)
                 )
+                .padding(.bottom, 2)
             Text(conn.displayLabel)
                 .font(.sacredMicroBold)
                 .foregroundColor(.sacredText)
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(width: max(avatarSize + 28, 60))
+            // Relation chip — quiet on the periphery, readable on focus.
+            // Lowercase + light tracking respects custom labels like "yoga
+            // teacher" that look ugly in tracked-out caps.
+            Text(conn.relationLabel.lowercased())
+                .font(.system(size: 9, weight: .medium, design: .serif))
+                .tracking(0.6)
+                .foregroundColor(.sacredLabel.opacity(0.6))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(width: max(avatarSize + 36, 68))
         }
     }
 
@@ -191,6 +251,23 @@ struct CircleMandalaView: View {
         case .outer:  0.25
         }
         return Color.sacredGold.opacity(recent ? min(base + 0.25, 0.95) : base)
+    }
+}
+
+// MARK: - Helpers
+
+/// One straight-line spoke. Wrapped in its own Shape so per-spoke
+/// gradient strokes work cleanly — `LinearGradient` as a `ShapeStyle`
+/// is bbox-relative, so each line needs its own Shape for the
+/// gradient direction to match the line's actual direction.
+private struct SpokeLine: Shape {
+    let start: CGPoint
+    let end: CGPoint
+    func path(in rect: CGRect) -> Path {
+        Path { p in
+            p.move(to: start)
+            p.addLine(to: end)
+        }
     }
 }
 
