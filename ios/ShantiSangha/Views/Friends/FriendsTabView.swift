@@ -11,6 +11,9 @@ struct FriendsTabView: View {
     @State private var shareItems: [Any] = []
     @State private var showAddLocal = false
     @State private var navTarget: FriendNavRoute?
+    @State private var circleSearchText = ""
+    @State private var selectedFilter: CircleFilter = .all
+    @FocusState private var circleSearchFocused: Bool
     /// String-backed because @AppStorage with custom enums needs a
     /// `RawRepresentable<String>` plus default-handling boilerplate;
     /// a tiny string compare is cheaper to read at the call site.
@@ -34,16 +37,15 @@ struct FriendsTabView: View {
     }
 
     var body: some View {
-        ZStack {
-            SacredBackground()
-                .ignoresSafeArea()
+        let displayedConnections = filteredConnections
 
-            ScrollView {
-                VStack(spacing: SacredSpacing.l) {
-                    findPeopleRow
-                        .padding(.horizontal, SacredSpacing.m)
-                        .padding(.top, SacredSpacing.m)
+        GeometryReader { viewport in
+            ZStack {
+                SacredBackground()
+                    .ignoresSafeArea()
 
+                ScrollView {
+                    LazyVStack(spacing: viewMode == .mandala ? SacredSpacing.s : SacredSpacing.l) {
                     if (circleVM.loading || vm.loading) && circleVM.connections.isEmpty
                         && vm.pendingInvitations.isEmpty
                         && vm.outgoingRequests.isEmpty && vm.incomingRequests.isEmpty {
@@ -68,40 +70,27 @@ struct FriendsTabView: View {
                         if !circleVM.connections.isEmpty {
                             switch viewMode {
                             case .list:
-                                SacredListCard {
-                                    VStack(spacing: 0) {
-                                        ForEach(Array(circleVM.connections.enumerated()), id: \.element.id) { index, conn in
-                                            ConnectionRow(
-                                                connection: conn,
-                                                onTapAvatar: { navTarget = .detail(conn.id) },
-                                                onTapBody: {
-                                                    navTarget = conn.messageable
-                                                        ? .chat(conn.id)
-                                                        : .detail(conn.id)
-                                                })
+                                circleOverview(connections: circleVM.connections)
+                                    .padding(.horizontal, SacredSpacing.m)
+                                    .padding(.top, SacredSpacing.m)
 
-                                            if index < circleVM.connections.count - 1 {
-                                                Divider()
-                                                    .padding(.leading, 68)
-                                            }
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal, SacredSpacing.m)
-                                .padding(.top, SacredSpacing.l)
+                                circleActions
+                                    .padding(.horizontal, SacredSpacing.m)
+
+                                circleControls
+                                    .padding(.horizontal, SacredSpacing.m)
+
+                                circleDirectory(connections: displayedConnections)
                             case .mandala:
-                                CircleMandalaView(
-                                    connections: circleVM.connections,
-                                    onTap: { id in
-                                        if let conn = circleVM.connections.first(where: { $0.id == id }) {
-                                            navTarget = conn.messageable ? .chat(id) : .detail(id)
-                                        } else {
-                                            navTarget = .detail(id)
-                                        }
-                                    })
-                                    .frame(height: 480)
-                                    .padding(.top, SacredSpacing.s)
+                                mandalaStage(
+                                    connections: displayedConnections,
+                                    totalCount: circleVM.connections.count,
+                                    viewportHeight: viewport.size.height)
                             }
+                        } else {
+                            circleActions
+                                .padding(.horizontal, SacredSpacing.m)
+                                .padding(.top, SacredSpacing.m)
                         }
 
                         if !vm.incomingRequests.isEmpty {
@@ -144,28 +133,9 @@ struct FriendsTabView: View {
                             }
                             .padding(.horizontal, SacredSpacing.m)
                         }
-
-                        SacredPrimaryButton("Invite to your circle", style: .pill, fullWidth: true) {
-                            Task { await onInvite() }
-                        }
-                        .padding(.horizontal, SacredSpacing.m)
-
-                        Button { showAddLocal = true } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "plus.circle")
-                                    .font(.system(size: 14, weight: .regular))
-                                Text("Add someone not on the app")
-                                    .font(.sacredSmall)
-                            }
-                            .foregroundColor(.sacredGold)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.horizontal, SacredSpacing.m)
                     }
 
-                    if let err = vm.errorMessage, !shouldHideError {
+                    if let err = inlineErrorMessage, !shouldHideError {
                         Text(err)
                             .font(.sacredMicro)
                             .foregroundColor(.sacredMuted)
@@ -173,11 +143,13 @@ struct FriendsTabView: View {
                             .padding(.horizontal, SacredSpacing.m)
                     }
                 }
-                .padding(.bottom, SacredSpacing.tabBarSafe)
+                    .padding(.bottom, SacredSpacing.tabBarSafe)
+                }
             }
         }
         .navigationTitle("Circle")
         .navigationBarTitleDisplayMode(.inline)
+        .scrollDismissesKeyboard(.interactively)
         .toolbar {
             // Only surface the toggle once there's actually a circle
             // to render — toggling between two empty states is noise.
@@ -222,6 +194,287 @@ struct FriendsTabView: View {
         }
     }
 
+    // MARK: - Circle directory
+
+    private var trimmedCircleSearch: String {
+        circleSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var filteredConnections: [Connection] {
+        let query = trimmedCircleSearch
+        let entries = circleVM.connections.compactMap { conn -> CircleDirectoryEntry? in
+            guard selectedFilter.includes(conn) else { return nil }
+            guard query.isEmpty || conn.matchesCircleSearch(query) else { return nil }
+            return CircleDirectoryEntry(
+                connection: conn,
+                lastMessageDate: FriendsDates.parse(conn.lastMessageAt))
+        }
+
+        return entries
+            .sorted(by: sortDirectoryEntries)
+            .map(\.connection)
+    }
+
+    private func sortDirectoryEntries(_ lhs: CircleDirectoryEntry, _ rhs: CircleDirectoryEntry) -> Bool {
+        if lhs.connection.unreadCount != rhs.connection.unreadCount {
+            return lhs.connection.unreadCount > rhs.connection.unreadCount
+        }
+
+        switch (lhs.lastMessageDate, rhs.lastMessageDate) {
+        case let (l?, r?) where l != r:
+            return l > r
+        case (.some, .none):
+            return true
+        case (.none, .some):
+            return false
+        default:
+            let nameCompare = lhs.connection.displayLabel
+                .localizedCaseInsensitiveCompare(rhs.connection.displayLabel)
+            if nameCompare != .orderedSame { return nameCompare == .orderedAscending }
+            return lhs.connection.id.uuidString < rhs.connection.id.uuidString
+        }
+    }
+
+    private var directoryTitle: String {
+        trimmedCircleSearch.isEmpty ? selectedFilter.sectionTitle : "MATCHES"
+    }
+
+    private var circleControls: some View {
+        VStack(spacing: SacredSpacing.s) {
+            circleSearchField
+            filterChips
+        }
+    }
+
+    @ViewBuilder
+    private func mandalaStage(
+        connections: [Connection],
+        totalCount: Int,
+        viewportHeight: CGFloat
+    ) -> some View {
+        if hasActiveCircleScope {
+            mandalaScopePill(shownCount: connections.count, totalCount: totalCount)
+                .padding(.horizontal, SacredSpacing.m)
+                .padding(.top, SacredSpacing.xs)
+        }
+
+        if connections.isEmpty {
+            noMatchesState
+                .padding(.horizontal, SacredSpacing.m)
+                .padding(.top, SacredSpacing.s)
+        } else {
+            CircleMandalaView(
+                connections: connections,
+                onTap: { id in
+                    if let conn = circleVM.connections.first(where: { $0.id == id }) {
+                        navTarget = conn.messageable ? .chat(id) : .detail(id)
+                    } else {
+                        navTarget = .detail(id)
+                    }
+                })
+                .frame(height: mandalaHeight(for: connections.count, viewportHeight: viewportHeight))
+                .padding(.horizontal, SacredSpacing.xxs)
+                .padding(.top, hasActiveCircleScope ? 0 : -SacredSpacing.s)
+        }
+    }
+
+    private var hasActiveCircleScope: Bool {
+        selectedFilter != .all || !trimmedCircleSearch.isEmpty
+    }
+
+    private var mandalaScopeLabel: String {
+        var parts: [String] = []
+        if selectedFilter != .all { parts.append(selectedFilter.label) }
+        if !trimmedCircleSearch.isEmpty { parts.append(trimmedCircleSearch) }
+        return parts.joined(separator: " · ")
+    }
+
+    private func mandalaScopePill(shownCount: Int, totalCount: Int) -> some View {
+        HStack(spacing: SacredSpacing.s) {
+            Text("\(shownCount.formatted()) of \(totalCount.formatted()) shown")
+                .font(.sacredSmallSemibold)
+                .foregroundColor(.sacredText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+
+            Text(mandalaScopeLabel)
+                .font(.sacredMicroBold)
+                .foregroundColor(.sacredGold)
+                .lineLimit(1)
+                .truncationMode(.tail)
+
+            Spacer(minLength: SacredSpacing.xs)
+
+            Button {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    selectedFilter = .all
+                    circleSearchText = ""
+                    circleSearchFocused = false
+                }
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            } label: {
+                Text("Clear")
+                    .font(.sacredSmallSemibold)
+                    .foregroundColor(.sacredGold)
+                    .frame(minHeight: 44)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, 10)
+        .frame(minHeight: 48)
+        .background(Capsule().fill(Color.sacredBgCard.opacity(0.72)))
+        .overlay(Capsule().stroke(Color.sacredGold.opacity(0.12), lineWidth: 1))
+    }
+
+    private var circleSearchField: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.sacredSmall)
+                .foregroundColor(.sacredMuted)
+
+            TextField("Search your circle", text: $circleSearchText)
+                .focused($circleSearchFocused)
+                .font(.sacredText)
+                .foregroundColor(.sacredText)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.words)
+
+            if !circleSearchText.isEmpty {
+                Button {
+                    circleSearchText = ""
+                    circleSearchFocused = false
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredMuted)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, circleSearchText.isEmpty ? 14 : 2)
+        .frame(minHeight: 50)
+        .background(RoundedRectangle(cornerRadius: 14).fill(.ultraThinMaterial))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.sacredGold.opacity(0.12)))
+    }
+
+    private var filterChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: SacredSpacing.xs) {
+                ForEach(CircleFilter.allCases) { filter in
+                    Button {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            selectedFilter = filter
+                        }
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } label: {
+                        Text(filter.label)
+                            .font(.sacredSmallSemibold)
+                            .foregroundColor(selectedFilter == filter ? .white : .sacredTextSecondary)
+                            .lineLimit(1)
+                            .padding(.horizontal, 14)
+                            .frame(minHeight: 44)
+                            .background(
+                                Capsule()
+                                    .fill(selectedFilter == filter
+                                          ? Color.sacredGold
+                                          : Color.sacredBgCard.opacity(0.72))
+                            )
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color.sacredGold.opacity(selectedFilter == filter ? 0 : 0.14),
+                                            lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 1)
+        }
+    }
+
+    @ViewBuilder
+    private func circleDirectory(connections: [Connection]) -> some View {
+        if connections.isEmpty {
+            noMatchesState
+                .padding(.horizontal, SacredSpacing.m)
+        } else {
+            SacredListCard {
+                LazyVStack(spacing: 0) {
+                    CircleDirectoryHeader(title: directoryTitle, count: connections.count)
+
+                    ForEach(connections) { conn in
+                        ConnectionRow(
+                            connection: conn,
+                            onTapAvatar: { navTarget = .detail(conn.id) },
+                            onTapBody: {
+                                navTarget = conn.messageable
+                                    ? .chat(conn.id)
+                                    : .detail(conn.id)
+                            })
+
+                        Divider()
+                            .padding(.leading, 68)
+                    }
+                }
+            }
+            .padding(.horizontal, SacredSpacing.m)
+        }
+    }
+
+    private var noMatchesState: some View {
+        SacredCard {
+            SacredEmptyState(
+                icon: "magnifyingglass",
+                title: "No one matches.",
+                subtitle: "Try another name, relation, or place.")
+        }
+    }
+
+    private func mandalaHeight(for count: Int, viewportHeight: CGFloat) -> CGFloat {
+        let base: CGFloat = switch count {
+        case ...8: 460
+        case 9...80: 560
+        case 81...300: 680
+        default: 820
+        }
+
+        let chromeReserve: CGFloat = hasActiveCircleScope ? 156 : 96
+        let available = max(420, viewportHeight - SacredSpacing.tabBarSafe - chromeReserve)
+        return max(base, available)
+    }
+
+    // MARK: - Top summary and actions
+
+    private func circleOverview(connections: [Connection]) -> some View {
+        CircleOverviewCard(connections: connections)
+    }
+
+    private var circleActions: some View {
+        HStack(spacing: SacredSpacing.s) {
+            NavigationLink(destination: UserSearchView()) {
+                CircleActionTile(icon: "magnifyingglass", title: "Find")
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                Task { await onInvite() }
+            } label: {
+                CircleActionTile(icon: "paperplane", title: "Invite")
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                showAddLocal = true
+            } label: {
+                CircleActionTile(icon: "plus", title: "Add local")
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
     private var emptyState: some View {
         SacredCard {
             SacredEmptyState(
@@ -240,44 +493,27 @@ struct FriendsTabView: View {
             SacredEmptyState(
                 icon: "wifi.slash",
                 title: "Couldn't load your circle.",
-                subtitle: vm.errorMessage ?? "Pull to refresh, or check your connection.",
+                subtitle: inlineErrorMessage ?? "Pull to refresh, or check your connection.",
                 actionLabel: "Try again"
-            ) { Task { await vm.refresh() } }
-        }
-    }
-
-    /// Persistent entry point at the top of the Friends tab. Pushes the
-    /// dedicated user-search screen. Styled as a search-bar lookalike so
-    /// the affordance is obvious without the screen actually being a live
-    /// search field (less keyboard accidents on tab open).
-    private var findPeopleRow: some View {
-        NavigationLink(destination: UserSearchView()) {
-            HStack(spacing: 10) {
-                Image(systemName: "magnifyingglass")
-                    .font(.sacredSmall)
-                    .foregroundColor(.sacredMuted)
-                Text("Find people by name or location")
-                    .font(.sacredText)
-                    .foregroundColor(.sacredMuted)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .regular))
-                    .foregroundColor(.sacredMuted.opacity(0.5))
+            ) {
+                Task {
+                    await vm.refresh()
+                    await circleVM.refresh()
+                }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(RoundedRectangle(cornerRadius: 12).fill(.ultraThinMaterial))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.sacredGold.opacity(0.1)))
         }
-        .buttonStyle(.plain)
     }
 
     /// Hide a one-off decode/network error when we have nothing to show — the
     /// empty state is the message at that point. Surface errors only when the
     /// user is mid-action or has loaded data and a follow-up call failed.
     private var shouldHideError: Bool {
-        vm.friends.isEmpty && vm.pendingInvitations.isEmpty
+        circleVM.connections.isEmpty && vm.pendingInvitations.isEmpty
             && vm.outgoingRequests.isEmpty && vm.incomingRequests.isEmpty
+    }
+
+    private var inlineErrorMessage: String? {
+        circleVM.errorMessage ?? vm.errorMessage
     }
 
     private func onInvite() async {
@@ -306,6 +542,218 @@ private struct ShareLink {
     init(_ invite: PendingInvitation) { self.url = invite.shareUrl }
 }
 
+private struct CircleDirectoryEntry {
+    let connection: Connection
+    let lastMessageDate: Date?
+}
+
+private enum CircleFilter: String, CaseIterable, Identifiable {
+    case all
+    case unread
+    case onApp
+    case local
+    case family
+    case close
+    case broader
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .all: return "All"
+        case .unread: return "Unread"
+        case .onApp: return "On app"
+        case .local: return "Local"
+        case .family: return "Family"
+        case .close: return "Close"
+        case .broader: return "Broader"
+        }
+    }
+
+    var sectionTitle: String {
+        switch self {
+        case .all: return "ALL CONNECTIONS"
+        case .unread: return "UNREAD"
+        case .onApp: return "ON THE APP"
+        case .local: return "LOCAL"
+        case .family: return "FAMILY"
+        case .close: return "CLOSE"
+        case .broader: return "BROADER"
+        }
+    }
+
+    func includes(_ connection: Connection) -> Bool {
+        switch self {
+        case .all:
+            return true
+        case .unread:
+            return connection.unreadCount > 0
+        case .onApp:
+            return connection.messageable
+        case .local:
+            return connection.person.userId == nil
+        case .family:
+            return [.spouse, .parent, .child].contains(connection.parsedRelationType)
+        case .close:
+            return [.sibling, .friend].contains(connection.parsedRelationType)
+        case .broader:
+            return [.colleague, .other].contains(connection.parsedRelationType)
+        }
+    }
+}
+
+private struct CircleOverviewCard: View {
+    let connections: [Connection]
+
+    private var totalCount: Int { connections.count }
+    private var messageableCount: Int { connections.filter { $0.messageable }.count }
+    private var localCount: Int { connections.filter { $0.person.userId == nil }.count }
+    private var unreadMessageCount: Int { connections.reduce(0) { $0 + $1.unreadCount } }
+
+    private var recentCount: Int {
+        let cutoff = Date().addingTimeInterval(-7 * 24 * 60 * 60)
+        return connections.filter { conn in
+            guard let date = FriendsDates.parse(conn.lastMessageAt) else { return false }
+            return date >= cutoff
+        }.count
+    }
+
+    private var summaryText: String {
+        var parts: [String] = []
+        if messageableCount > 0 { parts.append("\(messageableCount.formatted()) on the app") }
+        if localCount > 0 { parts.append("\(localCount.formatted()) local") }
+        if recentCount > 0 { parts.append("\(recentCount.formatted()) active this week") }
+        return parts.isEmpty ? "Private connections you choose." : parts.joined(separator: " · ")
+    }
+
+    var body: some View {
+        HStack(spacing: 14) {
+            CircleAvatarCluster(connections: connections)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(totalCount.formatted()) in your circle")
+                    .font(.sacredTitle)
+                    .foregroundColor(.sacredText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+
+                Text(summaryText)
+                    .font(.sacredSmall)
+                    .foregroundColor(.sacredMuted)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 4)
+
+            if unreadMessageCount > 0 {
+                VStack(spacing: 1) {
+                    Text(unreadMessageCount.formatted())
+                        .font(.sacredBodyBold)
+                    Text("unread")
+                        .font(.sacredMicro)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(Capsule().fill(Color.sacredGold))
+                .accessibilityLabel("\(unreadMessageCount) unread messages")
+            }
+        }
+        .padding(SacredSpacing.m)
+        .luxCardChrome()
+    }
+}
+
+private struct CircleAvatarCluster: View {
+    let connections: [Connection]
+
+    private var visibleConnections: [Connection] {
+        Array(connections.prefix(4))
+    }
+
+    private var remainingCount: Int {
+        max(0, connections.count - visibleConnections.count)
+    }
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            ForEach(Array(visibleConnections.enumerated()), id: \.element.id) { index, conn in
+                SacredAvatar(
+                    displayName: conn.displayLabel,
+                    avatarUrl: conn.person.avatarUrl,
+                    size: 34)
+                    .overlay(Circle().stroke(Color.sacredBg, lineWidth: 2))
+                    .offset(x: CGFloat(index) * 18)
+                    .zIndex(Double(visibleConnections.count - index))
+            }
+
+            if remainingCount > 0 {
+                ZStack {
+                    Circle()
+                        .fill(Color.sacredGold)
+                    Text("+\(remainingCount.formatted())")
+                        .font(.sacredMicroBold)
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.55)
+                        .padding(.horizontal, 2)
+                }
+                .frame(width: 34, height: 34)
+                .overlay(Circle().stroke(Color.sacredBg, lineWidth: 2))
+                .offset(x: CGFloat(visibleConnections.count) * 18)
+            }
+        }
+        .frame(width: 112, height: 44, alignment: .leading)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct CircleActionTile: View {
+    let icon: String
+    let title: String
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.sacredSmallSemibold)
+                .foregroundColor(.sacredGold)
+            Text(title)
+                .font(.sacredSmallSemibold)
+                .foregroundColor(.sacredTextSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: 64)
+        .contentShape(RoundedRectangle(cornerRadius: SacredRadius.card))
+        .luxCardChrome()
+    }
+}
+
+private struct CircleDirectoryHeader: View {
+    let title: String
+    let count: Int
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.sacredSectionLabel)
+                .tracking(3)
+                .foregroundColor(.sacredLabel)
+            Spacer()
+            Text(count.formatted())
+                .font(.sacredMicroBold)
+                .foregroundColor(.sacredGold)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(Capsule().stroke(Color.sacredGold.opacity(0.18), lineWidth: 1))
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 14)
+        .padding(.bottom, 4)
+    }
+}
+
 private struct ConnectionRow: View {
     let connection: Connection
     let onTapAvatar: () -> Void
@@ -322,6 +770,7 @@ private struct ConnectionRow: View {
                     displayName: connection.displayLabel,
                     avatarUrl: connection.person.avatarUrl,
                     size: 40)
+                    .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
 
@@ -331,8 +780,11 @@ private struct ConnectionRow: View {
                         Text(connection.displayLabel)
                             .font(.sacredTextSemibold)
                             .foregroundColor(.sacredText)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                         relationChip
-                        Spacer()
+                            .fixedSize(horizontal: true, vertical: false)
+                        Spacer(minLength: 4)
                         if connection.messageable && connection.unreadCount > 0 {
                             Text("\(connection.unreadCount)")
                                 .font(.sacredMicroBold)
@@ -370,6 +822,11 @@ private struct ConnectionRow: View {
                 .font(.sacredSmall)
                 .foregroundColor(.sacredTextSecondary)
                 .lineLimit(2)
+        } else if let location = connection.person.locationString {
+            Text(location)
+                .font(.sacredSmall)
+                .foregroundColor(.sacredMuted)
+                .lineLimit(1)
         } else if connection.messageable {
             Text("Say hello.")
                 .font(.sacredSmall)
@@ -484,6 +941,30 @@ private struct OutgoingRequestRow: View {
         if days <= 0 { return "Sent today" }
         if days == 1 { return "Sent yesterday" }
         return "Sent \(days) days ago"
+    }
+}
+
+private extension Connection {
+    var parsedRelationType: ConnectionType {
+        ConnectionType(rawValue: relationType.lowercased()) ?? .other
+    }
+
+    func matchesCircleSearch(_ query: String) -> Bool {
+        [
+            displayLabel,
+            relationLabel,
+            person.locationString,
+            person.city,
+            person.state,
+            person.country
+        ]
+        .compactMap { $0 }
+        .contains { value in
+            value.range(
+                of: query,
+                options: [.caseInsensitive, .diacriticInsensitive]
+            ) != nil
+        }
     }
 }
 

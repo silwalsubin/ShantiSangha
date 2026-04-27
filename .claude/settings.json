@@ -66,7 +66,10 @@
       "Bash(git fetch *)",
       "Bash(git ls-tree *)",
       "Bash(bash /Users/subinsilwal/Desktop/code/maiself/.claude/skills/app-health-check/scripts/health_check.sh)",
-      "Edit(/.claude/skills/app-health-check/**)"
+      "Edit(/.claude/skills/app-health-check/**)",
+      "Bash(bash .claude/skills/app-health-check/scripts/health_check.sh)",
+      "Bash(curl -sS -o /tmp/me_no_auth.json -w \"status=%{http_code}\\\\nsize=%{size_download}\\\\n\" https://shantisangha.com/api/me)",
+      "Bash(grep \"\\\\.cs$\")"
     ],
     "additionalDirectories": [
       "/Users/subinsilwal/Desktop/code/maiself/.claude",
