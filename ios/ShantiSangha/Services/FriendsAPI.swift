@@ -37,6 +37,12 @@ enum FriendsAPI {
         try await ApiService.shared.delete("/friends/\(friendshipId.uuidString.lowercased())")
     }
 
+    static func updateAnnotations(friendshipId: UUID, request: UpdateFriendAnnotationsRequest) async throws -> FriendSummary {
+        try await ApiService.shared.patch(
+            "/friends/\(friendshipId.uuidString.lowercased())",
+            body: request)
+    }
+
     // MARK: - Messages
 
     static func listMessages(friendshipId: UUID, before: Date? = nil, limit: Int = 50) async throws -> [FriendMessage] {

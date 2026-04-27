@@ -45,12 +45,21 @@ public class FriendsService(
             .ToListAsync(ct);
         var unreadMap = unreadCounts.ToDictionary(u => u.FriendshipId, u => u.Count);
 
+        // Bulk-fetch this viewer's annotations across every friendship in
+        // one round-trip so the per-row loop stays O(friends) regardless
+        // of how many have nicknames/notes set.
+        var annotations = await db.FriendshipAnnotations
+            .Where(a => a.OwnerUserId == userId && friendshipIds.Contains(a.FriendshipId))
+            .ToDictionaryAsync(a => a.FriendshipId, ct);
+
         var result = new List<FriendSummaryResponse>(friendships.Count);
         foreach (var f in friendships)
         {
             var friendUserId = f.UserAId == userId ? f.UserBId : f.UserAId;
             var displayName = await profileQuery.GetDisplayNameAsync(friendUserId, ct) ?? "Friend";
             var avatar = await profileQuery.GetAvatarInfoAsync(friendUserId, ct);
+            var location = await profileQuery.GetLocationAsync(friendUserId, ct);
+            annotations.TryGetValue(f.Id, out var ann);
 
             string? preview = null;
             DateTime? sentAt = null;
@@ -69,7 +78,12 @@ public class FriendsService(
                 sentAt,
                 unreadMap.GetValueOrDefault(f.Id, 0),
                 avatar.AvatarKey,
-                avatar.AvatarUrl));
+                avatar.AvatarUrl,
+                ann?.Nickname,
+                ann?.PrivateNotes,
+                location.Country,
+                location.State,
+                location.City));
         }
         return result;
     }
@@ -82,6 +96,9 @@ public class FriendsService(
         var friendUserId = f.UserAId == userId ? f.UserBId : f.UserAId;
         var displayName = await profileQuery.GetDisplayNameAsync(friendUserId, ct) ?? "Friend";
         var avatar = await profileQuery.GetAvatarInfoAsync(friendUserId, ct);
+        var location = await profileQuery.GetLocationAsync(friendUserId, ct);
+        var annotation = await db.FriendshipAnnotations
+            .FirstOrDefaultAsync(a => a.FriendshipId == f.Id && a.OwnerUserId == userId, ct);
 
         var last = await db.Messages
             .Where(m => m.FriendshipId == f.Id)
@@ -97,7 +114,12 @@ public class FriendsService(
             last?.SentAt,
             unread,
             avatar.AvatarKey,
-            avatar.AvatarUrl);
+            avatar.AvatarUrl,
+            annotation?.Nickname,
+            annotation?.PrivateNotes,
+            location.Country,
+            location.State,
+            location.City);
     }
 
     public async Task<CreateInvitationResponse> CreateInvitationAsync(Guid userId, string baseUrl, CancellationToken ct = default)
@@ -263,10 +285,64 @@ public class FriendsService(
         }
 
         var inviterAvatar = await profileQuery.GetAvatarInfoAsync(invite.InviterUserId, ct);
+        var inviterLocation = await profileQuery.GetLocationAsync(invite.InviterUserId, ct);
         return new FriendSummaryResponse(
             friendship.Id, invite.InviterUserId, inviterName,
             friendship.CreatedAt, null, null, 0,
-            inviterAvatar.AvatarKey, inviterAvatar.AvatarUrl);
+            inviterAvatar.AvatarKey, inviterAvatar.AvatarUrl,
+            // No annotations exist yet for a fresh friendship.
+            null, null,
+            inviterLocation.Country, inviterLocation.State, inviterLocation.City);
+    }
+
+    public async Task<FriendSummaryResponse?> UpdateFriendAnnotationsAsync(
+        Guid userId,
+        Guid friendshipId,
+        UpdateFriendAnnotationsRequest request,
+        CancellationToken ct = default)
+    {
+        var f = await FindFriendshipForUserAsync(friendshipId, userId, ct);
+        if (f is null) return null;
+
+        var row = await db.FriendshipAnnotations
+            .FirstOrDefaultAsync(a => a.FriendshipId == friendshipId && a.OwnerUserId == userId, ct);
+        if (row is null)
+        {
+            row = new FriendshipAnnotation
+            {
+                FriendshipId = friendshipId,
+                OwnerUserId = userId
+            };
+            db.FriendshipAnnotations.Add(row);
+        }
+
+        // Clear-flag wins over the value field — explicit "set to null"
+        // beats "leave alone." A null value with no clear flag is a no-op.
+        if (request.ClearNickname == true)
+        {
+            row.Nickname = null;
+        }
+        else if (request.Nickname is not null)
+        {
+            var trimmed = request.Nickname.Trim();
+            row.Nickname = trimmed.Length == 0 ? null : trimmed;
+        }
+
+        if (request.ClearPrivateNotes == true)
+        {
+            row.PrivateNotes = null;
+        }
+        else if (request.PrivateNotes is not null)
+        {
+            // Don't trim notes — preserve whitespace and newlines the user
+            // typed. Only collapse a fully-empty submission to null.
+            row.PrivateNotes = string.IsNullOrEmpty(request.PrivateNotes) ? null : request.PrivateNotes;
+        }
+
+        row.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        return await GetFriendAsync(userId, friendshipId, ct);
     }
 
     public async Task<bool> EndFriendshipAsync(Guid userId, Guid friendshipId, CancellationToken ct = default)

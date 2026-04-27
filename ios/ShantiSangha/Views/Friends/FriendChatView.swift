@@ -5,26 +5,36 @@ import UIKit
 /// 1:1 chat with a friend — text, image, and voice messages.
 struct FriendChatView: View {
     let friend: FriendSummary
+    @ObservedObject var friendsVM: FriendsViewModel
     @StateObject private var vm: FriendChatViewModel
     @State private var draft: String = ""
     @State private var photoSelection: PhotosPickerItem?
     @State private var showRecorder = false
-    @State private var showEndConfirm = false
     @State private var reactionPickerTarget: FriendMessage?
     @State private var imagePreview: PreviewedImage?
     @State private var didInitialScroll = false
     @State private var jumpToMessageId: UUID?
     @State private var highlightedMessageId: UUID?
+    @State private var showProfile = false
     @FocusState private var composerFocused: Bool
     @EnvironmentObject var profile: ProfileService
     @Environment(\.dismiss) private var dismiss
 
-    init(friend: FriendSummary) {
+    init(friend: FriendSummary, friendsVM: FriendsViewModel) {
         self.friend = friend
+        self.friendsVM = friendsVM
         _vm = StateObject(wrappedValue: FriendChatViewModel(
             friendshipId: friend.friendshipId,
             friendUserId: friend.friendUserId,
             friendDisplayName: friend.displayName))
+    }
+
+    /// Live friend record from the friends list — picks up annotation
+    /// updates (nickname, etc.) without re-pushing the view. Falls back
+    /// to the constructor-time copy if the row briefly drops out of
+    /// `friends` during a refresh.
+    private var currentFriend: FriendSummary {
+        friendsVM.friends.first(where: { $0.friendshipId == friend.friendshipId }) ?? friend
     }
 
     var body: some View {
@@ -37,32 +47,23 @@ struct FriendChatView: View {
                 .background(Color.sacredBg)
         }
         .background(Color.sacredBg.ignoresSafeArea())
-        .navigationTitle(friend.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button("End friendship", role: .destructive) {
-                        showEndConfirm = true
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .foregroundColor(.sacredGold)
+            // Tappable header — pushes the friend's profile (nickname,
+            // private notes, end friendship). Replaces the previous
+            // `navigationTitle` + trailing `...` menu.
+            ToolbarItem(placement: .principal) {
+                Button { showProfile = true } label: {
+                    Text(currentFriend.displayLabel)
+                        .font(.system(size: 17, weight: .semibold, design: .serif))
+                        .foregroundColor(.sacredText)
                 }
+                .buttonStyle(.plain)
             }
         }
-        .confirmationDialog(
-            "End friendship with \(friend.displayName)?",
-            isPresented: $showEndConfirm,
-            titleVisibility: .visible
-        ) {
-            Button("End friendship", role: .destructive) {
-                Task { await endFriendship() }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Your message thread and any media will be deleted on both sides. This can't be undone.")
+        .navigationDestination(isPresented: $showProfile) {
+            FriendProfileView(friendshipId: friend.friendshipId, vm: friendsVM)
         }
         .sheet(item: $reactionPickerTarget) { target in
             ReactionPickerSheet(
@@ -169,8 +170,8 @@ struct FriendChatView: View {
                                 MessageBubble(
                                     message: msg,
                                     fromFriend: vm.isFromFriend(msg),
-                                    friendDisplayName: friend.displayName,
-                                    friendAvatarUrl: friend.avatarUrl,
+                                    friendDisplayName: currentFriend.displayLabel,
+                                    friendAvatarUrl: currentFriend.avatarUrl,
                                     showAvatar: shouldShowAvatar(at: idx),
                                     currentUserId: profile.currentUserId,
                                     isHighlighted: highlightedMessageId == msg.id,
@@ -324,9 +325,9 @@ struct FriendChatView: View {
         let count = vm.typingFromMembers.count
         if count == 0 { return "" }
         // For 1:1 the only typer is the friend.
-        if count == 1 { return "\(friend.displayName) is typing…" }
-        if count == 2 { return "\(friend.displayName) and 1 other are typing…" }
-        return "\(friend.displayName) and \(count - 1) others are typing…"
+        if count == 1 { return "\(currentFriend.displayLabel) is typing…" }
+        if count == 2 { return "\(currentFriend.displayLabel) and 1 other are typing…" }
+        return "\(currentFriend.displayLabel) and \(count - 1) others are typing…"
     }
 
     private var composer: some View {
@@ -403,7 +404,7 @@ struct FriendChatView: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(.sacredGold)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Replying to \(vm.isFromFriend(message) ? friend.displayName : "you")")
+                Text("Replying to \(vm.isFromFriend(message) ? currentFriend.displayLabel : "you")")
                     .font(.sacredMicroBold)
                     .foregroundColor(.sacredTextSecondary)
                 Text(replyPreviewText(for: message))
@@ -477,15 +478,6 @@ struct FriendChatView: View {
         return flattened.jpegData(compressionQuality: 0.82)
     }
 
-    private func endFriendship() async {
-        do {
-            try await FriendsAPI.endFriendship(friend.friendshipId)
-            NotificationCenter.default.post(name: .friendsUpdated, object: nil)
-            dismiss()
-        } catch {
-            vm.errorMessage = error.localizedDescription
-        }
-    }
 }
 
 /// Identifiable wrapper for `.fullScreenCover(item:)` driven by a URL.

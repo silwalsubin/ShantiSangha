@@ -58,6 +58,16 @@ public class ProfileQueryService(
         return new UserBirthInfo(profile?.BirthDate, profile?.BirthTime, profile?.BirthPlace);
     }
 
+    public async Task<UserLocationInfo> GetLocationAsync(Guid userId, CancellationToken ct = default)
+    {
+        var profile = await db.Profiles
+            .Where(p => p.UserId == userId)
+            .Select(p => new { p.Country, p.State, p.City })
+            .FirstOrDefaultAsync(ct);
+
+        return new UserLocationInfo(profile?.Country, profile?.State, profile?.City);
+    }
+
     public async Task<bool> GetFriendMessageNotificationsEnabledAsync(Guid userId, CancellationToken ct = default)
     {
         var enabled = await db.Profiles

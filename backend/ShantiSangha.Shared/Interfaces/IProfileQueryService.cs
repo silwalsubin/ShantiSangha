@@ -6,6 +6,8 @@ public record UserReminderInfo(Guid UserId, string? Timezone, int? ReminderHour)
 
 public record UserBirthInfo(DateOnly? BirthDate, string? BirthTime, string? BirthPlace);
 
+public record UserLocationInfo(string? Country, string? State, string? City);
+
 /// <summary>
 /// What a consumer needs to render another user's avatar: the stable S3 key
 /// for round-tripping, plus a short-lived presigned GET URL for displaying
@@ -34,6 +36,13 @@ public interface IProfileQueryService
     /// Returns null fields if the user hasn't provided birth data.
     /// </summary>
     Task<UserBirthInfo> GetBirthInfoAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the user's Country / State / City for display on a friend's
+    /// profile page. Each field is independently nullable; consumers
+    /// compose them into a human string client-side.
+    /// </summary>
+    Task<UserLocationInfo> GetLocationAsync(Guid userId, CancellationToken ct = default);
 
     /// <summary>
     /// Whether the user wants visible push alerts for friend messages.

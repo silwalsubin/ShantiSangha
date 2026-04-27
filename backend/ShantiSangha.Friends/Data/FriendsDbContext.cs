@@ -16,6 +16,7 @@ public class FriendsDbContext(DbContextOptions<FriendsDbContext> options) : DbCo
     public DbSet<FriendMessage> Messages => Set<FriendMessage>();
     public DbSet<FriendRequest> Requests => Set<FriendRequest>();
     public DbSet<FriendMessageReaction> MessageReactions => Set<FriendMessageReaction>();
+    public DbSet<FriendshipAnnotation> FriendshipAnnotations => Set<FriendshipAnnotation>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -53,6 +54,17 @@ public class FriendsDbContext(DbContextOptions<FriendsDbContext> options) : DbCo
             // Materialization joins from FriendMessages → reactions by
             // MessageId; the PK already covers it.
             e.Property(r => r.Emoji).IsRequired();
+        });
+
+        mb.Entity<FriendshipAnnotation>(e =>
+        {
+            e.ToTable("FriendshipAnnotations");
+            // Composite PK isolates per-side annotations: A and B each
+            // get their own row keyed by (FriendshipId, OwnerUserId).
+            e.HasKey(a => new { a.FriendshipId, a.OwnerUserId });
+            // Owner-scoped queries — "all my annotations" — use this index
+            // for the LEFT JOIN inside ListFriendsAsync.
+            e.HasIndex(a => a.OwnerUserId);
         });
 
         mb.Entity<FriendRequest>(e =>

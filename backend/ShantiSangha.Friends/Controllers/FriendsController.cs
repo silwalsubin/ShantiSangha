@@ -133,6 +133,19 @@ public class FriendsController(
         return ok ? NoContent() : NotFound();
     }
 
+    [HttpPatch("{friendshipId:guid}")]
+    public async Task<IActionResult> UpdateAnnotations(
+        Guid friendshipId,
+        [FromBody] UpdateFriendAnnotationsRequest body,
+        CancellationToken ct)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+
+        var result = await service.UpdateFriendAnnotationsAsync(user.Id, friendshipId, body, ct);
+        return result is null ? NotFound() : Ok(result);
+    }
+
     private string GetInviteBaseUrl() =>
         config["FRIENDS_INVITE_BASE_URL"]
             ?? Environment.GetEnvironmentVariable("FRIENDS_INVITE_BASE_URL")

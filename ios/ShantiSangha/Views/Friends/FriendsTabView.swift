@@ -42,7 +42,7 @@ struct FriendsTabView: View {
                             SacredListCard {
                                 VStack(spacing: 0) {
                                     ForEach(Array(vm.friends.enumerated()), id: \.element.id) { index, friend in
-                                        NavigationLink(destination: FriendChatView(friend: friend)) {
+                                        NavigationLink(destination: FriendChatView(friend: friend, friendsVM: vm)) {
                                             FriendRow(friend: friend)
                                         }
                                         .buttonStyle(.plain)
@@ -213,13 +213,13 @@ private struct FriendRow: View {
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
             SacredAvatar(
-                displayName: friend.displayName,
+                displayName: friend.displayLabel,
                 avatarUrl: friend.avatarUrl,
                 size: 40)
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
-                    Text(friend.displayName)
+                    Text(friend.displayLabel)
                         .font(.sacredTextSemibold)
                         .foregroundColor(.sacredText)
                     Spacer()

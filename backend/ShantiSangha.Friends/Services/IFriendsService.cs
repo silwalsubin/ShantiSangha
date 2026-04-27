@@ -12,6 +12,11 @@ public interface IFriendsService
     Task<InvitationPreviewResponse?> PreviewInvitationAsync(Guid userId, string token, CancellationToken ct = default);
     Task<FriendSummaryResponse> AcceptInvitationAsync(Guid userId, string token, CancellationToken ct = default);
     Task<bool> EndFriendshipAsync(Guid userId, Guid friendshipId, CancellationToken ct = default);
+    Task<FriendSummaryResponse?> UpdateFriendAnnotationsAsync(
+        Guid userId,
+        Guid friendshipId,
+        UpdateFriendAnnotationsRequest request,
+        CancellationToken ct = default);
 }
 
 public class FriendsServiceException(string code, string message) : Exception(message)

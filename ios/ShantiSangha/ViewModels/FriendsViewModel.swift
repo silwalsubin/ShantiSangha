@@ -71,6 +71,31 @@ final class FriendsViewModel: ObservableObject {
         }
     }
 
+    /// Save annotations (nickname + private notes) for a friend. Replaces
+    /// the row in-place in the local list — the server returns the full
+    /// updated `FriendSummary`, so no follow-up `refresh()` round-trip is
+    /// needed for the friend list to reflect the new nickname.
+    @discardableResult
+    func updateAnnotations(
+        friendshipId: UUID,
+        nickname: String? = nil,
+        privateNotes: String? = nil,
+        clearNickname: Bool = false,
+        clearPrivateNotes: Bool = false
+    ) async throws -> FriendSummary {
+        let updated = try await FriendsAPI.updateAnnotations(
+            friendshipId: friendshipId,
+            request: UpdateFriendAnnotationsRequest(
+                nickname: nickname,
+                privateNotes: privateNotes,
+                clearNickname: clearNickname ? true : nil,
+                clearPrivateNotes: clearPrivateNotes ? true : nil))
+        if let i = friends.firstIndex(where: { $0.friendshipId == friendshipId }) {
+            friends[i] = updated
+        }
+        return updated
+    }
+
     func createInvitation() async -> CreateInvitationResponse? {
         do {
             let result = try await FriendsAPI.createInvitation()

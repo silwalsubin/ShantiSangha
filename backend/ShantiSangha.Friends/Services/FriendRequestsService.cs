@@ -210,6 +210,7 @@ public class FriendRequestsService(
         // Build the FriendSummaryResponse the iOS layer expects so it can
         // route directly to the chat view without re-fetching.
         var avatar = await profileQuery.GetAvatarInfoAsync(request.FromUserId, ct);
+        var location = await profileQuery.GetLocationAsync(request.FromUserId, ct);
         return new FriendSummaryResponse(
             friendship.Id,
             request.FromUserId,
@@ -219,7 +220,10 @@ public class FriendRequestsService(
             null,
             0,
             avatar.AvatarKey,
-            avatar.AvatarUrl);
+            avatar.AvatarUrl,
+            // No annotations for a freshly-accepted request.
+            null, null,
+            location.Country, location.State, location.City);
     }
 
     public async Task<bool> DeclineAsync(Guid recipientUserId, Guid requestId, CancellationToken ct = default)

@@ -9,7 +9,23 @@ public record FriendSummaryResponse(
     DateTime? LastMessageAt,
     int UnreadCount,
     string? AvatarKey,
-    string? AvatarUrl);
+    string? AvatarUrl,
+    string? Nickname,
+    string? PrivateNotes,
+    string? Country,
+    string? State,
+    string? City);
+
+/// Per-viewer overlay: A's nickname/notes for B are independent of B's
+/// for A. `Clear*` flags follow the Identity `UpdateMeRequest` pattern —
+/// null on a value field means "leave unchanged"; clear-flag = true
+/// means "set to NULL". This disambiguates "I didn't send this field"
+/// from "I want this cleared."
+public record UpdateFriendAnnotationsRequest(
+    string? Nickname = null,
+    string? PrivateNotes = null,
+    bool? ClearNickname = null,
+    bool? ClearPrivateNotes = null);
 
 public record CreateInvitationResponse(
     Guid InvitationId,

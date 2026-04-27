@@ -14,8 +14,45 @@ struct FriendSummary: Codable, Identifiable, Equatable, Hashable {
     /// `SacredAvatar`. Backend regenerates on every list/refresh; treat as
     /// read-only and refetch the friend list to get a new one if expired.
     let avatarUrl: String?
+    /// Viewer-private overlay: a label this user has chosen for the friend.
+    /// Replaces `displayName` everywhere in this user's UI when non-empty.
+    /// The friend never sees it.
+    let nickname: String?
+    /// Viewer-private freeform notes about the friend. Only this user can
+    /// read them; backend filters by `OwnerUserId` server-side.
+    let privateNotes: String?
+    let country: String?
+    let state: String?
+    let city: String?
 
     var id: UUID { friendshipId }
+
+    /// What we render anywhere a friend's name shows up. Falls back to the
+    /// real display name when the user hasn't set a nickname.
+    var displayLabel: String {
+        if let n = nickname?.trimmingCharacters(in: .whitespaces), !n.isEmpty { return n }
+        return displayName
+    }
+
+    /// Human-readable location for the profile page header. Drops empty
+    /// fields and joins what's left with commas — same shape as
+    /// `UserSearchResult.locationString`.
+    var locationString: String? {
+        let parts = [city, state, country]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: ", ")
+    }
+}
+
+/// Mirror of the backend `UpdateFriendAnnotationsRequest`. `clear*` flags
+/// disambiguate "leave this field alone" (null value) from "set it to
+/// null" (clear flag = true). Same pattern as `UpdateMeRequest`.
+struct UpdateFriendAnnotationsRequest: Encodable {
+    var nickname: String? = nil
+    var privateNotes: String? = nil
+    var clearNickname: Bool? = nil
+    var clearPrivateNotes: Bool? = nil
 }
 
 enum FriendMessageKind: String, Codable {
