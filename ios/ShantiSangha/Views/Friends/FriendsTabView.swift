@@ -6,6 +6,16 @@ struct FriendsTabView: View {
     @StateObject private var vm = FriendsViewModel()
     @State private var showShare = false
     @State private var shareItems: [Any] = []
+    @State private var navTarget: FriendNavRoute?
+
+    /// Programmatic navigation target — both the row body and the avatar
+    /// are tappable but route to different destinations, so we need a
+    /// single source of truth that `.navigationDestination(item:)` can
+    /// drive instead of stacking two NavigationLinks per row.
+    enum FriendNavRoute: Hashable {
+        case chat(UUID)
+        case profile(UUID)
+    }
 
     var body: some View {
         ZStack {
@@ -42,10 +52,10 @@ struct FriendsTabView: View {
                             SacredListCard {
                                 VStack(spacing: 0) {
                                     ForEach(Array(vm.friends.enumerated()), id: \.element.id) { index, friend in
-                                        NavigationLink(destination: FriendChatView(friend: friend, friendsVM: vm)) {
-                                            FriendRow(friend: friend)
-                                        }
-                                        .buttonStyle(.plain)
+                                        FriendRow(
+                                            friend: friend,
+                                            onTapAvatar: { navTarget = .profile(friend.friendshipId) },
+                                            onTapBody: { navTarget = .chat(friend.friendshipId) })
 
                                         if index < vm.friends.count - 1 {
                                             Divider()
@@ -121,6 +131,16 @@ struct FriendsTabView: View {
         .task { await vm.refresh() }
         .refreshable { await vm.refresh() }
         .sheet(isPresented: $showShare) { ShareSheet(items: shareItems) }
+        .navigationDestination(item: $navTarget) { route in
+            switch route {
+            case .chat(let id):
+                if let f = vm.friends.first(where: { $0.friendshipId == id }) {
+                    FriendChatView(friend: f, friendsVM: vm)
+                }
+            case .profile(let id):
+                FriendProfileView(friendshipId: id, vm: vm)
+            }
+        }
     }
 
     private var emptyState: some View {
@@ -209,41 +229,53 @@ private struct ShareLink {
 
 private struct FriendRow: View {
     let friend: FriendSummary
+    let onTapAvatar: () -> Void
+    let onTapBody: () -> Void
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            SacredAvatar(
-                displayName: friend.displayLabel,
-                avatarUrl: friend.avatarUrl,
-                size: 40)
+            // Avatar gets its own tap target → profile. Outer body tap
+            // (name + preview) → chat. Both branches funnel through
+            // the parent's nav-target state.
+            Button(action: onTapAvatar) {
+                SacredAvatar(
+                    displayName: friend.displayLabel,
+                    avatarUrl: friend.avatarUrl,
+                    size: 40)
+            }
+            .buttonStyle(.plain)
 
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(friend.displayLabel)
-                        .font(.sacredTextSemibold)
-                        .foregroundColor(.sacredText)
-                    Spacer()
-                    if friend.unreadCount > 0 {
-                        Text("\(friend.unreadCount)")
-                            .font(.sacredMicroBold)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 2)
-                            .background(Capsule().fill(Color.sacredGold))
+            Button(action: onTapBody) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(friend.displayLabel)
+                            .font(.sacredTextSemibold)
+                            .foregroundColor(.sacredText)
+                        Spacer()
+                        if friend.unreadCount > 0 {
+                            Text("\(friend.unreadCount)")
+                                .font(.sacredMicroBold)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Color.sacredGold))
+                        }
+                    }
+                    if let preview = friend.lastMessagePreview {
+                        Text(preview)
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredTextSecondary)
+                            .lineLimit(2)
+                    } else {
+                        Text("Say hello.")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMutedLight)
                     }
                 }
-                if let preview = friend.lastMessagePreview {
-                    Text(preview)
-                        .font(.sacredSmall)
-                        .foregroundColor(.sacredTextSecondary)
-                        .lineLimit(2)
-                } else {
-                    Text("Say hello.")
-                        .font(.sacredSmall)
-                        .foregroundColor(.sacredMutedLight)
-                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)

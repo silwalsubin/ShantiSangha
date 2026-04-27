@@ -181,7 +181,8 @@ struct FriendChatView: View {
                                             Task { await vm.toggleReaction(emoji, on: msg.id, currentUserId: me) }
                                         }
                                     },
-                                    onTapReplyPreview: { parentId in jumpToMessage(parentId) })
+                                    onTapReplyPreview: { parentId in jumpToMessage(parentId) },
+                                    onTapAvatar: { showProfile = true })
                             }
                             .id(msg.id)
                             .onLongPressGesture {
@@ -575,6 +576,7 @@ private struct MessageBubble: View {
     let onTapImage: (URL) -> Void
     let onTapReaction: (String) -> Void
     let onTapReplyPreview: (UUID) -> Void
+    let onTapAvatar: () -> Void
 
     /// Reserved width for the avatar gutter on the friend's side. Even
     /// on continuation rows (where we hide the avatar), the slot stays
@@ -590,10 +592,13 @@ private struct MessageBubble: View {
         HStack(alignment: .bottom, spacing: avatarGap) {
             if fromFriend {
                 if showAvatar {
-                    SacredAvatar(
-                        displayName: friendDisplayName,
-                        avatarUrl: friendAvatarUrl,
-                        size: avatarSize)
+                    Button(action: onTapAvatar) {
+                        SacredAvatar(
+                            displayName: friendDisplayName,
+                            avatarUrl: friendAvatarUrl,
+                            size: avatarSize)
+                    }
+                    .buttonStyle(.plain)
                 } else {
                     Color.clear.frame(width: avatarSize, height: avatarSize)
                 }
