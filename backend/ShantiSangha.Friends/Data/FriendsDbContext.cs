@@ -17,6 +17,8 @@ public class FriendsDbContext(DbContextOptions<FriendsDbContext> options) : DbCo
     public DbSet<FriendRequest> Requests => Set<FriendRequest>();
     public DbSet<FriendMessageReaction> MessageReactions => Set<FriendMessageReaction>();
     public DbSet<FriendshipAnnotation> FriendshipAnnotations => Set<FriendshipAnnotation>();
+    public DbSet<Person> Persons => Set<Person>();
+    public DbSet<Connection> Connections => Set<Connection>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -65,6 +67,25 @@ public class FriendsDbContext(DbContextOptions<FriendsDbContext> options) : DbCo
             // Owner-scoped queries — "all my annotations" — use this index
             // for the LEFT JOIN inside ListFriendsAsync.
             e.HasIndex(a => a.OwnerUserId);
+        });
+
+        mb.Entity<Person>(e =>
+        {
+            e.ToTable("Persons");
+            // Partial unique index lives in the migration SQL (EF Core can
+            // describe filtered indexes here too; we keep raw SQL as the
+            // source of truth for parity with how every other migration
+            // in this module is written).
+            e.HasIndex(p => p.UserId);
+        });
+
+        mb.Entity<Connection>(e =>
+        {
+            e.ToTable("Connections");
+            e.Property(c => c.RelationType).HasConversion<string>();
+            e.HasIndex(c => c.OwnerUserId);
+            e.HasIndex(c => new { c.OwnerUserId, c.PersonId }).IsUnique();
+            e.HasIndex(c => c.FriendshipId);
         });
 
         mb.Entity<FriendRequest>(e =>

@@ -247,6 +247,13 @@ public class FriendsService(
         invite.AcceptedAt = DateTime.UtcNow;
         invite.AcceptedByUserId = userId;
 
+        // Make sure both users have a Person row, then write the two
+        // mirroring Connection rows so the new pair shows up in each
+        // side's circle immediately.
+        var personA = await EnsurePersonForUserAsync(a, ct);
+        var personB = await EnsurePersonForUserAsync(b, ct);
+        AddPairedConnections(friendship.Id, a, b, personA.Id, personB.Id);
+
         try
         {
             await db.SaveChangesAsync(ct);
@@ -353,6 +360,16 @@ public class FriendsService(
         var messages = await db.Messages.Where(m => m.FriendshipId == f.Id).ToListAsync(ct);
         var mediaKeys = messages.Where(m => m.StorageKey is not null).Select(m => m.StorageKey!).ToList();
 
+        // Remove the two derived Connection rows so neither side is
+        // left with a stranded "local connection" pointing at someone
+        // they un-friended. The FK has ON DELETE SET NULL but that
+        // would orphan the rows as untyped local connections — we
+        // want them gone entirely.
+        var connectionsToRemove = await db.Connections
+            .Where(c => c.FriendshipId == f.Id)
+            .ToListAsync(ct);
+        db.Connections.RemoveRange(connectionsToRemove);
+
         db.Messages.RemoveRange(messages);
         db.Friendships.Remove(f);
         await db.SaveChangesAsync(ct);
@@ -375,6 +392,56 @@ public class FriendsService(
     private async Task<Friendship?> FindFriendshipForUserAsync(Guid friendshipId, Guid userId, CancellationToken ct) =>
         await db.Friendships.FirstOrDefaultAsync(
             f => f.Id == friendshipId && (f.UserAId == userId || f.UserBId == userId), ct);
+
+    /// Returns the Person row for this user, creating one on the fly
+    /// if missing. Defensively handles the case where a user signed up
+    /// before the Person backfill ran (or before the signup hook was
+    /// added).
+    private async Task<Person> EnsurePersonForUserAsync(Guid userId, CancellationToken ct)
+    {
+        var existing = await db.Persons.FirstOrDefaultAsync(p => p.UserId == userId, ct);
+        if (existing is not null) return existing;
+
+        var displayName = await profileQuery.GetDisplayNameAsync(userId, ct) ?? string.Empty;
+        var person = new Person
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            DisplayName = displayName,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+        db.Persons.Add(person);
+        return person;
+    }
+
+    /// Stages two mirroring Connection rows (one per side) for a newly
+    /// created friendship. Caller is responsible for SaveChanges /
+    /// transaction commit.
+    private void AddPairedConnections(Guid friendshipId, Guid userA, Guid userB, Guid personA, Guid personB)
+    {
+        var now = DateTime.UtcNow;
+        db.Connections.Add(new Connection
+        {
+            Id = Guid.NewGuid(),
+            OwnerUserId = userA,
+            PersonId = personB,
+            RelationType = ConnectionType.Friend,
+            FriendshipId = friendshipId,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        db.Connections.Add(new Connection
+        {
+            Id = Guid.NewGuid(),
+            OwnerUserId = userB,
+            PersonId = personA,
+            RelationType = ConnectionType.Friend,
+            FriendshipId = friendshipId,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+    }
 
     private async Task<bool> ExistsFriendshipAsync(Guid userA, Guid userB, CancellationToken ct)
     {

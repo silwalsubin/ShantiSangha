@@ -115,3 +115,99 @@ public record FriendRequestResponse(
     string OtherUserDisplayName,
     string? OtherUserAvatarKey,
     string? OtherUserAvatarUrl);
+
+// ── Circle: Person + Connection ─────────────────────────────────────
+
+/// The "who" — biographical data the owner can see about a person in
+/// their circle. For linked Persons (UserId set), biographical fields
+/// like BirthDate/Country flow from the user's Profile. For local
+/// Persons (UserId null), they're set directly by the owner.
+public record PersonResponse(
+    Guid Id,
+    Guid? UserId,
+    string DisplayName,
+    DateOnly? BirthDate,
+    string? BirthTime,
+    string? BirthPlace,
+    string? PhoneNumber,
+    string? Email,
+    string? Country,
+    string? State,
+    string? City,
+    string? Address,
+    string? AvatarKey,
+    string? AvatarUrl);
+
+/// The "how I know them" — owner-scoped relationship overlay. The
+/// embedded `Person` carries identity. `Messageable` is true iff
+/// `Person.UserId` is set AND `FriendshipId` is set; the iOS layer
+/// uses it to gate the chat affordance.
+public record ConnectionResponse(
+    Guid Id,
+    Guid OwnerUserId,
+    Guid PersonId,
+    string RelationType,
+    string? CustomRelationLabel,
+    string? Nickname,
+    string? PrivateNotes,
+    Guid? FriendshipId,
+    bool Messageable,
+    DateTime CreatedAt,
+    DateTime UpdatedAt,
+    PersonResponse Person,
+    string? LastMessagePreview,
+    DateTime? LastMessageAt,
+    int UnreadCount);
+
+/// Creates a local Person + Connection in one call. Backend sets
+/// `Person.UserId = NULL` and `Connection.FriendshipId = NULL`.
+public record CreateConnectionRequest(
+    string DisplayName,
+    string RelationType,
+    string? CustomRelationLabel = null,
+    string? Nickname = null,
+    string? PrivateNotes = null,
+    DateOnly? BirthDate = null,
+    string? BirthTime = null,
+    string? BirthPlace = null,
+    string? PhoneNumber = null,
+    string? Email = null,
+    string? Country = null,
+    string? State = null,
+    string? City = null,
+    string? Address = null);
+
+/// Updates Connection-overlay fields only. Person fields go through
+/// `UpdatePersonRequest`. Same Clear* pattern as the Identity service:
+/// null value = leave alone, clear-flag = true = set to null.
+public record UpdateConnectionRequest(
+    string? RelationType = null,
+    string? CustomRelationLabel = null,
+    string? Nickname = null,
+    string? PrivateNotes = null,
+    bool? ClearCustomRelationLabel = null,
+    bool? ClearNickname = null,
+    bool? ClearPrivateNotes = null);
+
+/// Updates the underlying Person row (only allowed when caller owns
+/// the local Person OR Person.UserId == caller). Same Clear* pattern.
+public record UpdatePersonRequest(
+    string? DisplayName = null,
+    DateOnly? BirthDate = null,
+    string? BirthTime = null,
+    string? BirthPlace = null,
+    string? PhoneNumber = null,
+    string? Email = null,
+    string? Country = null,
+    string? State = null,
+    string? City = null,
+    string? Address = null,
+    bool? ClearBirthDate = null,
+    bool? ClearBirthTime = null,
+    bool? ClearBirthPlace = null,
+    bool? ClearPhoneNumber = null,
+    bool? ClearEmail = null,
+    bool? ClearCountry = null,
+    bool? ClearState = null,
+    bool? ClearCity = null,
+    bool? ClearAddress = null);

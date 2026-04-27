@@ -150,6 +150,13 @@ public class FriendRequestsService(
                 CreatedAt = DateTime.UtcNow
             };
             db.Friendships.Add(friendship);
+
+            // Materialize the two Connection rows so the new pair shows
+            // up in each side's circle. Reuses the same helpers as
+            // FriendsService.AcceptInvitationAsync.
+            var personA = await EnsurePersonForUserAsync(a, ct);
+            var personB = await EnsurePersonForUserAsync(b, ct);
+            AddPairedConnections(friendship.Id, a, b, personA.Id, personB.Id);
         }
         else
         {
@@ -276,5 +283,51 @@ public class FriendRequestsService(
             otherName,
             otherAvatar.AvatarKey,
             otherAvatar.AvatarUrl);
+    }
+
+    /// Mirror of FriendsService.EnsurePersonForUserAsync — kept inline
+    /// here rather than extracted to a shared helper so this service
+    /// doesn't need to take a dependency on FriendsService.
+    private async Task<Person> EnsurePersonForUserAsync(Guid userId, CancellationToken ct)
+    {
+        var existing = await db.Persons.FirstOrDefaultAsync(p => p.UserId == userId, ct);
+        if (existing is not null) return existing;
+
+        var displayName = await profileQuery.GetDisplayNameAsync(userId, ct) ?? string.Empty;
+        var person = new Person
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            DisplayName = displayName,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+        db.Persons.Add(person);
+        return person;
+    }
+
+    private void AddPairedConnections(Guid friendshipId, Guid userA, Guid userB, Guid personA, Guid personB)
+    {
+        var now = DateTime.UtcNow;
+        db.Connections.Add(new Connection
+        {
+            Id = Guid.NewGuid(),
+            OwnerUserId = userA,
+            PersonId = personB,
+            RelationType = ConnectionType.Friend,
+            FriendshipId = friendshipId,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        db.Connections.Add(new Connection
+        {
+            Id = Guid.NewGuid(),
+            OwnerUserId = userB,
+            PersonId = personA,
+            RelationType = ConnectionType.Friend,
+            FriendshipId = friendshipId,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
     }
 }
