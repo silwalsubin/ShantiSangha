@@ -4,8 +4,11 @@ import UIKit
 
 /// 1:1 chat with a friend — text, image, and voice messages.
 struct FriendChatView: View {
-    let friend: FriendSummary
-    @ObservedObject var friendsVM: FriendsViewModel
+    /// Constructor-time snapshot. Live updates flow through the
+    /// `circleVM.connections` lookup below so nickname / display name
+    /// changes reflect without re-pushing the view.
+    let connection: Connection
+    @ObservedObject var circleVM: CircleViewModel
     @StateObject private var vm: FriendChatViewModel
     @State private var draft: String = ""
     @State private var photoSelection: PhotosPickerItem?
@@ -20,21 +23,22 @@ struct FriendChatView: View {
     @EnvironmentObject var profile: ProfileService
     @Environment(\.dismiss) private var dismiss
 
-    init(friend: FriendSummary, friendsVM: FriendsViewModel) {
-        self.friend = friend
-        self.friendsVM = friendsVM
+    init(connection: Connection, circleVM: CircleViewModel) {
+        precondition(connection.messageable, "FriendChatView requires a messageable connection")
+        self.connection = connection
+        self.circleVM = circleVM
         _vm = StateObject(wrappedValue: FriendChatViewModel(
-            friendshipId: friend.friendshipId,
-            friendUserId: friend.friendUserId,
-            friendDisplayName: friend.displayName))
+            friendshipId: connection.friendshipId!,
+            friendUserId: connection.person.userId!,
+            friendDisplayName: connection.person.displayName))
     }
 
-    /// Live friend record from the friends list — picks up annotation
+    /// Live connection record from the circle — picks up annotation
     /// updates (nickname, etc.) without re-pushing the view. Falls back
     /// to the constructor-time copy if the row briefly drops out of
-    /// `friends` during a refresh.
-    private var currentFriend: FriendSummary {
-        friendsVM.friends.first(where: { $0.friendshipId == friend.friendshipId }) ?? friend
+    /// `connections` during a refresh.
+    private var currentConnection: Connection {
+        circleVM.connections.first(where: { $0.id == connection.id }) ?? connection
     }
 
     var body: some View {
@@ -55,7 +59,7 @@ struct FriendChatView: View {
             // `navigationTitle` + trailing `...` menu.
             ToolbarItem(placement: .principal) {
                 Button { showProfile = true } label: {
-                    Text(currentFriend.displayLabel)
+                    Text(currentConnection.displayLabel)
                         .font(.system(size: 17, weight: .semibold, design: .serif))
                         .foregroundColor(.sacredText)
                 }
@@ -63,7 +67,7 @@ struct FriendChatView: View {
             }
         }
         .navigationDestination(isPresented: $showProfile) {
-            FriendProfileView(friendshipId: friend.friendshipId, vm: friendsVM)
+            ConnectionDetailView(connectionId: connection.id, vm: circleVM)
         }
         .sheet(item: $reactionPickerTarget) { target in
             ReactionPickerSheet(
@@ -170,8 +174,8 @@ struct FriendChatView: View {
                                 MessageBubble(
                                     message: msg,
                                     fromFriend: vm.isFromFriend(msg),
-                                    friendDisplayName: currentFriend.displayLabel,
-                                    friendAvatarUrl: currentFriend.avatarUrl,
+                                    friendDisplayName: currentConnection.displayLabel,
+                                    friendAvatarUrl: currentConnection.person.avatarUrl,
                                     showAvatar: shouldShowAvatar(at: idx),
                                     currentUserId: profile.currentUserId,
                                     isHighlighted: highlightedMessageId == msg.id,
@@ -326,9 +330,9 @@ struct FriendChatView: View {
         let count = vm.typingFromMembers.count
         if count == 0 { return "" }
         // For 1:1 the only typer is the friend.
-        if count == 1 { return "\(currentFriend.displayLabel) is typing…" }
-        if count == 2 { return "\(currentFriend.displayLabel) and 1 other are typing…" }
-        return "\(currentFriend.displayLabel) and \(count - 1) others are typing…"
+        if count == 1 { return "\(currentConnection.displayLabel) is typing…" }
+        if count == 2 { return "\(currentConnection.displayLabel) and 1 other are typing…" }
+        return "\(currentConnection.displayLabel) and \(count - 1) others are typing…"
     }
 
     private var composer: some View {
@@ -405,7 +409,7 @@ struct FriendChatView: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundColor(.sacredGold)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Replying to \(vm.isFromFriend(message) ? currentFriend.displayLabel : "you")")
+                Text("Replying to \(vm.isFromFriend(message) ? currentConnection.displayLabel : "you")")
                     .font(.sacredMicroBold)
                     .foregroundColor(.sacredTextSecondary)
                 Text(replyPreviewText(for: message))

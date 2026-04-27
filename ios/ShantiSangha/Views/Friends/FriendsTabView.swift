@@ -3,9 +3,13 @@ import SwiftUI
 /// Root of the Friends tab. Lists existing friendships, surfaces pending
 /// invites, and offers the "invite a friend" flow.
 struct FriendsTabView: View {
+    /// Pending invites + incoming/outgoing requests still live here.
+    /// The main connection list moved to `circleVM`.
     @StateObject private var vm = FriendsViewModel()
+    @StateObject private var circleVM = CircleViewModel()
     @State private var showShare = false
     @State private var shareItems: [Any] = []
+    @State private var showAddLocal = false
     @State private var navTarget: FriendNavRoute?
 
     /// Programmatic navigation target — both the row body and the avatar
@@ -13,8 +17,8 @@ struct FriendsTabView: View {
     /// single source of truth that `.navigationDestination(item:)` can
     /// drive instead of stacking two NavigationLinks per row.
     enum FriendNavRoute: Hashable {
-        case chat(UUID)
-        case profile(UUID)
+        case chat(UUID)        // connection id
+        case detail(UUID)      // connection id
     }
 
     var body: some View {
@@ -28,36 +32,41 @@ struct FriendsTabView: View {
                         .padding(.horizontal, SacredSpacing.m)
                         .padding(.top, SacredSpacing.m)
 
-                    if vm.loading && vm.friends.isEmpty && vm.pendingInvitations.isEmpty
+                    if (circleVM.loading || vm.loading) && circleVM.connections.isEmpty
+                        && vm.pendingInvitations.isEmpty
                         && vm.outgoingRequests.isEmpty && vm.incomingRequests.isEmpty {
                         ProgressView()
                             .padding(.top, SacredSpacing.xl * 2)
-                    } else if vm.friends.isEmpty && vm.pendingInvitations.isEmpty
+                    } else if circleVM.connections.isEmpty && vm.pendingInvitations.isEmpty
                         && vm.outgoingRequests.isEmpty && vm.incomingRequests.isEmpty
-                        && vm.errorMessage != nil {
+                        && (circleVM.errorMessage != nil || vm.errorMessage != nil) {
                         // Refresh failed and we have nothing to show. Tell
                         // the user the truth instead of "Walking solo for
                         // now" — that lie made a transient API/auth
-                        // failure look like an empty friend list.
+                        // failure look like an empty circle.
                         loadFailureState
                             .padding(.horizontal, SacredSpacing.m)
                             .padding(.top, SacredSpacing.xl)
-                    } else if vm.friends.isEmpty && vm.pendingInvitations.isEmpty
+                    } else if circleVM.connections.isEmpty && vm.pendingInvitations.isEmpty
                         && vm.outgoingRequests.isEmpty && vm.incomingRequests.isEmpty {
                         emptyState
                             .padding(.horizontal, SacredSpacing.m)
                             .padding(.top, SacredSpacing.xl)
                     } else {
-                        if !vm.friends.isEmpty {
+                        if !circleVM.connections.isEmpty {
                             SacredListCard {
                                 VStack(spacing: 0) {
-                                    ForEach(Array(vm.friends.enumerated()), id: \.element.id) { index, friend in
-                                        FriendRow(
-                                            friend: friend,
-                                            onTapAvatar: { navTarget = .profile(friend.friendshipId) },
-                                            onTapBody: { navTarget = .chat(friend.friendshipId) })
+                                    ForEach(Array(circleVM.connections.enumerated()), id: \.element.id) { index, conn in
+                                        ConnectionRow(
+                                            connection: conn,
+                                            onTapAvatar: { navTarget = .detail(conn.id) },
+                                            onTapBody: {
+                                                navTarget = conn.messageable
+                                                    ? .chat(conn.id)
+                                                    : .detail(conn.id)
+                                            })
 
-                                        if index < vm.friends.count - 1 {
+                                        if index < circleVM.connections.count - 1 {
                                             Divider()
                                                 .padding(.leading, 68)
                                         }
@@ -113,6 +122,20 @@ struct FriendsTabView: View {
                             Task { await onInvite() }
                         }
                         .padding(.horizontal, SacredSpacing.m)
+
+                        Button { showAddLocal = true } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "plus.circle")
+                                    .font(.system(size: 14, weight: .regular))
+                                Text("Add someone not on the app")
+                                    .font(.sacredSmall)
+                            }
+                            .foregroundColor(.sacredGold)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, SacredSpacing.m)
                     }
 
                     if let err = vm.errorMessage, !shouldHideError {
@@ -128,17 +151,26 @@ struct FriendsTabView: View {
         }
         .navigationTitle("Circle")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await vm.refresh() }
-        .refreshable { await vm.refresh() }
+        .task {
+            await vm.refresh()
+            await circleVM.refresh()
+        }
+        .refreshable {
+            await vm.refresh()
+            await circleVM.refresh()
+        }
         .sheet(isPresented: $showShare) { ShareSheet(items: shareItems) }
+        .sheet(isPresented: $showAddLocal) {
+            AddConnectionView(vm: circleVM)
+        }
         .navigationDestination(item: $navTarget) { route in
             switch route {
             case .chat(let id):
-                if let f = vm.friends.first(where: { $0.friendshipId == id }) {
-                    FriendChatView(friend: f, friendsVM: vm)
+                if let conn = circleVM.connections.first(where: { $0.id == id }), conn.messageable {
+                    FriendChatView(connection: conn, circleVM: circleVM)
                 }
-            case .profile(let id):
-                FriendProfileView(friendshipId: id, vm: vm)
+            case .detail(let id):
+                ConnectionDetailView(connectionId: id, vm: circleVM)
             }
         }
     }
@@ -227,33 +259,35 @@ private struct ShareLink {
     init(_ invite: PendingInvitation) { self.url = invite.shareUrl }
 }
 
-private struct FriendRow: View {
-    let friend: FriendSummary
+private struct ConnectionRow: View {
+    let connection: Connection
     let onTapAvatar: () -> Void
     let onTapBody: () -> Void
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
-            // Avatar gets its own tap target → profile. Outer body tap
-            // (name + preview) → chat. Both branches funnel through
-            // the parent's nav-target state.
+            // Avatar gets its own tap target → profile. Body tap
+            // (name + preview) → chat (when paired) or profile
+            // (when local). Both funnel through the parent's
+            // nav-target state.
             Button(action: onTapAvatar) {
                 SacredAvatar(
-                    displayName: friend.displayLabel,
-                    avatarUrl: friend.avatarUrl,
+                    displayName: connection.displayLabel,
+                    avatarUrl: connection.person.avatarUrl,
                     size: 40)
             }
             .buttonStyle(.plain)
 
             Button(action: onTapBody) {
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(friend.displayLabel)
+                    HStack(spacing: 8) {
+                        Text(connection.displayLabel)
                             .font(.sacredTextSemibold)
                             .foregroundColor(.sacredText)
+                        relationChip
                         Spacer()
-                        if friend.unreadCount > 0 {
-                            Text("\(friend.unreadCount)")
+                        if connection.messageable && connection.unreadCount > 0 {
+                            Text("\(connection.unreadCount)")
                                 .font(.sacredMicroBold)
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 7)
@@ -261,16 +295,7 @@ private struct FriendRow: View {
                                 .background(Capsule().fill(Color.sacredGold))
                         }
                     }
-                    if let preview = friend.lastMessagePreview {
-                        Text(preview)
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredTextSecondary)
-                            .lineLimit(2)
-                    } else {
-                        Text("Say hello.")
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredMutedLight)
-                    }
+                    subtitleLine
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
@@ -280,6 +305,34 @@ private struct FriendRow: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var relationChip: some View {
+        Text(connection.relationLabel)
+            .font(.sacredMicroBold)
+            .foregroundColor(.sacredGold.opacity(0.85))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 1)
+            .background(Capsule().stroke(Color.sacredGold.opacity(0.25), lineWidth: 0.5))
+    }
+
+    @ViewBuilder
+    private var subtitleLine: some View {
+        if connection.messageable, let preview = connection.lastMessagePreview {
+            Text(preview)
+                .font(.sacredSmall)
+                .foregroundColor(.sacredTextSecondary)
+                .lineLimit(2)
+        } else if connection.messageable {
+            Text("Say hello.")
+                .font(.sacredSmall)
+                .foregroundColor(.sacredMutedLight)
+        } else {
+            Text("Local — they'll be messageable when they join.")
+                .font(.sacredSmall)
+                .foregroundColor(.sacredMuted)
+                .lineLimit(2)
+        }
     }
 }
 
