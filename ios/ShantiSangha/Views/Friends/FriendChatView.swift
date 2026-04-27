@@ -15,6 +15,7 @@ struct FriendChatView: View {
     @State private var didInitialScroll = false
     @State private var jumpToMessageId: UUID?
     @State private var highlightedMessageId: UUID?
+    @FocusState private var composerFocused: Bool
     @EnvironmentObject var profile: ProfileService
     @Environment(\.dismiss) private var dismiss
 
@@ -215,6 +216,7 @@ struct FriendChatView: View {
                         .padding(.horizontal, SacredSpacing.m)
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             // Initial scroll-to-bottom. `defaultScrollAnchor(.bottom)`
             // doesn't reliably re-anchor after LazyVStack reflows
             // (especially with image bubbles resizing after async
@@ -252,6 +254,26 @@ struct FriendChatView: View {
                     proxy.scrollTo(target, anchor: .center)
                 }
                 jumpToMessageId = nil
+            }
+            .onChange(of: composerFocused) { _, focused in
+                // When the keyboard slides up, the ScrollView's content
+                // doesn't shift on its own, so the latest message ends up
+                // tucked behind the keyboard. Re-anchor to the bottom on
+                // every focus event — two passes because the first fires
+                // before UIKit has finalized the keyboard frame.
+                guard focused else { return }
+                guard let target = vm.outbox.last?.id ?? vm.messages.last?.id else { return }
+                withAnimation(.easeOut(duration: 0.25)) {
+                    proxy.scrollTo(target, anchor: .bottom)
+                }
+                Task {
+                    try? await Task.sleep(nanoseconds: 350_000_000)
+                    await MainActor.run {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            proxy.scrollTo(target, anchor: .bottom)
+                        }
+                    }
+                }
             }
         }
     }
@@ -339,6 +361,7 @@ struct FriendChatView: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 10)
                     .background(RoundedRectangle(cornerRadius: 18).fill(Color.sacredBgCard))
+                    .focused($composerFocused)
 
                 Button {
                     submitDraft()

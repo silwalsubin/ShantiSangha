@@ -39,12 +39,19 @@ struct FriendsTabView: View {
                             .padding(.top, SacredSpacing.xl)
                     } else {
                         if !vm.friends.isEmpty {
-                            VStack(spacing: SacredSpacing.s) {
-                                ForEach(vm.friends) { friend in
-                                    NavigationLink(destination: FriendChatView(friend: friend)) {
-                                        FriendRow(friend: friend)
+                            SacredListCard {
+                                VStack(spacing: 0) {
+                                    ForEach(Array(vm.friends.enumerated()), id: \.element.id) { index, friend in
+                                        NavigationLink(destination: FriendChatView(friend: friend)) {
+                                            FriendRow(friend: friend)
+                                        }
+                                        .buttonStyle(.plain)
+
+                                        if index < vm.friends.count - 1 {
+                                            Divider()
+                                                .padding(.leading, 68)
+                                        }
                                     }
-                                    .buttonStyle(.plain)
                                 }
                             }
                             .padding(.horizontal, SacredSpacing.m)
@@ -204,12 +211,13 @@ private struct FriendRow: View {
     let friend: FriendSummary
 
     var body: some View {
-        HStack(spacing: SacredSpacing.s) {
+        HStack(alignment: .center, spacing: 12) {
             SacredAvatar(
                 displayName: friend.displayName,
                 avatarUrl: friend.avatarUrl,
                 size: 40)
-            VStack(alignment: .leading, spacing: 2) {
+
+            VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(friend.displayName)
                         .font(.sacredTextSemibold)
@@ -227,17 +235,19 @@ private struct FriendRow: View {
                 if let preview = friend.lastMessagePreview {
                     Text(preview)
                         .font(.sacredSmall)
-                        .foregroundColor(.sacredMuted)
-                        .lineLimit(1)
+                        .foregroundColor(.sacredTextSecondary)
+                        .lineLimit(2)
                 } else {
                     Text("Say hello.")
                         .font(.sacredSmall)
                         .foregroundColor(.sacredMutedLight)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(SacredSpacing.s)
-        .luxCardChrome()
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
