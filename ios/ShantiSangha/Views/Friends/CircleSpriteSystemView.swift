@@ -37,7 +37,7 @@ struct CircleSpriteSystemView: View {
             scene: holder.scene,
             options: [.ignoresSiblingOrder, .shouldCullNonVisibleNodes]
         )
-        .background(Color.black)
+        .background(Color.sacredBg)
         .onAppear {
             holder.scene.onTap = onTap
             holder.scene.reduceMotion = reduceMotion
@@ -105,7 +105,11 @@ final class SpriteSceneHolder: ObservableObject {
         let s = CircleSpriteScene(size: CGSize(width: 400, height: 600))
         s.scaleMode = .resizeFill
         s.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-        s.backgroundColor = .black
+        // Sacred-dark warm brown rather than pure black — matches
+        // `Color.sacredBg` resolved in dark mode (#1a1410). Stars and
+        // glow read against a slightly warm void instead of clinical
+        // black.
+        s.backgroundColor = .sacredCosmicBg
         self.scene = s
     }
 }
@@ -205,29 +209,33 @@ final class CircleSpriteScene: SKScene {
     private func buildNebula() {
         let radius = max(size.width, size.height) * 0.9
         // Two soft radial halos blended additively give the cosmic
-        // depth without needing a Metal shader.
+        // depth without needing a Metal shader. Both stay within the
+        // sacred warm palette — the original second halo was a cool
+        // violet, which broke the "no cold colors" rule. Replaced
+        // with `sacredGold` at lower alpha for a slightly hotter
+        // accent on top of the deeper `sacredGoldDark` base halo.
         let warm = SKShapeNode(circleOfRadius: radius)
-        warm.fillColor = UIColor(red: 0.42, green: 0.22, blue: 0.08, alpha: 1.0)
+        warm.fillColor = .sacredGoldDark
         warm.strokeColor = .clear
         warm.alpha = 0.22
         warm.blendMode = .add
         warm.zPosition = -100
         nebula.addChild(warm)
 
-        let cool = SKShapeNode(circleOfRadius: radius * 0.7)
-        cool.fillColor = UIColor(red: 0.18, green: 0.10, blue: 0.22, alpha: 1.0)
-        cool.strokeColor = .clear
-        cool.alpha = 0.18
-        cool.blendMode = .add
-        cool.position = CGPoint(x: -radius * 0.25, y: radius * 0.18)
-        cool.zPosition = -99
-        nebula.addChild(cool)
+        let accent = SKShapeNode(circleOfRadius: radius * 0.7)
+        accent.fillColor = .sacredGold
+        accent.strokeColor = .clear
+        accent.alpha = 0.10
+        accent.blendMode = .add
+        accent.position = CGPoint(x: -radius * 0.25, y: radius * 0.18)
+        accent.zPosition = -99
+        nebula.addChild(accent)
 
         let drift = SKAction.sequence([
             .move(by: CGVector(dx: 12, dy: -8), duration: 18),
             .move(by: CGVector(dx: -12, dy: 8), duration: 18)
         ])
-        cool.run(.repeatForever(drift))
+        accent.run(.repeatForever(drift))
     }
 
     // MARK: - Build: starfield
@@ -252,7 +260,7 @@ final class CircleSpriteScene: SKScene {
             star.position = randomPoint(within: radius * 0.9)
             star.alpha = .random(in: 0.6...1.0)
             star.zPosition = -70
-            star.color = UIColor(red: 1.0, green: 0.92, blue: 0.78, alpha: 1.0)
+            star.color = UIColor.sacredCosmicText
             star.colorBlendFactor = .random(in: 0.0...0.6)
             starsNear.addChild(star)
             attachTwinkle(to: star, baseAlpha: star.alpha)
@@ -285,7 +293,7 @@ final class CircleSpriteScene: SKScene {
                                     endAngle: .pi * 2,
                                     clockwise: true).cgPath
             let line = SKShapeNode(path: path)
-            line.strokeColor = UIColor(red: 0.77, green: 0.53, blue: 0.23, alpha: 1.0)
+            line.strokeColor = UIColor.sacredGold
             line.lineWidth = 0.6
             line.alpha = 0.18
             line.fillColor = .clear
@@ -309,7 +317,7 @@ final class CircleSpriteScene: SKScene {
         // luminous-center reading even when the photo is dim.
 
         let corona = SKShapeNode(circleOfRadius: 64)
-        corona.fillColor = UIColor(red: 0.96, green: 0.74, blue: 0.32, alpha: 1.0)
+        corona.fillColor = UIColor.sacredGoldShine
         corona.strokeColor = .clear
         corona.alpha = 0.28
         corona.blendMode = .add
@@ -317,7 +325,7 @@ final class CircleSpriteScene: SKScene {
         sun.addChild(corona)
 
         let glow = SKShapeNode(circleOfRadius: 42)
-        glow.fillColor = UIColor(red: 1.0, green: 0.85, blue: 0.55, alpha: 1.0)
+        glow.fillColor = UIColor.sacredGoldShine
         glow.strokeColor = .clear
         glow.alpha = 0.32
         glow.blendMode = .add
@@ -326,14 +334,14 @@ final class CircleSpriteScene: SKScene {
 
         // Avatar disc, masked to a circle.
         let r = Self.sunAvatarRadius
-        let avatar = SKSpriteNode(color: UIColor(red: 0.36, green: 0.26, blue: 0.16, alpha: 1.0),
+        let avatar = SKSpriteNode(color: UIColor.sacredCosmicBgCard,
                                   size: CGSize(width: r * 2, height: r * 2))
         avatar.zPosition = 0
 
         let initials = SKLabelNode(text: "")
         initials.fontName = PlanetSprite.preferredSerifFontName
         initials.fontSize = r * 0.95
-        initials.fontColor = UIColor(red: 0.97, green: 0.85, blue: 0.65, alpha: 1.0)
+        initials.fontColor = UIColor.sacredGoldShine
         initials.verticalAlignmentMode = .center
         initials.horizontalAlignmentMode = .center
         initials.zPosition = 1
@@ -349,7 +357,7 @@ final class CircleSpriteScene: SKScene {
         sun.addChild(crop)
 
         let rim = SKShapeNode(circleOfRadius: r)
-        rim.strokeColor = UIColor(red: 0.96, green: 0.74, blue: 0.32, alpha: 1.0)
+        rim.strokeColor = UIColor.sacredGoldShine
         rim.fillColor = .clear
         rim.lineWidth = 1.4
         rim.alpha = 0.95
@@ -404,7 +412,7 @@ final class CircleSpriteScene: SKScene {
 
         guard let avatarUrl, let url = URL(string: avatarUrl) else {
             sunAvatarSprite?.texture = nil
-            sunAvatarSprite?.color = UIColor(red: 0.36, green: 0.26, blue: 0.16, alpha: 1.0)
+            sunAvatarSprite?.color = UIColor.sacredCosmicBgCard
             sunInitialsLabel?.alpha = 1.0
             return
         }
@@ -449,7 +457,7 @@ final class CircleSpriteScene: SKScene {
 
     private func spawnSunEmber() {
         let ember = SKShapeNode(circleOfRadius: 28)
-        ember.strokeColor = UIColor(red: 0.96, green: 0.74, blue: 0.32, alpha: 1.0)
+        ember.strokeColor = UIColor.sacredGoldShine
         ember.fillColor = .clear
         ember.lineWidth = 1.4
         ember.alpha = 0.6
@@ -756,20 +764,20 @@ final class PlanetSprite: SKNode {
         let radius = Self.diameter(for: ring) / 2
         self.halo = SKShapeNode(circleOfRadius: radius * 1.55)
         halo.fillColor = .clear
-        halo.strokeColor = UIColor(red: 0.96, green: 0.74, blue: 0.32, alpha: 1.0)
+        halo.strokeColor = UIColor.sacredGoldShine
         halo.lineWidth = 1.2
         halo.alpha = 0.0
         halo.blendMode = .add
         halo.zPosition = 0
 
-        self.avatarDisc = SKSpriteNode(color: UIColor(red: 0.36, green: 0.26, blue: 0.16, alpha: 1.0),
+        self.avatarDisc = SKSpriteNode(color: UIColor.sacredCosmicBgCard,
                                        size: CGSize(width: radius * 2, height: radius * 2))
         avatarDisc.zPosition = 1
 
         self.initialsLabel = SKLabelNode(text: "")
         initialsLabel.fontName = Self.preferredSerifFontName
         initialsLabel.fontSize = radius * 0.95
-        initialsLabel.fontColor = UIColor(red: 0.97, green: 0.85, blue: 0.65, alpha: 1.0)
+        initialsLabel.fontColor = UIColor.sacredGoldShine
         initialsLabel.verticalAlignmentMode = .center
         initialsLabel.horizontalAlignmentMode = .center
         initialsLabel.zPosition = 2
@@ -789,7 +797,7 @@ final class PlanetSprite: SKNode {
         crop.addChild(initialsLabel)
 
         let rim = SKShapeNode(circleOfRadius: radius)
-        rim.strokeColor = UIColor(red: 0.96, green: 0.74, blue: 0.32, alpha: 1.0)
+        rim.strokeColor = UIColor.sacredGoldShine
         rim.fillColor = .clear
         rim.lineWidth = 1.0
         rim.alpha = 0.85
@@ -855,8 +863,8 @@ final class PlanetSprite: SKNode {
         if needsBadge && unreadBadge == nil {
             let radius = Self.diameter(for: ring) / 2
             let badge = SKShapeNode(circleOfRadius: max(4, radius * 0.22))
-            badge.fillColor = UIColor(red: 0.96, green: 0.74, blue: 0.32, alpha: 1.0)
-            badge.strokeColor = UIColor(red: 0.10, green: 0.07, blue: 0.05, alpha: 1.0)
+            badge.fillColor = UIColor.sacredGoldShine
+            badge.strokeColor = UIColor.sacredCosmicBg
             badge.lineWidth = 1.2
             badge.position = CGPoint(x: radius * 0.72, y: radius * 0.72)
             badge.zPosition = 5
@@ -981,7 +989,7 @@ final class PlanetSprite: SKNode {
         emitter.particleScale = 0.55
         emitter.particleScaleRange = 0.25
         emitter.particleScaleSpeed = -0.3
-        emitter.particleColor = UIColor(red: 0.96, green: 0.74, blue: 0.32, alpha: 1.0)
+        emitter.particleColor = UIColor.sacredGoldShine
         emitter.particleColorBlendFactor = 1
         emitter.particleBlendMode = .add
         emitter.emissionAngle = .pi   // emit "behind" along orbit tangent
@@ -1022,4 +1030,28 @@ final class PlanetSprite: SKNode {
         }
         return SKTexture(image: image)
     }
+}
+
+// MARK: - Sacred palette bridges
+
+/// SpriteKit takes `UIColor`, not SwiftUI `Color`. These bridges resolve
+/// the sacred design tokens once for SpriteKit consumption. Adaptive
+/// tokens (`sacredBg`, `sacredBgCard`, `sacredText`, `sacredMuted`) are
+/// pinned to their **dark** variants — the solar visualization is
+/// intentionally cosmic-dark regardless of system appearance, matching
+/// the parent's `Color.black` page background.
+private extension UIColor {
+    static let sacredGold = UIColor(SwiftUI.Color.sacredGold)
+    static let sacredGoldDark = UIColor(SwiftUI.Color.sacredGoldDark)
+    static let sacredGoldLight = UIColor(SwiftUI.Color.sacredGoldLight)
+    static let sacredGoldShine = UIColor(SwiftUI.Color.sacredGoldShine)
+
+    static let sacredCosmicBg = UIColor(SwiftUI.Color.sacredBg)
+        .resolvedColor(with: UITraitCollection(userInterfaceStyle: .dark))
+    static let sacredCosmicBgCard = UIColor(SwiftUI.Color.sacredBgCard)
+        .resolvedColor(with: UITraitCollection(userInterfaceStyle: .dark))
+    static let sacredCosmicText = UIColor(SwiftUI.Color.sacredText)
+        .resolvedColor(with: UITraitCollection(userInterfaceStyle: .dark))
+    static let sacredCosmicMuted = UIColor(SwiftUI.Color.sacredMuted)
+        .resolvedColor(with: UITraitCollection(userInterfaceStyle: .dark))
 }
