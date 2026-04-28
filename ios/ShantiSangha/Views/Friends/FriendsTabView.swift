@@ -154,7 +154,7 @@ struct FriendsTabView: View {
                 }
             }
         }
-        .navigationTitle("Circle")
+        .navigationTitle("Circles")
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
         .toolbar {
@@ -664,24 +664,33 @@ private struct ConnectionRow: View {
             .buttonStyle(.plain)
 
             Button(action: onTapBody) {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
+                HStack(alignment: .top, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(connection.displayLabel)
                             .font(.sacredTextSemibold)
                             .foregroundColor(.sacredText)
                             .lineLimit(1)
                             .truncationMode(.tail)
-                        Spacer(minLength: 4)
-                        if connection.messageable && connection.unreadCount > 0 {
-                            Text("\(connection.unreadCount)")
-                                .font(.sacredMicroBold)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 2)
-                                .background(Capsule().fill(Color.sacredGold))
+                        subtitleLine
+                    }
+
+                    Spacer(minLength: 4)
+
+                    VStack(alignment: .trailing, spacing: 6) {
+                        if let timestamp = formattedTimestamp {
+                            Text(timestamp)
+                                .font(.sacredMicro)
+                                .foregroundColor(hasUnread ? .sacredGold : .sacredMuted)
+                                .lineLimit(1)
+                        }
+                        if hasUnread {
+                            Circle()
+                                .fill(Color.sacredGold)
+                                .frame(width: 8, height: 8)
+                                .accessibilityLabel("\(connection.unreadCount) unread")
                         }
                     }
-                    subtitleLine
+                    .fixedSize(horizontal: true, vertical: false)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
@@ -693,12 +702,72 @@ private struct ConnectionRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private var hasUnread: Bool {
+        connection.messageable && connection.unreadCount > 0
+    }
+
+    private var formattedTimestamp: String? {
+        guard let date = FriendsDates.parse(connection.lastMessageAt) else { return nil }
+        return ConnectionRow.relativeLabel(for: date, now: Date())
+    }
+
+    /// iMessage-style relative timestamp:
+    /// - today → "8:51 PM"
+    /// - yesterday → "Yesterday"
+    /// - within the last 6 days → short weekday ("Mon")
+    /// - same calendar year → "MMM d"
+    /// - older → "M/d/yy"
+    static func relativeLabel(for date: Date, now: Date) -> String {
+        let cal = Calendar.current
+        if cal.isDateInToday(date) {
+            return timeFormatter.string(from: date)
+        }
+        if cal.isDateInYesterday(date) {
+            return "Yesterday"
+        }
+        let days = cal.dateComponents(
+            [.day],
+            from: cal.startOfDay(for: date),
+            to: cal.startOfDay(for: now)
+        ).day ?? 0
+        if days < 7 {
+            return weekdayFormatter.string(from: date)
+        }
+        return cal.component(.year, from: date) == cal.component(.year, from: now)
+            ? monthDayFormatter.string(from: date)
+            : shortDateFormatter.string(from: date)
+    }
+
+    private static let timeFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.dateFormat = "h:mm a"
+        return df
+    }()
+
+    private static let weekdayFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.dateFormat = "EEE"
+        return df
+    }()
+
+    private static let monthDayFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.dateFormat = "MMM d"
+        return df
+    }()
+
+    private static let shortDateFormatter: DateFormatter = {
+        let df = DateFormatter()
+        df.dateFormat = "M/d/yy"
+        return df
+    }()
+
     @ViewBuilder
     private var subtitleLine: some View {
         if connection.messageable, let preview = connection.lastMessagePreview {
             Text(preview)
-                .font(.sacredSmall)
-                .foregroundColor(.sacredTextSecondary)
+                .font(hasUnread ? .sacredSmallSemibold : .sacredSmall)
+                .foregroundColor(hasUnread ? .sacredText : .sacredTextSecondary)
                 .lineLimit(2)
         } else if let location = connection.person.locationString {
             Text(location)
