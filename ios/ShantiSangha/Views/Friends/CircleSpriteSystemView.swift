@@ -7,13 +7,14 @@ import UIKit
 /// close / broader). Fully procedural — no asset pipeline, just code.
 ///
 /// Visual layers, back to front:
-///   1. Deep-space background (pure black + radial nebula glow)
-///   2. Far starfield (slow parallax, twinkle)
-///   3. Near starfield (faster parallax)
-///   4. Three orbital ring guides (faint dashed gold)
-///   5. The sun — the user — multi-layered glow + corona
-///   6. Planet nodes — one per connection, orbiting at ring speed
-///   7. Recency embers + comet trails on planets active < 48h
+///   1. Transparent scene — the SwiftUI `SacredBackground` bleeds through
+///   2. Radial nebula glow over the parchment
+///   3. Far starfield (slow parallax, twinkle)
+///   4. Near starfield (faster parallax)
+///   5. Three orbital ring guides (faint dashed gold)
+///   6. The sun — the user — multi-layered glow + corona
+///   7. Planet nodes — one per connection, orbiting at ring speed
+///   8. Recency embers + comet trails on planets active < 48h
 ///
 /// Interactivity:
 ///   • Drag    — orbits the camera around the sun (rotate the world)
@@ -35,9 +36,8 @@ struct CircleSpriteSystemView: View {
     var body: some View {
         SpriteView(
             scene: holder.scene,
-            options: [.ignoresSiblingOrder, .shouldCullNonVisibleNodes]
+            options: [.ignoresSiblingOrder, .shouldCullNonVisibleNodes, .allowsTransparency]
         )
-        .background(Color.sacredBg)
         .onAppear {
             holder.scene.onTap = onTap
             holder.scene.reduceMotion = reduceMotion
@@ -105,11 +105,11 @@ final class SpriteSceneHolder: ObservableObject {
         let s = CircleSpriteScene(size: CGSize(width: 400, height: 600))
         s.scaleMode = .resizeFill
         s.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-        // Sacred-dark warm brown rather than pure black — matches
-        // `Color.sacredBg` resolved in dark mode (#1a1410). Stars and
-        // glow read against a slightly warm void instead of clinical
-        // black.
-        s.backgroundColor = .sacredCosmicBg
+        // Transparent so the SwiftUI `SacredBackground` (warm parchment
+        // + soft gold radials) bleeds through, keeping Circle visually
+        // continuous with the rest of the tabs instead of floating its
+        // own dark rectangle on top.
+        s.backgroundColor = .clear
         self.scene = s
     }
 }
@@ -417,7 +417,11 @@ final class CircleSpriteScene: SKScene {
             return
         }
 
-        let key = url.absoluteString as NSString
+        // Cache by host+path, not the full URL — S3 regenerates the
+        // presigned query (X-Amz-Signature, X-Amz-Date, …) on every
+        // `/me` reload, which would otherwise miss the cache, refetch
+        // the same image, and blink the sun blank in the meantime.
+        let key = Self.avatarCacheKey(for: url)
         if let cached = PlanetSprite.avatarCache.object(forKey: key) {
             applyMyTexture(cached)
             return
@@ -428,12 +432,26 @@ final class CircleSpriteScene: SKScene {
             guard let data, let image = UIImage(data: data) else { return }
             PlanetSprite.avatarCache.setObject(image, forKey: key)
             DispatchQueue.main.async {
-                // Don't apply if the user changed avatar URL while the
-                // request was in flight — the latest pending URL wins.
-                guard self.pendingMyAvatarUrl == avatarUrl else { return }
+                // Compare by stable key so a presigned-URL refresh
+                // mid-flight doesn't throw away a perfectly good image
+                // (the path is the same, only the signature rotated).
+                guard let pending = self.pendingMyAvatarUrl,
+                      let pendingURL = URL(string: pending),
+                      Self.avatarCacheKey(for: pendingURL) == key
+                else { return }
                 self.applyMyTexture(image)
             }
         }.resume()
+    }
+
+    /// Stable cache key for an avatar URL — strips the presigned query
+    /// so the same underlying S3 object hits the same cache entry across
+    /// `/me` reloads.
+    fileprivate static func avatarCacheKey(for url: URL) -> NSString {
+        let scheme = url.scheme ?? ""
+        let host = url.host ?? ""
+        let path = url.path
+        return "\(scheme)://\(host)\(path)" as NSString
     }
 
     private func applyMyTexture(_ image: UIImage) {
@@ -918,7 +936,9 @@ final class PlanetSprite: SKNode {
             return
         }
 
-        let key = parsed.absoluteString as NSString
+        // See `CircleSpriteScene.avatarCacheKey(for:)` — strip the S3
+        // presigned query so the same image survives `/me` reloads.
+        let key = CircleSpriteScene.avatarCacheKey(for: parsed)
         if let cached = Self.avatarCache.object(forKey: key) {
             applyAvatar(cached)
             return
@@ -1038,8 +1058,9 @@ final class PlanetSprite: SKNode {
 /// the sacred design tokens once for SpriteKit consumption. Adaptive
 /// tokens (`sacredBg`, `sacredBgCard`, `sacredText`, `sacredMuted`) are
 /// pinned to their **dark** variants — the solar visualization is
-/// intentionally cosmic-dark regardless of system appearance, matching
-/// the parent's `Color.black` page background.
+/// intentionally cosmic-dark regardless of system appearance, so stars,
+/// nebula, and ember glow read crisply against the warm parchment
+/// `SacredBackground` showing through from the parent.
 private extension UIColor {
     static let sacredGold = UIColor(SwiftUI.Color.sacredGold)
     static let sacredGoldDark = UIColor(SwiftUI.Color.sacredGoldDark)

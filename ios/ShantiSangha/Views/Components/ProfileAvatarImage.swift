@@ -69,8 +69,11 @@ struct ProfileAvatarImage: View {
     }
 
     private static func cachedImage(for rawUrl: String?) -> UIImage? {
-        guard let rawUrl, let url = NSURL(string: rawUrl) else { return nil }
-        return cache.object(forKey: url)
+        guard let rawUrl,
+              let url = URL(string: rawUrl),
+              let key = stableCacheKey(for: url)
+        else { return nil }
+        return cache.object(forKey: key)
     }
 
     private func loadImageIfNeeded() async {
@@ -82,7 +85,12 @@ struct ProfileAvatarImage: View {
             return
         }
 
-        let cacheKey = url as NSURL
+        // Strip the S3 presigned query — the backend regenerates
+        // X-Amz-Signature on every `/me` read, so the full URL changes
+        // even when the image hasn't. Caching by path keeps the avatar
+        // alive across reloads instead of forcing a refetch and a brief
+        // empty slot.
+        guard let cacheKey = Self.stableCacheKey(for: url) else { return }
         if let cached = Self.cache.object(forKey: cacheKey) {
             image = cached
             loadedUrl = rawUrl
@@ -98,6 +106,12 @@ struct ProfileAvatarImage: View {
         } catch {
             // Keep the icon fallback quiet; the profile remains editable.
         }
+    }
+
+    private static func stableCacheKey(for url: URL) -> NSURL? {
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        components?.query = nil
+        return components?.url as NSURL?
     }
 }
 

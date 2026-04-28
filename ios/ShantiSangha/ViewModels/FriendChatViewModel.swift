@@ -132,9 +132,41 @@ final class FriendChatViewModel: ObservableObject {
     private func mergeFetched(_ fetched: [FriendMessage]) {
         var byId = Dictionary(uniqueKeysWithValues: messages.map { ($0.id, $0) })
         for msg in fetched {
-            byId[msg.id] = msg
+            if let local = byId[msg.id] {
+                byId[msg.id] = Self.merging(local: local, incoming: msg)
+            } else {
+                byId[msg.id] = msg
+            }
         }
         messages = byId.values.sorted { $0.sentAt < $1.sentAt }
+    }
+
+    /// Merge `incoming` over `local`, but never let monotonic fields
+    /// (`readAt`, `editedAt`, `deletedAt`) regress to nil. Realtime
+    /// broadcasts and `/messages` responses can race through different
+    /// replicas — a re-played `message_received` after a reconnect, or a
+    /// fetch that beat the friend's `MarkReadThrough` to a read replica,
+    /// will report `readAt = null` for a row we already stamped via a
+    /// `messages_read` event. Without this guard the read-receipt avatar
+    /// would flash on (correct) then vanish (wrong) once the stale event
+    /// landed.
+    private static func merging(local: FriendMessage, incoming: FriendMessage) -> FriendMessage {
+        FriendMessage(
+            id: incoming.id,
+            friendshipId: incoming.friendshipId,
+            conversationId: incoming.conversationId,
+            senderUserId: incoming.senderUserId,
+            replyToMessageId: incoming.replyToMessageId,
+            replyPreview: incoming.replyPreview,
+            kind: incoming.kind,
+            body: incoming.body,
+            mediaUrl: incoming.mediaUrl,
+            durationMs: incoming.durationMs,
+            sentAt: incoming.sentAt,
+            readAt: incoming.readAt ?? local.readAt,
+            editedAt: incoming.editedAt ?? local.editedAt,
+            deletedAt: incoming.deletedAt ?? local.deletedAt,
+            reactions: incoming.reactions)
     }
 
     func loadOlder() async {
@@ -576,7 +608,7 @@ final class FriendChatViewModel: ObservableObject {
 
     private func upsertMessage(_ msg: FriendMessage) {
         if let i = messages.firstIndex(where: { $0.id == msg.id }) {
-            messages[i] = msg
+            messages[i] = Self.merging(local: messages[i], incoming: msg)
         } else {
             // Insert sorted by sentAt so an out-of-order arrival
             // (history fetch racing the broadcast) lands in the right spot.

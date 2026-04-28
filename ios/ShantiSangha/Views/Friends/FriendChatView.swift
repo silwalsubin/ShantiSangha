@@ -117,22 +117,30 @@ struct FriendChatView: View {
         }
     }
 
-    /// Snap the scroll view to the latest message (or pending bubble
-    /// if outbox isn't empty). Waits a couple of run-loop ticks so the
-    /// LazyVStack has time to size its items — without this, scrollTo
-    /// can overshoot or undershoot the target. One-shot via the
-    /// `didInitialScroll` flag so re-renders don't re-snap mid-thread
-    /// when the user has scrolled up to read history.
+    /// Stable sentinel id pinned to the very end of the LazyVStack —
+    /// scrolling to this rather than the last message's id forces the
+    /// stack to lay out *through* the actual bottom row, which is the
+    /// only way `proxy.scrollTo(_, anchor: .bottom)` reliably lands on
+    /// the latest message in a lazy stack (otherwise it parks near the
+    /// last-materialized row and leaves the newest bubble clipped).
+    private static let bottomAnchorId = "chat-bottom-anchor"
+
+    /// Snap the scroll view to the bottom of the thread on first appear.
+    /// Three passes catch the common reflow points: SwiftUI's first
+    /// commit, the cache-hydrate / API-merge moment, and any late image
+    /// or voice bubble whose async size resolves last. One-shot via
+    /// `didInitialScroll` so subsequent re-renders don't yank the user
+    /// back down when they've scrolled up to read history.
     private func initialScrollIfNeeded(proxy: ScrollViewProxy) async {
         guard !didInitialScroll else { return }
-        guard let target = vm.outbox.last?.id ?? vm.messages.last?.id else { return }
-        // Two short sleeps: the first lets SwiftUI commit the initial
-        // layout; the second covers the case where the cache hydrate
-        // raced ahead of LazyVStack's first measurement pass.
+        guard !vm.messages.isEmpty || !vm.outbox.isEmpty else { return }
+
         try? await Task.sleep(nanoseconds: 80_000_000)
-        proxy.scrollTo(target, anchor: .bottom)
-        try? await Task.sleep(nanoseconds: 120_000_000)
-        proxy.scrollTo(target, anchor: .bottom)
+        proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
+        try? await Task.sleep(nanoseconds: 160_000_000)
+        proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
+        try? await Task.sleep(nanoseconds: 250_000_000)
+        proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
         didInitialScroll = true
     }
 
@@ -210,6 +218,14 @@ struct FriendChatView: View {
                                 onRetry: { Task { await vm.retryPending(pending.id) } },
                                 onDelete: { vm.deletePending(pending.id) })
                         }
+
+                        // Sentinel: gives `scrollTo(_, anchor: .bottom)`
+                        // a stable row past the last bubble so the lazy
+                        // stack always materializes through the real
+                        // bottom of the thread.
+                        Color.clear
+                            .frame(height: 1)
+                            .id(Self.bottomAnchorId)
                     }
                     .padding(.horizontal, SacredSpacing.m)
                     .padding(.vertical, SacredSpacing.m)
@@ -238,20 +254,18 @@ struct FriendChatView: View {
                     Task { await initialScrollIfNeeded(proxy: proxy) }
                 }
             }
-            .onChange(of: vm.messages.last?.id) { _, _ in
-                if let last = vm.messages.last {
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        proxy.scrollTo(last.id, anchor: .bottom)
-                    }
+            .onChange(of: vm.messages.last?.id) { _, newId in
+                guard newId != nil else { return }
+                withAnimation(.easeOut(duration: 0.2)) {
+                    proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
                 }
             }
-            .onChange(of: vm.outbox.last?.id) { _, _ in
+            .onChange(of: vm.outbox.last?.id) { _, newId in
                 // Keep the pending bubble in view while in flight so the
                 // user can see the "sending" → "failed" transition.
-                if let lastPending = vm.outbox.last {
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        proxy.scrollTo(lastPending.id, anchor: .bottom)
-                    }
+                guard newId != nil else { return }
+                withAnimation(.easeOut(duration: 0.2)) {
+                    proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
                 }
             }
             .onChange(of: jumpToMessageId) { _, target in
@@ -268,15 +282,15 @@ struct FriendChatView: View {
                 // every focus event — two passes because the first fires
                 // before UIKit has finalized the keyboard frame.
                 guard focused else { return }
-                guard let target = vm.outbox.last?.id ?? vm.messages.last?.id else { return }
+                guard !vm.messages.isEmpty || !vm.outbox.isEmpty else { return }
                 withAnimation(.easeOut(duration: 0.25)) {
-                    proxy.scrollTo(target, anchor: .bottom)
+                    proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
                 }
                 Task {
                     try? await Task.sleep(nanoseconds: 350_000_000)
                     await MainActor.run {
                         withAnimation(.easeOut(duration: 0.2)) {
-                            proxy.scrollTo(target, anchor: .bottom)
+                            proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
                         }
                     }
                 }

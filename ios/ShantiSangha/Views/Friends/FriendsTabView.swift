@@ -46,17 +46,8 @@ struct FriendsTabView: View {
         let displayedConnections = filteredConnections
 
         ZStack {
-            // Solar mode is a fully cosmic experience — the page bleeds
-            // to pure black so the SpriteKit scene and the surrounding
-            // chrome read as one continuous backdrop, rather than a
-            // black rectangle floating on a brown SacredBackground
-            // gradient.
-            if viewMode == .solar {
-                Color.black.ignoresSafeArea()
-            } else {
-                SacredBackground()
-                    .ignoresSafeArea()
-            }
+            SacredBackground()
+                .ignoresSafeArea()
 
             // Solar with at least one connection goes full-bleed —
             // the SpriteView fills the viewport edge-to-edge, scope
