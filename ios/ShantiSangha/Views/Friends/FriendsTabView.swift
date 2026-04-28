@@ -177,25 +177,29 @@ struct FriendsTabView: View {
                 }
             }
 
-            // Add menu collapses Invite + Add local into one trailing
-            // affordance so the page stays compact.
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button {
-                        Task { await onInvite() }
+            // Add menu only appears in solar mode — the list view has its
+            // search-bar driven discovery and feels cleaner without a
+            // second toolbar icon. Solar mode has no other affordances,
+            // so the "+" lives there.
+            if viewMode == .solar && !circleVM.connections.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button {
+                            Task { await onInvite() }
+                        } label: {
+                            Label("Invite", systemImage: "paperplane")
+                        }
+                        Button {
+                            showAddLocal = true
+                        } label: {
+                            Label("Add", systemImage: "person.badge.plus")
+                        }
                     } label: {
-                        Label("Invite", systemImage: "paperplane")
+                        Image(systemName: "plus")
+                            .foregroundColor(.sacredGold)
                     }
-                    Button {
-                        showAddLocal = true
-                    } label: {
-                        Label("Add", systemImage: "person.badge.plus")
-                    }
-                } label: {
-                    Image(systemName: "plus")
-                        .foregroundColor(.sacredGold)
+                    .accessibilityLabel("Add to circle")
                 }
-                .accessibilityLabel("Add to circle")
             }
         }
         .task {
