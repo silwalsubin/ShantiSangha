@@ -1,4 +1,6 @@
 import SwiftUI
+import Contacts
+import ContactsUI
 
 /// Per-connection detail screen — shows Person identity at the top
 /// (real name, location, optional birthday/contact), then editable
@@ -38,6 +40,9 @@ struct ConnectionDetailView: View {
     @State private var showRemoveConfirm = false
     @State private var removing = false
     @State private var didSeed = false
+    @State private var contactToSave: ContactItem?
+    @State private var showContactPicker = false
+    @State private var linkedContact: LinkedContactSnapshot?
 
     private var connection: Connection? {
         vm.connections.first(where: { $0.id == connectionId })
@@ -53,6 +58,9 @@ struct ConnectionDetailView: View {
                 VStack(spacing: SacredSpacing.l) {
                     header(connection)
                     aboutSection(connection)
+                    if let linkedContact {
+                        linkedContactSection(linkedContact)
+                    }
                     relationSection
                     nicknameSection
                     notesSection
@@ -68,8 +76,36 @@ struct ConnectionDetailView: View {
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
-        .onAppear { seedDrafts() }
-        .onChange(of: connection?.id) { _, _ in seedDrafts(force: true) }
+        .onAppear {
+            seedDrafts()
+            linkedContact = LinkedContactStore.snapshot(for: connectionId)
+        }
+        .onChange(of: connection?.id) { _, _ in
+            seedDrafts(force: true)
+            linkedContact = LinkedContactStore.snapshot(for: connectionId)
+        }
+        .sheet(item: $contactToSave) { item in
+            AddContactSheet(contact: item.contact) {
+                contactToSave = nil
+            }
+            .ignoresSafeArea()
+        }
+        .sheet(isPresented: $showContactPicker) {
+            ContactPickerSheet { picked in
+                showContactPicker = false
+                applyPickedContact(picked)
+            } onCancel: {
+                showContactPicker = false
+            }
+            .ignoresSafeArea()
+        }
+    }
+
+    /// Identifiable wrapper so the contact sheet can drive its presentation
+    /// via `.sheet(item:)` — `CNContact` doesn't conform to Identifiable.
+    private struct ContactItem: Identifiable {
+        let id = UUID()
+        let contact: CNContact
     }
 
     // MARK: - Sections
@@ -92,9 +128,149 @@ struct ConnectionDetailView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 3)
                 .background(Capsule().stroke(Color.sacredGold.opacity(0.3), lineWidth: 1))
+
+            headerActions(c)
+                .padding(.top, SacredSpacing.xs)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, SacredSpacing.m)
+    }
+
+    @ViewBuilder
+    private func headerActions(_ c: Connection) -> some View {
+        HStack(spacing: SacredSpacing.s) {
+            if c.messageable {
+                NavigationLink(destination: FriendChatView(connection: c, circleVM: vm)) {
+                    HeaderActionPill(icon: "bubble.left.and.bubble.right", label: "Message")
+                }
+                .buttonStyle(.plain)
+            }
+
+            Button {
+                contactToSave = ContactItem(contact: contactFromPerson(c.person, displayLabel: c.displayLabel))
+            } label: {
+                HeaderActionPill(icon: "person.crop.circle.badge.plus", label: "Save")
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                showContactPicker = true
+            } label: {
+                HeaderActionPill(
+                    icon: linkedContact == nil ? "link" : "link.circle.fill",
+                    label: linkedContact == nil ? "Link" : "Linked")
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    /// Snapshots the picked iPhone contact's fields into local storage,
+    /// keyed by this connection's id. Never touches the backend Person
+    /// record — paired ShantiSangha users own their own data, and even
+    /// for local persons we prefer to keep "your view" of someone
+    /// separate from "what they share".
+    private func applyPickedContact(_ contact: CNContact) {
+        let snapshot = LinkedContactSnapshot(from: contact)
+        LinkedContactStore.setSnapshot(snapshot, for: connectionId)
+        linkedContact = snapshot
+    }
+
+    private func unlinkContact() {
+        LinkedContactStore.setSnapshot(nil, for: connectionId)
+        linkedContact = nil
+    }
+
+    @ViewBuilder
+    private func linkedContactSection(_ snapshot: LinkedContactSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: SacredSpacing.xs) {
+            sectionLabel("LINKED CONTACT")
+
+            SacredListCard {
+                VStack(spacing: 0) {
+                    readOnlyRow("Name", value: snapshot.fullName)
+                    if let phone = snapshot.phoneNumber {
+                        Divider().padding(.leading, 16)
+                        readOnlyRow("Phone", value: phone)
+                    }
+                    if let email = snapshot.email {
+                        Divider().padding(.leading, 16)
+                        readOnlyRow("Email", value: email)
+                    }
+                    if let address = snapshot.address {
+                        Divider().padding(.leading, 16)
+                        readOnlyRow("Address", value: address)
+                    }
+                    if let bd = snapshot.birthDate {
+                        Divider().padding(.leading, 16)
+                        readOnlyRow("Birthday", value: bd)
+                    }
+
+                    Divider().padding(.leading, 16)
+                    Button { unlinkContact() } label: {
+                        Text("Unlink contact")
+                            .font(.sacredTextMedium)
+                            .foregroundColor(.sacredRed)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                }
+            }
+
+            Text("Only you see this — pulled from your iPhone contacts and stored on this device.")
+                .font(.sacredMicro)
+                .foregroundColor(.sacredMuted)
+                .padding(.horizontal, SacredSpacing.xs)
+        }
+    }
+
+    private func contactFromPerson(_ person: Person, displayLabel: String) -> CNContact {
+        let contact = CNMutableContact()
+
+        let parts = displayLabel.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
+        contact.givenName = parts.first.map(String.init) ?? displayLabel
+        if parts.count > 1 { contact.familyName = String(parts[1]) }
+
+        if let phone = person.phoneNumber?.trimmingCharacters(in: .whitespacesAndNewlines), !phone.isEmpty {
+            contact.phoneNumbers = [
+                CNLabeledValue(label: CNLabelPhoneNumberMain, value: CNPhoneNumber(stringValue: phone))
+            ]
+        }
+
+        if let email = person.email?.trimmingCharacters(in: .whitespacesAndNewlines), !email.isEmpty {
+            contact.emailAddresses = [
+                CNLabeledValue(label: CNLabelHome, value: email as NSString)
+            ]
+        }
+
+        let street = person.address?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let city = person.city?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let state = person.state?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let country = person.country?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !(street.isEmpty && city.isEmpty && state.isEmpty && country.isEmpty) {
+            let addr = CNMutablePostalAddress()
+            addr.street = street
+            addr.city = city
+            addr.state = state
+            addr.country = country
+            contact.postalAddresses = [
+                CNLabeledValue(label: CNLabelHome, value: addr)
+            ]
+        }
+
+        if let bd = person.birthDate {
+            let df = DateFormatter()
+            df.dateFormat = "yyyy-MM-dd"
+            df.locale = Locale(identifier: "en_US_POSIX")
+            df.timeZone = TimeZone(secondsFromGMT: 0)
+            if let date = df.date(from: bd) {
+                contact.birthday = Calendar(identifier: .gregorian)
+                    .dateComponents([.year, .month, .day], from: date)
+            }
+        }
+
+        return contact
     }
 
     @ViewBuilder
@@ -151,23 +327,49 @@ struct ConnectionDetailView: View {
 
             SacredListCard {
                 VStack(spacing: 0) {
-                    Picker("Type", selection: $relationType) {
+                    Menu {
+                        // Pinned-down menu items, with a checkmark on the
+                        // current selection so the open menu reads like a
+                        // sacred-styled list rather than a system Picker.
                         ForEach(ConnectionType.allCases) { type in
-                            Text(type.label).tag(type)
+                            Button {
+                                relationType = type
+                                // Custom-label reset is handled server-side when
+                                // type moves away from .other; sending the change
+                                // immediately keeps the row consistent without
+                                // waiting for a separate save action.
+                                Task { await saveRelation() }
+                            } label: {
+                                if relationType == type {
+                                    Label(type.label, systemImage: "checkmark")
+                                } else {
+                                    Text(type.label)
+                                }
+                            }
                         }
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "person.2.fill")
+                                .font(.sacredSmallSemibold)
+                                .foregroundColor(.sacredGold)
+                                .frame(width: 28, height: 28)
+                                .background(Circle().fill(Color.sacredGold.opacity(0.12)))
+
+                            Text(relationType.label)
+                                .font(.sacredTextSemibold)
+                                .foregroundColor(.sacredText)
+
+                            Spacer(minLength: 4)
+
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.sacredMicro)
+                                .foregroundColor(.sacredMuted)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                        .contentShape(Rectangle())
                     }
-                    .pickerStyle(.menu)
-                    .tint(.sacredGold)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .onChange(of: relationType) { _, _ in
-                        // Custom-label reset is handled server-side when type
-                        // moves away from .other; sending the change immediately
-                        // keeps the row consistent without waiting for a
-                        // separate save action.
-                        Task { await saveRelation() }
-                    }
+                    .buttonStyle(.plain)
 
                     if relationType == .other {
                         Divider().padding(.leading, 16)
@@ -572,5 +774,183 @@ struct ConnectionDetailView: View {
 private extension String {
     var trimmed: String {
         trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+/// Snapshot of an iPhone contact taken at link time. Persisted on
+/// device only — nothing flows to the backend, so paired users'
+/// records stay untouched.
+private struct LinkedContactSnapshot: Codable, Equatable {
+    let identifier: String
+    let givenName: String
+    let familyName: String
+    let phoneNumber: String?
+    let email: String?
+    let address: String?
+    let birthDate: String?
+
+    var fullName: String {
+        let parts = [givenName, familyName]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        return parts.isEmpty ? "Linked contact" : parts.joined(separator: " ")
+    }
+
+    init(from contact: CNContact) {
+        self.identifier = contact.identifier
+        self.givenName = contact.givenName
+        self.familyName = contact.familyName
+
+        let phone = contact.phoneNumbers.first?.value.stringValue
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.phoneNumber = (phone?.isEmpty == false) ? phone : nil
+
+        let mail = (contact.emailAddresses.first?.value as String?)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        self.email = (mail?.isEmpty == false) ? mail : nil
+
+        if let pa = contact.postalAddresses.first?.value {
+            let parts = [pa.street, pa.city, pa.state, pa.country]
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            self.address = parts.isEmpty ? nil : parts.joined(separator: ", ")
+        } else {
+            self.address = nil
+        }
+
+        if let bd = contact.birthday,
+           let date = Calendar(identifier: .gregorian).date(from: bd) {
+            let f = DateFormatter()
+            f.dateFormat = "yyyy-MM-dd"
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.timeZone = TimeZone(secondsFromGMT: 0)
+            self.birthDate = f.string(from: date)
+        } else {
+            self.birthDate = nil
+        }
+    }
+}
+
+/// Per-connection iPhone-contact links, persisted in UserDefaults as
+/// a single JSON-encoded `[connectionId: snapshot]` blob. Local-only
+/// — nothing here ever leaves the device.
+private enum LinkedContactStore {
+    private static let key = "linked_contacts_v1"
+
+    static func snapshot(for connectionId: UUID) -> LinkedContactSnapshot? {
+        loadAll()[connectionId.uuidString]
+    }
+
+    static func setSnapshot(_ snapshot: LinkedContactSnapshot?,
+                            for connectionId: UUID) {
+        var dict = loadAll()
+        if let snapshot {
+            dict[connectionId.uuidString] = snapshot
+        } else {
+            dict.removeValue(forKey: connectionId.uuidString)
+        }
+        save(dict)
+    }
+
+    private static func loadAll() -> [String: LinkedContactSnapshot] {
+        guard let data = UserDefaults.standard.data(forKey: key),
+              let dict = try? JSONDecoder().decode([String: LinkedContactSnapshot].self, from: data)
+        else { return [:] }
+        return dict
+    }
+
+    private static func save(_ dict: [String: LinkedContactSnapshot]) {
+        if let data = try? JSONEncoder().encode(dict) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
+    }
+}
+
+private struct HeaderActionPill: View {
+    let icon: String
+    let label: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.sacredSmallSemibold)
+            Text(label)
+                .font(.sacredSmallSemibold)
+                .lineLimit(1)
+        }
+        .foregroundColor(.sacredGold)
+        .padding(.horizontal, 14)
+        .frame(minHeight: 36)
+        .background(Capsule().fill(Color.sacredGold.opacity(0.12)))
+        .overlay(Capsule().stroke(Color.sacredGold.opacity(0.25), lineWidth: 1))
+    }
+}
+
+/// Wraps `CNContactPickerViewController` so the user can pick an
+/// existing iPhone contact. iOS hands back a `CNContact` with only
+/// the keys we ask for — no permission prompt is needed for the
+/// picker itself; the system gates field access via the picker.
+private struct ContactPickerSheet: UIViewControllerRepresentable {
+    let onPick: (CNContact) -> Void
+    let onCancel: () -> Void
+
+    func makeUIViewController(context: Context) -> CNContactPickerViewController {
+        let picker = CNContactPickerViewController()
+        picker.delegate = context.coordinator
+        picker.displayedPropertyKeys = [
+            CNContactGivenNameKey,
+            CNContactFamilyNameKey,
+            CNContactPhoneNumbersKey,
+            CNContactEmailAddressesKey,
+            CNContactPostalAddressesKey,
+            CNContactBirthdayKey
+        ]
+        return picker
+    }
+
+    func updateUIViewController(_ vc: CNContactPickerViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(onPick: onPick, onCancel: onCancel) }
+
+    final class Coordinator: NSObject, CNContactPickerDelegate {
+        let onPick: (CNContact) -> Void
+        let onCancel: () -> Void
+        init(onPick: @escaping (CNContact) -> Void, onCancel: @escaping () -> Void) {
+            self.onPick = onPick
+            self.onCancel = onCancel
+        }
+        func contactPicker(_ picker: CNContactPickerViewController, didSelect contact: CNContact) {
+            onPick(contact)
+        }
+        func contactPickerDidCancel(_ picker: CNContactPickerViewController) {
+            onCancel()
+        }
+    }
+}
+
+/// Wraps `CNContactViewController(forNewContact:)` in a navigation
+/// controller so it can be presented as a SwiftUI sheet. The system
+/// handles the contacts permission prompt when the user taps Done.
+private struct AddContactSheet: UIViewControllerRepresentable {
+    let contact: CNContact
+    let onDismiss: () -> Void
+
+    func makeUIViewController(context: Context) -> UINavigationController {
+        let vc = CNContactViewController(forNewContact: contact)
+        vc.delegate = context.coordinator
+        return UINavigationController(rootViewController: vc)
+    }
+
+    func updateUIViewController(_ vc: UINavigationController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(onDismiss: onDismiss) }
+
+    final class Coordinator: NSObject, CNContactViewControllerDelegate {
+        let onDismiss: () -> Void
+        init(onDismiss: @escaping () -> Void) { self.onDismiss = onDismiss }
+        func contactViewController(_ viewController: CNContactViewController,
+                                   didCompleteWith contact: CNContact?) {
+            onDismiss()
+        }
     }
 }

@@ -28,6 +28,11 @@ struct CircleSpriteSystemView: View {
     /// as the heart of the system, not just another planet.
     let myAvatarUrl: String?
     let myDisplayName: String?
+    /// Bumping this UUID from the parent triggers a camera reset
+    /// (rotation + zoom + pan back to defaults). The parent owns the
+    /// state so a toolbar button can fire it without reaching into
+    /// the scene.
+    var resetTrigger: UUID = UUID()
     let onTap: (UUID) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -55,6 +60,9 @@ struct CircleSpriteSystemView: View {
         }
         .onChange(of: myDisplayName) { _, _ in
             holder.scene.setMe(avatarUrl: myAvatarUrl, displayName: myDisplayName)
+        }
+        .onChange(of: resetTrigger) { _, _ in
+            holder.scene.resetCamera()
         }
         .accessibilityRepresentation { accessibilityList }
     }
@@ -319,7 +327,7 @@ final class CircleSpriteScene: SKScene {
         let corona = SKShapeNode(circleOfRadius: 64)
         corona.fillColor = UIColor.sacredGoldShine
         corona.strokeColor = .clear
-        corona.alpha = 0.28
+        corona.alpha = 0.10
         corona.blendMode = .add
         corona.zPosition = 4
         sun.addChild(corona)
@@ -327,7 +335,7 @@ final class CircleSpriteScene: SKScene {
         let glow = SKShapeNode(circleOfRadius: 42)
         glow.fillColor = UIColor.sacredGoldShine
         glow.strokeColor = .clear
-        glow.alpha = 0.32
+        glow.alpha = 0.12
         glow.blendMode = .add
         glow.zPosition = 5
         sun.addChild(glow)
@@ -359,8 +367,8 @@ final class CircleSpriteScene: SKScene {
         let rim = SKShapeNode(circleOfRadius: r)
         rim.strokeColor = UIColor.sacredGoldShine
         rim.fillColor = .clear
-        rim.lineWidth = 1.4
-        rim.alpha = 0.95
+        rim.lineWidth = 0.6
+        rim.alpha = 0.25
         rim.zPosition = 7
         sun.addChild(rim)
 
@@ -374,8 +382,8 @@ final class CircleSpriteScene: SKScene {
 
         // Slow breath on the corona — gives the sun a heartbeat.
         let breathe = SKAction.sequence([
-            .group([.scale(to: 1.10, duration: 2.6), .fadeAlpha(to: 0.42, duration: 2.6)]),
-            .group([.scale(to: 1.0, duration: 2.6), .fadeAlpha(to: 0.28, duration: 2.6)])
+            .group([.scale(to: 1.10, duration: 2.6), .fadeAlpha(to: 0.16, duration: 2.6)]),
+            .group([.scale(to: 1.0, duration: 2.6), .fadeAlpha(to: 0.10, duration: 2.6)])
         ])
         breathe.timingMode = .easeInEaseOut
         corona.run(.repeatForever(breathe), withKey: "breath")
@@ -384,8 +392,8 @@ final class CircleSpriteScene: SKScene {
         // with the corona so the layered glow shimmers rather than
         // expanding in lockstep.
         let glowBeat = SKAction.sequence([
-            .group([.scale(to: 1.06, duration: 1.8), .fadeAlpha(to: 0.46, duration: 1.8)]),
-            .group([.scale(to: 1.0, duration: 1.8), .fadeAlpha(to: 0.32, duration: 1.8)])
+            .group([.scale(to: 1.06, duration: 1.8), .fadeAlpha(to: 0.18, duration: 1.8)]),
+            .group([.scale(to: 1.0, duration: 1.8), .fadeAlpha(to: 0.12, duration: 1.8)])
         ])
         glowBeat.timingMode = .easeInEaseOut
         glow.run(.repeatForever(glowBeat), withKey: "glowbeat")
@@ -716,6 +724,13 @@ final class CircleSpriteScene: SKScene {
     }
 
     @objc private func handleDoubleTap(_ gr: UITapGestureRecognizer) {
+        resetCamera()
+    }
+
+    /// Spring the world back to its default rotation, position, and
+    /// zoom. Triggered by double-tap or by an external SwiftUI button
+    /// in solar mode.
+    func resetCamera() {
         let reset = SKAction.group([
             .rotate(toAngle: defaultRotation, duration: 0.4, shortestUnitArc: true),
             .move(to: defaultPosition, duration: 0.4),
@@ -723,6 +738,9 @@ final class CircleSpriteScene: SKScene {
         ])
         reset.timingMode = .easeInEaseOut
         world.run(reset)
+        baseScale = 1.0
+        pinchScale = 1.0
+        dragAccumulated = .zero
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
@@ -818,12 +836,29 @@ final class PlanetSprite: SKNode {
         rim.strokeColor = UIColor.sacredGoldShine
         rim.fillColor = .clear
         rim.lineWidth = 1.0
-        rim.alpha = 0.85
+        rim.alpha = 0.25
         rim.zPosition = 3
 
+        // The avatar body (crop + rim) breathes inside the static halo
+        // — a subtle scale pulse, randomized period and starting phase
+        // per planet so the circle doesn't pulse in lockstep.
+        let avatarBody = SKNode()
+        avatarBody.addChild(crop)
+        avatarBody.addChild(rim)
+
         addChild(halo)
-        addChild(crop)
-        addChild(rim)
+        addChild(avatarBody)
+
+        let period = TimeInterval.random(in: 2.6...3.8)
+        let grow = SKAction.scale(to: 1.05, duration: period / 2)
+        grow.timingMode = .easeInEaseOut
+        let shrink = SKAction.scale(to: 0.95, duration: period / 2)
+        shrink.timingMode = .easeInEaseOut
+        let phase = TimeInterval.random(in: 0...period)
+        avatarBody.run(.sequence([
+            .wait(forDuration: phase),
+            .repeatForever(.sequence([grow, shrink]))
+        ]))
 
         // Don't call update(connection:) here — the scene's layout()
         // calls it right after attaching the sprite to its orbit, at
@@ -853,8 +888,8 @@ final class PlanetSprite: SKNode {
 
         // Halo intensity scales with recency, with a small inner-ring
         // floor so family always reads as warm.
-        let baseline: CGFloat = (ring == .inner) ? 0.18 : 0.0
-        let target = baseline + CGFloat(recency) * 0.7
+        let baseline: CGFloat = (ring == .inner) ? 0.05 : 0.0
+        let target = baseline + CGFloat(recency) * 0.21
         halo.removeAction(forKey: "haloFade")
         halo.run(SKAction.fadeAlpha(to: target, duration: 0.4), withKey: "haloFade")
 

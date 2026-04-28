@@ -87,7 +87,7 @@ struct MainTabView: View {
                     FriendsTabView()
                 }
                 .tabItem {
-                    Image("tab.union")
+                    Image(systemName: "atom")
                     Text("Circles")
                 }
                 .badge(friendsBadge.count)

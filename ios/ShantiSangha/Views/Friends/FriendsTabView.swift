@@ -14,6 +14,7 @@ struct FriendsTabView: View {
     @State private var navTarget: FriendNavRoute?
     @State private var circleSearchText = ""
     @State private var selectedFilter: CircleFilter = .all
+    @State private var solarResetTrigger = UUID()
     @FocusState private var circleSearchFocused: Bool
     /// String-backed because @AppStorage with custom enums needs a
     /// `RawRepresentable<String>` plus default-handling boilerplate;
@@ -157,48 +158,56 @@ struct FriendsTabView: View {
         .navigationTitle("Circles")
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
+        // Solar is meant to feel like an immersive sky — hide the main
+        // tab bar so the bottom row of solar action buttons can sit
+        // where the tab items used to. The "list" button returns the
+        // user to list mode, which restores the tab bar. Use
+        // `.automatic` (not `.visible`) for the non-solar case so
+        // pushed children like FriendChatView and ConnectionDetailView
+        // can still set their own `.hidden`.
+        .toolbar(
+            (viewMode == .solar && !circleVM.connections.isEmpty) ? .hidden : .automatic,
+            for: .tabBar)
         .toolbar {
-            // Only surface the view-mode toggle once there's actually a
-            // circle to render — toggling between two empty states is noise.
-            if !circleVM.connections.isEmpty {
+            // List mode → atom toggle (top trailing) to enter solar.
+            // Solar mode → back chevron (top leading) to return to list.
+            if !circleVM.connections.isEmpty && viewMode == .list {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         withAnimation(.easeInOut(duration: 0.25)) {
-                            viewModeRaw = (viewMode == .list ? CircleViewMode.solar : .list).rawValue
+                            viewModeRaw = CircleViewMode.solar.rawValue
                         }
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
-                        Image(systemName: viewMode == .list
-                              ? "atom"
-                              : "list.bullet")
+                        Image(systemName: "atom")
                             .foregroundColor(.sacredGold)
                     }
-                    .accessibilityLabel(viewMode == .list ? "Show solar" : "Show list")
+                    .accessibilityLabel("Show solar")
                 }
             }
 
-            // Add menu only appears in solar mode — the list view has its
-            // search-bar driven discovery and feels cleaner without a
-            // second toolbar icon. Solar mode has no other affordances,
-            // so the "+" lives there.
             if viewMode == .solar && !circleVM.connections.isEmpty {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button {
-                            Task { await onInvite() }
-                        } label: {
-                            Label("Invite", systemImage: "paperplane")
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            viewModeRaw = CircleViewMode.list.rawValue
                         }
-                        Button {
-                            showAddLocal = true
-                        } label: {
-                            Label("Add", systemImage: "person.badge.plus")
-                        }
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
-                        Image(systemName: "plus")
+                        Image(systemName: "chevron.left")
                             .foregroundColor(.sacredGold)
                     }
-                    .accessibilityLabel("Add to circle")
+                    .accessibilityLabel("Back to list")
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        solarResetTrigger = UUID()
+                    } label: {
+                        Image(systemName: "arrow.counterclockwise")
+                            .foregroundColor(.sacredGold)
+                    }
+                    .accessibilityLabel("Reset view")
                 }
             }
         }
@@ -294,21 +303,45 @@ struct FriendsTabView: View {
                     connections: connections,
                     myAvatarUrl: profile.profile?.avatarUrl,
                     myDisplayName: profile.profile?.displayName,
+                    resetTrigger: solarResetTrigger,
                     onTap: { id in
-                        if let conn = circleVM.connections.first(where: { $0.id == id }) {
-                            navTarget = conn.messageable ? .chat(id) : .detail(id)
-                        } else {
-                            navTarget = .detail(id)
-                        }
+                        navTarget = .detail(id)
                     })
                     .ignoresSafeArea()
             }
 
-            if hasActiveCircleScope {
-                solarScopePill(shownCount: connections.count, totalCount: totalCount)
-                    .padding(.horizontal, SacredSpacing.m)
-                    .padding(.top, SacredSpacing.xs)
+            VStack(spacing: SacredSpacing.s) {
+                if hasActiveCircleScope {
+                    solarScopePill(shownCount: connections.count, totalCount: totalCount)
+                        .padding(.top, SacredSpacing.xs)
+                }
+
+                Spacer()
+
+                solarActionRow
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, SacredSpacing.m)
+            .padding(.bottom, SacredSpacing.m)
+        }
+    }
+
+    /// Bottom action row in solar mode — invite and add. Returning to
+    /// list mode happens via the standard back chevron in the top-leading
+    /// toolbar slot.
+    private var solarActionRow: some View {
+        HStack(spacing: SacredSpacing.s) {
+            Spacer()
+
+            SolarActionButton(icon: "paperplane", label: "Invite") {
+                Task { await onInvite() }
+            }
+
+            SolarActionButton(icon: "plus", label: "Add local") {
+                showAddLocal = true
+            }
+
+            Spacer()
         }
     }
 
@@ -615,18 +648,6 @@ private enum CircleFilter: String, CaseIterable, Identifiable {
         }
     }
 
-    var sectionTitle: String {
-        switch self {
-        case .all: return "ALL CONNECTIONS"
-        case .unread: return "UNREAD"
-        case .onApp: return "ON THE APP"
-        case .local: return "LOCAL"
-        case .family: return "FAMILY"
-        case .close: return "CLOSE"
-        case .broader: return "BROADER"
-        }
-    }
-
     func includes(_ connection: Connection) -> Bool {
         switch self {
         case .all:
@@ -919,6 +940,40 @@ private extension Connection {
     }
 }
 
+
+private struct SolarActionButton: View {
+    let icon: String
+    let label: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.sacredSmallSemibold)
+                .foregroundColor(.sacredGold)
+                .frame(width: 44, height: 44)
+                .background(
+                    Circle()
+                        .fill(Color.sacredBgCard.opacity(0.7))
+                        .overlay(
+                            Circle().fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color.sacredGoldShine.opacity(0.1),
+                                        Color.clear,
+                                        Color.sacredGoldDark.opacity(0.04)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing))
+                        )
+                )
+                .overlay(Circle().stroke(Color.sacredGold.opacity(0.18), lineWidth: 1))
+                .sacredCardShadow()
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+}
 
 /// UIKit share sheet bridge — uses the system's `UIActivityViewController`.
 struct ShareSheet: UIViewControllerRepresentable {
