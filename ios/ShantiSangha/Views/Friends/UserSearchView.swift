@@ -9,6 +9,11 @@ struct UserSearchView: View {
     @StateObject private var vm = UserSearchViewModel()
     @State private var selectedResult: UserSearchResult?
     @FocusState private var nameFocused: Bool
+    private let initialQuery: String?
+
+    init(initialQuery: String? = nil) {
+        self.initialQuery = initialQuery
+    }
 
     var body: some View {
         ZStack {
@@ -62,6 +67,12 @@ struct UserSearchView: View {
         .onChange(of: vm.query) { _, _ in vm.scheduleSearch() }
         .onChange(of: vm.location) { _, _ in vm.scheduleSearch() }
         .onAppear {
+            // Seed once when navigated in from the circle search bar so
+            // the user lands on the same query they were typing — the
+            // .onChange(of: vm.query) above kicks the debounced fetch.
+            if let initial = initialQuery, vm.query.isEmpty {
+                vm.query = initial
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 nameFocused = true
             }

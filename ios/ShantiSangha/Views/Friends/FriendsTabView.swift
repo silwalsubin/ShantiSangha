@@ -93,21 +93,11 @@ struct FriendsTabView: View {
                             if !circleVM.connections.isEmpty {
                                 // Solar branch handled above; this
                                 // path is list-only when reached.
-                                circleOverview(connections: circleVM.connections)
-                                    .padding(.horizontal, SacredSpacing.m)
-                                    .padding(.top, SacredSpacing.m)
-
-                                circleActions
-                                    .padding(.horizontal, SacredSpacing.m)
-
                                 circleControls
                                     .padding(.horizontal, SacredSpacing.m)
+                                    .padding(.top, SacredSpacing.m)
 
                                 circleDirectory(connections: displayedConnections)
-                            } else {
-                                circleActions
-                                    .padding(.horizontal, SacredSpacing.m)
-                                    .padding(.top, SacredSpacing.m)
                             }
 
                             if !vm.incomingRequests.isEmpty {
@@ -168,8 +158,8 @@ struct FriendsTabView: View {
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
         .toolbar {
-            // Only surface the toggle once there's actually a circle
-            // to render — toggling between two empty states is noise.
+            // Only surface the view-mode toggle once there's actually a
+            // circle to render — toggling between two empty states is noise.
             if !circleVM.connections.isEmpty {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -185,6 +175,27 @@ struct FriendsTabView: View {
                     }
                     .accessibilityLabel(viewMode == .list ? "Show solar" : "Show list")
                 }
+            }
+
+            // Add menu collapses Invite + Add local into one trailing
+            // affordance so the page stays compact.
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button {
+                        Task { await onInvite() }
+                    } label: {
+                        Label("Invite", systemImage: "paperplane")
+                    }
+                    Button {
+                        showAddLocal = true
+                    } label: {
+                        Label("Add", systemImage: "person.badge.plus")
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                        .foregroundColor(.sacredGold)
+                }
+                .accessibilityLabel("Add to circle")
             }
         }
         .task {
@@ -250,10 +261,6 @@ struct FriendsTabView: View {
             if nameCompare != .orderedSame { return nameCompare == .orderedAscending }
             return lhs.connection.id.uuidString < rhs.connection.id.uuidString
         }
-    }
-
-    private var directoryTitle: String {
-        trimmedCircleSearch.isEmpty ? selectedFilter.sectionTitle : "MATCHES"
     }
 
     private var circleControls: some View {
@@ -351,14 +358,14 @@ struct FriendsTabView: View {
     }
 
     private var circleSearchField: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
                 .font(.sacredSmall)
                 .foregroundColor(.sacredMuted)
 
             TextField("Search your circle", text: $circleSearchText)
                 .focused($circleSearchFocused)
-                .font(.sacredText)
+                .font(.sacredSmall)
                 .foregroundColor(.sacredText)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.words)
@@ -371,16 +378,17 @@ struct FriendsTabView: View {
                     Image(systemName: "xmark.circle.fill")
                         .font(.sacredSmall)
                         .foregroundColor(.sacredMuted)
-                        .frame(width: 44, height: 44)
+                        .padding(6)
+                        .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
             }
         }
         .padding(.leading, 14)
-        .padding(.trailing, circleSearchText.isEmpty ? 14 : 2)
-        .frame(minHeight: 50)
-        .background(RoundedRectangle(cornerRadius: 14).fill(.ultraThinMaterial))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.sacredGold.opacity(0.12)))
+        .padding(.trailing, circleSearchText.isEmpty ? 14 : 4)
+        .frame(minHeight: 38)
+        .background(Capsule().fill(.ultraThinMaterial))
+        .overlay(Capsule().stroke(Color.sacredGold.opacity(0.12)))
     }
 
     private var filterChips: some View {
@@ -394,11 +402,11 @@ struct FriendsTabView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
                         Text(filter.label)
-                            .font(.sacredSmallSemibold)
+                            .font(.sacredMicroBold)
                             .foregroundColor(selectedFilter == filter ? .white : .sacredTextSecondary)
                             .lineLimit(1)
-                            .padding(.horizontal, 14)
-                            .frame(minHeight: 44)
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 30)
                             .background(
                                 Capsule()
                                     .fill(selectedFilter == filter
@@ -410,6 +418,7 @@ struct FriendsTabView: View {
                                     .stroke(Color.sacredGold.opacity(selectedFilter == filter ? 0 : 0.14),
                                             lineWidth: 1)
                             )
+                            .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
                 }
@@ -420,31 +429,34 @@ struct FriendsTabView: View {
 
     @ViewBuilder
     private func circleDirectory(connections: [Connection]) -> some View {
-        if connections.isEmpty {
-            noMatchesState
-                .padding(.horizontal, SacredSpacing.m)
-        } else {
-            SacredListCard {
-                LazyVStack(spacing: 0) {
-                    CircleDirectoryHeader(title: directoryTitle, count: connections.count)
+        VStack(spacing: SacredSpacing.s) {
+            if !connections.isEmpty {
+                SacredListCard {
+                    LazyVStack(spacing: 0) {
+                        ForEach(connections) { conn in
+                            ConnectionRow(
+                                connection: conn,
+                                onTapAvatar: { navTarget = .detail(conn.id) },
+                                onTapBody: {
+                                    navTarget = conn.messageable
+                                        ? .chat(conn.id)
+                                        : .detail(conn.id)
+                                })
 
-                    ForEach(connections) { conn in
-                        ConnectionRow(
-                            connection: conn,
-                            onTapAvatar: { navTarget = .detail(conn.id) },
-                            onTapBody: {
-                                navTarget = conn.messageable
-                                    ? .chat(conn.id)
-                                    : .detail(conn.id)
-                            })
-
-                        Divider()
-                            .padding(.leading, 68)
+                            Divider()
+                                .padding(.leading, 68)
+                        }
                     }
                 }
+            } else if trimmedCircleSearch.isEmpty {
+                // Filter chip narrowed to nothing — no query to pivot,
+                // so the find-on-app row would have nothing to search.
+                noMatchesState
             }
-            .padding(.horizontal, SacredSpacing.m)
+
+            findOnAppPrompt
         }
+        .padding(.horizontal, SacredSpacing.m)
     }
 
     private var noMatchesState: some View {
@@ -452,47 +464,66 @@ struct FriendsTabView: View {
             SacredEmptyState(
                 icon: "magnifyingglass",
                 title: "No one matches.",
-                subtitle: "Try another name, relation, or place.")
+                subtitle: "Try another filter or clear your search.")
         }
     }
 
-    // MARK: - Top summary and actions
+    @ViewBuilder
+    private var findOnAppPrompt: some View {
+        let query = trimmedCircleSearch
+        if !query.isEmpty {
+            NavigationLink(destination: UserSearchView(initialQuery: query)) {
+                HStack(spacing: SacredSpacing.s) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.sacredSmallSemibold)
+                        .foregroundColor(.sacredGold)
+                        .frame(width: 32, height: 32)
+                        .background(Circle().fill(Color.sacredGold.opacity(0.12)))
 
-    private func circleOverview(connections: [Connection]) -> some View {
-        CircleOverviewCard(connections: connections)
-    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Find on ShantiSangha")
+                            .font(.sacredTextSemibold)
+                            .foregroundColor(.sacredText)
+                        Text("Search the app for \u{201C}\(query)\u{201D}")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
+                            .lineLimit(1)
+                    }
 
-    private var circleActions: some View {
-        HStack(spacing: SacredSpacing.s) {
-            NavigationLink(destination: UserSearchView()) {
-                CircleActionTile(icon: "magnifyingglass", title: "Find")
-            }
-            .buttonStyle(.plain)
+                    Spacer(minLength: 4)
 
-            Button {
-                Task { await onInvite() }
-            } label: {
-                CircleActionTile(icon: "paperplane", title: "Invite")
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                showAddLocal = true
-            } label: {
-                CircleActionTile(icon: "plus", title: "Add local")
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundColor(.sacredMuted.opacity(0.6))
+                }
+                .padding(SacredSpacing.m)
+                .luxCardChrome()
             }
             .buttonStyle(.plain)
         }
     }
 
     private var emptyState: some View {
-        SacredCard {
-            SacredEmptyState(
-                icon: "person.2",
-                title: "Walking solo for now.",
-                subtitle: "Invite someone you trust to message inside this private space.",
-                actionLabel: "Invite someone"
-            ) { Task { await onInvite() } }
+        VStack(spacing: SacredSpacing.s) {
+            SacredCard {
+                SacredEmptyState(
+                    icon: "person.2",
+                    title: "Walking solo for now.",
+                    subtitle: "Invite someone you trust to message inside this private space.",
+                    actionLabel: "Invite someone"
+                ) { Task { await onInvite() } }
+            }
+
+            // Secondary discovery affordance — without the Find tile,
+            // first-time users with an empty circle would have no path
+            // to the app-wide search.
+            NavigationLink(destination: UserSearchView()) {
+                Text("Or find someone on ShantiSangha")
+                    .font(.sacredSmallSemibold)
+                    .foregroundColor(.sacredGold)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -612,158 +643,6 @@ private enum CircleFilter: String, CaseIterable, Identifiable {
     }
 }
 
-private struct CircleOverviewCard: View {
-    let connections: [Connection]
-
-    private var totalCount: Int { connections.count }
-    private var messageableCount: Int { connections.filter { $0.messageable }.count }
-    private var localCount: Int { connections.filter { $0.person.userId == nil }.count }
-    private var unreadMessageCount: Int { connections.reduce(0) { $0 + $1.unreadCount } }
-
-    private var recentCount: Int {
-        let cutoff = Date().addingTimeInterval(-7 * 24 * 60 * 60)
-        return connections.filter { conn in
-            guard let date = FriendsDates.parse(conn.lastMessageAt) else { return false }
-            return date >= cutoff
-        }.count
-    }
-
-    private var summaryText: String {
-        var parts: [String] = []
-        if messageableCount > 0 { parts.append("\(messageableCount.formatted()) on the app") }
-        if localCount > 0 { parts.append("\(localCount.formatted()) local") }
-        if recentCount > 0 { parts.append("\(recentCount.formatted()) active this week") }
-        return parts.isEmpty ? "Private connections you choose." : parts.joined(separator: " · ")
-    }
-
-    var body: some View {
-        HStack(spacing: 14) {
-            CircleAvatarCluster(connections: connections)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(totalCount.formatted()) in your circle")
-                    .font(.sacredTitle)
-                    .foregroundColor(.sacredText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-
-                Text(summaryText)
-                    .font(.sacredSmall)
-                    .foregroundColor(.sacredMuted)
-                    .lineLimit(2)
-            }
-
-            Spacer(minLength: 4)
-
-            if unreadMessageCount > 0 {
-                VStack(spacing: 1) {
-                    Text(unreadMessageCount.formatted())
-                        .font(.sacredBodyBold)
-                    Text("unread")
-                        .font(.sacredMicro)
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(Capsule().fill(Color.sacredGold))
-                .accessibilityLabel("\(unreadMessageCount) unread messages")
-            }
-        }
-        .padding(SacredSpacing.m)
-        .luxCardChrome()
-    }
-}
-
-private struct CircleAvatarCluster: View {
-    let connections: [Connection]
-
-    private var visibleConnections: [Connection] {
-        Array(connections.prefix(4))
-    }
-
-    private var remainingCount: Int {
-        max(0, connections.count - visibleConnections.count)
-    }
-
-    var body: some View {
-        ZStack(alignment: .leading) {
-            ForEach(Array(visibleConnections.enumerated()), id: \.element.id) { index, conn in
-                SacredAvatar(
-                    displayName: conn.displayLabel,
-                    avatarUrl: conn.person.avatarUrl,
-                    size: 34)
-                    .overlay(Circle().stroke(Color.sacredBg, lineWidth: 2))
-                    .offset(x: CGFloat(index) * 18)
-                    .zIndex(Double(visibleConnections.count - index))
-            }
-
-            if remainingCount > 0 {
-                ZStack {
-                    Circle()
-                        .fill(Color.sacredGold)
-                    Text("+\(remainingCount.formatted())")
-                        .font(.sacredMicroBold)
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.55)
-                        .padding(.horizontal, 2)
-                }
-                .frame(width: 34, height: 34)
-                .overlay(Circle().stroke(Color.sacredBg, lineWidth: 2))
-                .offset(x: CGFloat(visibleConnections.count) * 18)
-            }
-        }
-        .frame(width: 112, height: 44, alignment: .leading)
-        .accessibilityHidden(true)
-    }
-}
-
-private struct CircleActionTile: View {
-    let icon: String
-    let title: String
-
-    var body: some View {
-        VStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.sacredSmallSemibold)
-                .foregroundColor(.sacredGold)
-            Text(title)
-                .font(.sacredSmallSemibold)
-                .foregroundColor(.sacredTextSecondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.78)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(minHeight: 64)
-        .contentShape(RoundedRectangle(cornerRadius: SacredRadius.card))
-        .luxCardChrome()
-    }
-}
-
-private struct CircleDirectoryHeader: View {
-    let title: String
-    let count: Int
-
-    var body: some View {
-        HStack {
-            Text(title)
-                .font(.sacredSectionLabel)
-                .tracking(3)
-                .foregroundColor(.sacredLabel)
-            Spacer()
-            Text(count.formatted())
-                .font(.sacredMicroBold)
-                .foregroundColor(.sacredGold)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(Capsule().stroke(Color.sacredGold.opacity(0.18), lineWidth: 1))
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 14)
-        .padding(.bottom, 4)
-    }
-}
-
 private struct ConnectionRow: View {
     let connection: Connection
     let onTapAvatar: () -> Void
@@ -792,8 +671,6 @@ private struct ConnectionRow: View {
                             .foregroundColor(.sacredText)
                             .lineLimit(1)
                             .truncationMode(.tail)
-                        relationChip
-                            .fixedSize(horizontal: true, vertical: false)
                         Spacer(minLength: 4)
                         if connection.messageable && connection.unreadCount > 0 {
                             Text("\(connection.unreadCount)")
@@ -814,15 +691,6 @@ private struct ConnectionRow: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var relationChip: some View {
-        Text(connection.relationLabel)
-            .font(.sacredMicroBold)
-            .foregroundColor(.sacredGold.opacity(0.85))
-            .padding(.horizontal, 6)
-            .padding(.vertical, 1)
-            .background(Capsule().stroke(Color.sacredGold.opacity(0.25), lineWidth: 0.5))
     }
 
     @ViewBuilder
