@@ -19,14 +19,14 @@ struct FriendChatView: View {
     /// edge. Bound to `.scrollPosition(id:anchor:)` so iOS keeps that row
     /// pinned at `.bottom` across every layout change — image bubbles
     /// resizing, lazy-stack materialization, message arrivals, keyboard
-    /// in/out. Seeded with the bottom-anchor id (rather than nil + a
-    /// `.task` assignment) so the binding is already "live" on the first
-    /// frame — otherwise tapping the composer before `.task` fires
-    /// leaves the latest message tucked behind the keyboard. User-driven
+    /// in/out. Starts as nil and gets assigned in `.task` once the
+    /// LazyVStack's bottom-anchor row actually exists; seeding it at
+    /// @State init competes with `defaultScrollAnchor(.bottom)` during
+    /// the first render and parks the chat scrolled UP. User-driven
     /// scrolling overwrites it (the binding is bidirectional), so
     /// scrolling up to read history doesn't get yanked back when new
     /// messages arrive.
-    @State private var pinnedScrollID: String? = "chat-bottom-anchor"
+    @State private var pinnedScrollID: String?
     @State private var jumpToMessageId: UUID?
     @State private var highlightedMessageId: UUID?
     @State private var showProfile = false
@@ -176,6 +176,18 @@ struct FriendChatView: View {
             // writes the visible row's id back into the binding, so
             // subsequent message arrivals don't yank them down.
             .scrollPosition(id: $pinnedScrollID, anchor: .bottom)
+            .task {
+                // First-render seed. defaultScrollAnchor handles the
+                // initial "park at bottom" snap; setting the binding
+                // here keeps the bottom anchor "live" so the
+                // scrollPosition modifier re-pins after later reflows
+                // (message arrivals, image bubble resizes). Done in
+                // .task — not at @State init — because pinning to a
+                // row id before that row exists in the LazyVStack
+                // fights with defaultScrollAnchor and parks the chat
+                // scrolled up.
+                pinnedScrollID = Self.bottomAnchorId
+            }
             .onChange(of: vm.messages.last?.id) { _, newId in
                 guard newId != nil else { return }
                 // Re-pin only if the user is currently at the bottom —
