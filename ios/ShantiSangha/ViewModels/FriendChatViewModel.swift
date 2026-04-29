@@ -22,6 +22,13 @@ final class FriendChatViewModel: ObservableObject {
     @Published var sending = false
     @Published var errorMessage: String?
 
+    /// Pending IDs that have an `attemptSend` call in flight. Without
+    /// this guard, a concurrent `flushOutbox` (fired on network
+    /// reconnect) could re-send the same pending while the original
+    /// `sendText`'s API call is still pending — the server would then
+    /// store two messages and the chat would render two bubbles.
+    private var inFlightSendIds: Set<UUID> = []
+
     /// Set of user ids currently typing in the conversation (excluding
     /// us). For 1:1 it's at most one entry; the typing-pill UI is built
     /// to handle a multi-member set so groups need only a string change.
@@ -213,8 +220,16 @@ final class FriendChatViewModel: ObservableObject {
     /// previous lastError) — they'll retry automatically on reconnect;
     /// HTTP errors as non-transient — they need user action.
     private func attemptSend(_ pending: PendingMessage) async {
+        // Bail if another send for this exact pending is already in
+        // flight — `sendText` and `flushOutbox` can both reach here for
+        // the same pending if a reconnect event fires mid-send.
+        guard !inFlightSendIds.contains(pending.id) else { return }
+        inFlightSendIds.insert(pending.id)
         sending = true
-        defer { sending = false }
+        defer {
+            sending = false
+            inFlightSendIds.remove(pending.id)
+        }
         do {
             let msg = try await FriendsAPI.sendText(
                 friendshipId: friendshipId,
