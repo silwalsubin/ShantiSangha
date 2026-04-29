@@ -70,10 +70,20 @@ final class FriendChatViewModel: ObservableObject {
 
     private var realtime: ChatRealtimeClient?
 
-    init(friendshipId: UUID, friendUserId: UUID, friendDisplayName: String) {
+    /// Test seam — production uses `LiveFriendsMessagingClient`, tests
+    /// pass a fake to drive send/edit/react paths without the network.
+    private let api: FriendsMessagingClient
+
+    init(
+        friendshipId: UUID,
+        friendUserId: UUID,
+        friendDisplayName: String,
+        api: FriendsMessagingClient = LiveFriendsMessagingClient()
+    ) {
         self.friendshipId = friendshipId
         self.friendUserId = friendUserId
         self.friendDisplayName = friendDisplayName
+        self.api = api
         // Hydrate from disk synchronously so the first SwiftUI render
         // shows the last-known thread instead of a flash of empty.
         // The .task-driven refresh() upserts whatever's newer from the
@@ -113,7 +123,7 @@ final class FriendChatViewModel: ObservableObject {
         loading = true
         defer { loading = false }
         do {
-            let loaded = try await FriendsAPI.listMessages(friendshipId: friendshipId, limit: 50)
+            let loaded = try await api.listMessages(friendshipId: friendshipId, before: nil, limit: 50)
             // Upsert into the cache-hydrated baseline rather than
             // replacing it: a thread the user has paginated deeper on
             // still has those older rows in `messages` from disk; we
@@ -183,7 +193,7 @@ final class FriendChatViewModel: ObservableObject {
         loadingOlder = true
         defer { loadingOlder = false }
         do {
-            let older = try await FriendsAPI.listMessages(friendshipId: friendshipId, before: oldestDate, limit: 50)
+            let older = try await api.listMessages(friendshipId: friendshipId, before: oldestDate, limit: 50)
             if older.isEmpty { loadedAll = true; return }
             // Merge by id so a partial overlap with the existing range
             // doesn't duplicate rows in the cache.
@@ -231,7 +241,7 @@ final class FriendChatViewModel: ObservableObject {
             inFlightSendIds.remove(pending.id)
         }
         do {
-            let msg = try await FriendsAPI.sendText(
+            let msg = try await api.sendText(
                 friendshipId: friendshipId,
                 body: pending.body,
                 replyToMessageId: pending.replyToMessageId)
@@ -314,9 +324,9 @@ final class FriendChatViewModel: ObservableObject {
         sending = true
         defer { sending = false }
         do {
-            let upload = try await FriendsAPI.createImageUpload(friendshipId: friendshipId, contentType: contentType)
-            try await FriendsAPI.uploadMedia(uploadUrl: upload.uploadUrl, contentType: contentType, data: data)
-            let msg = try await FriendsAPI.commitImage(
+            let upload = try await api.createImageUpload(friendshipId: friendshipId, contentType: contentType)
+            try await api.uploadMedia(uploadUrl: upload.uploadUrl, contentType: contentType, data: data)
+            let msg = try await api.commitImage(
                 friendshipId: friendshipId,
                 objectKey: upload.objectKey,
                 replyToMessageId: replyTarget?.id)
@@ -332,9 +342,9 @@ final class FriendChatViewModel: ObservableObject {
         sending = true
         defer { sending = false }
         do {
-            let upload = try await FriendsAPI.createVoiceUpload(friendshipId: friendshipId, contentType: contentType)
-            try await FriendsAPI.uploadMedia(uploadUrl: upload.uploadUrl, contentType: contentType, data: data)
-            let msg = try await FriendsAPI.commitVoice(
+            let upload = try await api.createVoiceUpload(friendshipId: friendshipId, contentType: contentType)
+            try await api.uploadMedia(uploadUrl: upload.uploadUrl, contentType: contentType, data: data)
+            let msg = try await api.commitVoice(
                 friendshipId: friendshipId,
                 objectKey: upload.objectKey,
                 durationMs: durationMs,
@@ -351,7 +361,7 @@ final class FriendChatViewModel: ObservableObject {
         guard let lastUnread = messages.last(where: { $0.readAt == nil && $0.senderUserId == friendUserId }) else {
             return
         }
-        try? await FriendsAPI.markReadThrough(friendshipId: friendshipId, lastMessageId: lastUnread.id)
+        try? await api.markReadThrough(friendshipId: friendshipId, lastMessageId: lastUnread.id)
         NotificationCenter.default.post(name: .friendsUpdated, object: nil)
     }
 
@@ -408,7 +418,7 @@ final class FriendChatViewModel: ObservableObject {
         sending = true
         defer { sending = false }
         do {
-            let updated = try await FriendsAPI.editText(friendshipId: friendshipId, messageId: id, body: body)
+            let updated = try await api.editText(friendshipId: friendshipId, messageId: id, body: body)
             upsertMessage(updated)
             cancelEdit()
         } catch {
@@ -419,7 +429,7 @@ final class FriendChatViewModel: ObservableObject {
     func deleteMessage(_ message: FriendMessage) async {
         guard canDelete(message) else { return }
         do {
-            let updated = try await FriendsAPI.deleteMessage(friendshipId: friendshipId, messageId: message.id)
+            let updated = try await api.deleteMessage(friendshipId: friendshipId, messageId: message.id)
             upsertMessage(updated)
         } catch {
             errorMessage = error.localizedDescription
@@ -463,7 +473,7 @@ final class FriendChatViewModel: ObservableObject {
         replaceReactions(at: i, with: optimistic)
 
         do {
-            let updated = try await FriendsAPI.reactToMessage(
+            let updated = try await api.reactToMessage(
                 friendshipId: friendshipId, messageId: messageId, emoji: emoji)
             upsertMessage(updated)
         } catch {
@@ -486,7 +496,7 @@ final class FriendChatViewModel: ObservableObject {
         replaceReactions(at: i, with: optimistic)
 
         do {
-            let updated = try await FriendsAPI.unreactToMessage(
+            let updated = try await api.unreactToMessage(
                 friendshipId: friendshipId, messageId: messageId)
             upsertMessage(updated)
         } catch {
@@ -517,7 +527,9 @@ final class FriendChatViewModel: ObservableObject {
 
     /// Apply a `message_reactions_changed` realtime event — replace the
     /// row's reactions with whatever the server now considers canonical.
-    private func applyReactionsChanged(messageId: UUID, reactions: [FriendMessageReactionSummary]) {
+    /// Internal so tests can simulate the broadcast without standing up
+    /// a fake socket.
+    func applyReactionsChanged(messageId: UUID, reactions: [FriendMessageReactionSummary]) {
         guard let i = messages.firstIndex(where: { $0.id == messageId }) else { return }
         replaceReactions(at: i, with: reactions)
     }
@@ -543,7 +555,7 @@ final class FriendChatViewModel: ObservableObject {
                     // mark it read immediately so the sender sees the receipt
                     // without a refetch round-trip.
                     if msg.senderUserId == self.friendUserId, msg.readAt == nil {
-                        try? await FriendsAPI.markReadThrough(friendshipId: self.friendshipId, lastMessageId: msg.id)
+                        try? await self.api.markReadThrough(friendshipId: self.friendshipId, lastMessageId: msg.id)
                         NotificationCenter.default.post(name: .friendsUpdated, object: nil)
                     }
                 }
@@ -621,7 +633,11 @@ final class FriendChatViewModel: ObservableObject {
 
     // MARK: - Realtime → state reducers
 
-    private func upsertMessage(_ msg: FriendMessage) {
+    /// Insert-or-merge entry point used by both the API send-success path
+    /// and every realtime callback (`onMessageReceived`, `onMessageEdited`,
+    /// reaction broadcasts). Internal so tests can simulate a realtime
+    /// echo by calling it directly without standing up a fake socket.
+    func upsertMessage(_ msg: FriendMessage) {
         if let i = messages.firstIndex(where: { $0.id == msg.id }) {
             messages[i] = Self.merging(local: messages[i], incoming: msg)
         } else {

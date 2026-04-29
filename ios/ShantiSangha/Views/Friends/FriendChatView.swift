@@ -19,11 +19,14 @@ struct FriendChatView: View {
     /// edge. Bound to `.scrollPosition(id:anchor:)` so iOS keeps that row
     /// pinned at `.bottom` across every layout change — image bubbles
     /// resizing, lazy-stack materialization, message arrivals, keyboard
-    /// in/out. We set it to `bottomAnchorId` from `.task` so the chat
-    /// opens at the latest message; user-driven scrolling overwrites it
-    /// (the binding is bidirectional), so scrolling up to read history
-    /// doesn't get yanked back when new messages arrive.
-    @State private var pinnedScrollID: String?
+    /// in/out. Seeded with the bottom-anchor id (rather than nil + a
+    /// `.task` assignment) so the binding is already "live" on the first
+    /// frame — otherwise tapping the composer before `.task` fires
+    /// leaves the latest message tucked behind the keyboard. User-driven
+    /// scrolling overwrites it (the binding is bidirectional), so
+    /// scrolling up to read history doesn't get yanked back when new
+    /// messages arrive.
+    @State private var pinnedScrollID: String? = "chat-bottom-anchor"
     @State private var jumpToMessageId: UUID?
     @State private var highlightedMessageId: UUID?
     @State private var showProfile = false
@@ -173,12 +176,6 @@ struct FriendChatView: View {
             // writes the visible row's id back into the binding, so
             // subsequent message arrivals don't yank them down.
             .scrollPosition(id: $pinnedScrollID, anchor: .bottom)
-            .task {
-                // First-render seed. defaultScrollAnchor handles the
-                // layout snap; this keeps the bottom anchor "live" so
-                // it re-pins after any reflow.
-                pinnedScrollID = Self.bottomAnchorId
-            }
             .onChange(of: vm.messages.last?.id) { _, newId in
                 guard newId != nil else { return }
                 // Re-pin only if the user is currently at the bottom —
@@ -211,17 +208,21 @@ struct FriendChatView: View {
                 jumpToMessageId = nil
             }
             .onChange(of: composerFocused) { _, focused in
-                // Keyboard opening shrinks the scroll viewport. The
-                // safeAreaInset composer + scrollPosition pinning lift
-                // bottom-anchored content automatically, but only when
-                // pinnedScrollID is actively set to the sentinel — if
-                // it's still the seed nil, the binding has no row to
-                // re-align. Re-asserting it here guarantees the latest
-                // bubble lands above the keyboard. Preserve history
-                // reading: if the user is scrolled up, leave them.
+                // Keyboard opening shrinks the scroll viewport. With
+                // pinnedScrollID seeded to the bottom anchor, the
+                // scrollPosition binding will pin the latest bubble
+                // automatically — but only when SwiftUI re-evaluates
+                // it. Assigning the binding to its current value
+                // (Self.bottomAnchorId) is a no-op, so tapping the
+                // field before any other interaction has dirtied the
+                // binding leaves the latest message hidden. Drive the
+                // scroll imperatively via the proxy: it always
+                // re-applies, and `withAnimation` syncs it with the
+                // keyboard rise. Preserve history reading: if the user
+                // is scrolled up, leave them alone.
                 guard focused, isAtBottom else { return }
-                withAnimation(.easeOut(duration: 0.2)) {
-                    pinnedScrollID = Self.bottomAnchorId
+                withAnimation(.easeOut(duration: 0.25)) {
+                    proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
                 }
             }
         }
