@@ -42,7 +42,6 @@ const router = createRouter({
         { path: 'journey', component: () => import('@/pages/app/journey.vue') },
         { path: 'journey/goals/:id', component: () => import('@/pages/app/goal-detail.vue') },
         { path: 'journey/goals/:id/calendar', component: () => import('@/pages/app/goal-calendar.vue') },
-        { path: 'journey/insights', component: () => import('@/pages/app/journey-insights.vue') },
         { path: 'about', component: () => import('@/pages/app/about.vue') },
         { path: '', redirect: 'home' },
       ],

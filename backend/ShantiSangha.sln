@@ -17,8 +17,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShantiSangha.Journal", "Sha
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShantiSangha.Wellness", "ShantiSangha.Wellness\ShantiSangha.Wellness.csproj", "{DEE12B56-CE86-4452-A9FE-90DBBFBC4AB9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShantiSangha.Insights", "ShantiSangha.Insights\ShantiSangha.Insights.csproj", "{929ED8A6-7F94-40DB-B848-49201B2A0018}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShantiSangha.Jyotish", "ShantiSangha.Jyotish\ShantiSangha.Jyotish.csproj", "{FE38CAD9-D194-49BF-8876-EE38F9BC4981}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShantiSangha.Jyotish.Tests", "ShantiSangha.Jyotish.Tests\ShantiSangha.Jyotish.Tests.csproj", "{FCC92B97-41B5-4E6E-89A3-1D4615EF13A4}"
@@ -66,10 +64,6 @@ Global
 		{DEE12B56-CE86-4452-A9FE-90DBBFBC4AB9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DEE12B56-CE86-4452-A9FE-90DBBFBC4AB9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DEE12B56-CE86-4452-A9FE-90DBBFBC4AB9}.Release|Any CPU.Build.0 = Release|Any CPU
-		{929ED8A6-7F94-40DB-B848-49201B2A0018}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{929ED8A6-7F94-40DB-B848-49201B2A0018}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{929ED8A6-7F94-40DB-B848-49201B2A0018}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{929ED8A6-7F94-40DB-B848-49201B2A0018}.Release|Any CPU.Build.0 = Release|Any CPU
 		{FE38CAD9-D194-49BF-8876-EE38F9BC4981}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{FE38CAD9-D194-49BF-8876-EE38F9BC4981}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FE38CAD9-D194-49BF-8876-EE38F9BC4981}.Release|Any CPU.ActiveCfg = Release|Any CPU

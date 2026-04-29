@@ -30,10 +30,6 @@ const weekHistoryLoading = ref(true)
 const recurringGoals = computed(() => goals.value.filter(g => g.type === 'Recurring'))
 const oneTimeGoals = computed(() => goals.value.filter(g => g.type === 'OneTime'))
 
-// --- Existing state ---
-const insights = ref<any[]>([])
-const insightsLoading = ref(true)
-
 const conversationCount = ref(0)
 const journalCount = ref(0)
 const voiceCount = ref(0)
@@ -111,19 +107,6 @@ function dayLabel(dateStr: string): string {
   return d.toLocaleDateString('en-US', { weekday: 'narrow' })
 }
 
-async function loadInsights() {
-  insightsLoading.value = true
-  try {
-    const data = await api.get<any>('/insights?page=1')
-    const items = Array.isArray(data) ? data : (data?.insights || data?.items || data?.results || [])
-    insights.value = items.slice(0, 3)
-  } catch {
-    insights.value = []
-  } finally {
-    insightsLoading.value = false
-  }
-}
-
 async function loadStats() {
   statsLoading.value = true
   try {
@@ -161,18 +144,9 @@ function formatTargetDate(dateStr: string | null): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-function sourceLabel(s: string) {
-  const map: Record<string, string> = {
-    conversation: 'Conversation',
-    journal: 'Journal',
-  }
-  return map[s] || s || 'Unknown'
-}
-
 onMounted(async () => {
   await loadGoals()
   loadWeekHistory()
-  loadInsights()
   loadStats()
 })
 </script>
@@ -343,38 +317,6 @@ onMounted(async () => {
           <p class="mt-0.5 text-[9px] uppercase tracking-[0.2em] text-sacred-muted">Voice Notes</p>
         </div>
       </div>
-    </div>
-
-    <!-- Recent Insights -->
-    <div class="rounded-2xl border border-sacred-border bg-sacred-bg-card p-4 shadow-sacred backdrop-blur-[20px] sm:p-6">
-      <div class="flex items-center justify-between">
-        <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-sacred-label">Recent Insights</p>
-        <router-link
-          to="/app/journey/insights"
-          class="min-h-[44px] flex items-center text-xs font-medium text-sacred-gold transition duration-200 hover:text-sacred-gold-dark"
-        >
-          View all
-        </router-link>
-      </div>
-
-      <div v-if="insightsLoading" class="mt-3 space-y-2">
-        <div v-for="i in 3" :key="i" class="h-16 animate-pulse rounded-2xl bg-sacred-bg-hover" />
-      </div>
-
-      <div v-else-if="insights.length === 0" class="mt-3 text-sm text-sacred-text-secondary">
-        No insights yet. They are generated during conversations and journal sessions.
-      </div>
-
-      <ul v-else class="mt-3 space-y-2">
-        <li
-          v-for="insight in insights"
-          :key="insight.id"
-          class="rounded-2xl border border-sacred-border-subtle bg-sacred-bg-card-inner px-4 py-3"
-        >
-          <p class="text-sm leading-relaxed text-sacred-text">{{ insight.content }}</p>
-          <p class="mt-1.5 text-[10px] uppercase tracking-[0.15em] text-sacred-label">{{ sourceLabel(insight.source) }}</p>
-        </li>
-      </ul>
     </div>
   </div>
 </template>

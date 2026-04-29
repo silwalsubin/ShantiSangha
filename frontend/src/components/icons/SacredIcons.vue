@@ -119,7 +119,7 @@ defineProps<{ name: string; size?: number }>()
     <circle cx="17" cy="12" r="0.5" fill="currentColor" stroke="none" />
   </svg>
 
-  <!-- Diya lamp / Insights — traditional oil lamp -->
+  <!-- Diya lamp — traditional oil lamp -->
   <svg v-else-if="name === 'diya'" :width="size || 22" :height="size || 22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round">
     <!-- Flame -->
     <path d="M12 3c-.8 1.5-1.5 3-1.5 4.5 0 1.5.7 2.5 1.5 2.5s1.5-1 1.5-2.5C13.5 6 12.8 4.5 12 3Z" fill="currentColor" opacity="0.15" />

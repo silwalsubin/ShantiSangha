@@ -20,7 +20,7 @@ People share their deepest fears, struggles, and vulnerabilities here — things
 A user may consciously connect with other users as Friends. Once connected, friends can send each other text, images, and voice messages. This is the ONLY social surface the app permits, and the boundary between "solo content" and "friend content" is sharp:
 
 - **What a friend sees about you:** your chosen Display Name, and the messages you have explicitly sent to them. Nothing else.
-- **What a friend NEVER sees:** journal entries, AI chat history, voice notes (the solo kind), daily reflections, goal titles, goal counts, streaks, "deeper why" text, insights, calendar history, or anything else you wrote for yourself rather than for them.
+- **What a friend NEVER sees:** journal entries, AI chat history, voice notes (the solo kind), daily reflections, goal titles, goal counts, streaks, "deeper why" text, calendar history, or anything else you wrote for yourself rather than for them.
 - **Friend messages are deliberately authored content.** Sending a text, image, or voice message to a friend is an explicit, per-message act of disclosure. This is categorically different from your solo records, which are never shared.
 - **Friendships are private to the pair.** Friend A cannot see who else is in your friend list. There is no friend graph, no friends-of-friends, no public list. Each friendship row is independent.
 - **Symmetric and ephemeral.** Either side can end a friendship at any time. When they do, the message thread is hard-deleted on both sides, the read grant is revoked, and stored media (images, voice files) is removed from object storage. No notification — the connection simply disappears.

@@ -15,7 +15,15 @@ struct FriendChatView: View {
     @State private var showRecorder = false
     @State private var reactionPickerTarget: FriendMessage?
     @State private var imagePreview: PreviewedImage?
-    @State private var didInitialScroll = false
+    /// The id of the row currently aligned with the scroll view's bottom
+    /// edge. Bound to `.scrollPosition(id:anchor:)` so iOS keeps that row
+    /// pinned at `.bottom` across every layout change — image bubbles
+    /// resizing, lazy-stack materialization, message arrivals, keyboard
+    /// in/out. We set it to `bottomAnchorId` from `.task` so the chat
+    /// opens at the latest message; user-driven scrolling overwrites it
+    /// (the binding is bidirectional), so scrolling up to read history
+    /// doesn't get yanked back when new messages arrive.
+    @State private var pinnedScrollID: String?
     @State private var jumpToMessageId: UUID?
     @State private var highlightedMessageId: UUID?
     @State private var showProfile = false
@@ -42,13 +50,22 @@ struct FriendChatView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            messageList
-
-            typingPill
-
-            composer
-                .background(Color.sacredBg)
+        // Composer + typing pill are declared as a bottom safe-area
+        // inset of the ScrollView. That tells SwiftUI "this is the
+        // bottom of the scroll surface" — when the keyboard opens, the
+        // platform shrinks the scroll viewport's bottom inset to make
+        // room and the bottom-anchored content lifts automatically.
+        // Stacking them in a VStack instead (the previous layout)
+        // hides the keyboard-frame change from the ScrollView, which
+        // is why the latest message kept ending up tucked behind the
+        // keyboard.
+        messageList
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+                typingPill
+                composer
+            }
+            .background(Color.sacredBg)
         }
         .background(Color.sacredBg.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
@@ -118,31 +135,11 @@ struct FriendChatView: View {
     }
 
     /// Stable sentinel id pinned to the very end of the LazyVStack —
-    /// scrolling to this rather than the last message's id forces the
-    /// stack to lay out *through* the actual bottom row, which is the
-    /// only way `proxy.scrollTo(_, anchor: .bottom)` reliably lands on
-    /// the latest message in a lazy stack (otherwise it parks near the
-    /// last-materialized row and leaves the newest bubble clipped).
+    /// scrollPosition aligns this row at `.bottom`, which is the only
+    /// reliable way to land on the latest message in a lazy stack
+    /// (otherwise the stack parks near the last-materialized row and
+    /// leaves the newest bubble clipped).
     private static let bottomAnchorId = "chat-bottom-anchor"
-
-    /// Snap the scroll view to the bottom of the thread on first appear.
-    /// Three passes catch the common reflow points: SwiftUI's first
-    /// commit, the cache-hydrate / API-merge moment, and any late image
-    /// or voice bubble whose async size resolves last. One-shot via
-    /// `didInitialScroll` so subsequent re-renders don't yank the user
-    /// back down when they've scrolled up to read history.
-    private func initialScrollIfNeeded(proxy: ScrollViewProxy) async {
-        guard !didInitialScroll else { return }
-        guard !vm.messages.isEmpty || !vm.outbox.isEmpty else { return }
-
-        try? await Task.sleep(nanoseconds: 80_000_000)
-        proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
-        try? await Task.sleep(nanoseconds: 160_000_000)
-        proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
-        try? await Task.sleep(nanoseconds: 250_000_000)
-        proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
-        didInitialScroll = true
-    }
 
     /// Show the friend's avatar only on the first message of a
     /// consecutive run from them — repeating the same avatar on every
@@ -159,142 +156,163 @@ struct FriendChatView: View {
     private var messageList: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                if vm.loading && vm.messages.isEmpty && vm.outbox.isEmpty {
-                    ProgressView().padding(.top, SacredSpacing.xl)
-                } else if vm.messages.isEmpty && vm.outbox.isEmpty {
-                    SacredEmptyState(
-                        icon: "ellipsis.message",
-                        title: "Say hello.",
-                        subtitle: "Your messages stay between the two of you."
-                    )
-                    .padding(.top, SacredSpacing.xl)
-                } else {
-                    LazyVStack(spacing: 6) {
-                        if vm.loadingOlder {
-                            ProgressView()
-                                .padding(.vertical, SacredSpacing.s)
-                        }
-
-                        ForEach(Array(vm.messages.enumerated()), id: \.element.id) { idx, msg in
-                            SwipeToReplyRow(enabled: !msg.isDeleted) {
-                                vm.beginReply(msg)
-                            } content: {
-                                MessageBubble(
-                                    message: msg,
-                                    fromFriend: vm.isFromFriend(msg),
-                                    friendDisplayName: currentConnection.displayLabel,
-                                    friendAvatarUrl: currentConnection.person.avatarUrl,
-                                    showAvatar: shouldShowAvatar(at: idx),
-                                    currentUserId: profile.currentUserId,
-                                    isHighlighted: highlightedMessageId == msg.id,
-                                    onTapImage: { url in imagePreview = PreviewedImage(url: url, messageId: msg.id) },
-                                    onTapReaction: { emoji in
-                                        if let me = profile.currentUserId {
-                                            Task { await vm.toggleReaction(emoji, on: msg.id, currentUserId: me) }
-                                        }
-                                    },
-                                    onTapReplyPreview: { parentId in jumpToMessage(parentId) },
-                                    onTapAvatar: { showProfile = true })
-                            }
-                            .id(msg.id)
-                            .onLongPressGesture {
-                                if !msg.isDeleted {
-                                    reactionPickerTarget = msg
-                                }
-                            }
-                            .onAppear {
-                                if idx == 0 {
-                                    Task { await vm.loadOlder() }
-                                }
-                            }
-                        }
-
-                        // Pending sends — text-only for v1 — render
-                        // after the real thread so they always appear
-                        // at the bottom while in flight.
-                        ForEach(vm.outbox) { pending in
-                            PendingBubble(
-                                pending: pending,
-                                onRetry: { Task { await vm.retryPending(pending.id) } },
-                                onDelete: { vm.deletePending(pending.id) })
-                        }
-
-                        // Sentinel: gives `scrollTo(_, anchor: .bottom)`
-                        // a stable row past the last bubble so the lazy
-                        // stack always materializes through the real
-                        // bottom of the thread.
-                        Color.clear
-                            .frame(height: 1)
-                            .id(Self.bottomAnchorId)
-                    }
-                    .padding(.horizontal, SacredSpacing.m)
-                    .padding(.vertical, SacredSpacing.m)
-                }
-
-                if let err = vm.errorMessage {
-                    Text(err)
-                        .font(.sacredSmall)
-                        .foregroundColor(.sacredRed)
-                        .padding(.horizontal, SacredSpacing.m)
-                }
+                messageListContent
             }
             .scrollDismissesKeyboard(.interactively)
-            // Initial scroll-to-bottom. `defaultScrollAnchor(.bottom)`
-            // doesn't reliably re-anchor after LazyVStack reflows
-            // (especially with image bubbles resizing after async
-            // load), so do an explicit jump on first appear and also
-            // any time messages get populated for the first time.
-            // No animation here so the chat opens AT the bottom rather
-            // than animating from the top.
+            // `defaultScrollAnchor(.bottom)` tells the platform to
+            // place the initial content at the bottom — the chat opens
+            // AT the latest message. This is the platform's official
+            // answer for chat layouts, designed to survive lazy-stack
+            // reflows and async image loads (the failure mode that
+            // broke every previous timing-based fix).
+            .defaultScrollAnchor(.bottom)
+            // Bidirectional bind: writing `pinnedScrollID =
+            // bottomAnchorId` re-aligns the sentinel row to the
+            // viewport's bottom, which the system re-applies after
+            // every layout change. When the user scrolls up the system
+            // writes the visible row's id back into the binding, so
+            // subsequent message arrivals don't yank them down.
+            .scrollPosition(id: $pinnedScrollID, anchor: .bottom)
             .task {
-                await initialScrollIfNeeded(proxy: proxy)
-            }
-            .onChange(of: vm.messages.count) { _, _ in
-                if !didInitialScroll {
-                    Task { await initialScrollIfNeeded(proxy: proxy) }
-                }
+                // First-render seed. defaultScrollAnchor handles the
+                // layout snap; this keeps the bottom anchor "live" so
+                // it re-pins after any reflow.
+                pinnedScrollID = Self.bottomAnchorId
             }
             .onChange(of: vm.messages.last?.id) { _, newId in
                 guard newId != nil else { return }
+                // Re-pin only if the user is currently at the bottom —
+                // otherwise they're reading history and we leave them
+                // alone. `pinnedScrollID` reflects whatever the system
+                // last wrote (visible bottom row or our sentinel).
+                guard isAtBottom else { return }
                 withAnimation(.easeOut(duration: 0.2)) {
-                    proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
+                    pinnedScrollID = Self.bottomAnchorId
                 }
             }
             .onChange(of: vm.outbox.last?.id) { _, newId in
-                // Keep the pending bubble in view while in flight so the
-                // user can see the "sending" → "failed" transition.
+                // The user just sent something — always follow their
+                // own sends to the bottom, even if scrolled up.
                 guard newId != nil else { return }
                 withAnimation(.easeOut(duration: 0.2)) {
-                    proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
+                    pinnedScrollID = Self.bottomAnchorId
                 }
             }
             .onChange(of: jumpToMessageId) { _, target in
+                // Reply-preview taps still center the parent message,
+                // not pin it to the bottom — use the proxy's imperative
+                // scrollTo for that case. After the jump the user can
+                // tap the new message to scroll back; pinnedScrollID
+                // updates passively from the system as they scroll.
                 guard let target else { return }
                 withAnimation(.easeInOut(duration: 0.3)) {
-                    proxy.scrollTo(target, anchor: .center)
+                    proxy.scrollTo(target.uuidString, anchor: .center)
                 }
                 jumpToMessageId = nil
             }
             .onChange(of: composerFocused) { _, focused in
-                // When the keyboard slides up, the ScrollView's content
-                // doesn't shift on its own, so the latest message ends up
-                // tucked behind the keyboard. Re-anchor to the bottom on
-                // every focus event — two passes because the first fires
-                // before UIKit has finalized the keyboard frame.
-                guard focused else { return }
-                guard !vm.messages.isEmpty || !vm.outbox.isEmpty else { return }
-                withAnimation(.easeOut(duration: 0.25)) {
-                    proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
+                // Keyboard opening shrinks the scroll viewport. The
+                // safeAreaInset composer + scrollPosition pinning lift
+                // bottom-anchored content automatically, but only when
+                // pinnedScrollID is actively set to the sentinel — if
+                // it's still the seed nil, the binding has no row to
+                // re-align. Re-asserting it here guarantees the latest
+                // bubble lands above the keyboard. Preserve history
+                // reading: if the user is scrolled up, leave them.
+                guard focused, isAtBottom else { return }
+                withAnimation(.easeOut(duration: 0.2)) {
+                    pinnedScrollID = Self.bottomAnchorId
                 }
-                Task {
-                    try? await Task.sleep(nanoseconds: 350_000_000)
-                    await MainActor.run {
-                        withAnimation(.easeOut(duration: 0.2)) {
-                            proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
+            }
+        }
+    }
+
+    /// Whether the chat is currently parked at (or pinned to) the
+    /// bottom of the thread. We treat "no current pin" as bottom too —
+    /// that's the seed state before .task fires.
+    private var isAtBottom: Bool {
+        pinnedScrollID == nil || pinnedScrollID == Self.bottomAnchorId
+    }
+
+    @ViewBuilder
+    private var messageListContent: some View {
+        if vm.loading && vm.messages.isEmpty && vm.outbox.isEmpty {
+            ProgressView().padding(.top, SacredSpacing.xl)
+        } else if vm.messages.isEmpty && vm.outbox.isEmpty {
+            SacredEmptyState(
+                icon: "ellipsis.message",
+                title: "Say hello.",
+                subtitle: "Your messages stay between the two of you."
+            )
+            .padding(.top, SacredSpacing.xl)
+        } else {
+            LazyVStack(spacing: 6) {
+                if vm.loadingOlder {
+                    ProgressView()
+                        .padding(.vertical, SacredSpacing.s)
+                }
+
+                ForEach(Array(vm.messages.enumerated()), id: \.element.id) { idx, msg in
+                    SwipeToReplyRow(enabled: !msg.isDeleted) {
+                        vm.beginReply(msg)
+                    } content: {
+                        MessageBubble(
+                            message: msg,
+                            fromFriend: vm.isFromFriend(msg),
+                            friendDisplayName: currentConnection.displayLabel,
+                            friendAvatarUrl: currentConnection.person.avatarUrl,
+                            showAvatar: shouldShowAvatar(at: idx),
+                            currentUserId: profile.currentUserId,
+                            isHighlighted: highlightedMessageId == msg.id,
+                            onTapImage: { url in imagePreview = PreviewedImage(url: url, messageId: msg.id) },
+                            onTapReaction: { emoji in
+                                if let me = profile.currentUserId {
+                                    Task { await vm.toggleReaction(emoji, on: msg.id, currentUserId: me) }
+                                }
+                            },
+                            onTapReplyPreview: { parentId in jumpToMessage(parentId) },
+                            onTapAvatar: { showProfile = true })
+                    }
+                    .id(msg.id.uuidString)
+                    .onLongPressGesture {
+                        if !msg.isDeleted {
+                            reactionPickerTarget = msg
+                        }
+                    }
+                    .onAppear {
+                        if idx == 0 {
+                            Task { await vm.loadOlder() }
                         }
                     }
                 }
+
+                // Pending sends — text-only for v1 — render after the
+                // real thread so they always appear at the bottom while
+                // in flight.
+                ForEach(vm.outbox) { pending in
+                    PendingBubble(
+                        pending: pending,
+                        onRetry: { Task { await vm.retryPending(pending.id) } },
+                        onDelete: { vm.deletePending(pending.id) })
+                }
+
+                // Sentinel row at the very bottom of the lazy stack.
+                // `scrollPosition(id:)` aligns this row with the
+                // scroll view's bottom edge — keeping it the durable
+                // pin point regardless of how the bubbles above resize.
+                Color.clear
+                    .frame(height: 1)
+                    .id(Self.bottomAnchorId)
             }
+            .padding(.horizontal, SacredSpacing.m)
+            .padding(.vertical, SacredSpacing.m)
+        }
+
+        if let err = vm.errorMessage {
+            Text(err)
+                .font(.sacredSmall)
+                .foregroundColor(.sacredRed)
+                .padding(.horizontal, SacredSpacing.m)
         }
     }
 

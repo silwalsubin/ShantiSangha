@@ -25,7 +25,6 @@ public static class DependencyInjection
         services.AddScoped<ISafetyService, SafetyService>();
         services.AddScoped<ChatQueryService>();
         services.AddScoped<IChatQueryService>(sp => sp.GetRequiredService<ChatQueryService>());
-        services.AddScoped<GenerateMessageEmbeddingJob>();
         services.AddScoped<GenerateConversationTitleJob>();
 
         return services;
@@ -38,9 +37,6 @@ public static class DependencyInjection
         eventBus.Subscribe<MessagesSavedEvent>(async (@event, ct) =>
         {
             var jobs = services.GetRequiredService<IBackgroundJobClient>();
-
-            foreach (var msgId in @event.LastMessageIds)
-                jobs.Enqueue<GenerateMessageEmbeddingJob>(j => j.RunAsync(msgId));
 
             // Generate title after first exchange (user + assistant = 2 messages)
             if (@event.MessageCount == 2)

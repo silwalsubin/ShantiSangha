@@ -90,29 +90,22 @@ public static class SystemPrompt
     public static string WithContext(
         string? displayName,
         string? todaysReflection,
-        IEnumerable<string>? savedInsights,
-        IEnumerable<string>? conversationSummaries,
-        IEnumerable<string>? journalSummaries = null,
         IEnumerable<GoalContext>? goals = null,
         JyotishContext? jyotish = null,
         IEnumerable<JyotishPassage>? jyotishPassages = null)
     {
         // Ordering is deliberate: stablest blocks first, most variable last.
         // OpenAI's automatic prompt caching matches on a shared prefix, so
-        // pushing per-message variables (insights retrieved against the user's
-        // latest message, jyotish passages from semantic search) to the bottom
-        // lets turns 2+ of a conversation reuse the cached prefix above them.
+        // pushing per-message Jyotish passages to the bottom lets turns 2+ of
+        // a conversation reuse the cached prefix above them.
         //
         // Stability tiers (top = most stable):
         //   1. Base                         — identical across all users
         //   2. displayName                  — stable per user
         //   3. jyotish.FormatForPrompt()    — stable per user (per day)
         //   4. todaysReflection             — stable per day
-        //   5. conversationSummaries        — slow-changing (batched jobs)
-        //   6. journalSummaries             — slow-changing (batched jobs)
-        //   7. goals                        — intra-day stable
-        //   8. savedInsights                — VARIES per message (semantic search)
-        //   9. jyotishPassages              — VARIES per message (semantic search)
+        //   5. goals                        — intra-day stable
+        //   6. jyotishPassages              — VARIES per message (semantic search)
         var parts = new List<string> { Base };
 
         if (displayName is not null)
@@ -137,33 +130,6 @@ public static class SystemPrompt
                 it. You can build on it, but do not simply repeat it — they already read it.
                 If they don't bring it up, don't force it in.
                 """);
-
-        var summaries = conversationSummaries?.ToList();
-        if (summaries is { Count: > 0 })
-        {
-            var summaryText = string.Join("\n\n", summaries);
-            parts.Add($"""
-                ## Their recent inner work
-                Summaries from their previous conversations. Use this context to build
-                continuity — they should feel that you remember their journey:
-                {summaryText}
-                """);
-        }
-
-        var journals = journalSummaries?.ToList();
-        if (journals is { Count: > 0 })
-        {
-            var journalText = string.Join("\n\n", journals);
-            parts.Add($"""
-                ## What they have been writing about
-                Summaries from their recent journal entries. These are private reflections —
-                they reveal what the person is processing beneath the surface. Use this to
-                understand their inner world. Do not quote their journal back to them unless
-                they bring it up — instead, let this awareness shape the depth and direction
-                of your responses:
-                {journalText}
-                """);
-        }
 
         var goalList = goals?.ToList();
         if (goalList is { Count: > 0 })
@@ -215,18 +181,6 @@ public static class SystemPrompt
         }
 
         // --- Per-message variable blocks below this line (keep last for cache alignment) ---
-
-        var insights = savedInsights?.ToList();
-        if (insights is { Count: > 0 })
-        {
-            var insightText = string.Join("\n- ", insights);
-            parts.Add($"""
-                ## What has been meaningful to them
-                These are insights from their past reflections. Refer to them when relevant
-                to show that their journey is remembered and valued:
-                - {insightText}
-                """);
-        }
 
         var passageList = jyotishPassages?.ToList();
         if (passageList is { Count: > 0 })

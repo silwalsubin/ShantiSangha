@@ -19,8 +19,6 @@ public class ChatService(
     ChatDbContext db,
     Kernel kernel,
     ISafetyService safety,
-    IInsightQueryService insightQuery,
-    ISummaryQueryService summaryQuery,
     IGoalQueryService goalQuery,
     IReflectionQueryService reflectionQuery,
     IProfileQueryService profileQuery,
@@ -31,8 +29,6 @@ public class ChatService(
     ILogger<ChatService> logger) : IChatService
 {
     private const int RecentMessageCount = 20;
-    private const int SummaryCount = 3;
-    private const int InsightCount = 5;
     private const int PassageCount = 4;
 
     // A full chart emits 30–40 signature matches, each pulling a passage.
@@ -172,17 +168,14 @@ public class ChatService(
         // failure (e.g. embedding search) doesn't kill the entire conversation.
         string? displayName = null;
         string? todaysReflection = null;
-        IReadOnlyList<string> summaries = [];
-        IReadOnlyList<string> journalSummaries = [];
         IReadOnlyList<GoalSummaryDto> goalDtos = [];
-        IReadOnlyList<string> insights = [];
         JyotishContext? jyotish = null;
         IReadOnlyList<JyotishPassage> passages = [];
 
         try
         {
-            // For chart conversations we skip goals / journal / insight / reflection
-            // context entirely — they dilute the corpus grounding and aren't what
+            // For chart conversations we skip goals and reflection context
+            // entirely — they dilute the corpus grounding and aren't what
             // the person is asking about. Chart chat is Jyotish-only.
             var displayNameTask = profileQuery.GetDisplayNameAsync(userId, cancellationToken);
             var jyotishTask = jyotishService.GetContextAsync(userId, DateOnly.FromDateTime(DateTime.UtcNow), cancellationToken);
@@ -195,16 +188,12 @@ public class ChatService(
             }
             else
             {
-                var summariesTask = summaryQuery.GetRecentSummariesAsync(userId, SummaryCount, cancellationToken);
-                var journalSummariesTask = summaryQuery.GetRecentJournalSummariesAsync(userId, SummaryCount, cancellationToken);
                 var goalsTask = goalQuery.GetActiveGoalsForContextAsync(userId, ct: cancellationToken);
                 var reflectionTask = reflectionQuery.GetRecentReflectionAsync(userId, cancellationToken);
 
-                await Task.WhenAll(displayNameTask, summariesTask, journalSummariesTask, goalsTask, reflectionTask, jyotishTask);
+                await Task.WhenAll(displayNameTask, goalsTask, reflectionTask, jyotishTask);
 
                 displayName = displayNameTask.Result;
-                summaries = summariesTask.Result;
-                journalSummaries = journalSummariesTask.Result;
                 goalDtos = goalsTask.Result;
                 todaysReflection = reflectionTask.Result;
                 jyotish = jyotishTask.Result;
@@ -213,28 +202,6 @@ public class ChatService(
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to load some context for conversation {ConversationId} — continuing with partial context", conversationId);
-        }
-
-        if (!isChart)
-        {
-            try
-            {
-                if (!string.IsNullOrWhiteSpace(currentMessage))
-                {
-                    insights = await insightQuery.SearchInsightsAsync(userId, currentMessage, InsightCount, cancellationToken);
-
-                    if (insights.Count == 0)
-                        insights = await insightQuery.GetRecentInsightsAsync(userId, InsightCount, cancellationToken);
-                }
-                else
-                {
-                    insights = await insightQuery.GetRecentInsightsAsync(userId, InsightCount, cancellationToken);
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to load insights for conversation {ConversationId} — continuing without insights", conversationId);
-            }
         }
 
         // Chart conversations read from the pre-composed chart reading when
@@ -326,9 +293,6 @@ public class ChatService(
             : SystemPrompt.WithContext(
                 displayName: displayName,
                 todaysReflection: todaysReflection,
-                savedInsights: insights,
-                conversationSummaries: summaries,
-                journalSummaries: journalSummaries,
                 goals: goalContexts,
                 jyotish: jyotish,
                 jyotishPassages: passages);

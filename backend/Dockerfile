@@ -10,7 +10,6 @@ COPY ShantiSangha.Goals/ShantiSangha.Goals.csproj ShantiSangha.Goals/
 COPY ShantiSangha.Chat/ShantiSangha.Chat.csproj ShantiSangha.Chat/
 COPY ShantiSangha.Journal/ShantiSangha.Journal.csproj ShantiSangha.Journal/
 COPY ShantiSangha.Wellness/ShantiSangha.Wellness.csproj ShantiSangha.Wellness/
-COPY ShantiSangha.Insights/ShantiSangha.Insights.csproj ShantiSangha.Insights/
 COPY ShantiSangha.Jyotish/ShantiSangha.Jyotish.csproj ShantiSangha.Jyotish/
 
 # Restore only the API project (transitively restores all referenced projects).

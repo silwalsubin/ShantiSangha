@@ -26,7 +26,6 @@ frontend/src/
 │   └── app/
 │       ├── home.vue          # "What needs your attention today?"
 │       ├── journey.vue       # Progress tracking, streaks
-│       ├── journey-insights.vue  # Browse insights
 │       ├── goal-detail.vue   # Single goal view with history
 │       └── reflect/
 │           ├── index.vue     # Timeline: conversations + journals + voice
@@ -48,7 +47,7 @@ frontend/src/
 
 All shared interfaces live in `types/index.ts`. Page-specific types that are only used in one file can stay local. Anything referenced by multiple files must be here.
 
-Key types: `Task`, `Goal`, `CheckIn`, `Message`, `Conversation`, `JournalEntry`, `VoiceEntry`, `Insight`, `TimelineItem`.
+Key types: `Task`, `Goal`, `CheckIn`, `Message`, `Conversation`, `JournalEntry`, `VoiceEntry`, `TimelineItem`.
 
 ### Composables (`src/composables/`)
 

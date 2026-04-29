@@ -19,7 +19,7 @@ Connect with people you trust and message them inside the app — text, images, 
 
 ## What friends see / never see
 - **See**: Display Name, messages sent to/from each other in the chat thread
-- **Never see**: journal entries, AI chat history, voice notes (solo), reflections, goal titles, goal counts, streaks, deeper-why text, insights, calendar history
+- **Never see**: journal entries, AI chat history, voice notes (solo), reflections, goal titles, goal counts, streaks, deeper-why text, calendar history
 
 ## Privacy guarantees
 - Friend messages are NEVER sent to OpenAI / Anthropic / any model provider

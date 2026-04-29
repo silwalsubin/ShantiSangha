@@ -20,8 +20,6 @@ public class JournalPromptController(
     Kernel kernel,
     IGoalQueryService goalQuery,
     IReflectionQueryService reflectionQuery,
-    ISummaryQueryService summaryQuery,
-    IInsightQueryService insightQuery,
     IJyotishContextService jyotishService,
     ILogger<JournalPromptController> logger) : ControllerBase
 {
@@ -51,30 +49,10 @@ public class JournalPromptController(
         // Gather context
         var goals = await goalQuery.GetActiveGoalsForContextAsync(user.Id, today, ct);
         var todaysReflection = await reflectionQuery.GetRecentReflectionAsync(user.Id, ct);
-        var journalSummaries = await summaryQuery.GetRecentJournalSummariesAsync(user.Id, 3, ct);
-        var conversationSummaries = await summaryQuery.GetRecentSummariesAsync(user.Id, 3, ct);
-        var insights = await insightQuery.GetRecentInsightsAsync(user.Id, 3, ct);
-
-        // RAG: search for thematically relevant AND distant entries
-        IReadOnlyList<ShantiSangha.Shared.Models.SemanticSearchResultDto> relatedEntries = [];
-        IReadOnlyList<ShantiSangha.Shared.Models.SemanticSearchResultDto> unexploredEntries = [];
-        try
-        {
-            // Find what's semantically close to recent themes (for callbacks)
-            var recentTheme = journalSummaries.FirstOrDefault() ?? conversationSummaries.FirstOrDefault();
-            if (recentTheme is not null)
-            {
-                relatedEntries = await insightQuery.SearchAllAsync(user.Id, recentTheme, 3, ct);
-            }
-        }
-        catch { /* RAG is optional enrichment */ }
 
         // If the user has no context at all, return null — client falls back.
         var hasContext = goals.Count > 0
-            || !string.IsNullOrWhiteSpace(todaysReflection)
-            || journalSummaries.Count > 0
-            || conversationSummaries.Count > 0
-            || insights.Count > 0;
+            || !string.IsNullOrWhiteSpace(todaysReflection);
         if (!hasContext)
             return Ok(new { Prompt = (string?)null });
 
@@ -89,15 +67,6 @@ public class JournalPromptController(
 
         if (!string.IsNullOrWhiteSpace(todaysReflection))
             contextParts.Add($"Today's reflection: \"{todaysReflection}\"");
-
-        if (journalSummaries.Count > 0)
-            contextParts.Add($"Recent journal themes:\n{string.Join("\n", journalSummaries.Select(s => $"  - {s}"))}");
-
-        if (conversationSummaries.Count > 0)
-            contextParts.Add($"Recent conversation themes:\n{string.Join("\n", conversationSummaries.Select(s => $"  - {s}"))}");
-
-        if (insights.Count > 0)
-            contextParts.Add($"Saved insights:\n{string.Join("\n", insights.Select(i => $"  - {i}"))}");
 
         // Jyotish: today's moon nakshatra quality — invisible thematic influence
         try
@@ -119,14 +88,6 @@ public class JournalPromptController(
         }
         catch { /* Jyotish is optional enrichment */ }
 
-        // RAG-sourced thematic connections
-        if (relatedEntries.Count > 0)
-        {
-            var lines = relatedEntries.Select(e =>
-                $"  - [{e.Type}, {e.CreatedAt:yyyy-MM-dd}] \"{e.Content}\"");
-            contextParts.Add($"Past entries related to recent themes (for callbacks):\n{string.Join("\n", lines)}");
-        }
-
         var context = string.Join("\n\n", contextParts);
 
         try
@@ -140,15 +101,11 @@ public class JournalPromptController(
                 Rules:
                 - ONE sentence. Under 20 words. A question or invitation.
                 - Be SPECIFIC to their context — reference their actual streaks,
-                  journal themes, or reflections. Generic prompts are worthless.
+                  goals, or today's reflection. Generic prompts are worthless.
                 - Never give advice. Never mention what they haven't done.
                 - Never use exclamation marks. No emojis.
                 - Tone: warm, curious, unhurried. Like a friend asking the right
                   question at the right moment.
-                - If past entries are provided, use them for CALLBACKS — reference
-                  something from days or weeks ago and invite the user to revisit
-                  it. "You wrote about patience two weeks ago. Where is that now?"
-                  This creates the feeling that the app remembers their story.
                 - Do not use their name.
                 - Do not wrap the prompt in quotes.
 
@@ -165,9 +122,7 @@ public class JournalPromptController(
 
                 Good examples:
                 - "Twelve days of meditation. What has changed in how you wake up?"
-                - "You wrote about feeling stuck last week. Where is that now?"
                 - "What would you say to the version of you from a month ago?"
-                - "The word 'tired' came up twice this week. What's underneath it?"
                 - "What needed to fall away before you could see clearly?" (Ardra day)
                 - "What is growing in you that you haven't named yet?" (Rohini day)
 

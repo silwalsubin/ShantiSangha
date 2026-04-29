@@ -21,8 +21,6 @@ public class GeneratePortraitJob(
     WellnessDbContext db,
     Kernel kernel,
     IGoalQueryService goalQuery,
-    ISummaryQueryService summaryQuery,
-    IInsightQueryService insightQuery,
     IProfileQueryService profileQuery,
     IJyotishContextService jyotishService,
     IJyotishKnowledgeService jyotishKnowledge,
@@ -35,9 +33,6 @@ public class GeneratePortraitJob(
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             var displayName = await profileQuery.GetDisplayNameAsync(userId);
             var goals = await goalQuery.GetActiveGoalsForContextAsync(userId, today);
-            var summaries = await summaryQuery.GetRecentSummariesAsync(userId, 5);
-            var journalSummaries = await summaryQuery.GetRecentJournalSummariesAsync(userId, 5);
-            var insights = await insightQuery.GetRecentInsightsAsync(userId, 5);
 
             // Previous reflections — for understanding their arc
             var recentReflections = await db.DailyReflections
@@ -87,25 +82,6 @@ public class GeneratePortraitJob(
                 logger.LogWarning(ex, "Failed to load Vedic context for portrait — continuing without it");
             }
 
-            // RAG: find thematic threads across their history
-            List<string> ragEntries = [];
-            try
-            {
-                var searchTerms = goals.Where(g => g.CurrentStreak > 0).Select(g => g.Title)
-                    .Concat(journalSummaries.Take(2));
-                var searchQuery = string.Join(", ", searchTerms);
-                if (!string.IsNullOrWhiteSpace(searchQuery))
-                {
-                    var results = await insightQuery.SearchAllAsync(userId, searchQuery, 5);
-                    ragEntries = results.Select(e =>
-                        $"  - [{e.Type}, {e.CreatedAt:yyyy-MM-dd}] \"{e.Content}\"").ToList();
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "RAG search failed for portrait — continuing without it");
-            }
-
             // Build context
             var contextParts = new List<string>();
 
@@ -144,22 +120,6 @@ public class GeneratePortraitJob(
                 });
                 contextParts.Add($"Active practices and goals:\n{string.Join("\n", goalLines)}");
             }
-
-            // Conversation themes
-            if (summaries.Count > 0)
-                contextParts.Add($"Recurring conversation themes:\n{string.Join("\n", summaries.Select(s => $"  - {s}"))}");
-
-            // Journal themes
-            if (journalSummaries.Count > 0)
-                contextParts.Add($"Journal themes:\n{string.Join("\n", journalSummaries.Select(s => $"  - {s}"))}");
-
-            // Insights (patterns the AI has noticed)
-            if (insights.Count > 0)
-                contextParts.Add($"Patterns noticed over time:\n{string.Join("\n", insights.Select(i => $"  - {i}"))}");
-
-            // RAG entries
-            if (ragEntries.Count > 0)
-                contextParts.Add($"Thematic threads from their history:\n{string.Join("\n", ragEntries)}");
 
             // Recent reflections for arc
             if (recentReflections.Count > 0)
@@ -227,7 +187,7 @@ public class GeneratePortraitJob(
         {
             0 => "This person just started. You know almost nothing yet. Write a seed portrait based on their nakshatra qualities and what they've chosen to practice. End with: 'As you practice, this portrait will grow with you.'",
             < 7 => "This person is new. You have limited data. Write what you can see so far — their chosen practices, their early patterns. Keep it grounded in what's real, not what you imagine.",
-            < 30 => "You have a few weeks of data. You can start to see patterns — which practices stick, what themes emerge in their journals, how they show up. Name what you notice.",
+            < 30 => "You have a few weeks of data. You can start to see patterns — which practices stick, which daily reflections keep echoing, how they show up. Name what you notice.",
             _ => "You have deep history. You can see arcs, shifts, contradictions, and growth. This portrait should feel like it could only describe THIS person — specific, earned, true."
         };
 
@@ -252,11 +212,10 @@ public class GeneratePortraitJob(
             - If Vedic identity is available, let it anchor the portrait. The nakshatra
               quality should feel like the foundation of who they are, with practice
               data as evidence.
-            - If no Vedic identity, anchor in practice patterns and journal themes.
+            - If no Vedic identity, anchor in practice patterns and daily reflections.
             - Reference specific numbers (streak days, practice counts) naturally.
-            - Name thematic threads from their journals/conversations if available.
-              "Patience keeps appearing in your words" or "You circle back to the
-              question of discipline — not whether you have it, but what it means."
+            - Name thematic threads only when they are visible in the provided
+              reflections or practice history.
             - The tone is warm, observant, unhurried. Like a wise teacher who has
               been watching quietly and finally speaks.
             - Never give advice. Never instruct. Only observe and reflect back.

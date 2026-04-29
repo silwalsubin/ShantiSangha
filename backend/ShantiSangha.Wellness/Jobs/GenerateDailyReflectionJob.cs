@@ -14,8 +14,6 @@ public class GenerateDailyReflectionJob(
     WellnessDbContext db,
     Kernel kernel,
     IGoalQueryService goalQuery,
-    ISummaryQueryService summaryQuery,
-    IInsightQueryService insightQuery,
     IProfileQueryService profileQuery,
     IJyotishContextService jyotishService,
     IJyotishKnowledgeService jyotishKnowledge,
@@ -33,9 +31,6 @@ public class GenerateDailyReflectionJob(
         {
             var displayName = await profileQuery.GetDisplayNameAsync(userId);
             var goals = await goalQuery.GetActiveGoalsForContextAsync(userId, today);
-            var summaries = await summaryQuery.GetRecentSummariesAsync(userId, 5);
-            var journalSummaries = await summaryQuery.GetRecentJournalSummariesAsync(userId, 5);
-            var insights = await insightQuery.GetRecentInsightsAsync(userId, 5);
 
             // Get previous reflections — now used for CONTINUITY, not just deduplication
             var previousReflections = await db.DailyReflections
@@ -77,37 +72,6 @@ public class GenerateDailyReflectionJob(
 
             if (milestonesHitToday.Count > 0)
                 contextParts.Add($"MILESTONE(S) HIT TODAY:\n{string.Join("\n", milestonesHitToday.Select(m => $"  - {m}"))}");
-
-            if (summaries.Count > 0)
-                contextParts.Add($"Recent conversation themes:\n{string.Join("\n", summaries.Select(s => $"  - {s}"))}");
-
-            if (journalSummaries.Count > 0)
-                contextParts.Add($"Recent journal reflections:\n{string.Join("\n", journalSummaries.Select(s => $"  - {s}"))}");
-
-            if (insights.Count > 0)
-                contextParts.Add($"Patterns from their reflections:\n{string.Join("\n", insights.Select(i => $"  - {i}"))}");
-
-            // RAG: semantic search for thematically relevant past entries
-            // Build a search query from the user's current context (goals + recent themes)
-            try
-            {
-                var goalTitles = goals.Where(g => g.CurrentStreak > 0).Select(g => g.Title);
-                var searchQuery = string.Join(", ", goalTitles.Concat(summaries.Take(2)));
-                if (!string.IsNullOrWhiteSpace(searchQuery))
-                {
-                    var relatedEntries = await insightQuery.SearchAllAsync(userId, searchQuery, 3);
-                    if (relatedEntries.Count > 0)
-                    {
-                        var entryLines = relatedEntries.Select(e =>
-                            $"  - [{e.Type}, {e.CreatedAt:yyyy-MM-dd}] \"{e.Content}\"");
-                        contextParts.Add($"Semantically relevant past entries (for callbacks and depth):\n{string.Join("\n", entryLines)}");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "RAG search failed for user {UserId} — continuing without it", userId);
-            }
 
             // Check days since last visit
             var lastReflection = previousReflections.FirstOrDefault();

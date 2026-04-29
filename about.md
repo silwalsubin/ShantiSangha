@@ -77,14 +77,6 @@ Simple mood check-ins help users notice patterns in how they feel and build awar
 
 The app offers supportive exercises for moments of stress, overwhelm, or emotional fatigue, helping users pause, reset, and recenter.
 
-### Conversation Summaries
-
-Users can receive summaries of what they explored, helping them keep track of insights, recurring themes, and next steps for self-care.
-
-### Saved Insights
-
-Important reflections, patterns, and personal takeaways can be saved so users can revisit what matters most to them.
-
 ### Voice Journaling
 
 Users can speak their thoughts out loud when writing feels difficult, making emotional reflection more accessible and natural.
@@ -102,8 +94,6 @@ The first version of ShantiSangha should focus on:
 - journaling
 - mood check-ins
 - coping exercises
-- conversation summaries
-- saved insights
 - basic voice journaling
 - safety and support resource guidance
 
@@ -115,7 +105,6 @@ After the MVP, ShantiSangha can expand into:
 - smarter memory of user preferences and patterns
 - more advanced voice experiences
 - goals and habit support
-- richer emotional insights over time
 - optional connection to human support or professional care pathways
 
 ## Product Vision

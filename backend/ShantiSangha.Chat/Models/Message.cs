@@ -1,5 +1,3 @@
-using Pgvector;
-
 namespace ShantiSangha.Chat.Models;
 
 public enum MessageRole { User, Assistant }
@@ -10,7 +8,6 @@ public class Message
     public Guid ConversationId { get; set; }
     public MessageRole Role { get; set; }
     public string Content { get; set; } = string.Empty;
-    public Vector? Embedding { get; set; }
     public DateTime CreatedAt { get; set; }
 
     public Conversation Conversation { get; set; } = null!;

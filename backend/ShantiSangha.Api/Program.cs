@@ -16,7 +16,6 @@ using ShantiSangha.Friends;
 using ShantiSangha.Friends.Realtime;
 using ShantiSangha.Identity;
 using ShantiSangha.Goals;
-using ShantiSangha.Insights;
 using ShantiSangha.Journal;
 using ShantiSangha.Jyotish;
 using ShantiSangha.Notifications;
@@ -100,7 +99,6 @@ try
     builder.Services.AddChatModule(vectorDataSource);
     builder.Services.AddJournalModule(vectorDataSource);
     builder.Services.AddWellnessModule(connStr, appConfig.VoiceBucketName);
-    builder.Services.AddInsightsModule(vectorDataSource);
     builder.Services.AddJyotishModule(vectorDataSource);
     builder.Services.AddFriendsModule(connStr, appConfig.FriendsMediaBucketName, appConfig.RedisUrl);
     builder.Services.AddNotificationsModule(connStr);
@@ -112,7 +110,6 @@ try
         .AddApplicationPart(typeof(ShantiSangha.Chat.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Journal.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Wellness.DependencyInjection).Assembly)
-        .AddApplicationPart(typeof(ShantiSangha.Insights.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Jyotish.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Friends.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Notifications.DependencyInjection).Assembly)
@@ -233,7 +230,6 @@ try
     using (var scope = app.Services.CreateScope())
     {
         scope.ServiceProvider.UseIdentityModule();
-        scope.ServiceProvider.SubscribeInsightsEvents();
         scope.ServiceProvider.SubscribeJournalEvents();
     }
 
@@ -246,7 +242,6 @@ try
         await sp.GetRequiredService<ShantiSangha.Chat.Data.ChatDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Journal.Data.JournalDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Wellness.Data.WellnessDbContext>().Database.MigrateAsync();
-        await sp.GetRequiredService<ShantiSangha.Insights.Data.InsightsDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Jyotish.Data.JyotishDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Friends.Data.FriendsDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Notifications.Data.NotificationsDbContext>().Database.MigrateAsync();
@@ -257,6 +252,18 @@ try
         var chatDb = sp.GetRequiredService<ShantiSangha.Chat.Data.ChatDbContext>();
         await chatDb.Database.ExecuteSqlRawAsync(
             "ALTER TABLE \"Conversations\" ADD COLUMN IF NOT EXISTS \"Type\" text NOT NULL DEFAULT 'general';");
+
+        // Insights has been retired. Drop its derived-data tables if they still
+        // exist in an older environment; these are safe to remove because no
+        // remaining domain owns or reads them.
+        var identityDb = sp.GetRequiredService<ShantiSangha.Identity.Data.IdentityDbContext>();
+        await identityDb.Database.ExecuteSqlRawAsync(
+            """
+            DROP TABLE IF EXISTS "SavedInsights" CASCADE;
+            DROP TABLE IF EXISTS "Summaries" CASCADE;
+            ALTER TABLE IF EXISTS "Messages" DROP COLUMN IF EXISTS "Embedding";
+            ALTER TABLE IF EXISTS "Journals" DROP COLUMN IF EXISTS "Embedding";
+            """);
 
     }
 

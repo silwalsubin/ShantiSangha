@@ -84,16 +84,6 @@ export interface VoiceEntry {
   createdAt: string
 }
 
-// --- Insights ---
-
-export interface Insight {
-  id: string
-  content: string
-  source: 'conversation' | 'journal'
-  sourceId: string
-  createdAt: string
-}
-
 // --- Timeline (Reflect page) ---
 
 export interface TimelineItem {

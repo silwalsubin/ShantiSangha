@@ -76,7 +76,8 @@
       "Bash(grep -rn \"withAnimation\\(.spring\" SolarSystem/ CircleSolarSystemView.swift)",
       "Bash(grep -rn \"value\\\\.translation\\\\.width\\\\|value\\\\.translation\\\\.height\\\\|value\\\\.scale\" SolarSystem/ CircleSolarSystemView.swift)",
       "Bash(grep -rn \"isRealWorldProxy\\\\|TextureResource\\(image:\" SolarSystem/)",
-      "Bash(killall -9 SourceKitService SKAgent SwiftPM-Helper XCBBuildService)"
+      "Bash(killall -9 SourceKitService SKAgent SwiftPM-Helper XCBBuildService)",
+      "Bash(git log *)"
     ],
     "additionalDirectories": [
       "/Users/subinsilwal/Desktop/code/maiself/.claude",

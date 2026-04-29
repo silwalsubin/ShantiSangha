@@ -21,9 +21,6 @@ enum SilentPushHandler {
             // Voice transcription completed — no widget data to update,
             // but reload timelines in case we add voice data to widget later
             break
-        case "insight", "summary":
-            // Insights don't currently surface in widget, but refresh anyway
-            break
         case "friend_message":
             // Extract Sendable values BEFORE the MainActor hop — the raw
             // `userInfo` dict is `[AnyHashable: Any]`, which is not Sendable

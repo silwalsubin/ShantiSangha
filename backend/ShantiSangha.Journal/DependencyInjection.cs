@@ -18,7 +18,6 @@ public static class DependencyInjection
 
         services.AddScoped<IJournalService, JournalService>();
         services.AddScoped<IJournalQueryService, JournalQueryService>();
-        services.AddScoped<IJournalSearchService, JournalSearchService>();
 
         return services;
     }

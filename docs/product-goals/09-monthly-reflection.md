@@ -15,7 +15,7 @@ Once a month, generate and display a brief AI-written reflection on the user's m
 - Appears on the Journey tab at the start of each new month
 - Not analytics. Not metrics. A letter:
   > "This month, you showed up for your practice 22 out of 30 days. You journaled about change, and your conversations kept returning to courage. You're growing."
-- Draws from: check-in history, journal summaries, extracted insights, goal progress
+- Draws from: check-in history, fulfilled commitments, daily reflections, goal progress
 - One reflection per month. Cannot be regenerated or edited.
 - Previous months' reflections are viewable in a simple list
 
@@ -31,7 +31,7 @@ This is the payoff for a month of practice. It's the app holding up a mirror and
 
 ## What This Replaces
 
-Nothing. This adds a new rhythm to the app — daily (check-ins), weekly (insight), monthly (reflection).
+Nothing. This adds a new rhythm to the app — daily check-ins and monthly reflection.
 
 ## Definition of Done
 

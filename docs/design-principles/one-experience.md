@@ -4,7 +4,7 @@ The app is a single flowing journey, not a collection of separate tools.
 
 ## Why this matters
 
-Modular apps feel like work. "Which tab do I use? What's the difference between Chat and Voice? Where did my insight go?" Every question is friction. Friction kills daily habits.
+Modular apps feel like work. "Which tab do I use? What's the difference between Chat and Voice? Where do I go next?" Every question is friction. Friction kills daily habits.
 
 A spiritual practice should feel effortless — open the app, ground yourself, reflect, and go.
 
@@ -23,7 +23,7 @@ A spiritual practice should feel effortless — open the app, ground yourself, r
 Open app
   → Home: ground yourself (daily reflection, check in on practices)
     → Reflect: process what you feel (talk, write, or speak)
-      → Journey: see how you've grown (trends, insights, history)
+      → Journey: see how you've grown (practice history and fulfilled commitments)
         → Home: tomorrow, begin again
 ```
 

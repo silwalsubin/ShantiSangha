@@ -11,15 +11,14 @@ The core feature of ShantiSangha. A conversational AI that helps users process e
 ## How it works
 - User creates a conversation and sends messages
 - Backend streams responses via Server-Sent Events (SSE) using GPT-4o
-- Messages are stored with embeddings (text-embedding-3-small) for semantic search
-- Background jobs extract insights and generate summaries after conversations
+- Messages are stored as conversation history for the user
+- The companion uses current goals, today's reflection, and Jyotish context when available
 - Each conversation belongs to one user, identified via JWT `sub` claim
 
 ## Key files
-- Frontend: `frontend/src/pages/app/chat/index.vue`, `frontend/src/pages/app/chat/[id].vue`
-- Backend routes: `backend/ShantiSangha.Api/Routes/ConversationRoutes.cs`
-- AI service: `backend/ShantiSangha.Infrastructure/AI/ChatService.cs`
-- Background jobs: `GenerateSummaryJob`, `GenerateEmbeddingJob`, `ExtractInsightsJob`
+- Frontend: `frontend/src/pages/app/reflect/index.vue`, `frontend/src/pages/app/reflect/chat.vue`
+- Backend controller: `backend/ShantiSangha.Chat/Controllers/ConversationsController.cs`
+- AI service: `backend/ShantiSangha.Chat/AI/ChatService.cs`
 
 ## API endpoints
 - `GET /api/conversations` — list conversations
@@ -29,7 +28,6 @@ The core feature of ShantiSangha. A conversational AI that helps users process e
 - `POST /api/conversations/{id}/messages` — send message (SSE streaming response)
 
 ## Q2 improvements planned
-- Conversation memory (include past insights/mood in system prompt)
 - Spiritual grounding (system prompt with Gita, Buddhist teachings)
 - Contextual responses ("I feel anxious" → breathing exercise + teaching)
 - Suggested prompts based on mood/time/activity

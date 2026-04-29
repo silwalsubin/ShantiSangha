@@ -5,12 +5,12 @@ A single AI-generated observation about the user that appears at the top of Home
 
 ## Value
 - Gives the user a reason to return to the app daily: curiosity about what it noticed
-- Makes "the app knows you" tangible — draws from journals, conversations, goals, streaks, and past reflections
+- Makes "the app knows you" tangible — draws from goals, streaks, Jyotish context, and past reflections
 - Never shames what was missed — only observes what is
 - Replaces generic motivation with personal observation
 
 ## How it works
-- A Hangfire job (`GenerateDailyReflectionJob`) gathers context about the user: active goals with streaks, recent conversation summaries, recent journal summaries, saved insights, and the last few reflections (to avoid repeating themes)
+- A Hangfire job (`GenerateDailyReflectionJob`) gathers context about the user: active goals with streaks, Jyotish context, and the last few reflections (to avoid repeating themes)
 - GPT generates a 2–3 sentence reflection (max 50 words) using a tightly scoped prompt that forbids advice, motivation, and mentions of inactive goals
 - Generation is lazy: the first `GET /api/reflection/today?date=YYYY-MM-DD` call for a given user-date triggers the job and returns `{ content: null }`; the client polls up to 5 times (3s apart) for the result
 - On completion, a silent push (`type: "reflection"`) is sent so HomeView can refresh
