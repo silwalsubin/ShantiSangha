@@ -68,6 +68,19 @@ public class WiseCatController(
         return dto is null ? NotFound() : Ok(dto);
     }
 
+    [HttpGet("symbols/search")]
+    public async Task<IActionResult> SearchSymbols(string q, int limit = 10, CancellationToken ct = default)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+
+        var trimmed = (q ?? string.Empty).Trim();
+        if (trimmed.Length < 1) return Ok(Array.Empty<object>());
+
+        var results = await marketData.SearchSymbolsAsync(trimmed, Math.Clamp(limit, 1, 25), ct);
+        return Ok(results);
+    }
+
     [HttpGet("history/{ticker}")]
     public async Task<IActionResult> GetHistory(string ticker, int days = 90, CancellationToken ct = default)
     {

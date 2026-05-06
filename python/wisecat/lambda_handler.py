@@ -21,6 +21,7 @@ from .finnhub_client import (
     get_price_history,
     get_quotes,
     healthcheck,
+    search_symbols,
 )
 from .scoring import score_ticker
 from .settings import settings
@@ -42,6 +43,8 @@ def handler(event: dict, context: Any) -> dict:
         return _history(event)
     if action == "quote":
         return _quote(event)
+    if action == "symbolSearch":
+        return _symbol_search(event)
 
     raise ValueError(f"unknown action: {action}")
 
@@ -107,6 +110,20 @@ def _history(event: dict) -> dict:
         for row in df.itertuples()
     ]
     return {"ticker": ticker, "bars": bars}
+
+
+def _symbol_search(event: dict) -> dict:
+    query = (event.get("query") or "").strip()
+    limit = int(event.get("limit") or 10)
+    if not query:
+        return {"results": []}
+
+    try:
+        results = search_symbols(query, limit=limit)
+    except FinnhubUnavailable as e:
+        raise RuntimeError(f"finnhub unavailable: {e}") from e
+
+    return {"results": results}
 
 
 def _quote(event: dict) -> dict:

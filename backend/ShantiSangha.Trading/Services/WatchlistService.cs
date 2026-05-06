@@ -5,7 +5,10 @@ using ShantiSangha.Trading.Models;
 
 namespace ShantiSangha.Trading.Services;
 
-public class WatchlistService(TradingDbContext db, IStockChartService stockChart) : IWatchlistService
+public class WatchlistService(
+    TradingDbContext db,
+    IStockChartService stockChart,
+    IMarketDataClient marketData) : IWatchlistService
 {
     public async Task<IReadOnlyList<WatchlistItemDto>> ListAsync(Guid userId, CancellationToken ct = default)
     {
@@ -26,12 +29,20 @@ public class WatchlistService(TradingDbContext db, IStockChartService stockChart
             .FirstOrDefaultAsync(w => w.UserId == userId && w.Ticker == ticker, ct);
         if (existing != null) return new WatchlistItemDto(existing.Ticker, existing.AddedAt);
 
-        var item = new WatchlistItem { UserId = userId, Ticker = ticker, AddedAt = DateTime.UtcNow };
+        // Validate against Finnhub — reject anything that isn't a real US-listed
+        // common stock or ETF. This is the same path the iOS search uses, so a
+        // ticker the user picked from a search result is guaranteed to pass.
+        var matches = await marketData.SearchSymbolsAsync(ticker, limit: 25, ct);
+        var exact = matches.FirstOrDefault(m => string.Equals(m.Symbol, ticker, StringComparison.OrdinalIgnoreCase));
+        if (exact is null)
+            throw new InvalidOperationException($"'{ticker}' is not a recognized US-listed symbol");
+
+        var item = new WatchlistItem { UserId = userId, Ticker = exact.Symbol, AddedAt = DateTime.UtcNow };
         db.WatchlistItems.Add(item);
         await db.SaveChangesAsync(ct);
 
         // Best-effort: warm the natal chart cache so the daily job doesn't have to.
-        try { await stockChart.GetOrCreateAsync(ticker, ct); }
+        try { await stockChart.GetOrCreateAsync(exact.Symbol, ct); }
         catch { /* non-fatal */ }
 
         return new WatchlistItemDto(item.Ticker, item.AddedAt);

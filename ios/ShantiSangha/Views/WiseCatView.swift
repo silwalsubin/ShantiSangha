@@ -14,13 +14,11 @@ struct WiseCatView: View {
                 VStack(spacing: SacredSpacing.l) {
                     header
 
-                    if vm.loading && vm.signals.isEmpty {
+                    if vm.loading && vm.watchlist.isEmpty {
                         ProgressView()
                             .frame(maxWidth: .infinity, minHeight: 160)
                     } else if vm.watchlist.isEmpty {
                         emptyWatchlist
-                    } else if vm.isStale {
-                        staleState
                     } else {
                         ForEach(vm.watchlist) { entry in
                             WiseCatRow(entry: entry, signal: vm.signal(for: entry.ticker))
@@ -95,19 +93,6 @@ struct WiseCatView: View {
         }
     }
 
-    private var staleState: some View {
-        LuxCard {
-            VStack(alignment: .leading, spacing: SacredSpacing.s) {
-                Text("Wise Cat is being updated")
-                    .font(.sacredSubheading)
-                    .foregroundColor(.sacredText)
-                Text("Today's signals haven't been generated yet — pull down to refresh, or check back after market close.")
-                    .font(.sacredText)
-                    .foregroundColor(.sacredTextSecondary)
-            }
-            .padding(SacredSpacing.lux)
-        }
-    }
 }
 
 private struct WiseCatRow: View {

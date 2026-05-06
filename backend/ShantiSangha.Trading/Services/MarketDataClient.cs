@@ -49,6 +49,19 @@ public class MarketDataClient(
         return new QuoteSnapshot(resp.Ticker, resp.Price.Value, null, null, null);
     }
 
+    public async Task<IReadOnlyList<SymbolMatch>> SearchSymbolsAsync(string query, int limit = 10, CancellationToken ct = default)
+    {
+        var resp = await InvokeAsync<SymbolSearchResponseDto>(new
+        {
+            action = "symbolSearch",
+            query,
+            limit,
+        }, ct);
+
+        if (resp?.Results is null) return Array.Empty<SymbolMatch>();
+        return resp.Results.Select(r => new SymbolMatch(r.Symbol, r.Description, r.Type)).ToList();
+    }
+
     public async Task<IReadOnlyList<TechnicalScore>> ScoreAsync(IReadOnlyList<ScoreInput> items, CancellationToken ct = default)
     {
         var payload = new
@@ -147,6 +160,9 @@ public class MarketDataClient(
         List<SignalContributionDto>? Signals);
 
     private record SignalContributionDto(string Name, double Value, double Contribution);
+
+    private record SymbolSearchResponseDto(List<SymbolMatchDto>? Results);
+    private record SymbolMatchDto(string Symbol, string Description, string Type);
 }
 
 public record WisecatLambdaConfig(string FunctionName);

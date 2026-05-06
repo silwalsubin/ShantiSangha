@@ -131,6 +131,35 @@ def get_price_history(ticker: str, lookback_days: int | None = None) -> pd.DataF
     return df
 
 
+def search_symbols(query: str, limit: int = 10) -> list[dict]:
+    """Search Finnhub for symbols matching `query`. Filters to US-tradable
+    securities (Common Stock + ETF) and strips OTC tickers (containing '.')
+    that don't trade on the major exchanges.
+    """
+    if not query or not query.strip():
+        return []
+
+    data = _get("/search", {"q": query.strip(), "exchange": "US"})
+    results = data.get("result") or []
+
+    out: list[dict] = []
+    for r in results:
+        symbol = (r.get("symbol") or "").strip().upper()
+        if not symbol or "." in symbol:
+            continue
+        type_ = r.get("type") or ""
+        if type_ not in ("Common Stock", "ETF", "ETP", "ADR"):
+            continue
+        out.append({
+            "symbol": symbol,
+            "description": r.get("description") or "",
+            "type": type_,
+        })
+        if len(out) >= limit:
+            break
+    return out
+
+
 def healthcheck() -> tuple[str, str | None]:
     try:
         _api_key()

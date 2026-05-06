@@ -22,4 +22,9 @@ enum WiseCatAPI {
     static func getSignal(_ ticker: String) async throws -> TradingSignal {
         try await ApiService.shared.get("/wisecat/signals/\(ticker)")
     }
+
+    static func searchSymbols(_ query: String, limit: Int = 10) async throws -> [SymbolMatch] {
+        let escaped = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+        return try await ApiService.shared.get("/wisecat/symbols/search?q=\(escaped)&limit=\(limit)")
+    }
 }

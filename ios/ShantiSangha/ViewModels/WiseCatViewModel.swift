@@ -35,6 +35,7 @@ final class WiseCatViewModel: ObservableObject {
             self.signals = try await sig
             self.error = nil
         } catch {
+            if error.isCancellation { return }
             self.error = error.localizedDescription
         }
     }
@@ -46,6 +47,7 @@ final class WiseCatViewModel: ObservableObject {
             _ = try await WiseCatAPI.addWatchlist(cleaned)
             await refresh()
         } catch {
+            if error.isCancellation { return }
             self.error = error.localizedDescription
         }
     }
@@ -55,6 +57,7 @@ final class WiseCatViewModel: ObservableObject {
             try await WiseCatAPI.removeWatchlist(ticker)
             await refresh()
         } catch {
+            if error.isCancellation { return }
             self.error = error.localizedDescription
         }
     }
@@ -62,9 +65,6 @@ final class WiseCatViewModel: ObservableObject {
     func signal(for ticker: String) -> TradingSignal? {
         signals.first(where: { $0.ticker == ticker })
     }
-
-    /// True when no signals have been generated yet (e.g., the daily job hasn't run, or auth-stale state).
-    var isStale: Bool { !loading && watchlist.isEmpty == false && signals.isEmpty }
 
     var hasStrongCalls: Bool {
         signals.contains(where: { $0.conviction >= 0.7 && $0.action != "Hold" })

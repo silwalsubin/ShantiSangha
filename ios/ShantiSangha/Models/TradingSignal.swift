@@ -35,6 +35,14 @@ struct WatchlistEntry: Codable, Identifiable, Hashable {
     var id: String { ticker }
 }
 
+struct SymbolMatch: Codable, Identifiable, Hashable {
+    let symbol: String
+    let description: String
+    let type: String
+
+    var id: String { symbol }
+}
+
 enum WiseCatAction: String {
     case buy = "Buy"
     case sell = "Sell"

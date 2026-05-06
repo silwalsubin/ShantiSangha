@@ -12,10 +12,12 @@ public record TechnicalScore(string Ticker, decimal? Price, double Score, IReadO
 
 public record ScoreInput(string Ticker, IReadOnlyList<MarketBar> Bars, decimal? Price);
 
+public record SymbolMatch(string Symbol, string Description, string Type);
+
 /// <summary>
 /// Wraps the Python wisecat service. The .NET side owns the durable bar cache;
 /// this client only uses Python for (a) computing technical scores from bars
-/// and (b) fetching missing bars / live quotes from Finnhub.
+/// and (b) fetching missing bars / live quotes / symbol search from Finnhub.
 /// </summary>
 public interface IMarketDataClient
 {
@@ -27,4 +29,7 @@ public interface IMarketDataClient
 
     /// <summary>Pure compute. Caller passes bars from local cache.</summary>
     Task<IReadOnlyList<TechnicalScore>> ScoreAsync(IReadOnlyList<ScoreInput> items, CancellationToken ct = default);
+
+    /// <summary>Symbol search — used for watchlist add validation + iOS suggestions.</summary>
+    Task<IReadOnlyList<SymbolMatch>> SearchSymbolsAsync(string query, int limit = 10, CancellationToken ct = default);
 }
