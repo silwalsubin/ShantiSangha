@@ -14,6 +14,8 @@ struct WiseCatDetailView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: SacredSpacing.l) {
+                    headerHero
+
                     if loading {
                         ProgressView()
                             .frame(maxWidth: .infinity, minHeight: 200)
@@ -36,7 +38,7 @@ struct WiseCatDetailView: View {
             .refreshable { await load() }
         }
         .navigationTitle(ticker)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
     }
 
@@ -49,6 +51,19 @@ struct WiseCatDetailView: View {
         } catch {
             self.error = error.localizedDescription
         }
+    }
+
+    private var headerHero: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("WISE CAT")
+                .font(.sacredSectionLabel)
+                .tracking(3)
+                .foregroundColor(.sacredLabel)
+            Text(ticker)
+                .font(.sacredTitle)
+                .foregroundColor(.sacredText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func priceHeader(_ s: TradingSignal) -> some View {

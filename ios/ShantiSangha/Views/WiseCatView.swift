@@ -43,7 +43,7 @@ struct WiseCatView: View {
             .refreshable { await vm.refresh() }
         }
         .navigationTitle("Wise Cat")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -62,13 +62,13 @@ struct WiseCatView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-            Text("Today's read")
+        VStack(alignment: .leading, spacing: 6) {
+            Text("WISE CAT")
                 .font(.sacredSectionLabel)
                 .tracking(3)
                 .foregroundColor(.sacredLabel)
-            Text("Markets, weighed against the sky")
-                .font(.sacredHeading)
+            Text("Today's read")
+                .font(.sacredTitle)
                 .foregroundColor(.sacredText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
