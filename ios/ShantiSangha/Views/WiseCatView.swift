@@ -21,7 +21,11 @@ struct WiseCatView: View {
                         emptyWatchlist
                     } else {
                         ForEach(vm.watchlist) { entry in
-                            WiseCatRow(entry: entry, signal: vm.signal(for: entry.ticker))
+                            WiseCatRow(
+                                entry: entry,
+                                signal: vm.signal(for: entry.ticker),
+                                generating: vm.generatingTickers.contains(entry.ticker)
+                            )
                         }
                     }
 
@@ -98,6 +102,7 @@ struct WiseCatView: View {
 private struct WiseCatRow: View {
     let entry: WatchlistEntry
     let signal: TradingSignal?
+    let generating: Bool
 
     var body: some View {
         NavigationLink(destination: WiseCatDetailView(ticker: entry.ticker)) {
@@ -111,8 +116,12 @@ private struct WiseCatRow: View {
                             Text(priceLabel(signal))
                                 .font(.sacredSmall)
                                 .foregroundColor(.sacredTextSecondary)
+                        } else if generating {
+                            Text("Reading the sky…")
+                                .font(.sacredSmall)
+                                .foregroundColor(.sacredMuted)
                         } else {
-                            Text("waiting for today's read")
+                            Text("Waiting for today's read")
                                 .font(.sacredSmall)
                                 .foregroundColor(.sacredMuted)
                         }
@@ -125,6 +134,10 @@ private struct WiseCatRow: View {
                             actionChip(signal)
                             convictionDots(signal.conviction)
                         }
+                    } else if generating {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                            .tint(.sacredGold)
                     }
                 }
                 .padding(SacredSpacing.lux)

@@ -7,6 +7,7 @@ final class WiseCatViewModel: ObservableObject {
     @Published var signals: [TradingSignal] = []
     @Published var loading = false
     @Published var error: String?
+    @Published var generatingTickers: Set<String> = []
 
     private var pushObserver: NSObjectProtocol?
 
@@ -28,6 +29,7 @@ final class WiseCatViewModel: ObservableObject {
     func refresh() async {
         loading = true
         defer { loading = false }
+
         do {
             async let wl = WiseCatAPI.listWatchlist()
             async let sig = WiseCatAPI.getSignals()
@@ -37,7 +39,33 @@ final class WiseCatViewModel: ObservableObject {
         } catch {
             if error.isCancellation { return }
             self.error = error.localizedDescription
+            return
         }
+
+        // For any watchlist ticker without a cached signal — typically a
+        // freshly-added one, before the daily Hangfire job runs — generate
+        // on-demand in parallel and stream results into the UI as each lands.
+        let missing = watchlist
+            .map { $0.ticker }
+            .filter { ticker in !signals.contains(where: { $0.ticker == ticker }) }
+        if missing.isEmpty { return }
+
+        generatingTickers = Set(missing)
+        await withTaskGroup(of: TradingSignal?.self) { group in
+            for ticker in missing {
+                group.addTask {
+                    try? await WiseCatAPI.getSignal(ticker)
+                }
+            }
+            for await signal in group {
+                guard let signal else { continue }
+                if !self.signals.contains(where: { $0.ticker == signal.ticker }) {
+                    self.signals.append(signal)
+                }
+                self.generatingTickers.remove(signal.ticker)
+            }
+        }
+        generatingTickers = []
     }
 
     func add(_ ticker: String) async {
