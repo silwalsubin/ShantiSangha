@@ -36,6 +36,7 @@
     <ProjectReference Include="..\ShantiSangha.Jyotish\ShantiSangha.Jyotish.csproj" />
     <ProjectReference Include="..\ShantiSangha.Friends\ShantiSangha.Friends.csproj" />
     <ProjectReference Include="..\ShantiSangha.Notifications\ShantiSangha.Notifications.csproj" />
+    <ProjectReference Include="..\ShantiSangha.Trading\ShantiSangha.Trading.csproj" />
   </ItemGroup>
 
 </Project>

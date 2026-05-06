@@ -147,7 +147,8 @@ resource "aws_ecs_task_definition" "api" {
       { name = "ASPNETCORE_ENVIRONMENT", value = "Production" },
       { name = "EXPOSE_ERRORS",          value = "true" },
       { name = "FIREBASE_PROJECT_ID",   value = "shantisangha-bc0f9" },
-      { name = "FRONTEND_ORIGIN",       value = "https://${var.domain_name},https://${aws_cloudfront_distribution.frontend.domain_name},http://localhost:5173" }
+      { name = "FRONTEND_ORIGIN",       value = "https://${var.domain_name},https://${aws_cloudfront_distribution.frontend.domain_name},http://localhost:5173" },
+      { name = "WISECAT_BASE_URL",      value = "http://${aws_lb.wisecat.dns_name}" }
     ]
 
     secrets = concat([
@@ -162,6 +163,10 @@ resource "aws_ecs_task_definition" "api" {
       {
         name      = "JYOTISH_ADMIN_KEY"
         valueFrom = aws_secretsmanager_secret.jyotish_admin_key.arn
+      },
+      {
+        name      = "WISECAT_INTERNAL_KEY"
+        valueFrom = aws_secretsmanager_secret.wisecat_internal_key.arn
       }
     ], local.firebase_enabled ? [
       {

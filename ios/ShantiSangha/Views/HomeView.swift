@@ -94,6 +94,12 @@ struct HomeView: View {
                                 .transition(.opacity.combined(with: .move(edge: .bottom)))
                         }
                     }
+
+                    // Wise Cat — astro-aware trading signals. Quiet by default;
+                    // the card shows what's there only if the user is using it.
+                    WiseCatHomeCard()
+                        .padding(.horizontal, SacredSpacing.m)
+                        .padding(.top, SacredSpacing.l)
                 }
                 .padding(.top, SacredSpacing.xl)
                 .padding(.bottom, SacredSpacing.tabBarSafe)

@@ -20,6 +20,7 @@ using ShantiSangha.Journal;
 using ShantiSangha.Jyotish;
 using ShantiSangha.Notifications;
 using ShantiSangha.Shared;
+using ShantiSangha.Trading;
 using ShantiSangha.Shared.Interfaces;
 using ShantiSangha.Wellness;
 using System.Net.Http.Headers;
@@ -103,6 +104,15 @@ try
     builder.Services.AddFriendsModule(connStr, appConfig.FriendsMediaBucketName, appConfig.RedisUrl);
     builder.Services.AddNotificationsModule(connStr);
 
+    if (appConfig.WisecatEnabled)
+    {
+        builder.Services.AddTradingModule(connStr, appConfig.WisecatBaseUrl!, appConfig.WisecatInternalKey!);
+    }
+    else
+    {
+        Log.Warning("Wise Cat (Trading module) not registered: WISECAT_BASE_URL or WISECAT_INTERNAL_KEY missing");
+    }
+
     // ── Controller discovery from domain assemblies ─────────────────────
     builder.Services.AddControllers()
         .AddApplicationPart(typeof(ShantiSangha.Identity.DependencyInjection).Assembly)
@@ -113,6 +123,7 @@ try
         .AddApplicationPart(typeof(ShantiSangha.Jyotish.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Friends.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Notifications.DependencyInjection).Assembly)
+        .AddApplicationPart(typeof(ShantiSangha.Trading.DependencyInjection).Assembly)
         .AddJsonOptions(opts =>
         {
             opts.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
@@ -245,6 +256,10 @@ try
         await sp.GetRequiredService<ShantiSangha.Jyotish.Data.JyotishDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Friends.Data.FriendsDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Notifications.Data.NotificationsDbContext>().Database.MigrateAsync();
+        if (appConfig.WisecatEnabled)
+        {
+            await sp.GetRequiredService<ShantiSangha.Trading.Data.TradingDbContext>().Database.MigrateAsync();
+        }
 
         // Chat module has no EF migrations folder — schema was bootstrapped
         // pre-migration-framework. Apply lightweight additive changes via
@@ -293,6 +308,21 @@ try
             "morning-reflection-push",
             job => job.RunAsync(),
             "0 * * * *");
+
+        if (appConfig.WisecatEnabled)
+        {
+            // Wise Cat — pulls only the bars we don't already have, then
+            // generates per-user astro-aware signals. Runs after US close.
+            recurring.AddOrUpdate<ShantiSangha.Trading.Jobs.RefreshMarketDataJob>(
+                "wisecat-refresh-market-data",
+                job => job.RunAsync(),
+                "15 20 * * 1-5");
+
+            recurring.AddOrUpdate<ShantiSangha.Trading.Jobs.GenerateDailyTradingSignalsJob>(
+                "wisecat-generate-signals",
+                job => job.RunAsync(),
+                "30 20 * * 1-5");
+        }
     }
 
     // Global error handler — returns full error details when EXPOSE_ERRORS=true

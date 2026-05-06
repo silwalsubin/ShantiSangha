@@ -1,0 +1,22 @@
+ticker,company,ipo_date,first_trade_time_et,exchange,lat,lon,notes
+AAPL,Apple Inc.,1980-12-12,09:30,NASDAQ,40.7128,-74.0060,IPO at $22 on NASDAQ
+MSFT,Microsoft Corporation,1986-03-13,09:30,NASDAQ,40.7128,-74.0060,IPO at $21 on NASDAQ
+NVDA,NVIDIA Corporation,1999-01-22,09:30,NASDAQ,40.7128,-74.0060,IPO at $12 on NASDAQ
+GOOGL,Alphabet Inc. Class A,2004-08-19,09:30,NASDAQ,40.7128,-74.0060,IPO at $85 on NASDAQ (formerly GOOG)
+AMZN,Amazon.com Inc.,1997-05-15,09:30,NASDAQ,40.7128,-74.0060,IPO at $18 on NASDAQ
+META,Meta Platforms Inc.,2012-05-18,11:30,NASDAQ,40.7128,-74.0060,Famously delayed open due to NASDAQ glitch
+TSLA,Tesla Inc.,2010-06-29,09:30,NASDAQ,40.7128,-74.0060,IPO at $17 on NASDAQ
+NFLX,Netflix Inc.,2002-05-23,09:30,NASDAQ,40.7128,-74.0060,IPO at $15 on NASDAQ
+JPM,JPMorgan Chase & Co.,2000-12-31,09:30,NYSE,40.7068,-74.0090,Formed via merger; using merger close date
+V,Visa Inc.,2008-03-19,09:30,NYSE,40.7068,-74.0090,IPO at $44 on NYSE
+DIS,The Walt Disney Company,1957-11-12,10:00,NYSE,40.7068,-74.0090,Original IPO before standardized NYSE open
+KO,The Coca-Cola Company,1919-09-05,10:00,NYSE,40.7068,-74.0090,Pre-modern NYSE open
+NKE,NIKE Inc.,1980-12-02,09:30,NYSE,40.7068,-74.0090,IPO at $22 on NYSE
+SPY,SPDR S&P 500 ETF,1993-01-22,09:30,NYSE,40.7068,-74.0090,First US ETF
+QQQ,Invesco QQQ Trust,1999-03-10,09:30,NASDAQ,40.7128,-74.0060,Tracks Nasdaq-100
+BRK.B,Berkshire Hathaway B,1996-05-09,09:30,NYSE,40.7068,-74.0090,B-shares introduced
+AMD,Advanced Micro Devices,1972-09-27,10:00,NYSE,40.7068,-74.0090,IPO at $15.50
+INTC,Intel Corporation,1971-10-13,10:00,NASDAQ,40.7128,-74.0060,Early NASDAQ listing
+PYPL,PayPal Holdings,2015-07-20,09:30,NASDAQ,40.7128,-74.0060,Spinoff from eBay
+SHOP,Shopify Inc.,2015-05-21,09:30,NYSE,40.7068,-74.0090,IPO at $17 on NYSE
+COIN,Coinbase Global,2021-04-14,12:30,NASDAQ,40.7128,-74.0060,Direct listing; opened at $381

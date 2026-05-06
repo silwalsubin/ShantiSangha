@@ -57,6 +57,17 @@ enum SilentPushHandler {
                 NotificationCenter.default.post(name: .notificationsRefreshNeeded, object: nil)
                 NotificationCenter.default.post(name: .friendsUpdated, object: nil)
             }
+        case "trading_signal":
+            // Strong-conviction Wise Cat call. WiseCatViewModel listens and refreshes.
+            let ticker = userInfo["ticker"] as? String ?? ""
+            let action = userInfo["action"] as? String ?? ""
+            await MainActor.run {
+                NotificationCenter.default.post(
+                    name: .tradingSignalReceived,
+                    object: nil,
+                    userInfo: ["ticker": ticker, "action": action]
+                )
+            }
         default:
             break
         }

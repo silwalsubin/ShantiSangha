@@ -11,6 +11,9 @@ COPY ShantiSangha.Chat/ShantiSangha.Chat.csproj ShantiSangha.Chat/
 COPY ShantiSangha.Journal/ShantiSangha.Journal.csproj ShantiSangha.Journal/
 COPY ShantiSangha.Wellness/ShantiSangha.Wellness.csproj ShantiSangha.Wellness/
 COPY ShantiSangha.Jyotish/ShantiSangha.Jyotish.csproj ShantiSangha.Jyotish/
+COPY ShantiSangha.Friends/ShantiSangha.Friends.csproj ShantiSangha.Friends/
+COPY ShantiSangha.Notifications/ShantiSangha.Notifications.csproj ShantiSangha.Notifications/
+COPY ShantiSangha.Trading/ShantiSangha.Trading.csproj ShantiSangha.Trading/
 
 # Restore only the API project (transitively restores all referenced projects).
 # This avoids needing to copy the test project's csproj into the build stage.

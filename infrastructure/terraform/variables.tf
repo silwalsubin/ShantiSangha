@@ -95,3 +95,10 @@ variable "langfuse_secret_key" {
   sensitive   = true
   default     = ""
 }
+
+variable "finnhub_api_key" {
+  description = "Finnhub API key — used by the wisecat Python service for market data"
+  type        = string
+  sensitive   = true
+  default     = ""
+}

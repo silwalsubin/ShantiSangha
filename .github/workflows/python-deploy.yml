@@ -1,0 +1,82 @@
+name: Python (wisecat) Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'python/**'
+      - '.github/workflows/python-deploy.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: python/wisecat/requirements.txt
+
+      - name: Install dependencies
+        working-directory: python
+        run: |
+          pip install -r wisecat/requirements.txt
+          pip install pytest
+
+      - name: Run tests
+        working-directory: python
+        run: pytest wisecat/tests
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image to ECR
+        working-directory: python
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: shantisangha-wisecat
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            --build-arg GIT_HASH=${{ github.sha }} \
+            --build-arg BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+            -f wisecat/Dockerfile \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      - name: Deploy to ECS with latest task definition
+        run: |
+          LATEST_TD=$(aws ecs describe-task-definition \
+            --task-definition shantisangha-wisecat \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text \
+            --region us-east-1)
+          echo "Deploying task definition: $LATEST_TD"
+
+          aws ecs update-service \
+            --cluster shantisangha-cluster \
+            --service shantisangha-wisecat \
+            --task-definition "$LATEST_TD" \
+            --force-new-deployment \
+            --region us-east-1

@@ -20,6 +20,11 @@ public class AppConfig
     public string? LangfuseSecretKey { get; init; }
     public string LangfuseBaseUrl { get; init; } = "https://cloud.langfuse.com";
 
+    // Wise Cat — Python market-data service. Both required when the Trading module is registered.
+    public string? WisecatBaseUrl { get; init; }
+    public string? WisecatInternalKey { get; init; }
+    public bool WisecatEnabled => !string.IsNullOrEmpty(WisecatBaseUrl) && !string.IsNullOrEmpty(WisecatInternalKey);
+
     // When true, unhandled exceptions return full details in API responses
     public bool ExposeErrors { get; init; }
 
@@ -62,6 +67,8 @@ public class AppConfig
             LangfusePublicKey = config["LANGFUSE_PUBLIC_KEY"],
             LangfuseSecretKey = config["LANGFUSE_SECRET_KEY"],
             LangfuseBaseUrl = config["LANGFUSE_BASE_URL"] ?? "https://cloud.langfuse.com",
+            WisecatBaseUrl = config["WISECAT_BASE_URL"],
+            WisecatInternalKey = config["WISECAT_INTERNAL_KEY"],
             ExposeErrors = string.Equals(config["EXPOSE_ERRORS"], "true", StringComparison.OrdinalIgnoreCase)
         };
     }

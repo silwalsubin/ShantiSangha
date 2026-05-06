@@ -71,6 +71,31 @@ resource "aws_secretsmanager_secret_version" "firebase" {
   secret_string = var.firebase_service_account_json
 }
 
+# Wise Cat — internal shared-secret between .NET API and the Python service.
+resource "random_password" "wisecat_internal_key" {
+  length  = 48
+  special = false
+}
+
+resource "aws_secretsmanager_secret" "wisecat_internal_key" {
+  name = "${var.app_name}/wisecat_internal_key"
+}
+
+resource "aws_secretsmanager_secret_version" "wisecat_internal_key" {
+  secret_id     = aws_secretsmanager_secret.wisecat_internal_key.id
+  secret_string = random_password.wisecat_internal_key.result
+}
+
+# Wise Cat — Finnhub API key (provided via TF var; rotate via tfvars).
+resource "aws_secretsmanager_secret" "finnhub_api_key" {
+  name = "${var.app_name}/finnhub_api_key"
+}
+
+resource "aws_secretsmanager_secret_version" "finnhub_api_key" {
+  secret_id     = aws_secretsmanager_secret.finnhub_api_key.id
+  secret_string = var.finnhub_api_key
+}
+
 # Optional: Langfuse
 
 resource "aws_secretsmanager_secret" "langfuse" {
