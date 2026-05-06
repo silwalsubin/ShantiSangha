@@ -45,7 +45,7 @@ resource "aws_cloudwatch_log_group" "wisecat" {
 
 resource "aws_security_group" "wisecat_alb" {
   name        = "${var.app_name}-wisecat-alb-sg"
-  description = "Internal ALB for wisecat — only the .NET API task reaches it"
+  description = "Internal ALB for wisecat - only the .NET API task reaches it"
   vpc_id      = aws_vpc.main.id
 
   ingress {
@@ -65,7 +65,7 @@ resource "aws_security_group" "wisecat_alb" {
 
 resource "aws_security_group" "wisecat" {
   name        = "${var.app_name}-wisecat-sg"
-  description = "wisecat ECS task: ingress from internal ALB only"
+  description = "wisecat ECS task - ingress from internal ALB only"
   vpc_id      = aws_vpc.main.id
 
   ingress {
