@@ -106,11 +106,11 @@ try
 
     if (appConfig.WisecatEnabled)
     {
-        builder.Services.AddTradingModule(connStr, appConfig.WisecatBaseUrl!, appConfig.WisecatInternalKey!);
+        builder.Services.AddTradingModule(connStr, appConfig.WisecatFunctionName!);
     }
     else
     {
-        Log.Warning("Wise Cat (Trading module) not registered: WISECAT_BASE_URL or WISECAT_INTERNAL_KEY missing");
+        Log.Warning("Wise Cat (Trading module) not registered: WISECAT_FUNCTION_NAME missing");
     }
 
     // ── Controller discovery from domain assemblies ─────────────────────

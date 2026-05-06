@@ -49,6 +49,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build and push Docker image to ECR
+        id: build-image
         working-directory: python
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -64,19 +65,25 @@ jobs:
             .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "image_uri=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-      - name: Deploy to ECS with latest task definition
+      - name: Update Lambda function code
+        env:
+          FUNCTION_NAME: shantisangha-wisecat
+          IMAGE_URI: ${{ steps.build-image.outputs.image_uri }}
         run: |
-          LATEST_TD=$(aws ecs describe-task-definition \
-            --task-definition shantisangha-wisecat \
-            --query 'taskDefinition.taskDefinitionArn' \
-            --output text \
-            --region us-east-1)
-          echo "Deploying task definition: $LATEST_TD"
+          if ! aws lambda get-function --function-name "$FUNCTION_NAME" --region us-east-1 >/dev/null 2>&1; then
+            echo "Lambda function $FUNCTION_NAME does not exist yet."
+            echo "Image has been pushed to ECR; run terraform apply to create the function."
+            exit 0
+          fi
 
-          aws ecs update-service \
-            --cluster shantisangha-cluster \
-            --service shantisangha-wisecat \
-            --task-definition "$LATEST_TD" \
-            --force-new-deployment \
+          aws lambda update-function-code \
+            --function-name "$FUNCTION_NAME" \
+            --image-uri "$IMAGE_URI" \
+            --region us-east-1 >/dev/null
+
+          aws lambda wait function-updated \
+            --function-name "$FUNCTION_NAME" \
             --region us-east-1
+          echo "Lambda function $FUNCTION_NAME updated to $IMAGE_URI"

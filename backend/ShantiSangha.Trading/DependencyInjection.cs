@@ -1,4 +1,4 @@
-using System.Net.Http.Headers;
+using Amazon.Lambda;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using ShantiSangha.Trading.Data;
@@ -12,8 +12,7 @@ public static class DependencyInjection
     public static IServiceCollection AddTradingModule(
         this IServiceCollection services,
         string connectionString,
-        string wisecatBaseUrl,
-        string wisecatInternalKey)
+        string wisecatFunctionName)
     {
         services.AddDbContext<TradingDbContext>(options =>
             options.UseNpgsql(connectionString));
@@ -30,13 +29,10 @@ public static class DependencyInjection
         services.AddScoped<RefreshMarketDataJob>();
         services.AddScoped<GenerateDailyTradingSignalsJob>();
 
-        services.AddHttpClient(MarketDataClient.HttpClientName, client =>
-        {
-            client.BaseAddress = new Uri(wisecatBaseUrl);
-            client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", wisecatInternalKey);
-            client.Timeout = TimeSpan.FromSeconds(30);
-        });
+        // AWS Lambda client — uses the default credential chain, which on
+        // ECS Fargate resolves to the task role automatically.
+        services.AddSingleton<IAmazonLambda>(_ => new AmazonLambdaClient());
+        services.AddSingleton(new WisecatLambdaConfig(wisecatFunctionName));
 
         return services;
     }

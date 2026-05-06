@@ -5,6 +5,7 @@ Quotes are 15-min delayed on the free tier; sub-second SIP requires a paid plan
 """
 
 import logging
+import os
 import time
 from typing import Any
 
@@ -21,6 +22,7 @@ class FinnhubUnavailable(RuntimeError):
 
 
 _client: httpx.Client | None = None
+_cached_api_key: str | None = None
 
 
 def _http() -> httpx.Client:
@@ -30,11 +32,33 @@ def _http() -> httpx.Client:
     return _client
 
 
-def _get(path: str, params: dict[str, Any]) -> dict:
-    if not settings.finnhub_api_key:
-        raise FinnhubUnavailable("WISECAT_FINNHUB_API_KEY not configured")
+def _api_key() -> str:
+    """Resolve the Finnhub key — env var first (local dev), then Secrets Manager (Lambda)."""
+    if settings.finnhub_api_key:
+        return settings.finnhub_api_key
 
-    params = {**params, "token": settings.finnhub_api_key}
+    global _cached_api_key
+    if _cached_api_key:
+        return _cached_api_key
+
+    secret_id = os.environ.get("WISECAT_FINNHUB_SECRET_ID", "shantisangha/finnhub_api_key")
+    try:
+        import boto3
+        sm = boto3.client("secretsmanager")
+        resp = sm.get_secret_value(SecretId=secret_id)
+        _cached_api_key = resp["SecretString"]
+        return _cached_api_key
+    except Exception as e:
+        raise FinnhubUnavailable(f"unable to resolve Finnhub API key: {e}") from e
+
+
+def _get(path: str, params: dict[str, Any]) -> dict:
+    try:
+        key = _api_key()
+    except FinnhubUnavailable:
+        raise
+
+    params = {**params, "token": key}
     try:
         resp = _http().get(path, params=params)
     except httpx.HTTPError as e:
@@ -108,8 +132,10 @@ def get_price_history(ticker: str, lookback_days: int | None = None) -> pd.DataF
 
 
 def healthcheck() -> tuple[str, str | None]:
-    if not settings.finnhub_api_key:
-        return "degraded", "WISECAT_FINNHUB_API_KEY not set"
+    try:
+        _api_key()
+    except FinnhubUnavailable as e:
+        return "degraded", str(e)
     try:
         # cheap probe — quote SPY
         _get("/quote", {"symbol": "SPY"})
