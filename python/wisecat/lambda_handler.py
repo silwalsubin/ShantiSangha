@@ -16,9 +16,10 @@ import logging
 from datetime import date
 from typing import Any
 
+from datetime import timedelta
+
 from .finnhub_client import (
     FinnhubUnavailable,
-    get_price_history,
     get_quotes,
     healthcheck,
     search_symbols,
@@ -82,6 +83,10 @@ def _score(event: dict) -> dict:
 
 
 def _history(event: dict) -> dict:
+    """Daily OHLCV history for the .NET cache. Backed by yfinance — Finnhub's
+    `/stock/candle` endpoint went paid-only, so the free-tier integration we
+    used originally now 403s. yfinance is free, returns full history, and we
+    already use it for the chart endpoints."""
     ticker = event.get("ticker")
     if not ticker:
         raise ValueError("'ticker' required")
@@ -90,16 +95,16 @@ def _history(event: dict) -> dict:
     days = event.get("days")
 
     try:
-        if from_date_str:
-            from_date = date.fromisoformat(from_date_str)
-            today = date.today()
-            lookback = (today - from_date).days + 1
-            df = get_price_history(ticker, lookback_days=lookback)
-            df = df[df["date"] >= from_date]
-        else:
-            df = get_price_history(ticker, lookback_days=days)
-    except FinnhubUnavailable as e:
-        raise RuntimeError(f"finnhub unavailable: {e}") from e
+        df = get_full_history(ticker)
+    except YFinanceUnavailable as e:
+        raise RuntimeError(f"yfinance unavailable: {e}") from e
+
+    if from_date_str:
+        from_date = date.fromisoformat(from_date_str)
+        df = df[df["date"] >= from_date]
+    elif days:
+        cutoff = date.today() - timedelta(days=int(days))
+        df = df[df["date"] >= cutoff]
 
     bars = [
         {
@@ -108,7 +113,7 @@ def _history(event: dict) -> dict:
             "high": float(row.high),
             "low": float(row.low),
             "close": float(row.close),
-            "volume": int(row.volume),
+            "volume": int(row.volume) if row.volume == row.volume else 0,
         }
         for row in df.itertuples()
     ]
