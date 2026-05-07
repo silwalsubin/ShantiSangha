@@ -86,12 +86,20 @@ struct WiseCatDetailView: View {
             }
         }()
         return LuxCard {
-            VStack(alignment: .leading, spacing: SacredSpacing.s) {
-                Text(s.action.uppercased())
-                    .font(.sacredHero)
-                    .foregroundColor(color)
+            HStack(alignment: .center, spacing: SacredSpacing.m) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Today's call")
+                        .font(.sacredSectionLabel)
+                        .tracking(3)
+                        .foregroundColor(.sacredLabel)
+                    Text(s.action)
+                        .font(.sacredSubheading)
+                        .foregroundColor(color)
+                }
+                Spacer()
                 Text(convictionLabel(s.conviction))
-                    .font(.sacredText)
+                    .font(.sacredSmallSemibold)
+                    .tracking(2)
                     .foregroundColor(.sacredTextSecondary)
             }
             .padding(SacredSpacing.lux)
@@ -187,8 +195,11 @@ struct WiseCatDetailView: View {
     }
 
     private func convictionLabel(_ c: Double) -> String {
-        let pct = Int((c * 100).rounded())
-        return "Conviction \(pct)%"
+        switch c {
+        case ..<0.5: return "SOFT"
+        case ..<0.8: return "CLEAR"
+        default: return "STRONG"
+        }
     }
 
     private func prettyStrategyName(_ raw: String) -> String {

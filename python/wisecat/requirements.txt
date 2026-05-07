@@ -8,5 +8,5 @@ pydantic==2.9.2
 pydantic-settings==2.6.1
 python-dateutil==2.9.0
 boto3==1.35.54
-yfinance==0.2.54
-curl_cffi==0.7.4
+yfinance==0.2.65
+curl_cffi==0.13.0
