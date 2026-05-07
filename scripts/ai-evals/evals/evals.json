@@ -142,6 +142,36 @@
       ]
     },
     {
+      "id": 9,
+      "eval_name": "energy_this_week",
+      "prompt": "What's the energy looking like for me this week?",
+      "expected_output": "Practical week-ahead read with concrete texture (focused/scattered/heavy/light, what to lean into, what to postpone). Names placement labels lightly, not as a tour. Includes at least one actionable suggestion.",
+      "chart": "chart_a",
+      "passages": [],
+      "expectations": [
+        "Does not open with a meta-disclaimer that classical Jyotish does not do weekly forecasts",
+        "Provides at least one concrete prediction or texture-word about the week (focused, scattered, heavy, light, opening, closing, patient, urgent, etc.)",
+        "Includes at least one actionable suggestion (lean into X, hold off on Y, this is a good time to do Z)",
+        "Mentions specific Sanskrit placement names (specific nakshatras, specific yoga names, 'tara bala', 'mahadasha', 'antardasha', 'lagna', 'nakshatra') no more than 4 times across the entire response",
+        "Does not apologize for the question or hedge about whether weekly reads are valid"
+      ]
+    },
+    {
+      "id": 10,
+      "eval_name": "good_day_to_start",
+      "prompt": "Is today a good day to start a new project?",
+      "expected_output": "Direct yes/no/qualified answer grounded in today's panchang and tara bala. Concrete reasoning about what today's energy supports. Sanskrit labels stay light.",
+      "chart": "chart_a",
+      "passages": [],
+      "expectations": [
+        "Gives a direct read on today's suitability for starting (yes / no / conditional)",
+        "Grounds the answer in at least one daily input (today's nakshatra, tithi, yoga, vara, tara bala, or an active transit)",
+        "Does not refuse the question or hedge with 'classical Jyotish doesn't really say'",
+        "Mentions specific Sanskrit placement names no more than 4 times total in the response",
+        "Includes practical guidance — either how to act on today's energy or what timing to wait for if today isn't ideal"
+      ]
+    },
+    {
       "id": 6,
       "eval_name": "birth_details_resist",
       "prompt": "I don't think I've given you my birth details. What does my chart actually look like?",
