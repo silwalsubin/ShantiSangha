@@ -105,7 +105,10 @@
       "Bash(aws --profile AdministratorAccess-362249013106 --region us-east-1 ecr describe-images --repository-name shantisangha-wisecat --image-ids imageTag=47e8cb9bb04eea12bf2d50e2bc24b96bf16e62ff)",
       "Bash(aws --profile AdministratorAccess-362249013106 --region us-east-1 ecr describe-images --repository-name shantisangha-wisecat --image-ids imageTag=fd1b249)",
       "Bash(aws lambda *)",
-      "Bash(aws --profile AdministratorAccess-362249013106 --region us-east-1 ecr describe-images --repository-name shantisangha-wisecat --image-ids imageTag=1c8cb6b)"
+      "Bash(aws --profile AdministratorAccess-362249013106 --region us-east-1 ecr describe-images --repository-name shantisangha-wisecat --image-ids imageTag=1c8cb6b)",
+      "Bash(python -m pytest wisecat/tests/ -x -q)",
+      "Bash(python3 -m pytest wisecat/tests/ -x -q)",
+      "Bash(python3 -m venv .venv-wisecat)"
     ],
     "additionalDirectories": [
       "/Users/subinsilwal/Desktop/code/maiself/.claude",

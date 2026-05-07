@@ -136,6 +136,7 @@ struct WiseCatDetailView: View {
                     }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(SacredSpacing.lux)
         }
     }
@@ -179,6 +180,7 @@ struct WiseCatDetailView: View {
         case "rsi_14": return "Momentum (RSI-14)"
         case "bollinger_pctb": return "Mean reversion (Bollinger)"
         case "volume_confirm": return "Volume confirmation"
+        case "ts_momentum_12_1": return "Time-series momentum (12-1)"
         default: return raw.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }
