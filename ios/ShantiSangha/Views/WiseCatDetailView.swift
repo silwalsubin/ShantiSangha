@@ -68,30 +68,21 @@ struct WiseCatDetailView: View {
             }
         }()
         return LuxCard {
-            HStack(alignment: .center, spacing: SacredSpacing.m) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Today's call")
-                        .font(.sacredSmall)
-                        .foregroundColor(.sacredMuted)
-                    Text(s.action)
-                        .font(.sacredSubheading)
-                        .foregroundColor(color)
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text("Conviction")
-                        .font(.sacredSmall)
-                        .foregroundColor(.sacredMuted)
-                    ConvictionMeter(
-                        conviction: s.conviction,
-                        color: color,
-                        diameter: 88,
-                        lineWidth: 6
-                    )
-                }
+            VStack(spacing: SacredSpacing.s) {
+                Text("Today's call")
+                    .font(.sacredSmall)
+                    .foregroundColor(.sacredMuted)
+                ConvictionMeter(
+                    conviction: s.conviction,
+                    color: color,
+                    label: s.action,
+                    diameter: 140,
+                    lineWidth: 8,
+                    labelFont: .sacredHeading
+                )
             }
+            .frame(maxWidth: .infinity)
             .padding(SacredSpacing.lux)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 

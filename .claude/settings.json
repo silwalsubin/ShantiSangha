@@ -100,7 +100,12 @@
       "Bash(curl -sL \"https://api.github.com/repos/silwalsubin/ShantiSangha/actions/runs/25413725091/logs\" -o /tmp/deploy_logs.zip)",
       "Bash(python3 -m json.tool)",
       "Bash(export AWS_PROFILE=AdministratorAccess-362249013106 AWS_REGION=us-east-1)",
-      "Bash(curl -s https://shantisangha.com/api/version)"
+      "Bash(curl -s https://shantisangha.com/api/version)",
+      "Bash(curl -s -A \"wisecat/1.0\" \"https://stooq.com/q/d/l/?s=aapl.us&i=d\")",
+      "Bash(aws --profile AdministratorAccess-362249013106 --region us-east-1 ecr describe-images --repository-name shantisangha-wisecat --image-ids imageTag=47e8cb9bb04eea12bf2d50e2bc24b96bf16e62ff)",
+      "Bash(aws --profile AdministratorAccess-362249013106 --region us-east-1 ecr describe-images --repository-name shantisangha-wisecat --image-ids imageTag=fd1b249)",
+      "Bash(aws lambda *)",
+      "Bash(aws --profile AdministratorAccess-362249013106 --region us-east-1 ecr describe-images --repository-name shantisangha-wisecat --image-ids imageTag=1c8cb6b)"
     ],
     "additionalDirectories": [
       "/Users/subinsilwal/Desktop/code/maiself/.claude",

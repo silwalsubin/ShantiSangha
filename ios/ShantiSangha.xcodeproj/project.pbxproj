@@ -16,13 +16,13 @@
 		04546F7A2F8B19B30026D26F /* ShantiSanghaWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 04546F672F8B19B20026D26F /* ShantiSanghaWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		0456C3CF9D12840A26ECAA6C /* FeedbackServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95AD8709C353998FDE5BE52E /* FeedbackServiceTests.swift */; };
 		046FDCC62F8C0B11003AE52C /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 046FDCC52F8C0B11003AE52C /* FirebaseMessaging */; };
-		1C6E8B19452EBF1F0FBF377F /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 608EE11F5A81C4476766F59E /* Foundation.framework */; };
-		244EBA0B449278CC7958DB5B /* TaskModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A09E248379299BAC76B4CF2 /* TaskModelTests.swift */; };
 		04F1A2B3C4D5E6F700000001 /* FriendChatViewModelOutboxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F1A2B3C4D5E6F700000002 /* FriendChatViewModelOutboxTests.swift */; };
 		04F1A2B3C4D5E6F700000003 /* FriendChatTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F1A2B3C4D5E6F700000004 /* FriendChatTestSupport.swift */; };
 		04F1A2B3C4D5E6F700000005 /* FriendChatViewModelEditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F1A2B3C4D5E6F700000006 /* FriendChatViewModelEditTests.swift */; };
 		04F1A2B3C4D5E6F700000007 /* FriendChatViewModelDeleteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F1A2B3C4D5E6F700000008 /* FriendChatViewModelDeleteTests.swift */; };
 		04F1A2B3C4D5E6F700000009 /* FriendChatViewModelReactionsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F1A2B3C4D5E6F70000000A /* FriendChatViewModelReactionsTests.swift */; };
+		1C6E8B19452EBF1F0FBF377F /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 608EE11F5A81C4476766F59E /* Foundation.framework */; };
+		244EBA0B449278CC7958DB5B /* TaskModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A09E248379299BAC76B4CF2 /* TaskModelTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -62,13 +62,13 @@
 		04546F6A2F8B19B20026D26F /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		04546F802F8B19DC0026D26F /* ShantiSanghaWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ShantiSanghaWidgetExtension.entitlements; sourceTree = "<group>"; };
 		04A24D962F7AFC1400775F13 /* ShantiSangha.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ShantiSangha.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		608EE11F5A81C4476766F59E /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
-		7A09E248379299BAC76B4CF2 /* TaskModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskModelTests.swift; sourceTree = "<group>"; };
 		04F1A2B3C4D5E6F700000002 /* FriendChatViewModelOutboxTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FriendChatViewModelOutboxTests.swift; sourceTree = "<group>"; };
 		04F1A2B3C4D5E6F700000004 /* FriendChatTestSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FriendChatTestSupport.swift; sourceTree = "<group>"; };
 		04F1A2B3C4D5E6F700000006 /* FriendChatViewModelEditTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FriendChatViewModelEditTests.swift; sourceTree = "<group>"; };
 		04F1A2B3C4D5E6F700000008 /* FriendChatViewModelDeleteTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FriendChatViewModelDeleteTests.swift; sourceTree = "<group>"; };
 		04F1A2B3C4D5E6F70000000A /* FriendChatViewModelReactionsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FriendChatViewModelReactionsTests.swift; sourceTree = "<group>"; };
+		608EE11F5A81C4476766F59E /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		7A09E248379299BAC76B4CF2 /* TaskModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskModelTests.swift; sourceTree = "<group>"; };
 		95AD8709C353998FDE5BE52E /* FeedbackServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeedbackServiceTests.swift; sourceTree = "<group>"; };
 		EB354C813E86D53BA84588A6 /* ShantiSanghaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ShantiSanghaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */

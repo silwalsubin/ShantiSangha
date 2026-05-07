@@ -7,7 +7,7 @@ struct WiseCatChartView: View {
     let ticker: String
 
     @State private var chart: ChartHistory?
-    @State private var range: ChartRange = .oneYear
+    @State private var range: ChartRange = .intraday
     @State private var loading = false
     @State private var error: String?
     @State private var selectedDate: Date?
@@ -64,23 +64,24 @@ struct WiseCatChartView: View {
 
     @ViewBuilder
     private var headline: some View {
-        if let agg = chart?.aggregates {
+        if let chart {
             if let selected = selectedBar {
                 selectedReadout(selected)
             } else {
-                headlineReadout(agg)
+                headlineReadout(chart)
             }
         }
     }
 
-    private func headlineReadout(_ agg: ChartAggregates) -> some View {
-        let prev = agg.previousClose ?? agg.currentPrice
-        let change = agg.currentPrice - prev
-        let changePct = prev != 0 ? (change / prev) * 100 : 0
+    private func headlineReadout(_ chart: ChartHistory) -> some View {
+        let current = chart.aggregates?.currentPrice ?? chart.bars.last?.close ?? 0
+        let baseline = baselineForRange(chart) ?? current
+        let change = current - baseline
+        let changePct = baseline != 0 ? (change / baseline) * 100 : 0
         let color: Color = change > 0 ? .sacredGold : change < 0 ? .sacredGoldDark : .sacredText
 
         return VStack(alignment: .leading, spacing: 2) {
-            Text(formatPrice(agg.currentPrice))
+            Text(formatPrice(current))
                 .font(.sacredDisplayNumber)
                 .foregroundColor(.sacredText)
             HStack(spacing: SacredSpacing.xs) {
@@ -90,10 +91,29 @@ struct WiseCatChartView: View {
                 Text(String(format: "%@%.2f%%", change >= 0 ? "+" : "", changePct))
                     .font(.sacredSmallSemibold)
                     .foregroundColor(color)
-                Text("today")
+                Text(rangeLabel)
                     .font(.sacredSmall)
                     .foregroundColor(.sacredMuted)
             }
+        }
+    }
+
+    private func baselineForRange(_ chart: ChartHistory) -> Double? {
+        if range.isIntraday, let prev = chart.aggregates?.previousClose {
+            return prev
+        }
+        return chart.bars.first?.close
+    }
+
+    private var rangeLabel: String {
+        switch range {
+        case .intraday: return "today"
+        case .oneMonth: return "past month"
+        case .sixMonth: return "past 6 months"
+        case .ytd: return "year to date"
+        case .oneYear: return "past year"
+        case .fiveYear: return "past 5 years"
+        case .max: return "all time"
         }
     }
 

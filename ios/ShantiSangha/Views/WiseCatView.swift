@@ -24,13 +24,7 @@ struct WiseCatView: View {
                         if let sky = vm.todaysSky {
                             todaysSkyCard(sky)
                         }
-                        ForEach(vm.watchlist) { entry in
-                            WiseCatRow(
-                                entry: entry,
-                                signal: vm.signal(for: entry.ticker),
-                                generating: vm.generatingTickers.contains(entry.ticker)
-                            )
-                        }
+                        watchlistList
                     }
 
                     if let err = vm.error {
@@ -70,6 +64,23 @@ struct WiseCatView: View {
             .font(.sacredTitle)
             .foregroundColor(.sacredText)
             .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var watchlistList: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(vm.watchlist.enumerated()), id: \.element.id) { index, entry in
+                if index > 0 {
+                    Rectangle()
+                        .fill(Color.sacredMuted.opacity(0.18))
+                        .frame(height: 1)
+                }
+                WiseCatRow(
+                    entry: entry,
+                    signal: vm.signal(for: entry.ticker),
+                    generating: vm.generatingTickers.contains(entry.ticker)
+                )
+            }
+        }
     }
 
     private func todaysSkyCard(_ sky: WiseCatViewModel.TodaysSky) -> some View {
@@ -173,46 +184,47 @@ private struct WiseCatRow: View {
 
     var body: some View {
         NavigationLink(destination: WiseCatDetailView(ticker: entry.ticker)) {
-            LuxCard {
-                HStack(alignment: .center, spacing: SacredSpacing.m) {
-                    VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
-                        Text(entry.ticker)
-                            .font(.sacredHeading)
-                            .foregroundColor(.sacredText)
-                        if let signal {
-                            Text(priceLabel(signal))
-                                .font(.sacredSmall)
-                                .foregroundColor(.sacredTextSecondary)
-                        } else if generating {
-                            Text("Reading the sky…")
-                                .font(.sacredSmall)
-                                .foregroundColor(.sacredMuted)
-                        } else {
-                            Text("Waiting for today's read")
-                                .font(.sacredSmall)
-                                .foregroundColor(.sacredMuted)
-                        }
-                    }
-
-                    Spacer()
-
+            HStack(alignment: .center, spacing: SacredSpacing.m) {
+                VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
+                    Text(entry.ticker)
+                        .font(.sacredHeading)
+                        .foregroundColor(.sacredText)
                     if let signal {
-                        VStack(alignment: .trailing, spacing: SacredSpacing.xxs) {
-                            actionChip(signal)
-                            if let label = convictionLabel(signal) {
-                                Text(label)
-                                    .font(.sacredSmall)
-                                    .foregroundColor(.sacredMuted)
-                            }
-                        }
+                        Text(priceLabel(signal))
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredTextSecondary)
                     } else if generating {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                            .tint(.sacredGold)
+                        Text("Reading the sky…")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
+                    } else {
+                        Text("Waiting for today's read")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
                     }
                 }
-                .padding(SacredSpacing.lux)
+
+                Spacer()
+
+                if let signal {
+                    VStack(alignment: .trailing, spacing: 6) {
+                        actionChip(signal)
+                        if WiseCatAction.from(signal.action) != .hold {
+                            ConvictionMeter(
+                                conviction: signal.conviction,
+                                color: meterColor(signal)
+                            )
+                        }
+                    }
+                } else if generating {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                        .tint(.sacredGold)
+                }
             }
+            .padding(.vertical, SacredSpacing.m)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -236,14 +248,11 @@ private struct WiseCatRow: View {
             )
     }
 
-    /// Small textual conviction cue — only meaningful for BUY/SELL. HOLD has no
-    /// "strength of holding," so we return nil and show nothing.
-    private func convictionLabel(_ s: TradingSignal) -> String? {
-        guard WiseCatAction.from(s.action) != .hold else { return nil }
-        switch s.conviction {
-        case ..<0.5: return "soft"
-        case ..<0.8: return "clear"
-        default: return "strong"
+    private func meterColor(_ s: TradingSignal) -> Color {
+        switch WiseCatAction.from(s.action) {
+        case .buy: return .sacredGold
+        case .sell: return .sacredGoldDark
+        case .hold: return .sacredText
         }
     }
 
