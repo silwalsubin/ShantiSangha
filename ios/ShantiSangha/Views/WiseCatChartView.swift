@@ -16,18 +16,40 @@ struct WiseCatChartView: View {
         VStack(alignment: .leading, spacing: SacredSpacing.s) {
             statsStrip
 
-            chartCanvas
-                .frame(height: 200)
+            chartArea
 
             rangeSelector
-
-            if let error {
-                Text(error)
-                    .font(.sacredCaption)
-                    .foregroundColor(.sacredRed)
-            }
         }
         .task { await load(range) }
+    }
+
+    /// Renders one of: chart, loading spinner, or empty/error message — but
+    /// never shows a giant blank region with tiny text in the middle.
+    @ViewBuilder
+    private var chartArea: some View {
+        if loading && (chart?.bars.isEmpty ?? true) {
+            ProgressView()
+                .tint(.sacredGold)
+                .frame(maxWidth: .infinity, minHeight: 200)
+        } else if let bars = chart?.bars, !bars.isEmpty {
+            chartCanvas
+                .frame(height: 200)
+        } else {
+            chartUnavailable
+        }
+    }
+
+    private var chartUnavailable: some View {
+        VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
+            Text("Chart unavailable")
+                .font(.sacredSubheading)
+                .foregroundColor(.sacredText)
+            Text(error ?? "No price history could be loaded for \(ticker).")
+                .font(.sacredText)
+                .foregroundColor(.sacredTextSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, SacredSpacing.s)
     }
 
     // MARK: - Stats strip
@@ -106,80 +128,69 @@ struct WiseCatChartView: View {
 
     // MARK: - Chart canvas
 
-    @ViewBuilder
     private var chartCanvas: some View {
-        if loading && (chart?.bars.isEmpty ?? true) {
-            ProgressView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .tint(.sacredGold)
-        } else if let bars = chart?.bars, !bars.isEmpty {
-            Chart {
-                ForEach(bars) { bar in
-                    LineMark(
-                        x: .value("Date", bar.parsedDate),
-                        y: .value("Price", bar.close)
-                    )
-                    .foregroundStyle(Color.sacredGold)
-                    .interpolationMethod(.linear)
+        let bars = chart?.bars ?? []
+        return Chart {
+            ForEach(bars) { bar in
+                LineMark(
+                    x: .value("Date", bar.parsedDate),
+                    y: .value("Price", bar.close)
+                )
+                .foregroundStyle(Color.sacredGold)
+                .interpolationMethod(.linear)
 
-                    AreaMark(
-                        x: .value("Date", bar.parsedDate),
-                        y: .value("Price", bar.close)
+                AreaMark(
+                    x: .value("Date", bar.parsedDate),
+                    y: .value("Price", bar.close)
+                )
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color.sacredGold.opacity(0.18), Color.sacredGold.opacity(0)],
+                        startPoint: .top,
+                        endPoint: .bottom
                     )
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [Color.sacredGold.opacity(0.18), Color.sacredGold.opacity(0)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .interpolationMethod(.linear)
-                }
+                )
+                .interpolationMethod(.linear)
+            }
 
-                if let selectedDate, let bar = selectedBar {
-                    RuleMark(x: .value("Selected", selectedDate))
-                        .foregroundStyle(Color.sacredMuted.opacity(0.5))
-                        .lineStyle(StrokeStyle(lineWidth: 1))
-                    PointMark(
-                        x: .value("Date", bar.parsedDate),
-                        y: .value("Price", bar.close)
-                    )
-                    .foregroundStyle(Color.sacredGold)
-                    .symbolSize(70)
-                }
+            if let selectedDate, let bar = selectedBar {
+                RuleMark(x: .value("Selected", selectedDate))
+                    .foregroundStyle(Color.sacredMuted.opacity(0.5))
+                    .lineStyle(StrokeStyle(lineWidth: 1))
+                PointMark(
+                    x: .value("Date", bar.parsedDate),
+                    y: .value("Price", bar.close)
+                )
+                .foregroundStyle(Color.sacredGold)
+                .symbolSize(70)
             }
-            .chartYScale(domain: .automatic(includesZero: false))
-            .chartXAxis {
-                AxisMarks(preset: .aligned, values: .automatic(desiredCount: 4)) { value in
-                    if let date = value.as(Date.self) {
-                        AxisValueLabel {
-                            Text(formatAxisDate(date))
-                                .font(.sacredFinePrint)
-                                .foregroundStyle(Color.sacredMuted)
-                        }
-                    }
-                    AxisGridLine().foregroundStyle(Color.sacredMutedLight.opacity(0.15))
-                }
-            }
-            .chartYAxis {
-                AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
-                    if let v = value.as(Double.self) {
-                        AxisValueLabel {
-                            Text(formatPrice(v))
-                                .font(.sacredFinePrint)
-                                .foregroundStyle(Color.sacredMuted)
-                        }
-                    }
-                    AxisGridLine().foregroundStyle(Color.sacredMutedLight.opacity(0.15))
-                }
-            }
-            .chartXSelection(value: $selectedDate)
-        } else if !loading {
-            Text("No price data available.")
-                .font(.sacredSmall)
-                .foregroundColor(.sacredMuted)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .chartYScale(domain: .automatic(includesZero: false))
+        .chartXAxis {
+            AxisMarks(preset: .aligned, values: .automatic(desiredCount: 4)) { value in
+                if let date = value.as(Date.self) {
+                    AxisValueLabel {
+                        Text(formatAxisDate(date))
+                            .font(.sacredFinePrint)
+                            .foregroundStyle(Color.sacredMuted)
+                    }
+                }
+                AxisGridLine().foregroundStyle(Color.sacredMutedLight.opacity(0.15))
+            }
+        }
+        .chartYAxis {
+            AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
+                if let v = value.as(Double.self) {
+                    AxisValueLabel {
+                        Text(formatPrice(v))
+                            .font(.sacredFinePrint)
+                            .foregroundStyle(Color.sacredMuted)
+                    }
+                }
+                AxisGridLine().foregroundStyle(Color.sacredMutedLight.opacity(0.15))
+            }
+        }
+        .chartXSelection(value: $selectedDate)
     }
 
     // MARK: - Range selector
