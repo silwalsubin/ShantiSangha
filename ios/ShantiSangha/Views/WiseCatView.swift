@@ -207,15 +207,15 @@ private struct WiseCatRow: View {
                 Spacer()
 
                 if let signal {
-                    VStack(alignment: .trailing, spacing: 6) {
-                        actionChip(signal)
-                        if WiseCatAction.from(signal.action) != .hold {
-                            ConvictionMeter(
-                                conviction: signal.conviction,
-                                color: meterColor(signal)
-                            )
-                        }
-                    }
+                    ConvictionMeter(
+                        conviction: signal.conviction,
+                        color: meterColor(signal),
+                        label: signal.action,
+                        diameter: 72,
+                        lineWidth: 5,
+                        labelFont: .sacredButtonLabel,
+                        labelPosition: .diameterLine
+                    )
                 } else if generating {
                     ProgressView()
                         .scaleEffect(0.8)
@@ -229,29 +229,10 @@ private struct WiseCatRow: View {
         .buttonStyle(.plain)
     }
 
-    private func actionChip(_ s: TradingSignal) -> some View {
-        let color: Color = {
-            switch WiseCatAction.from(s.action) {
-            case .buy: return .sacredGold
-            case .sell: return .sacredGoldDark
-            case .hold: return .sacredText
-            }
-        }()
-        return Text(s.action)
-            .font(.sacredButtonLabel)
-            .foregroundColor(color)
-            .padding(.horizontal, SacredSpacing.s)
-            .padding(.vertical, 6)
-            .overlay(
-                RoundedRectangle(cornerRadius: SacredRadius.pill)
-                    .stroke(color.opacity(0.45), lineWidth: 1)
-            )
-    }
-
     private func meterColor(_ s: TradingSignal) -> Color {
         switch WiseCatAction.from(s.action) {
-        case .buy: return .sacredGold
-        case .sell: return .sacredGoldDark
+        case .buy: return .sacredGreen
+        case .sell: return .sacredRed
         case .hold: return .sacredText
         }
     }

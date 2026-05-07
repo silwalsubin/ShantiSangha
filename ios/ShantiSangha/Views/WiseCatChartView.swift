@@ -85,7 +85,7 @@ struct WiseCatChartView: View {
         let baseline = baselineForRange(chart) ?? current
         let change = current - baseline
         let changePct = baseline != 0 ? (change / baseline) * 100 : 0
-        let color: Color = change > 0 ? .sacredGold : change < 0 ? .sacredGoldDark : .sacredText
+        let color: Color = change > 0 ? .sacredGreen : change < 0 ? .sacredRed : .sacredText
 
         return VStack(alignment: .leading, spacing: 2) {
             Text(formatPrice(current))

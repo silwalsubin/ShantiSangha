@@ -47,9 +47,9 @@ struct WiseCatHomeCard: View {
     private var statsRow: some View {
         let counts = actionCounts()
         return HStack(spacing: 0) {
-            statCell(count: counts.buy, label: "Buy", activeColor: .sacredGold)
+            statCell(count: counts.buy, label: "Buy", activeColor: .sacredGreen)
             statCell(count: counts.hold, label: "Hold", activeColor: .sacredText)
-            statCell(count: counts.sell, label: "Sell", activeColor: .sacredGoldDark)
+            statCell(count: counts.sell, label: "Sell", activeColor: .sacredRed)
         }
     }
 

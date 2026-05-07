@@ -62,8 +62,8 @@ struct WiseCatDetailView: View {
         let action = WiseCatAction.from(s.action)
         let color: Color = {
             switch action {
-            case .buy: return .sacredGold
-            case .sell: return .sacredGoldDark
+            case .buy: return .sacredGreen
+            case .sell: return .sacredRed
             case .hold: return .sacredText
             }
         }()
@@ -78,7 +78,8 @@ struct WiseCatDetailView: View {
                     label: s.action,
                     diameter: 140,
                     lineWidth: 8,
-                    labelFont: .sacredHeading
+                    labelFont: .sacredHeading,
+                    labelPosition: .diameterLine
                 )
             }
             .frame(maxWidth: .infinity)
@@ -108,7 +109,7 @@ struct WiseCatDetailView: View {
             Spacer()
             Text(String(format: "%+.2f", value))
                 .font(.sacredTextMedium)
-                .foregroundColor(value > 0.1 ? .sacredGold : value < -0.1 ? .sacredGoldDark : .sacredText)
+                .foregroundColor(value > 0.1 ? .sacredGreen : value < -0.1 ? .sacredRed : .sacredText)
         }
     }
 

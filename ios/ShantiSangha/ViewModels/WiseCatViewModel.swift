@@ -42,30 +42,52 @@ final class WiseCatViewModel: ObservableObject {
             return
         }
 
-        // For any watchlist ticker without a cached signal — typically a
-        // freshly-added one, before the daily Hangfire job runs — generate
-        // on-demand in parallel and stream results into the UI as each lands.
-        let missing = watchlist
+        // Regenerate any ticker whose cached signal is missing, from an
+        // earlier UTC day, or has empty technical contributions (which
+        // typically means an upstream Lambda call failed and persisted a
+        // hollow row — e.g. the Finnhub 403 incident). Existing healthy
+        // rows for today are kept as-is so the UI doesn't churn.
+        let needsRefresh = watchlist
             .map { $0.ticker }
-            .filter { ticker in !signals.contains(where: { $0.ticker == ticker }) }
-        if missing.isEmpty { return }
+            .filter { ticker in
+                guard let signal = signals.first(where: { $0.ticker == ticker }) else { return true }
+                return isStale(signal)
+            }
+        if needsRefresh.isEmpty { return }
 
-        generatingTickers = Set(missing)
+        generatingTickers = Set(needsRefresh)
         await withTaskGroup(of: TradingSignal?.self) { group in
-            for ticker in missing {
+            for ticker in needsRefresh {
                 group.addTask {
                     try? await WiseCatAPI.getSignal(ticker)
                 }
             }
             for await signal in group {
                 guard let signal else { continue }
-                if !self.signals.contains(where: { $0.ticker == signal.ticker }) {
+                if let idx = self.signals.firstIndex(where: { $0.ticker == signal.ticker }) {
+                    self.signals[idx] = signal
+                } else {
                     self.signals.append(signal)
                 }
                 self.generatingTickers.remove(signal.ticker)
             }
         }
         generatingTickers = []
+    }
+
+    private static let utcDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
+    private func isStale(_ signal: TradingSignal) -> Bool {
+        if signal.technicalSignals.isEmpty { return true }
+        if signal.date != Self.utcDateFormatter.string(from: Date()) { return true }
+        return false
     }
 
     func add(_ ticker: String) async {
