@@ -563,6 +563,43 @@ public static class VedicCalendar
 
     public static (string Name, string Quality) GetNakshatra(int index) => (Nakshatras[index], NakshatraQualities[index]);
 
+    /// <summary>
+    /// The 9 tara names in cycle order, with classical polarity. The tara
+    /// cycle repeats every 9 nakshatras across the 27, so positions 1, 10,
+    /// and 19 from janma all map to Janma; positions 2, 11, 20 to Sampat;
+    /// and so on.
+    /// </summary>
+    private static readonly (string Name, string Polarity)[] TaraEntries =
+    [
+        ("Janma",    "neutral"),
+        ("Sampat",   "favorable"),
+        ("Vipat",    "warning"),
+        ("Kshema",   "favorable"),
+        ("Pratyak",  "warning"),
+        ("Sadhaka",  "favorable"),
+        ("Vadha",    "warning"),
+        ("Mitra",    "favorable"),
+        ("Atimitra", "favorable")
+    ];
+
+    /// <summary>
+    /// Tara bala — counts nakshatras forward from janma (birth) to current,
+    /// then maps the position into the 9-tara cycle. Returns the absolute
+    /// position (1..27 from janma), the cycle number (1..9), the tara name,
+    /// and its classical polarity. Pre-computing this here lets the AI prompt
+    /// quote the value rather than counting nakshatras itself (which it does
+    /// unreliably).
+    /// </summary>
+    public static (int Position, int Number, string Name, string Polarity) GetTaraBala(
+        int birthNakshatraIndex, int currentNakshatraIndex)
+    {
+        var diff = ((currentNakshatraIndex - birthNakshatraIndex) % 27 + 27) % 27;
+        var position = diff + 1;          // 1..27
+        var number = ((position - 1) % 9) + 1; // 1..9
+        var (name, polarity) = TaraEntries[number - 1];
+        return (position, number, name, polarity);
+    }
+
     // Vimshottari Dasha — the 120-year planetary period system.
     // Sequence and durations (years): Ketu 7, Venus 20, Sun 6, Moon 10, Mars 7,
     // Rahu 18, Jupiter 16, Saturn 19, Mercury 17. The lord of your birth nakshatra
@@ -649,7 +686,7 @@ public static class VedicCalendar
             AntardashaEnd: subEnd);
     }
 
-    public static (string Tithi, string TithiQuality, string Vara, string VaraDeity, string Yoga, string Nakshatra, string NakshatraQuality) GetPanchang(DateTime date)
+    public static (string Tithi, string TithiQuality, string Vara, string VaraDeity, string Yoga, string Nakshatra, string NakshatraQuality, int NakshatraIndex) GetPanchang(DateTime date)
     {
         var sunSidereal = ToSidereal(GetTropicalSunLongitude(date), date);
         var moonSidereal = ToSidereal(GetTropicalMoonLongitude(date), date);
@@ -672,6 +709,6 @@ public static class VedicCalendar
         var nakshatraIndex = GetNakshatraIndex(moonSidereal);
         var (nakshatraName, nakshatraQuality) = GetNakshatra(nakshatraIndex);
 
-        return ($"{paksha} {tithiName}", tithiQuality, vara, varaDeity, yoga, nakshatraName, nakshatraQuality);
+        return ($"{paksha} {tithiName}", tithiQuality, vara, varaDeity, yoga, nakshatraName, nakshatraQuality, nakshatraIndex);
     }
 }

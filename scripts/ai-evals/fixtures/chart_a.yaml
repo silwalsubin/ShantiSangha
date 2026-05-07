@@ -16,6 +16,18 @@ birth_nakshatra: "Mrigashirsha"
 panchang_summary: "Today the moon is in Hasta nakshatra under Saubhagya yoga — a steady, capable sky."
 mahadasha: "Jupiter"
 antardasha: "Saturn"
+# Tara bala precomputed by the backend (VedicCalendar.GetTaraBala). Birth
+# nakshatra Mrigashirsha is index 4; today's Hasta is index 12. Position
+# from janma = ((12 - 4) mod 27) + 1 = 9. Number 9 in the 9-tara cycle =
+# Atimitra (favorable). Hard-coded here so the eval mirrors what the C#
+# code emits in production.
+tara_bala:
+  position: 9
+  number: 9
+  name: "Atimitra"
+  polarity: "favorable"
+  from_nakshatra: "Mrigashirsha"
+  to_nakshatra: "Hasta"
 transit_note: "Saturn is currently transiting their 7th house, echoing its natal placement."
 
 details:

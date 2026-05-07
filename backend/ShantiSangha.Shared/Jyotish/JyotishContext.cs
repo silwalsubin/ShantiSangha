@@ -32,7 +32,9 @@ public record JyotishContext(
     /// <summary>Raw birth nakshatra name (for matching against current day's nakshatra)</summary>
     string? BirthNakshatraName = null,
     /// <summary>Full birth chart details — birth data, lagna, all planets. Null if birth time or place unavailable.</summary>
-    JyotishChartDetails? Chart = null)
+    JyotishChartDetails? Chart = null,
+    /// <summary>Tara bala — today's position in the 9-tara cycle counted from birth nakshatra. Null if birth time isn't known.</summary>
+    TaraBala? TaraBala = null)
 {
     /// <summary>
     /// Formats this context as a text block for AI prompt injection.
@@ -56,6 +58,13 @@ public record JyotishContext(
 
         if (Mahadasha is not null && Antardasha is not null)
             parts.Add($"They are currently in {Mahadasha} Mahadasha / {Antardasha} Antardasha — the planetary season shaping this chapter of their life.");
+
+        if (TaraBala is not null)
+            parts.Add(
+                $"Tara bala today: position {TaraBala.Position} of 27 from janma — " +
+                $"{TaraBala.Name} ({TaraBala.Polarity}). The moon's daily journey from " +
+                $"their birth {TaraBala.FromNakshatra} to today's {TaraBala.ToNakshatra} " +
+                $"sits in this slot of the 9-tara cycle.");
 
         if (TransitNote is not null)
             parts.Add(TransitNote);
@@ -135,6 +144,22 @@ public record JyotishChartDetails(
 }
 
 public record ChartLagna(string Rashi, double Degree, string Nakshatra, int Pada);
+
+/// <summary>
+/// Tara bala — the lunar-day quality cycle counted from the person's birth
+/// nakshatra. Position 1..27 is the absolute count from janma; Number 1..9
+/// is the position within the 9-tara cycle (Janma, Sampat, Vipat, Kshema,
+/// Pratyak, Sadhaka, Vadha, Mitra, Atimitra), which repeats three times
+/// across the 27 nakshatras. Polarity reduces to favorable / warning /
+/// neutral so the AI doesn't have to interpret the technical name.
+/// </summary>
+public record TaraBala(
+    int Position,
+    int Number,
+    string Name,
+    string Polarity,
+    string FromNakshatra,
+    string ToNakshatra);
 
 public static class JyotishSignatureDerivation
 {

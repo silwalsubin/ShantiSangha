@@ -16,7 +16,7 @@ public class JyotishContextService(IProfileQueryService profileQuery) : IJyotish
         var birth = await profileQuery.GetBirthInfoAsync(userId, ct);
         var today = date.ToDateTime(TimeOnly.FromTimeSpan(TimeSpan.FromHours(6)), DateTimeKind.Utc);
 
-        var (tithi, tithiQuality, vara, varaDeity, yoga, todayNakshatra, todayNakshatraQuality) =
+        var (tithi, tithiQuality, vara, varaDeity, yoga, todayNakshatra, todayNakshatraQuality, todayNakshatraIndex) =
             VedicCalendar.GetPanchang(today);
 
         string? sunRashi = null;
@@ -28,6 +28,7 @@ public class JyotishContextService(IProfileQueryService profileQuery) : IJyotish
         string? antardasha = null;
         DateTime? antardashaStart = null;
         JyotishChartDetails? chartDetails = null;
+        TaraBala? taraBala = null;
 
         if (birth.BirthDate is not null)
         {
@@ -74,6 +75,19 @@ public class JyotishContextService(IProfileQueryService profileQuery) : IJyotish
                 antardasha = dasha.Antardasha;
                 antardashaStart = dasha.AntardashaStart;
 
+                // Tara bala — pre-compute the cycle position for today against
+                // their birth nakshatra so the prompt can quote it instead of
+                // having the AI count nakshatras (which it gets wrong).
+                var (tbPosition, tbNumber, tbName, tbPolarity) =
+                    VedicCalendar.GetTaraBala(nakshatraIndex, todayNakshatraIndex);
+                taraBala = new TaraBala(
+                    Position: tbPosition,
+                    Number: tbNumber,
+                    Name: tbName,
+                    Polarity: tbPolarity,
+                    FromNakshatra: name,
+                    ToNakshatra: todayNakshatra);
+
                 chartDetails = BuildChartDetails(birth, birthDateTime, sunTropical, lat, lon);
             }
 
@@ -103,7 +117,8 @@ public class JyotishContextService(IProfileQueryService profileQuery) : IJyotish
             Antardasha: antardasha,
             AntardashaStart: antardashaStart,
             BirthNakshatraName: birthNakshatraName,
-            Chart: chartDetails);
+            Chart: chartDetails,
+            TaraBala: taraBala);
     }
 
     private static JyotishChartDetails BuildChartDetails(

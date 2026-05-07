@@ -199,6 +199,15 @@ def format_chart_block(chart: dict) -> str:
             "the planetary season shaping this chapter of their life."
         )
 
+    tb = chart.get("tara_bala")
+    if tb:
+        parts.append(
+            f"Tara bala today: position {tb['position']} of 27 from janma — "
+            f"{tb['name']} ({tb['polarity']}). The moon's daily journey from "
+            f"their birth {tb['from_nakshatra']} to today's {tb['to_nakshatra']} "
+            f"sits in this slot of the 9-tara cycle."
+        )
+
     if chart.get("transit_note"):
         parts.append(chart["transit_note"])
 
