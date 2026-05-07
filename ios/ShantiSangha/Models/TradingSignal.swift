@@ -20,6 +20,7 @@ struct StrategyContribution: Codable, Hashable {
     let name: String
     let value: Double
     let contribution: Double
+    let weight: Double
 }
 
 struct AstroAngleScore: Codable, Hashable {

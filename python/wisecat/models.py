@@ -28,6 +28,7 @@ class StrategyContribution(BaseModel):
     name: str
     value: float
     contribution: float
+    weight: float
 
 
 class TickerScore(BaseModel):

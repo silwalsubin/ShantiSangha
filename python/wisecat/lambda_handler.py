@@ -252,7 +252,12 @@ def _serialize_score(score) -> dict:
         "price": score.price,
         "technicalScore": score.technical_score,
         "signals": [
-            {"name": s.name, "value": s.value, "contribution": s.contribution}
+            {
+                "name": s.name,
+                "value": s.value,
+                "contribution": s.contribution,
+                "weight": s.weight,
+            }
             for s in score.signals
         ],
         "error": score.error,

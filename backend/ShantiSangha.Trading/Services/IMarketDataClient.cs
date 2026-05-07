@@ -6,7 +6,7 @@ public record MarketBar(DateOnly Date, decimal Open, decimal High, decimal Low, 
 
 public record QuoteSnapshot(string Ticker, decimal Price, decimal? PrevClose, decimal? DayHigh, decimal? DayLow);
 
-public record TechnicalSignalContribution(string Name, double Value, double Contribution);
+public record TechnicalSignalContribution(string Name, double Value, double Contribution, double Weight);
 
 public record TechnicalScore(string Ticker, decimal? Price, double Score, IReadOnlyList<TechnicalSignalContribution> Contributions);
 

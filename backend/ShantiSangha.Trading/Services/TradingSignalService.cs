@@ -72,7 +72,7 @@ public class TradingSignalService(
 
         var reasoning = new SignalReasoning(
             Technical: techScore?.Contributions
-                .Select(c => new StrategyContributionDto(c.Name, c.Value, c.Contribution))
+                .Select(c => new StrategyContributionDto(c.Name, c.Value, c.Contribution, c.Weight))
                 .ToList() ?? [],
             Astro: astroResult.Angles
                 .Select(a => new AstroAngleScoreDto(a.Name, a.Score, a.Highlights))

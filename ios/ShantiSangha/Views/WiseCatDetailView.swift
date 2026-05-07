@@ -113,31 +113,53 @@ struct WiseCatDetailView: View {
     }
 
     private func technicalBlock(_ s: TradingSignal) -> some View {
-        LuxCard {
+        // Sort by weight desc so the strategies driving the composite
+        // surface first. Weights were chosen from a 16y SPY backtest:
+        // trend + TS momentum had real edge (54-55% hit rate, n≈4100);
+        // RSI / Bollinger / volume were ≤ coin flip and got down-weighted.
+        let sorted = s.technicalSignals.sorted { $0.weight > $1.weight }
+
+        return LuxCard {
             VStack(alignment: .leading, spacing: SacredSpacing.s) {
-                Text("Technical")
-                    .font(.sacredSubheading)
-                    .foregroundColor(.sacredText)
-                if s.technicalSignals.isEmpty {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Technical")
+                        .font(.sacredSubheading)
+                        .foregroundColor(.sacredText)
+                    Spacer()
+                    Text("weight · score")
+                        .font(.sacredCaption)
+                        .foregroundColor(.sacredMuted)
+                }
+
+                if sorted.isEmpty {
                     Text("No strategies fired today.")
                         .font(.sacredText)
                         .foregroundColor(.sacredMuted)
                 } else {
-                    ForEach(s.technicalSignals, id: \.name) { sig in
-                        HStack(alignment: .firstTextBaseline) {
-                            Text(prettyStrategyName(sig.name))
-                                .font(.sacredText)
-                                .foregroundColor(.sacredText)
-                            Spacer()
-                            Text(String(format: "%+.2f", sig.contribution))
-                                .font(.sacredCaption)
-                                .foregroundColor(.sacredTextSecondary)
-                        }
+                    ForEach(sorted, id: \.name) { sig in
+                        technicalRow(sig)
                     }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(SacredSpacing.lux)
+        }
+    }
+
+    private func technicalRow(_ sig: StrategyContribution) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: SacredSpacing.s) {
+            Text(prettyStrategyName(sig.name))
+                .font(.sacredText)
+                .foregroundColor(.sacredText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(String(format: "%.0f%%", sig.weight * 100))
+                .font(.sacredCaption)
+                .foregroundColor(.sacredMuted)
+                .frame(width: 44, alignment: .trailing)
+            Text(String(format: "%+.2f", sig.contribution))
+                .font(.sacredCaption)
+                .foregroundColor(.sacredTextSecondary)
+                .frame(width: 56, alignment: .trailing)
         }
     }
 

@@ -5,7 +5,7 @@ import logging
 import pandas as pd
 
 from .models import StrategyContribution, TickerScore
-from .strategies import ALL_STRATEGIES
+from .strategies import ALL_STRATEGIES, STRATEGY_WEIGHTS
 
 logger = logging.getLogger(__name__)
 
@@ -22,18 +22,23 @@ def score_ticker(ticker: str, df: pd.DataFrame, price: float | None) -> TickerSc
 
     contributions: list[StrategyContribution] = []
     total = 0.0
-    weight_per = 1.0 / len(ALL_STRATEGIES)
 
     for name, strategy_fn in ALL_STRATEGIES:
+        weight = STRATEGY_WEIGHTS.get(name, 0.0)
         try:
             raw, value = strategy_fn(df)
         except Exception as e:
             logger.warning("strategy %s failed for %s: %s", name, ticker, e)
             continue
         contributions.append(
-            StrategyContribution(name=name, value=raw, contribution=value * weight_per)
+            StrategyContribution(
+                name=name,
+                value=raw,
+                contribution=value * weight,
+                weight=weight,
+            )
         )
-        total += value * weight_per
+        total += value * weight
 
     return TickerScore(
         ticker=ticker,

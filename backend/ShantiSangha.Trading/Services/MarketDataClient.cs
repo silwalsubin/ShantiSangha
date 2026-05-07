@@ -119,7 +119,7 @@ public class MarketDataClient(
             s.Ticker,
             s.Price,
             s.TechnicalScore,
-            (s.Signals ?? new()).Select(c => new TechnicalSignalContribution(c.Name, c.Value, c.Contribution)).ToList()
+            (s.Signals ?? new()).Select(c => new TechnicalSignalContribution(c.Name, c.Value, c.Contribution, c.Weight)).ToList()
         )).ToList();
     }
 
@@ -189,7 +189,7 @@ public class MarketDataClient(
         [property: JsonPropertyName("technicalScore")] double TechnicalScore,
         List<SignalContributionDto>? Signals);
 
-    private record SignalContributionDto(string Name, double Value, double Contribution);
+    private record SignalContributionDto(string Name, double Value, double Contribution, double Weight);
 
     private record SymbolSearchResponseDto(List<SymbolMatchDto>? Results);
     private record SymbolMatchDto(string Symbol, string Description, string Type);

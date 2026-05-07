@@ -88,10 +88,15 @@ def run_backtest(
     start: date,
     end: date | None = None,
     threshold: float = 0.5,
+    long_only: bool = True,
     history: pd.DataFrame | None = None,
 ) -> BacktestResult:
     """Simulate the technical-only ensemble. Pass `history` to inject a fixed
     DataFrame (used by tests); otherwise pulls full daily history via yfinance.
+
+    long_only=True (the default) maps would-be shorts to flat. The 16-year
+    SPY backtest showed shorting gave back ~20% of strategy return — equity
+    benchmarks have a structural long bias and shorting them fights that.
     """
     df = history if history is not None else get_full_history(ticker)
     if df.empty:
@@ -133,7 +138,7 @@ def run_backtest(
 
         if composite > threshold:
             position = 1.0
-        elif composite < -threshold:
+        elif composite < -threshold and not long_only:
             position = -1.0
         else:
             position = 0.0
@@ -223,12 +228,23 @@ def main() -> None:
     parser.add_argument("--start", required=True, help="YYYY-MM-DD")
     parser.add_argument("--end", default=None, help="YYYY-MM-DD")
     parser.add_argument("--threshold", type=float, default=0.5)
+    parser.add_argument(
+        "--allow-shorts",
+        action="store_true",
+        help="Take short positions when composite < -threshold (default: long-only).",
+    )
     args = parser.parse_args()
 
     start = date.fromisoformat(args.start)
     end = date.fromisoformat(args.end) if args.end else None
 
-    r = run_backtest(args.ticker, start=start, end=end, threshold=args.threshold)
+    r = run_backtest(
+        args.ticker,
+        start=start,
+        end=end,
+        threshold=args.threshold,
+        long_only=not args.allow_shorts,
+    )
     _print_report(r)
 
 

@@ -9,7 +9,7 @@ public record WatchlistItemDto(
     DateTime AddedAt
 );
 
-public record StrategyContributionDto(string Name, double Value, double Contribution);
+public record StrategyContributionDto(string Name, double Value, double Contribution, double Weight);
 
 public record AstroAngleScoreDto(string Angle, double Score, IReadOnlyList<string> Highlights);
 
