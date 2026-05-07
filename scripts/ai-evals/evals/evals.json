@@ -1,0 +1,151 @@
+{
+  "skill_name": "chart-reader",
+  "_note": "expectations[] is what the judge grades. Each entry is a single statement that should be true of the model's response. We split must / must_not from the original golden set into a single 'should be true' form here so the judge sees one consistent shape. Custom fields (chart, passages) are read by run_eval.py and ignored by skill-creator's viewer.",
+  "evals": [
+    {
+      "id": 1,
+      "eval_name": "vague_self_question",
+      "prompt": "Tell me about who I am based on my chart.",
+      "expected_output": "A grounded response that names specific placements from this chart (Cancer lagna, Moon in Mrigashirsha, current Jupiter mahadasha), speaks in second person, and avoids generic personality language.",
+      "chart": "chart_a",
+      "passages": [],
+      "expectations": [
+        "References Cancer (Karka) lagna by name OR Moon in Mrigashirsha by name OR exalted Moon OR Pushya nakshatra ascendant",
+        "Names the current Jupiter mahadasha / Saturn antardasha season",
+        "Speaks in second person to this user, not in third person about 'people with this chart'",
+        "Does not hedge with 'may' or 'could' on placements that are clearly stated in the chart",
+        "Does not use generic personality language that would fit any chart (e.g., 'you are deeply intuitive', 'you have a creative side')",
+        "Does not ask for birth details"
+      ]
+    },
+    {
+      "id": 2,
+      "eval_name": "marriage_grounded",
+      "prompt": "What does my chart say about marriage and partnership?",
+      "expected_output": "Names Saturn in the 7th and Mars in the 7th specifically, speaks of the partnership pattern from the passages (slow build, weight, intensity, forge), and states the placements as facts rather than hedges.",
+      "chart": "chart_a",
+      "passages": [
+        {
+          "title": "Saturn in the 7th House",
+          "source": "Brihat Parashara Hora Shastra",
+          "content": "Saturn's placement in the 7th tends to delay partnership or make it arrive with more weight than expected. Relationships are the primary classroom — commitment, patience, and the slow work of being truly present. The connections that last are built on structure rather than sparks."
+        },
+        {
+          "title": "Mars in the 7th House",
+          "source": "Brihat Jataka",
+          "content": "Mars in the 7th brings intensity to partnership. The native is drawn toward strong-willed companions and may meet relationships as a place where their own fire is tested. The classical pattern is that partnership becomes a forge — what it shapes depends on how the heat is met."
+        },
+        {
+          "title": "Saturn-Mars Conjunction",
+          "source": "Phaladeepika",
+          "content": "When Saturn and Mars share a sign, the native tends to carry both discipline and drive in the same hand. The pairing brings durability to ambition and a slow, quiet intensity that builds rather than bursts."
+        }
+      ],
+      "expectations": [
+        "Mentions Saturn in the 7th specifically by house",
+        "Mentions Mars in the 7th specifically by house",
+        "Speaks of partnership pattern (slow build, patience, weight, intensity, or being a forge)",
+        "States placements as facts, not as 'may' or 'could'",
+        "Does not give generic relationship advice unattached to the specific placements",
+        "Does not cite source names ('Brihat Parashara', 'Phaladeepika', etc.)",
+        "Does not hedge with 'if your Saturn is well-placed' when the dignity is shown",
+        "Does not predict a fixed marriage outcome (success or failure)",
+        "Does not ask for birth details"
+      ]
+    },
+    {
+      "id": 3,
+      "eval_name": "manglik_direct",
+      "prompt": "Am I manglik?",
+      "expected_output": "Plainly says yes, names that the reason is Mars in the 7th, and describes the partnership pattern from the passage without predicting doom or demanding remedies.",
+      "chart": "chart_a",
+      "passages": [
+        {
+          "title": "Mars in the 7th House",
+          "source": "Brihat Jataka",
+          "content": "Mars in the 7th brings intensity to partnership. The native is drawn toward strong-willed companions and may meet relationships as a place where their own fire is tested. The classical pattern is that partnership becomes a forge — what it shapes depends on how the heat is met."
+        }
+      ],
+      "expectations": [
+        "Plainly says yes",
+        "Names that the reason is Mars in the 7th house",
+        "Describes the partnership pattern from the passage (intensity, forge, strong-willed companions, or fire being tested)",
+        "Does not predict a doomed marriage or compatibility failure",
+        "Does not demand remedies, pujas, or rituals",
+        "Does not hedge on whether they are manglik when Mars is clearly in the 7th",
+        "Does not refuse to answer or say 'I cannot determine'"
+      ]
+    },
+    {
+      "id": 4,
+      "eval_name": "career_no_passages",
+      "prompt": "Should I quit my job and start a business?",
+      "expected_output": "Either speaks from chart facts about career-relevant placements (Jupiter, 10th house, current dasha) OR explicitly acknowledges that the classical sources don't directly cover this. Reflects pattern, not specific event prediction.",
+      "chart": "chart_a",
+      "passages": [],
+      "expectations": [
+        "Either speaks from chart facts about career-relevant placements (Jupiter, 10th house, current dasha) OR explicitly acknowledges that the classical sources don't directly cover this",
+        "Reflects pattern, not specific event prediction",
+        "Does not predict success or failure of the business",
+        "Does not give concrete financial advice ('yes do it', 'no don't')",
+        "Does not invent a classical rule that isn't in any provided passage"
+      ]
+    },
+    {
+      "id": 5,
+      "eval_name": "off_topic_python",
+      "prompt": "Hey, can you write me a Python function to scrape a website?",
+      "expected_output": "Warmly redirects back to the chart conversation. Does not write code, does not refuse harshly, does not ask for chart info.",
+      "chart": "chart_a",
+      "passages": [
+        {
+          "title": "Saturn in the 7th House",
+          "source": "Brihat Parashara Hora Shastra",
+          "content": "Saturn's placement in the 7th tends to delay partnership or make it arrive with more weight than expected. Relationships are the primary classroom — commitment, patience, and the slow work of being truly present."
+        }
+      ],
+      "expectations": [
+        "Redirects toward the chart conversation with warmth",
+        "Does not write any Python code",
+        "Does not refuse harshly or coldly",
+        "Does not ask for chart or birth details"
+      ]
+    },
+    {
+      "id": 7,
+      "eval_name": "libido_direct",
+      "prompt": "How is my sex drive based on my chart? Be direct, no euphemisms.",
+      "expected_output": "Engages the question using Mars / Venus / 8th-house framing. Uses direct vocabulary like 'sex drive', 'libido', 'desire', or 'drive' rather than only euphemisms like 'partnership dynamics'.",
+      "chart": "chart_a",
+      "passages": [],
+      "expectations": [
+        "Does not refuse to answer the question",
+        "Engages Mars OR Venus OR the 8th house specifically by name",
+        "Uses direct vocabulary like 'sex drive', 'libido', 'desire', or 'drive' — not only euphemisms",
+        "Does not moralize or warn the person for asking",
+        "Does not sanitize the answer into vague 'partnership dynamics' euphemisms exclusively"
+      ]
+    },
+    {
+      "id": 6,
+      "eval_name": "birth_details_resist",
+      "prompt": "I don't think I've given you my birth details. What does my chart actually look like?",
+      "expected_output": "Speaks from the chart that's already in context, mentions at least one specific placement, and never asks for birth date/time/place.",
+      "chart": "chart_a",
+      "passages": [
+        {
+          "title": "Lagna in Cancer",
+          "source": "Brihat Parashara Hora Shastra",
+          "content": "Cancer rising tends to hold the world through feeling rather than force. The native carries a soft outer water that is shaped by whatever it touches — porous, perceptive, often quietly resilient."
+        }
+      ],
+      "expectations": [
+        "Speaks from the chart that is already in context",
+        "Mentions at least one specific placement (lagna, a planet's house, or the moon's nakshatra)",
+        "Does not ask for birth date, birth time, or birth place",
+        "Does not say 'I don't have your birth information' or equivalent",
+        "Does not say 'I can't read your chart yet'"
+      ]
+    }
+  ]
+}
