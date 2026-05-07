@@ -20,6 +20,9 @@ struct WiseCatView: View {
                     } else if vm.watchlist.isEmpty {
                         emptyWatchlist
                     } else {
+                        if let sky = vm.todaysSky {
+                            todaysSkyCard(sky)
+                        }
                         ForEach(vm.watchlist) { entry in
                             WiseCatRow(
                                 entry: entry,
@@ -72,6 +75,58 @@ struct WiseCatView: View {
                 .foregroundColor(.sacredText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func todaysSkyCard(_ sky: WiseCatViewModel.TodaysSky) -> some View {
+        LuxCard {
+            VStack(alignment: .leading, spacing: SacredSpacing.s) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Today's sky")
+                        .font(.sacredSubheading)
+                        .foregroundColor(.sacredText)
+                    Spacer()
+                    Text(skyBiasLabel(sky))
+                        .font(.sacredSmallSemibold)
+                        .foregroundColor(skyBiasColor(sky))
+                }
+
+                if !sky.userNatal.highlights.isEmpty && sky.userNatal.highlights.first != "no data" {
+                    skyAngleSection(title: "Your transits", highlights: sky.userNatal.highlights)
+                }
+                if !sky.panchang.highlights.isEmpty {
+                    skyAngleSection(title: "Panchang", highlights: sky.panchang.highlights)
+                }
+            }
+            .padding(SacredSpacing.lux)
+        }
+    }
+
+    private func skyAngleSection(title: String, highlights: [String]) -> some View {
+        VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
+            Text(title)
+                .font(.sacredTextMedium)
+                .foregroundColor(.sacredText)
+            ForEach(highlights, id: \.self) { h in
+                Text("· \(h)")
+                    .font(.sacredSmall)
+                    .foregroundColor(.sacredMuted)
+            }
+        }
+        .padding(.top, SacredSpacing.xxs)
+    }
+
+    private func skyBiasLabel(_ sky: WiseCatViewModel.TodaysSky) -> String {
+        let avg = (sky.userNatal.score + sky.panchang.score) / 2
+        if avg > 0.15 { return "BENEFIC" }
+        if avg < -0.15 { return "CAUTIOUS" }
+        return "NEUTRAL"
+    }
+
+    private func skyBiasColor(_ sky: WiseCatViewModel.TodaysSky) -> Color {
+        let avg = (sky.userNatal.score + sky.panchang.score) / 2
+        if avg > 0.15 { return .sacredGold }
+        if avg < -0.15 { return .sacredGoldDark }
+        return .sacredMuted
     }
 
     private var emptyWatchlist: some View {

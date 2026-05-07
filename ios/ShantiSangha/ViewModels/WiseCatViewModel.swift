@@ -97,6 +97,26 @@ final class WiseCatViewModel: ObservableObject {
     var hasStrongCalls: Bool {
         signals.contains(where: { $0.conviction >= 0.7 && $0.action != "Hold" })
     }
+
+    /// Today's global astrological context — user's natal transits + panchang.
+    /// These angles are the same for every ticker today; we lift them from any
+    /// available signal so the user sees them once rather than repeated under
+    /// each stock.
+    struct TodaysSky {
+        let userNatal: AstroAngleScore
+        let panchang: AstroAngleScore
+    }
+
+    var todaysSky: TodaysSky? {
+        for signal in signals {
+            let userNatal = signal.astroAngles.first(where: { $0.angle == "user_natal" })
+            let panchang = signal.astroAngles.first(where: { $0.angle == "panchang" })
+            if let userNatal, let panchang {
+                return TodaysSky(userNatal: userNatal, panchang: panchang)
+            }
+        }
+        return nil
+    }
 }
 
 extension Notification.Name {

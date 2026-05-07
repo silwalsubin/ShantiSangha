@@ -156,35 +156,36 @@ struct WiseCatDetailView: View {
         }
     }
 
+    @ViewBuilder
     private func astroBlock(_ s: TradingSignal) -> some View {
-        LuxCard {
-            VStack(alignment: .leading, spacing: SacredSpacing.s) {
-                Text("Sky")
-                    .font(.sacredSubheading)
-                    .foregroundColor(.sacredText)
-                ForEach(s.astroAngles, id: \.angle) { angle in
-                    VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
-                        HStack(alignment: .firstTextBaseline) {
-                            Text(prettyAstroAngle(angle.angle))
-                                .font(.sacredTextMedium)
-                                .foregroundColor(.sacredText)
-                            Spacer()
-                            Text(String(format: "%+.2f", angle.score))
-                                .font(.sacredCaption)
-                                .foregroundColor(.sacredTextSecondary)
-                        }
-                        if !angle.highlights.isEmpty {
-                            ForEach(angle.highlights, id: \.self) { h in
-                                Text("· \(h)")
-                                    .font(.sacredSmall)
-                                    .foregroundColor(.sacredMuted)
-                            }
-                        }
+        let stockChart = s.astroAngles.first(where: { $0.angle == "stock_natal" })
+        let hasData = stockChart != nil
+            && !(stockChart?.highlights.first == "no data")
+            && !(stockChart?.highlights.isEmpty ?? true)
+
+        if let stockChart, hasData {
+            LuxCard {
+                VStack(alignment: .leading, spacing: SacredSpacing.s) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Stock chart")
+                            .font(.sacredSubheading)
+                            .foregroundColor(.sacredText)
+                        Spacer()
+                        Text(String(format: "%+.2f", stockChart.score))
+                            .font(.sacredCaption)
+                            .foregroundColor(.sacredTextSecondary)
                     }
-                    .padding(.bottom, SacredSpacing.xs)
+                    Text("Transits to \(ticker)'s IPO chart")
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredMuted)
+                    ForEach(stockChart.highlights, id: \.self) { h in
+                        Text("· \(h)")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
+                    }
                 }
+                .padding(SacredSpacing.lux)
             }
-            .padding(SacredSpacing.lux)
         }
     }
 
@@ -203,12 +204,4 @@ struct WiseCatDetailView: View {
         }
     }
 
-    private func prettyAstroAngle(_ raw: String) -> String {
-        switch raw {
-        case "user_natal": return "Your natal chart"
-        case "panchang": return "Today's panchang"
-        case "stock_natal": return "Stock's IPO chart"
-        default: return raw.replacingOccurrences(of: "_", with: " ").capitalized
-        }
-    }
 }
