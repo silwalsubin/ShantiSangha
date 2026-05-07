@@ -122,14 +122,19 @@ struct WiseCatDetailView: View {
 
         return LuxCard {
             VStack(alignment: .leading, spacing: SacredSpacing.s) {
-                HStack(alignment: .firstTextBaseline) {
+                HStack(alignment: .firstTextBaseline, spacing: SacredSpacing.s) {
                     Text("Technical")
                         .font(.sacredSubheading)
                         .foregroundColor(.sacredText)
-                    Spacer()
-                    Text("weight · score")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text("weight")
                         .font(.sacredCaption)
                         .foregroundColor(.sacredMuted)
+                        .frame(width: 44, alignment: .trailing)
+                    Text("score")
+                        .font(.sacredCaption)
+                        .foregroundColor(.sacredMuted)
+                        .frame(width: 56, alignment: .trailing)
                 }
 
                 if sorted.isEmpty {

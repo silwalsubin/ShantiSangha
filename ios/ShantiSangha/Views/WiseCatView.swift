@@ -40,7 +40,7 @@ struct WiseCatView: View {
             }
             .refreshable { await vm.refresh() }
         }
-        .navigationTitle("Wise Cat")
+        .navigationTitle("Stocks")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

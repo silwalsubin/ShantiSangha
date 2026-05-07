@@ -7,17 +7,13 @@ struct WiseCatHomeCard: View {
     var body: some View {
         NavigationLink(destination: WiseCatView()) {
             LuxCard {
-                VStack(alignment: .leading, spacing: SacredSpacing.m) {
+                VStack(alignment: .leading, spacing: SacredSpacing.lux) {
                     header
 
-                    if vm.watchlist.isEmpty {
-                        Text("Add a ticker to begin reading the markets each day.")
-                            .font(.sacredText)
-                            .foregroundColor(.sacredTextSecondary)
-                    } else if vm.signals.isEmpty {
-                        Text("Today's read is being prepared.")
-                            .font(.sacredText)
-                            .foregroundColor(.sacredTextSecondary)
+                    if vm.watchlist.isEmpty || vm.signals.isEmpty {
+                        // Subtitle already conveys state — no body needed,
+                        // matches Today's Rhythm's empty-friendly shape.
+                        EmptyView()
                     } else {
                         statsRow
                     }
@@ -31,17 +27,25 @@ struct WiseCatHomeCard: View {
     }
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text("Wise Cat")
-                .font(.sacredSubheading)
-                .foregroundColor(.sacredText)
-            Spacer()
-            if !vm.signals.isEmpty, let bias = skyBias() {
-                Text(bias.label)
-                    .font(.sacredTextMedium)
-                    .foregroundColor(bias.color)
+        HStack {
+            VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
+                Text("STOCKS")
+                    .font(.sacredSectionLabel)
+                    .tracking(3)
+                    .foregroundColor(.sacredLabel)
+                Text(headerSubtitle)
+                    .font(.sacredSmall)
+                    .foregroundColor(.sacredMuted)
             }
+            Spacer()
         }
+    }
+
+    private var headerSubtitle: String {
+        if vm.watchlist.isEmpty { return "Add a ticker to begin." }
+        if vm.signals.isEmpty { return "Today's reading is being prepared." }
+        if let bias = skyBias() { return bias.label }
+        return ""
     }
 
     private var statsRow: some View {
