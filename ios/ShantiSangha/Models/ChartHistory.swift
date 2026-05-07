@@ -61,8 +61,9 @@ struct ChartHistory: Codable, Hashable {
 
 enum ChartRange: String, CaseIterable, Identifiable {
     case intraday = "1d"
+    case oneWeek = "1w"
     case oneMonth = "1mo"
-    case sixMonth = "6mo"
+    case threeMonth = "3mo"
     case ytd = "ytd"
     case oneYear = "1y"
     case fiveYear = "5y"
@@ -73,8 +74,9 @@ enum ChartRange: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .intraday: return "1D"
+        case .oneWeek: return "1W"
         case .oneMonth: return "1M"
-        case .sixMonth: return "6M"
+        case .threeMonth: return "3M"
         case .ytd: return "YTD"
         case .oneYear: return "1Y"
         case .fiveYear: return "5Y"

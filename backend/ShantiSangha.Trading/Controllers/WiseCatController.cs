@@ -98,7 +98,7 @@ public class WiseCatController(
         var user = await currentUser.GetAsync();
         if (user is null) return Unauthorized();
 
-        var validPeriods = new HashSet<string> { "1d", "1mo", "6mo", "ytd", "1y", "5y", "max" };
+        var validPeriods = new HashSet<string> { "1d", "1w", "1mo", "3mo", "ytd", "1y", "5y", "max" };
         var normalized = period.ToLowerInvariant();
         if (!validPeriods.Contains(normalized))
             return BadRequest(new { error = $"period must be one of: {string.Join(", ", validPeriods)}" });

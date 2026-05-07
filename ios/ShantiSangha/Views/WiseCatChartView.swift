@@ -6,12 +6,19 @@ import SwiftUI
 struct WiseCatChartView: View {
     let ticker: String
 
-    @State private var chart: ChartHistory?
+    // Per-range cache so range switches feel instant after the initial
+    // prefetch lands. Also tracks loading + error state per range so the
+    // currently selected range's UI is independent of the others.
+    @State private var charts: [ChartRange: ChartHistory] = [:]
+    @State private var loadingRanges: Set<ChartRange> = []
+    @State private var errors: [ChartRange: String] = [:]
     @State private var range: ChartRange = .intraday
-    @State private var loading = false
-    @State private var error: String?
     @State private var selectedDate: Date?
     @State private var statsExpanded = false
+
+    private var chart: ChartHistory? { charts[range] }
+    private var error: String? { errors[range] }
+    private var isLoadingCurrent: Bool { loadingRanges.contains(range) }
 
     var body: some View {
         // chartArea spans full width; surrounding text/buttons stay inset so
@@ -28,20 +35,20 @@ struct WiseCatChartView: View {
             statsCard
                 .padding(.horizontal, SacredSpacing.m)
         }
-        .task { await load(range) }
+        .task { await prefetchAll() }
     }
 
     /// Renders one of: chart, loading spinner, or empty/error message — but
     /// never shows a giant blank region with tiny text in the middle.
     @ViewBuilder
     private var chartArea: some View {
-        if loading && (chart?.bars.isEmpty ?? true) {
+        if let bars = chart?.bars, !bars.isEmpty {
+            chartCanvas
+                .frame(height: 200)
+        } else if isLoadingCurrent {
             ProgressView()
                 .tint(.sacredGold)
                 .frame(maxWidth: .infinity, minHeight: 200)
-        } else if let bars = chart?.bars, !bars.isEmpty {
-            chartCanvas
-                .frame(height: 200)
         } else {
             chartUnavailable
         }
@@ -108,8 +115,9 @@ struct WiseCatChartView: View {
     private var rangeLabel: String {
         switch range {
         case .intraday: return "today"
+        case .oneWeek: return "past week"
         case .oneMonth: return "past month"
-        case .sixMonth: return "past 6 months"
+        case .threeMonth: return "past 3 months"
         case .ytd: return "year to date"
         case .oneYear: return "past year"
         case .fiveYear: return "past 5 years"
@@ -285,7 +293,9 @@ struct WiseCatChartView: View {
                 Button {
                     range = r
                     selectedDate = nil
-                    Task { await load(r) }
+                    if charts[r] == nil {
+                        Task { await load(r) }
+                    }
                 } label: {
                     Text(r.label)
                         .font(.sacredTextMedium)
@@ -312,16 +322,30 @@ struct WiseCatChartView: View {
         return bars.min(by: { abs($0.parsedDate.timeIntervalSince(selectedDate)) < abs($1.parsedDate.timeIntervalSince(selectedDate)) })
     }
 
+    /// Fetches every range in parallel so range switches feel instant. The
+    /// selected range fires first; the rest race behind it. `load(_:)` is
+    /// idempotent — already-cached or already-in-flight ranges no-op.
+    private func prefetchAll() async {
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await load(range) }
+            for r in ChartRange.allCases where r != range {
+                group.addTask { await load(r) }
+            }
+        }
+    }
+
     private func load(_ r: ChartRange) async {
-        loading = true
-        defer { loading = false }
+        if charts[r] != nil { return }
+        if loadingRanges.contains(r) { return }
+        loadingRanges.insert(r)
+        defer { loadingRanges.remove(r) }
         do {
             let result = try await WiseCatAPI.getChart(ticker, range: r)
-            self.chart = result
-            self.error = nil
+            charts[r] = result
+            errors[r] = nil
         } catch {
             if error.isCancellation { return }
-            self.error = error.localizedDescription
+            errors[r] = error.localizedDescription
         }
     }
 

@@ -116,8 +116,9 @@ def _history(event: dict) -> dict:
 
 
 _PERIOD_DAYS = {
+    "1w": 7,
     "1mo": 31,
-    "6mo": 184,
+    "3mo": 92,
     "1y": 365,
     "5y": 1826,
     # "ytd" handled by year-start filter
