@@ -187,7 +187,12 @@ private struct WiseCatRow: View {
                     if let signal {
                         VStack(alignment: .trailing, spacing: SacredSpacing.xxs) {
                             actionChip(signal)
-                            convictionDots(signal.conviction)
+                            if let label = convictionLabel(signal) {
+                                Text(label)
+                                    .font(.sacredFinePrint)
+                                    .foregroundColor(.sacredMuted)
+                                    .tracking(2)
+                            }
                         }
                     } else if generating {
                         ProgressView()
@@ -220,14 +225,14 @@ private struct WiseCatRow: View {
             )
     }
 
-    private func convictionDots(_ conviction: Double) -> some View {
-        let level = Int((conviction * 5).rounded())
-        return HStack(spacing: 3) {
-            ForEach(0..<5) { i in
-                Circle()
-                    .fill(i < level ? Color.sacredGold : Color.sacredMutedLight.opacity(0.3))
-                    .frame(width: 5, height: 5)
-            }
+    /// Small textual conviction cue — only meaningful for BUY/SELL. HOLD has no
+    /// "strength of holding," so we return nil and show nothing.
+    private func convictionLabel(_ s: TradingSignal) -> String? {
+        guard WiseCatAction.from(s.action) != .hold else { return nil }
+        switch s.conviction {
+        case ..<0.5: return "SOFT"
+        case ..<0.8: return "CLEAR"
+        default: return "STRONG"
         }
     }
 
