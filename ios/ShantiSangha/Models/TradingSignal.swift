@@ -21,6 +21,23 @@ struct TradingSignal: Codable, Identifiable, Hashable {
     let horizon1Y: HorizonRead
 
     var id: String { "\(ticker)-\(date)" }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        ticker = try c.decode(String.self, forKey: .ticker)
+        date = try c.decode(String.self, forKey: .date)
+        action = try c.decode(String.self, forKey: .action)
+        conviction = try c.decode(Double.self, forKey: .conviction)
+        technicalScore = try c.decode(Double.self, forKey: .technicalScore)
+        astroScore = try c.decode(Double.self, forKey: .astroScore)
+        compositeScore = try c.decode(Double.self, forKey: .compositeScore)
+        price = try c.decodeIfPresent(Double.self, forKey: .price)
+        technicalSignals = try c.decodeArrayLenient(forKey: .technicalSignals)
+        astroAngles = try c.decodeArrayLenient(forKey: .astroAngles)
+        horizon1W = try c.decode(HorizonRead.self, forKey: .horizon1W)
+        horizon1M = try c.decode(HorizonRead.self, forKey: .horizon1M)
+        horizon1Y = try c.decode(HorizonRead.self, forKey: .horizon1Y)
+    }
 }
 
 /// One horizon's read of (ticker, date) — Buy/Hold/Sell, composite, conviction,
@@ -33,6 +50,25 @@ struct HorizonRead: Codable, Hashable {
     let astroScore: Double
     let compositeScore: Double
     let technicalSignals: [StrategyContribution]
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        action = try c.decode(String.self, forKey: .action)
+        conviction = try c.decode(Double.self, forKey: .conviction)
+        technicalScore = try c.decode(Double.self, forKey: .technicalScore)
+        astroScore = try c.decode(Double.self, forKey: .astroScore)
+        compositeScore = try c.decode(Double.self, forKey: .compositeScore)
+        technicalSignals = try c.decodeArrayLenient(forKey: .technicalSignals)
+    }
+}
+
+private extension KeyedDecodingContainer {
+    /// Decode an array field that may be missing or explicitly null on the
+    /// wire, defaulting to []. Defensive against legacy server responses
+    /// where a contribution list hasn't been backfilled yet.
+    func decodeArrayLenient<T: Decodable>(forKey key: K) throws -> [T] {
+        try decodeIfPresent([T].self, forKey: key) ?? []
+    }
 }
 
 enum WiseCatHorizon: String, CaseIterable, Identifiable {

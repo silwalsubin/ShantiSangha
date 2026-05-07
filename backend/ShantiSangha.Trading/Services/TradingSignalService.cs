@@ -173,8 +173,17 @@ public class TradingSignalService(
 
     private static TradingSignalDto ToDto(TradingSignal s)
     {
-        var reasoning = JsonSerializer.Deserialize<SignalReasoning>(s.ReasoningJson)
-                        ?? new SignalReasoning([], [], [], []);
+        // Rows persisted before the per-horizon split have ReasoningJson with
+        // a `Technical` field instead of `Technical1W/1M/1Y`, so those three
+        // properties deserialize as null. Coalesce so the API never emits
+        // null lists where iOS expects an array.
+        var raw = JsonSerializer.Deserialize<SignalReasoning>(s.ReasoningJson);
+        var reasoning = new SignalReasoning(
+            Technical1W: raw?.Technical1W ?? Array.Empty<StrategyContributionDto>(),
+            Technical1M: raw?.Technical1M ?? Array.Empty<StrategyContributionDto>(),
+            Technical1Y: raw?.Technical1Y ?? Array.Empty<StrategyContributionDto>(),
+            Astro:       raw?.Astro       ?? Array.Empty<AstroAngleScoreDto>()
+        );
 
         var horizon1W = new HorizonReadDto(
             Action: s.Action1W.ToString(),
