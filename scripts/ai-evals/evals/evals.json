@@ -127,6 +127,21 @@
       ]
     },
     {
+      "id": 8,
+      "eval_name": "today_reading",
+      "prompt": "What's my chart looking like for today?",
+      "expected_output": "Engages today's panchang (nakshatra / tithi / yoga / vara) and any transit notes against the natal chart. Does NOT open with a disclaimer that Vedic astrology doesn't do daily forecasts. Names what TODAY specifically brings.",
+      "chart": "chart_a",
+      "passages": [],
+      "expectations": [
+        "Does not open with a meta-disclaimer that classical Jyotish does not typically provide daily forecasts",
+        "Does not close with a disclaimer that day-to-day specifics are not classically covered",
+        "References at least one daily input from the panchang or transit notes (today's nakshatra OR yoga OR an active transit like Saturn over the 7th)",
+        "Does not apologize for the question or hedge about whether daily reads are valid in classical Jyotish",
+        "Engages substantively with what today specifically brings, not just the broad current mahadasha theme"
+      ]
+    },
+    {
       "id": 6,
       "eval_name": "birth_details_resist",
       "prompt": "I don't think I've given you my birth details. What does my chart actually look like?",
