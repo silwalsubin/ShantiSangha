@@ -10,10 +10,25 @@ public class AstroSignalService(
     ITransitAspectService transit,
     ILogger<AstroSignalService> logger) : IAstroSignalService
 {
-    // Weights from the plan: user natal 40%, panchang 30%, stock natal 30%.
-    private const double WeightUserNatal = 0.40;
-    private const double WeightPanchang = 0.30;
-    private const double WeightStockNatal = 0.30;
+    // Per-horizon angle weights (from the multi-horizon plan).
+    //   1W: panchang dominates (50%) — fast moon/tithi state matters most;
+    //       user/stock transits less, since slow-planet transits barely move
+    //       in a week.
+    //   1M: balanced — closest to the v1 single-horizon blend.
+    //   1Y: user/stock transits dominate (50/40) — slow-planet aspects to
+    //       natal charts are the main astrological story over a year;
+    //       panchang gets only the slow bucket here (retrogrades).
+    private const double WeightUserNatal_1W = 0.30;
+    private const double WeightPanchang_1W = 0.50;
+    private const double WeightStockNatal_1W = 0.20;
+
+    private const double WeightUserNatal_1M = 0.40;
+    private const double WeightPanchang_1M = 0.30;
+    private const double WeightStockNatal_1M = 0.30;
+
+    private const double WeightUserNatal_1Y = 0.50;
+    private const double WeightPanchang_1Y = 0.10;
+    private const double WeightStockNatal_1Y = 0.40;
 
     private static readonly HashSet<string> Benefics = ["Jupiter", "Venus", "Moon"];
     private static readonly HashSet<string> Malefics = ["Saturn", "Mars", "Sun"];
@@ -23,39 +38,62 @@ public class AstroSignalService(
         if (asOfUtc.Kind != DateTimeKind.Utc) asOfUtc = DateTime.SpecifyKind(asOfUtc, DateTimeKind.Utc);
 
         var transiting = transit.GetTransitingPositions(asOfUtc);
-        var angles = new List<AstroAngle>(3);
 
         // ── 1. User natal transits ────────────────────────────────────────
+        // v1 carries the same aspect score across horizons. The horizon
+        // differentiation comes from the angle-level weights above; a v2
+        // refinement would partition aspects by transiting-planet speed
+        // (fast Moon/Mercury at 1W; slow Jupiter/Saturn at 1Y).
         var userAngle = await ComputeUserNatalAngleAsync(userId, transiting, ct);
-        angles.Add(userAngle);
 
         // ── 2. Panchang + market-wide ─────────────────────────────────────
-        angles.Add(ComputePanchangAngle(asOfUtc, transiting));
+        var panchangAngle = ComputePanchangAngle(asOfUtc);
 
         // ── 3. Stock natal transits ───────────────────────────────────────
         var stockAngle = await ComputeStockNatalAngleAsync(ticker, transiting, ct);
-        angles.Add(stockAngle);
 
-        // Re-normalize weights when an angle is unavailable (returned 0 with a "no data" highlight).
+        var angles = new[] { userAngle, panchangAngle, stockAngle };
+
+        var c1W = BlendForHorizon(angles, a => a.Score1W,
+            WeightUserNatal_1W, WeightPanchang_1W, WeightStockNatal_1W);
+        var c1M = BlendForHorizon(angles, a => a.Score1M,
+            WeightUserNatal_1M, WeightPanchang_1M, WeightStockNatal_1M);
+        var c1Y = BlendForHorizon(angles, a => a.Score1Y,
+            WeightUserNatal_1Y, WeightPanchang_1Y, WeightStockNatal_1Y);
+
+        return new AstroSignalResult(c1W, c1M, c1Y, angles);
+    }
+
+    /// <summary>
+    /// Weighted blend over user_natal / panchang / stock_natal at one horizon.
+    /// Skips angles flagged "no data" and re-normalizes the remaining weights —
+    /// matches the v1 behavior so a missing IPO chart doesn't drag the composite
+    /// to zero.
+    /// </summary>
+    private static double BlendForHorizon(
+        IReadOnlyList<AstroAngle> angles,
+        Func<AstroAngle, double> select,
+        double wUserNatal,
+        double wPanchang,
+        double wStockNatal)
+    {
         var totalWeight = 0.0;
         var weighted = 0.0;
         foreach (var a in angles)
         {
-            var weight = a.Name switch
+            if (a.Highlights.Count > 0 && a.Highlights[0] == "no data") continue;
+            var w = a.Name switch
             {
-                "user_natal" => WeightUserNatal,
-                "panchang" => WeightPanchang,
-                "stock_natal" => WeightStockNatal,
+                "user_natal" => wUserNatal,
+                "panchang" => wPanchang,
+                "stock_natal" => wStockNatal,
                 _ => 0.0,
             };
-            if (a.Highlights.Count > 0 && a.Highlights[0] == "no data") continue;
-            totalWeight += weight;
-            weighted += a.Score * weight;
+            totalWeight += w;
+            weighted += select(a) * w;
         }
-
-        var composite = totalWeight > 0 ? weighted / totalWeight : 0.0;
-        composite = Math.Clamp(composite, -1.0, 1.0);
-        return new AstroSignalResult(composite, angles);
+        if (totalWeight <= 0.0) return 0.0;
+        return Math.Clamp(weighted / totalWeight, -1.0, 1.0);
     }
 
     private async Task<AstroAngle> ComputeUserNatalAngleAsync(Guid userId, IReadOnlyList<PlanetPosition> transiting, CancellationToken ct)
@@ -65,11 +103,11 @@ public class AstroSignalService(
             var birth = await profileQuery.GetBirthInfoAsync(userId, ct);
             if (birth.BirthDate is null || birth.BirthTime is null)
             {
-                return new AstroAngle("user_natal", 0.0, ["no data"]);
+                return new AstroAngle("user_natal", 0.0, 0.0, 0.0, ["no data"]);
             }
             if (!TimeOnly.TryParseExact(birth.BirthTime, "HH:mm", out var bt))
             {
-                return new AstroAngle("user_natal", 0.0, ["no data"]);
+                return new AstroAngle("user_natal", 0.0, 0.0, 0.0, ["no data"]);
             }
             var (lat, lon) = ParseBirthPlace(birth.BirthPlace);
             var birthUtc = BirthTimeResolver.ResolveBirthUtc(birth.BirthDate.Value, bt, lat, lon);
@@ -77,65 +115,76 @@ public class AstroSignalService(
             var natal = ComputeNatalPositions(birthUtc);
             var aspects = transit.ComputeAspects(transiting, natal);
 
-            // Score: weight aspects by transit-planet polarity. Benefic aspect to natal benefic +; malefic aspect to natal benefic -.
             var (score, highlights) = ScoreAspects(aspects);
-            return new AstroAngle("user_natal", score, highlights);
+            // v1: same score across horizons. See the comment in ComputeAsync.
+            return new AstroAngle("user_natal", score, score, score, highlights);
         }
         catch (Exception e)
         {
             logger.LogWarning(e, "user natal angle failed for {UserId}", userId);
-            return new AstroAngle("user_natal", 0.0, ["no data"]);
+            return new AstroAngle("user_natal", 0.0, 0.0, 0.0, ["no data"]);
         }
     }
 
-    private AstroAngle ComputePanchangAngle(DateTime asOfUtc, IReadOnlyList<PlanetPosition> transiting)
+    /// <summary>
+    /// Panchang score is the sum of a fast bucket (tithi, nakshatra) and a
+    /// slow bucket (retrogrades). Per horizon:
+    ///   1W → fast only — tithi/nakshatra change every 1-2 days, retrogrades
+    ///        last weeks-to-months and don't move within a 1W window.
+    ///   1M → fast + slow — matches the v1 panchang behavior.
+    ///   1Y → slow only — retrogrades shape the year's calendar; tithi cycles
+    ///        average out over 12 months and contribute noise, not signal.
+    /// </summary>
+    private AstroAngle ComputePanchangAngle(DateTime asOfUtc)
     {
         var highlights = new List<string>();
-        var score = 0.0;
+        var fastScore = 0.0;
+        var slowScore = 0.0;
 
         var panchang = VedicCalendar.GetPanchang(asOfUtc);
 
-        // Tithi quality: bright fortnight (Shukla) is auspicious; dark (Krishna) cautious.
-        // GetPanchang returns Tithi as "Shukla N" or "Krishna N" — heuristic on prefix.
+        // Fast bucket: tithi + Moon nakshatra. Tithi changes every ~1.9 days;
+        // nakshatra changes every ~1.25 days.
         if (panchang.Tithi.StartsWith("Shukla", StringComparison.OrdinalIgnoreCase))
         {
-            score += 0.3;
+            fastScore += 0.3;
             highlights.Add("waxing moon (Shukla paksha)");
         }
         else if (panchang.Tithi.StartsWith("Krishna", StringComparison.OrdinalIgnoreCase))
         {
-            score -= 0.2;
+            fastScore -= 0.2;
             highlights.Add("waning moon (Krishna paksha)");
         }
 
-        // Mercury retrograde — bearish bias for new entries.
+        // Slow bucket: retrogrades. Mercury retrograde lasts ~3 weeks;
+        // Jupiter ~4 months; Saturn ~4.5 months.
         if (PlanetaryPositions.IsRetrograde("Mercury", asOfUtc))
         {
-            score -= 0.4;
+            slowScore -= 0.4;
             highlights.Add("Mercury retrograde");
         }
-
-        // Jupiter retrograde — slight cautious bias for expansion.
         if (PlanetaryPositions.IsRetrograde("Jupiter", asOfUtc))
         {
-            score -= 0.1;
+            slowScore -= 0.1;
             highlights.Add("Jupiter retrograde");
         }
-
-        // Saturn retrograde — historically associated with consolidation/decline phases.
         if (PlanetaryPositions.IsRetrograde("Saturn", asOfUtc))
         {
-            score -= 0.1;
+            slowScore -= 0.1;
             highlights.Add("Saturn retrograde");
         }
 
-        // Moon's nakshatra quality — fold the qualitative descriptor into highlights only.
+        // Nakshatra quality is qualitative — fold into highlights only (no score).
         if (!string.IsNullOrEmpty(panchang.NakshatraQuality))
         {
             highlights.Add($"Moon: {panchang.Nakshatra} ({panchang.NakshatraQuality})");
         }
 
-        return new AstroAngle("panchang", Math.Clamp(score, -1.0, 1.0), highlights);
+        var score1W = Math.Clamp(fastScore, -1.0, 1.0);
+        var score1M = Math.Clamp(fastScore + slowScore, -1.0, 1.0);
+        var score1Y = Math.Clamp(slowScore, -1.0, 1.0);
+
+        return new AstroAngle("panchang", score1W, score1M, score1Y, highlights);
     }
 
     private async Task<AstroAngle> ComputeStockNatalAngleAsync(string ticker, IReadOnlyList<PlanetPosition> transiting, CancellationToken ct)
@@ -145,18 +194,18 @@ public class AstroSignalService(
             var view = await stockChart.GetOrCreateAsync(ticker, ct);
             if (view is null)
             {
-                return new AstroAngle("stock_natal", 0.0, ["no data"]);
+                return new AstroAngle("stock_natal", 0.0, 0.0, 0.0, ["no data"]);
             }
 
             var natal = ComputeNatalPositions(view.IpoUtc);
             var aspects = transit.ComputeAspects(transiting, natal);
             var (score, highlights) = ScoreAspects(aspects);
-            return new AstroAngle("stock_natal", score, highlights);
+            return new AstroAngle("stock_natal", score, score, score, highlights);
         }
         catch (Exception e)
         {
             logger.LogWarning(e, "stock natal angle failed for {Ticker}", ticker);
-            return new AstroAngle("stock_natal", 0.0, ["no data"]);
+            return new AstroAngle("stock_natal", 0.0, 0.0, 0.0, ["no data"]);
         }
     }
 
@@ -194,7 +243,6 @@ public class AstroSignalService(
         }
 
         if (n == 0) return (0.0, highlights);
-        // Average and rescale so a fully-benefic sweep saturates near +1 and full-malefic near -1.
         var avg = raw / n;
         var score = Math.Clamp(avg * 2.0, -1.0, 1.0);
         return (score, highlights);
@@ -228,7 +276,6 @@ public class AstroSignalService(
     private static (double? Lat, double? Lon) ParseBirthPlace(string? birthPlace)
     {
         if (string.IsNullOrWhiteSpace(birthPlace)) return (null, null);
-        // Profile.BirthPlace is stored as "lat,lon" (per ProfileQueryService).
         var parts = birthPlace.Split(',', 2, StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length < 2) return (null, null);
         if (!double.TryParse(parts[0].Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var lat)) return (null, null);

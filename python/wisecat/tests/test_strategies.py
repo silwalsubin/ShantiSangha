@@ -2,7 +2,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from wisecat.strategies import ALL_STRATEGIES
+from wisecat.scoring import score_ticker
+from wisecat.strategies import (
+    ALL_STRATEGIES,
+    HORIZONS,
+    STRATEGY_WEIGHTS_BY_HORIZON,
+)
+# mean_reversion / momentum / volume strategies are still in the source
+# tree but unregistered after the 2026-05-07 basket tune showed sub-coinflip
+# hit rate. Their unit tests still run against the strategy files directly.
 from wisecat.strategies.mean_reversion import score as mr_score
 from wisecat.strategies.momentum import score as mom_score
 from wisecat.strategies.trend import score as trend_score
@@ -124,3 +132,54 @@ def test_ts_momentum_skips_recent_month():
     df = _bars(base + crash)
     _, value = ts_mom_score(df)
     assert value > 0  # crash was in the skipped window; trailing year is +50%
+
+
+def test_per_horizon_weights_sum_to_one():
+    for horizon, weights in STRATEGY_WEIGHTS_BY_HORIZON.items():
+        total = sum(weights.values())
+        assert abs(total - 1.0) < 1e-9, f"{horizon} weights sum to {total}"
+
+
+def test_per_horizon_weights_cover_all_strategies():
+    strategy_names = {name for name, _ in ALL_STRATEGIES}
+    for horizon, weights in STRATEGY_WEIGHTS_BY_HORIZON.items():
+        missing = strategy_names - set(weights.keys())
+        assert not missing, f"{horizon} missing weights for {missing}"
+
+
+def test_score_ticker_returns_per_horizon_scores():
+    # Strong uptrend so trend + 12-1 dominate at 1Y; oscillators saturate at 1W.
+    rng = np.random.default_rng(seed=11)
+    base = np.linspace(100.0, 200.0, 300)
+    noise = rng.normal(0, 0.5, 300).cumsum()
+    df = _bars(list(base + noise))
+
+    score = score_ticker("TEST", df, price=float(df["close"].iloc[-1]))
+    assert set(score.horizons.keys()) == set(HORIZONS)
+    for horizon in HORIZONS:
+        hs = score.horizons[horizon]
+        assert -1.0 <= hs.score <= 1.0
+        # Every strategy should appear in every horizon's signal list (even
+        # when its weight is 0 — preserves the contract for the iOS detail view).
+        names_present = {sig.name for sig in hs.signals}
+        names_expected = {name for name, _ in ALL_STRATEGIES}
+        assert names_present == names_expected
+
+
+def test_score_ticker_horizon_weights_differ():
+    # Same raw signal should produce different contributions at different horizons.
+    # With the post-2026-05-07 weights, trend is 0.55 at 1Y, 0.45 at 1W, 0.50
+    # at 1M — not the wild differentials of the v1 stack, but still distinct.
+    prices = list(np.linspace(100.0, 200.0, 300))
+    df = _bars(prices)
+    score = score_ticker("TEST", df, price=200.0)
+
+    one_y_trend = next(s.contribution for s in score.horizons["1Y"].signals if s.name == "trend_50_200")
+    one_w_trend = next(s.contribution for s in score.horizons["1W"].signals if s.name == "trend_50_200")
+    one_y_tsmom = next(s.contribution for s in score.horizons["1Y"].signals if s.name == "ts_momentum_12_1")
+    one_w_tsmom = next(s.contribution for s in score.horizons["1W"].signals if s.name == "ts_momentum_12_1")
+
+    # 1Y trend weight (0.55) > 1W trend weight (0.45) → bigger 1Y contribution.
+    assert one_y_trend > one_w_trend
+    # 1W ts_momentum weight (0.55) > 1Y ts_momentum weight (0.45) → opposite tilt.
+    assert one_w_tsmom > one_y_tsmom

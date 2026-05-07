@@ -8,7 +8,20 @@ public record QuoteSnapshot(string Ticker, decimal Price, decimal? PrevClose, de
 
 public record TechnicalSignalContribution(string Name, double Value, double Contribution, double Weight);
 
-public record TechnicalScore(string Ticker, decimal? Price, double Score, IReadOnlyList<TechnicalSignalContribution> Contributions);
+public record HorizonTechnicalScore(double Score, IReadOnlyList<TechnicalSignalContribution> Contributions);
+
+public record TechnicalScore(
+    string Ticker,
+    decimal? Price,
+    HorizonTechnicalScore Horizon1W,
+    HorizonTechnicalScore Horizon1M,
+    HorizonTechnicalScore Horizon1Y)
+{
+    /// <summary>Legacy single-horizon view = 1M score.</summary>
+    public double Score => Horizon1M.Score;
+    /// <summary>Legacy single-horizon view = 1M contributions.</summary>
+    public IReadOnlyList<TechnicalSignalContribution> Contributions => Horizon1M.Contributions;
+}
 
 public record ScoreInput(string Ticker, IReadOnlyList<MarketBar> Bars, decimal? Price);
 

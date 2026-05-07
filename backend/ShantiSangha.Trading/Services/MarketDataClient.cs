@@ -118,9 +118,33 @@ public class MarketDataClient(
         return resp.Scores.Select(s => new TechnicalScore(
             s.Ticker,
             s.Price,
-            s.TechnicalScore,
-            (s.Signals ?? new()).Select(c => new TechnicalSignalContribution(c.Name, c.Value, c.Contribution, c.Weight)).ToList()
+            ToHorizonScore(s, "1W"),
+            ToHorizonScore(s, "1M"),
+            ToHorizonScore(s, "1Y")
         )).ToList();
+    }
+
+    private static HorizonTechnicalScore ToHorizonScore(TickerScoreDto dto, string horizon)
+    {
+        // Lambda returns horizons keyed "1W"/"1M"/"1Y". If a key is missing
+        // (e.g. older Lambda revision still in flight), fall back to the
+        // legacy top-level signals so the consumer doesn't see all-zeros.
+        if (dto.Horizons is { } horizons && horizons.TryGetValue(horizon, out var h) && h is not null)
+        {
+            var contribs = (h.Signals ?? new())
+                .Select(c => new TechnicalSignalContribution(c.Name, c.Value, c.Contribution, c.Weight))
+                .ToList();
+            return new HorizonTechnicalScore(h.Score, contribs);
+        }
+        // Fallback: legacy shape — apply only for 1M (the legacy default horizon).
+        if (horizon == "1M")
+        {
+            var contribs = (dto.Signals ?? new())
+                .Select(c => new TechnicalSignalContribution(c.Name, c.Value, c.Contribution, c.Weight))
+                .ToList();
+            return new HorizonTechnicalScore(dto.TechnicalScore, contribs);
+        }
+        return new HorizonTechnicalScore(0.0, Array.Empty<TechnicalSignalContribution>());
     }
 
     private async Task<T?> InvokeAsync<T>(object payload, CancellationToken ct)
@@ -187,7 +211,10 @@ public class MarketDataClient(
         string Ticker,
         decimal? Price,
         [property: JsonPropertyName("technicalScore")] double TechnicalScore,
-        List<SignalContributionDto>? Signals);
+        List<SignalContributionDto>? Signals,
+        Dictionary<string, HorizonScoreDto>? Horizons);
+
+    private record HorizonScoreDto(double Score, List<SignalContributionDto>? Signals);
 
     private record SignalContributionDto(string Name, double Value, double Contribution, double Weight);
 

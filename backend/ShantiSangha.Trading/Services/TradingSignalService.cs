@@ -31,7 +31,7 @@ public class TradingSignalService(
     {
         ticker = ticker.Trim().ToUpperInvariant();
 
-        // Pull cached bars; if fewer than 200 (smallest indicator window), backfill from Finnhub.
+        // Pull cached bars; if fewer than 200 (smallest indicator window), backfill.
         var cutoff = date.AddDays(-450); // 400 trading-day lookback + buffer
         var bars = await db.TickerDailyCloses
             .Where(b => b.Ticker == ticker && b.Date <= date && b.Date >= cutoff)
@@ -54,26 +54,36 @@ public class TradingSignalService(
         var quote = await marketData.GetQuoteAsync(ticker, ct);
         decimal? price = quote?.Price ?? (bars.Count > 0 ? bars[^1].Close : (decimal?)null);
 
-        // Technical score (pure compute on Python; bars are sent in-line).
+        // Per-horizon technical scores (Lambda).
         var scores = await marketData.ScoreAsync(
             new[] { new ScoreInput(ticker, bars, price) }, ct);
         var techScore = scores.FirstOrDefault();
-        var technical = techScore?.Score ?? 0.0;
+        var tech1W = techScore?.Horizon1W ?? new HorizonTechnicalScore(0.0, Array.Empty<TechnicalSignalContribution>());
+        var tech1M = techScore?.Horizon1M ?? new HorizonTechnicalScore(0.0, Array.Empty<TechnicalSignalContribution>());
+        var tech1Y = techScore?.Horizon1Y ?? new HorizonTechnicalScore(0.0, Array.Empty<TechnicalSignalContribution>());
 
-        // Astro score.
+        // Per-horizon astro composites.
         var astroResult = await astro.ComputeAsync(userId, ticker, DateTime.UtcNow, ct);
 
-        var composite = TechnicalWeight * technical + AstroWeight * astroResult.CompositeScore;
-        composite = Math.Clamp(composite, -1.0, 1.0);
+        // Per-horizon composites.
+        var composite1W = ClampComposite(TechnicalWeight * tech1W.Score + AstroWeight * astroResult.Composite1W);
+        var composite1M = ClampComposite(TechnicalWeight * tech1M.Score + AstroWeight * astroResult.Composite1M);
+        var composite1Y = ClampComposite(TechnicalWeight * tech1Y.Score + AstroWeight * astroResult.Composite1Y);
 
-        var action = composite > BuyThreshold ? TradingAction.Buy
-                   : composite < SellThreshold ? TradingAction.Sell
-                   : TradingAction.Hold;
+        var action1W = ToAction(composite1W);
+        var action1M = ToAction(composite1M);
+        var action1Y = ToAction(composite1Y);
 
         var reasoning = new SignalReasoning(
-            Technical: techScore?.Contributions
+            Technical1W: tech1W.Contributions
                 .Select(c => new StrategyContributionDto(c.Name, c.Value, c.Contribution, c.Weight))
-                .ToList() ?? [],
+                .ToList(),
+            Technical1M: tech1M.Contributions
+                .Select(c => new StrategyContributionDto(c.Name, c.Value, c.Contribution, c.Weight))
+                .ToList(),
+            Technical1Y: tech1Y.Contributions
+                .Select(c => new StrategyContributionDto(c.Name, c.Value, c.Contribution, c.Weight))
+                .ToList(),
             Astro: astroResult.Angles
                 .Select(a => new AstroAngleScoreDto(a.Name, a.Score, a.Highlights))
                 .ToList()
@@ -95,11 +105,29 @@ public class TradingSignalService(
             db.TradingSignals.Add(existing);
         }
 
-        existing.Action = action;
-        existing.Conviction = Math.Abs(composite);
-        existing.TechnicalScore = technical;
-        existing.AstroScore = astroResult.CompositeScore;
-        existing.CompositeScore = composite;
+        existing.Action1W = action1W;
+        existing.Action1M = action1M;
+        existing.Action1Y = action1Y;
+        existing.Conviction1W = Math.Abs(composite1W);
+        existing.Conviction1M = Math.Abs(composite1M);
+        existing.Conviction1Y = Math.Abs(composite1Y);
+        existing.Technical1W = tech1W.Score;
+        existing.Technical1M = tech1M.Score;
+        existing.Technical1Y = tech1Y.Score;
+        existing.Astro1W = astroResult.Composite1W;
+        existing.Astro1M = astroResult.Composite1M;
+        existing.Astro1Y = astroResult.Composite1Y;
+        existing.Composite1W = composite1W;
+        existing.Composite1M = composite1M;
+        existing.Composite1Y = composite1Y;
+
+        // Legacy single-horizon columns mirror the 1M values.
+        existing.Action = action1M;
+        existing.Conviction = Math.Abs(composite1M);
+        existing.TechnicalScore = tech1M.Score;
+        existing.AstroScore = astroResult.Composite1M;
+        existing.CompositeScore = composite1M;
+
         existing.ReasoningJson = reasoningJson;
         existing.PriceAtSignal = price;
         existing.CreatedAt = DateTime.UtcNow;
@@ -108,12 +136,18 @@ public class TradingSignalService(
         return ToDto(existing);
     }
 
+    private static double ClampComposite(double composite) => Math.Clamp(composite, -1.0, 1.0);
+
+    private static TradingAction ToAction(double composite) =>
+        composite > BuyThreshold ? TradingAction.Buy
+        : composite < SellThreshold ? TradingAction.Sell
+        : TradingAction.Hold;
+
     private async Task BackfillAsync(string ticker, DateOnly fromDate, CancellationToken ct)
     {
         var bars = await marketData.GetHistoryAsync(ticker, fromDate, ct);
         if (bars.Count == 0) return;
 
-        // Upsert: skip dates we already have.
         var existingDates = await db.TickerDailyCloses
             .Where(b => b.Ticker == ticker && b.Date >= fromDate)
             .Select(b => b.Date)
@@ -140,18 +174,48 @@ public class TradingSignalService(
     private static TradingSignalDto ToDto(TradingSignal s)
     {
         var reasoning = JsonSerializer.Deserialize<SignalReasoning>(s.ReasoningJson)
-                        ?? new SignalReasoning([], []);
+                        ?? new SignalReasoning([], [], [], []);
+
+        var horizon1W = new HorizonReadDto(
+            Action: s.Action1W.ToString(),
+            Conviction: s.Conviction1W,
+            TechnicalScore: s.Technical1W,
+            AstroScore: s.Astro1W,
+            CompositeScore: s.Composite1W,
+            TechnicalSignals: reasoning.Technical1W
+        );
+        var horizon1M = new HorizonReadDto(
+            Action: s.Action1M.ToString(),
+            Conviction: s.Conviction1M,
+            TechnicalScore: s.Technical1M,
+            AstroScore: s.Astro1M,
+            CompositeScore: s.Composite1M,
+            TechnicalSignals: reasoning.Technical1M
+        );
+        var horizon1Y = new HorizonReadDto(
+            Action: s.Action1Y.ToString(),
+            Conviction: s.Conviction1Y,
+            TechnicalScore: s.Technical1Y,
+            AstroScore: s.Astro1Y,
+            CompositeScore: s.Composite1Y,
+            TechnicalSignals: reasoning.Technical1Y
+        );
+
         return new TradingSignalDto(
             Ticker: s.Ticker,
             Date: s.Date,
-            Action: s.Action.ToString(),
-            Conviction: s.Conviction,
-            TechnicalScore: s.TechnicalScore,
-            AstroScore: s.AstroScore,
-            CompositeScore: s.CompositeScore,
+            // Legacy top-level fields = 1M view.
+            Action: horizon1M.Action,
+            Conviction: horizon1M.Conviction,
+            TechnicalScore: horizon1M.TechnicalScore,
+            AstroScore: horizon1M.AstroScore,
+            CompositeScore: horizon1M.CompositeScore,
             Price: s.PriceAtSignal,
-            TechnicalSignals: reasoning.Technical,
-            AstroAngles: reasoning.Astro
+            TechnicalSignals: horizon1M.TechnicalSignals,
+            AstroAngles: reasoning.Astro,
+            Horizon1W: horizon1W,
+            Horizon1M: horizon1M,
+            Horizon1Y: horizon1Y
         );
     }
 }

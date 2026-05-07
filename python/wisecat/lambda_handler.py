@@ -252,10 +252,29 @@ def _quote(event: dict) -> dict:
 
 
 def _serialize_score(score) -> dict:
+    horizons = {
+        h: {
+            "score": hs.score,
+            "signals": [
+                {
+                    "name": s.name,
+                    "value": s.value,
+                    "contribution": s.contribution,
+                    "weight": s.weight,
+                }
+                for s in hs.signals
+            ],
+        }
+        for h, hs in score.horizons.items()
+    }
+    # Top-level technicalScore + signals shadow the 1M view for callers that
+    # haven't migrated to the horizons block yet.
+    legacy_horizon = score.horizons.get("1M")
     return {
         "ticker": score.ticker,
         "price": score.price,
-        "technicalScore": score.technical_score,
+        "horizons": horizons,
+        "technicalScore": legacy_horizon.score if legacy_horizon else 0.0,
         "signals": [
             {
                 "name": s.name,
@@ -263,7 +282,7 @@ def _serialize_score(score) -> dict:
                 "contribution": s.contribution,
                 "weight": s.weight,
             }
-            for s in score.signals
+            for s in (legacy_horizon.signals if legacy_horizon else [])
         ],
         "error": score.error,
     }

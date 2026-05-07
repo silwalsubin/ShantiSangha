@@ -31,12 +31,29 @@ class StrategyContribution(BaseModel):
     weight: float
 
 
+class HorizonScore(BaseModel):
+    """Per-horizon technical roll-up. One per horizon (1W, 1M, 1Y)."""
+    score: float
+    signals: list[StrategyContribution]
+
+
 class TickerScore(BaseModel):
     ticker: str
     price: float | None
-    technical_score: float = Field(alias="technicalScore")
-    signals: list[StrategyContribution]
+    # Per-horizon scores keyed by "1W" | "1M" | "1Y".
+    horizons: dict[str, HorizonScore]
     error: str | None = None
+
+    @property
+    def technical_score(self) -> float:
+        """Legacy single-horizon view = the 1M score. Kept for callers that
+        haven't migrated to the per-horizon API."""
+        return self.horizons["1M"].score if "1M" in self.horizons else 0.0
+
+    @property
+    def signals(self) -> list[StrategyContribution]:
+        """Legacy single-horizon view = the 1M signal contributions."""
+        return self.horizons["1M"].signals if "1M" in self.horizons else []
 
     model_config = {"populate_by_name": True}
 
