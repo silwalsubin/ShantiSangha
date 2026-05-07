@@ -120,6 +120,7 @@ _PERIOD_DAYS = {
     "6mo": 184,
     "1y": 365,
     "5y": 1826,
+    # "ytd" handled by year-start filter
     # "max" handled separately
 }
 
@@ -134,7 +135,7 @@ def _chart_history(event: dict) -> dict:
     if not ticker:
         raise ValueError("'ticker' required")
     period = (event.get("period") or "1y").lower()
-    if period not in _PERIOD_DAYS and period != "max":
+    if period not in _PERIOD_DAYS and period not in ("max", "ytd"):
         raise ValueError(f"unknown period: {period}")
 
     try:
@@ -160,8 +161,12 @@ def _chart_history(event: dict) -> dict:
     }
 
     # Filter to requested period for the bars.
+    from datetime import date as _date_cls
     if period == "max":
         bars_df = df
+    elif period == "ytd":
+        cutoff = _date_cls(today.year, 1, 1)
+        bars_df = df[df["date"] >= cutoff]
     else:
         cutoff = today - timedelta(days=_PERIOD_DAYS[period])
         bars_df = df[df["date"] >= cutoff]
