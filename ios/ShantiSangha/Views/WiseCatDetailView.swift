@@ -26,7 +26,6 @@ struct WiseCatDetailView: View {
                                 .frame(maxWidth: .infinity, minHeight: 200)
                         } else if let signal {
                             actionSummary(signal)
-                            scoresBlock(signal)
                             technicalBlock(signal)
                             astroBlock(signal)
                         } else if let error {
@@ -81,36 +80,19 @@ struct WiseCatDetailView: View {
                     labelFont: .sacredHeading,
                     labelPosition: .diameterLine
                 )
+                Text(String(format: "Composite %+.2f", s.compositeScore))
+                    .font(.sacredSmall)
+                    .foregroundColor(.sacredMuted)
             }
             .frame(maxWidth: .infinity)
             .padding(SacredSpacing.lux)
         }
     }
 
-    private func scoresBlock(_ s: TradingSignal) -> some View {
-        LuxCard {
-            VStack(alignment: .leading, spacing: SacredSpacing.s) {
-                Text("Scores")
-                    .font(.sacredSubheading)
-                    .foregroundColor(.sacredText)
-                scoreRow("Technical", s.technicalScore)
-                scoreRow("Astrological", s.astroScore)
-                scoreRow("Composite", s.compositeScore)
-            }
-            .padding(SacredSpacing.lux)
-        }
-    }
-
-    private func scoreRow(_ label: String, _ value: Double) -> some View {
-        HStack {
-            Text(label)
-                .font(.sacredText)
-                .foregroundColor(.sacredTextSecondary)
-            Spacer()
-            Text(String(format: "%+.2f", value))
-                .font(.sacredTextMedium)
-                .foregroundColor(value > 0.1 ? .sacredGreen : value < -0.1 ? .sacredRed : .sacredText)
-        }
+    private func scoreColor(_ value: Double) -> Color {
+        if value > 0.1 { return .sacredGreen }
+        if value < -0.1 { return .sacredRed }
+        return .sacredText
     }
 
     private func technicalBlock(_ s: TradingSignal) -> some View {
@@ -122,19 +104,25 @@ struct WiseCatDetailView: View {
 
         return LuxCard {
             VStack(alignment: .leading, spacing: SacredSpacing.s) {
-                HStack(alignment: .firstTextBaseline, spacing: SacredSpacing.s) {
-                    Text("Technical")
-                        .font(.sacredSubheading)
-                        .foregroundColor(.sacredText)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Text("weight")
-                        .font(.sacredCaption)
-                        .foregroundColor(.sacredMuted)
-                        .frame(width: 44, alignment: .trailing)
-                    Text("score")
-                        .font(.sacredCaption)
-                        .foregroundColor(.sacredMuted)
-                        .frame(width: 56, alignment: .trailing)
+                sectionHeader(
+                    title: "Technical",
+                    weightInComposite: 0.6,
+                    score: s.technicalScore
+                )
+
+                if !sorted.isEmpty {
+                    HStack(alignment: .firstTextBaseline, spacing: SacredSpacing.s) {
+                        Spacer()
+                        Text("weight")
+                            .font(.sacredCaption)
+                            .foregroundColor(.sacredMuted)
+                            .frame(width: 44, alignment: .trailing)
+                        Text("score")
+                            .font(.sacredCaption)
+                            .foregroundColor(.sacredMuted)
+                            .frame(width: 56, alignment: .trailing)
+                    }
+                    .padding(.top, SacredSpacing.xxs)
                 }
 
                 if sorted.isEmpty {
@@ -149,6 +137,23 @@ struct WiseCatDetailView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(SacredSpacing.lux)
+        }
+    }
+
+    private func sectionHeader(title: String, weightInComposite: Double, score: Double) -> some View {
+        VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                    .font(.sacredSubheading)
+                    .foregroundColor(.sacredText)
+                Spacer()
+                Text(String(format: "%+.2f", score))
+                    .font(.sacredSubheading)
+                    .foregroundColor(scoreColor(score))
+            }
+            Text(String(format: "%.0f%% weight in composite", weightInComposite * 100))
+                .font(.sacredSmall)
+                .foregroundColor(.sacredMuted)
         }
     }
 
@@ -169,36 +174,41 @@ struct WiseCatDetailView: View {
         }
     }
 
-    @ViewBuilder
     private func astroBlock(_ s: TradingSignal) -> some View {
         let stockChart = s.astroAngles.first(where: { $0.angle == "stock_natal" })
-        let hasData = stockChart != nil
+        let hasStockData = stockChart != nil
             && !(stockChart?.highlights.first == "no data")
             && !(stockChart?.highlights.isEmpty ?? true)
 
-        if let stockChart, hasData {
-            LuxCard {
-                VStack(alignment: .leading, spacing: SacredSpacing.s) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("Stock chart")
-                            .font(.sacredSubheading)
-                            .foregroundColor(.sacredText)
-                        Spacer()
-                        Text(String(format: "%+.2f", stockChart.score))
-                            .font(.sacredCaption)
-                            .foregroundColor(.sacredTextSecondary)
-                    }
-                    Text("Transits to \(ticker)'s IPO chart")
-                        .font(.sacredSmall)
-                        .foregroundColor(.sacredMuted)
-                    ForEach(stockChart.highlights, id: \.self) { h in
-                        Text("· \(h)")
+        return LuxCard {
+            VStack(alignment: .leading, spacing: SacredSpacing.s) {
+                sectionHeader(
+                    title: "Astrological",
+                    weightInComposite: 0.4,
+                    score: s.astroScore
+                )
+
+                if let stockChart, hasStockData {
+                    VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
+                        Text("Transits to \(ticker)'s IPO chart")
                             .font(.sacredSmall)
                             .foregroundColor(.sacredMuted)
+                        ForEach(stockChart.highlights, id: \.self) { h in
+                            Text("· \(h)")
+                                .font(.sacredSmall)
+                                .foregroundColor(.sacredMuted)
+                        }
                     }
+                    .padding(.top, SacredSpacing.xxs)
+                } else {
+                    Text("Today's read for this stock comes from your transits and the panchang — see Today's sky on the Stocks page.")
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredMuted)
+                        .padding(.top, SacredSpacing.xxs)
                 }
-                .padding(SacredSpacing.lux)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(SacredSpacing.lux)
         }
     }
 
