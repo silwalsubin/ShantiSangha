@@ -14,14 +14,19 @@ struct WiseCatChartView: View {
     @State private var statsExpanded = false
 
     var body: some View {
+        // chartArea spans full width; surrounding text/buttons stay inset so
+        // they don't touch the screen edges.
         VStack(alignment: .leading, spacing: SacredSpacing.s) {
             headline
+                .padding(.horizontal, SacredSpacing.m)
 
             chartArea
 
             rangeSelector
+                .padding(.horizontal, SacredSpacing.m)
 
             statsCard
+                .padding(.horizontal, SacredSpacing.m)
         }
         .task { await load(range) }
     }
@@ -238,10 +243,18 @@ struct WiseCatChartView: View {
                 .symbolSize(70)
             }
         }
-        .chartYScale(domain: .automatic(includesZero: false))
+        .chartYScale(domain: yDomain(bars))
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
         .chartXSelection(value: $selectedDate)
+    }
+
+    private func yDomain(_ bars: [ChartBar]) -> ClosedRange<Double> {
+        guard let lo = bars.map(\.close).min(),
+              let hi = bars.map(\.close).max() else { return 0...1 }
+        let span = hi - lo
+        let pad = span > 0 ? span * 0.08 : max(hi * 0.005, 0.5)
+        return (lo - pad)...(hi + pad)
     }
 
     // MARK: - Range selector

@@ -15,24 +15,28 @@ struct WiseCatDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: SacredSpacing.l) {
                     // Chart loads independently — kicks off as soon as the view
-                    // appears, in parallel with the signal fetch.
+                    // appears, in parallel with the signal fetch. Owns its own
+                    // internal padding so the canvas can extend edge to edge.
                     WiseCatChartView(ticker: ticker)
 
-                    if loading {
-                        ProgressView()
-                            .frame(maxWidth: .infinity, minHeight: 200)
-                    } else if let signal {
-                        actionSummary(signal)
-                        scoresBlock(signal)
-                        technicalBlock(signal)
-                        astroBlock(signal)
-                    } else if let error {
-                        Text(error)
-                            .font(.sacredText)
-                            .foregroundColor(.sacredRed)
+                    // Non-chart content stays at the standard inset.
+                    VStack(alignment: .leading, spacing: SacredSpacing.l) {
+                        if loading {
+                            ProgressView()
+                                .frame(maxWidth: .infinity, minHeight: 200)
+                        } else if let signal {
+                            actionSummary(signal)
+                            scoresBlock(signal)
+                            technicalBlock(signal)
+                            astroBlock(signal)
+                        } else if let error {
+                            Text(error)
+                                .font(.sacredText)
+                                .foregroundColor(.sacredRed)
+                        }
                     }
+                    .padding(.horizontal, SacredSpacing.m)
                 }
-                .padding(.horizontal, SacredSpacing.m)
                 .padding(.top, SacredSpacing.l)
                 .padding(.bottom, SacredSpacing.tabBarSafe)
             }
@@ -74,9 +78,17 @@ struct WiseCatDetailView: View {
                         .foregroundColor(color)
                 }
                 Spacer()
-                Text(convictionLabel(s.conviction))
-                    .font(.sacredTextMedium)
-                    .foregroundColor(.sacredTextSecondary)
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("Conviction")
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredMuted)
+                    ConvictionMeter(
+                        conviction: s.conviction,
+                        color: color,
+                        diameter: 88,
+                        lineWidth: 6
+                    )
+                }
             }
             .padding(SacredSpacing.lux)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -167,14 +179,6 @@ struct WiseCatDetailView: View {
                 }
                 .padding(SacredSpacing.lux)
             }
-        }
-    }
-
-    private func convictionLabel(_ c: Double) -> String {
-        switch c {
-        case ..<0.5: return "soft"
-        case ..<0.8: return "clear"
-        default: return "strong"
         }
     }
 
