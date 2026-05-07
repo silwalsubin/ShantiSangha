@@ -30,7 +30,10 @@ struct FriendChatView: View {
     @State private var jumpToMessageId: UUID?
     @State private var highlightedMessageId: UUID?
     @State private var showProfile = false
-    @FocusState private var composerFocused: Bool
+    /// Mirrors the composer's internal `@FocusState`. The composer pings
+    /// us on focus change so we can scroll the latest message above the
+    /// keyboard rise.
+    @State private var composerFocused: Bool = false
     @EnvironmentObject var profile: ProfileService
     @Environment(\.dismiss) private var dismiss
 
@@ -381,15 +384,14 @@ struct FriendChatView: View {
     }
 
     private var composer: some View {
-        VStack(spacing: 6) {
-            if vm.editingMessageId != nil {
-                editBanner
-            }
-            if let reply = vm.replyTarget {
-                replyBanner(reply)
-            }
-
-            HStack(alignment: .bottom, spacing: 8) {
+        SacredChatComposer(
+            text: $draft,
+            placeholder: vm.editingMessageId == nil ? "Message" : "Edit message",
+            isEditing: vm.editingMessageId != nil,
+            canSend: canSend && !vm.sending,
+            onSend: submitDraft,
+            onFocusChange: { composerFocused = $0 },
+            accessories: {
                 if vm.editingMessageId == nil {
                     PhotosPicker(selection: $photoSelection, matching: .images) {
                         Image(systemName: "photo")
@@ -405,29 +407,14 @@ struct FriendChatView: View {
                             .frame(width: 38, height: 38)
                     }
                 }
-
-                TextField(vm.editingMessageId == nil ? "Message" : "Edit message", text: $draft, axis: .vertical)
-                    .font(.sacredText)
-                    .lineLimit(1...5)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(RoundedRectangle(cornerRadius: 18).fill(Color.sacredBgCard))
-                    .focused($composerFocused)
-
-                Button {
-                    submitDraft()
-                } label: {
-                    Image(systemName: vm.editingMessageId == nil ? "arrow.up.circle.fill" : "checkmark.circle.fill")
-                        .font(.system(size: 30))
-                        .foregroundColor(canSend ? .sacredGold : .sacredMutedLight)
+            },
+            banner: {
+                if vm.editingMessageId != nil {
+                    editBanner
+                } else if let reply = vm.replyTarget {
+                    replyBanner(reply)
                 }
-                .disabled(!canSend || vm.sending)
-            }
-        }
-        .padding(.horizontal, SacredSpacing.m)
-        .padding(.vertical, SacredSpacing.s)
-        .background(Color.sacredBg)
-        .overlay(Rectangle().fill(Color.sacredGold.opacity(0.1)).frame(height: 0.5), alignment: .top)
+            })
     }
 
     private var editBanner: some View {
@@ -729,13 +716,9 @@ private struct MessageBubble: View {
         } else {
             switch message.kind {
             case .text:
-                Text(message.body ?? "")
-                    .font(.sacredText)
-                    .foregroundColor(fromFriend ? .sacredText : .white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(bubbleBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                SacredChatBubblePill(side: fromFriend ? .theirs : .mine) {
+                    Text(message.body ?? "")
+                }
             case .image:
                 if let urlStr = message.mediaUrl, let url = URL(string: urlStr) {
                     CachedAsyncImage(messageId: message.id, remoteUrl: url)
@@ -745,15 +728,13 @@ private struct MessageBubble: View {
                         .onTapGesture { onTapImage(url) }
                 }
             case .voice:
-                VoicePlayerView(
-                    messageId: message.id,
-                    url: message.mediaUrl,
-                    durationMs: message.durationMs,
-                    fromFriend: fromFriend)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(bubbleBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                SacredChatBubblePill(side: fromFriend ? .theirs : .mine) {
+                    VoicePlayerView(
+                        messageId: message.id,
+                        url: message.mediaUrl,
+                        durationMs: message.durationMs,
+                        fromFriend: fromFriend)
+                }
             }
         }
     }
@@ -820,16 +801,6 @@ private struct MessageBubble: View {
                     displayName: friendDisplayName,
                     avatarUrl: friendAvatarUrl,
                     size: 12)
-            }
-        }
-    }
-
-    private var bubbleBackground: some View {
-        Group {
-            if fromFriend {
-                Color.sacredBgCard
-            } else {
-                LinearGradient.sacredGoldShinyVertical
             }
         }
     }

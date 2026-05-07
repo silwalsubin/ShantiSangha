@@ -109,39 +109,19 @@ struct ChatView: View {
                     }
                     .padding(.horizontal, SacredSpacing.m)
                     .padding(.top, SacredSpacing.xs)
-                    .background(.ultraThinMaterial)
+                    .background(Color.sacredBg)
                 }
 
-                HStack(spacing: SacredSpacing.s) {
-                    TextField("Share what's on your mind...", text: $inputText, axis: .vertical)
-                        .font(.sacredText)
-                        .lineLimit(1...4)
-                        .padding(SacredSpacing.s)
-                        .background(
-                            RoundedRectangle(cornerRadius: SacredRadius.card)
-                                .fill(Color.sacredBgCard.opacity(0.6))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: SacredRadius.card)
-                                .stroke(Color.sacredMuted.opacity(0.15))
-                        )
-
-                    Button {
-                        Task { await sendMessage() }
-                    } label: {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.sacredIconLarge)
-                            .foregroundColor(inputText.trimmingCharacters(in: .whitespaces).isEmpty || sending ? .sacredMuted.opacity(0.3) : .sacredGold)
-                    }
-                    .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty || sending)
-                }
-                .padding(.horizontal, SacredSpacing.m)
-                .padding(.vertical, SacredSpacing.s)
-                .background(.ultraThinMaterial)
+                SacredChatComposer(
+                    text: $inputText,
+                    placeholder: "Share what's on your mind...",
+                    canSend: !inputText.trimmingCharacters(in: .whitespaces).isEmpty && !sending,
+                    onSend: { Task { await sendMessage() } })
             }
         }
         .navigationTitle(displayTitle)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .tabBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if !messages.isEmpty {
@@ -173,25 +153,12 @@ struct ChatView: View {
     // MARK: - Message bubble
 
     private func messageBubble(_ msg: ChatMessage) -> some View {
-        VStack(alignment: msg.role == "user" ? .trailing : .leading, spacing: 4) {
-            HStack {
-                if msg.role == "user" { Spacer() }
+        let side: SacredChatSide = msg.role == "user" ? .mine : .theirs
+        return VStack(alignment: msg.role == "user" ? .trailing : .leading, spacing: 4) {
+            SacredChatBubbleRow(side: side) {
                 Text(msg.content)
-                    .font(.sacredText)
-                    .foregroundColor(msg.role == "user" ? .white : .sacredText)
-                    .padding(msg.role == "user" ? SacredSpacing.s : 0)
-                    .background(
-                        Group {
-                            if msg.role == "user" {
-                                RoundedRectangle(cornerRadius: SacredRadius.card)
-                                    .fill(LinearGradient.sacredGoldShiny)
-                            }
-                        }
-                    )
-                if msg.role == "assistant" { Spacer() }
             }
 
-            // Timestamp
             if let ts = msg.timestamp {
                 Text(formatTimestamp(ts))
                     .font(.sacredMicro)
