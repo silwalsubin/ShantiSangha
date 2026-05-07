@@ -66,16 +66,10 @@ struct WiseCatView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("WISE CAT")
-                .font(.sacredSectionLabel)
-                .tracking(3)
-                .foregroundColor(.sacredLabel)
-            Text("Today's read")
-                .font(.sacredTitle)
-                .foregroundColor(.sacredText)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        Text("Today's read")
+            .font(.sacredTitle)
+            .foregroundColor(.sacredText)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func todaysSkyCard(_ sky: WiseCatViewModel.TodaysSky) -> some View {
@@ -92,8 +86,7 @@ struct WiseCatView: View {
                             .foregroundColor(.sacredText)
                         Spacer()
                         Text(skyBiasLabel(sky))
-                            .font(.sacredSmallSemibold)
-                            .tracking(2)
+                            .font(.sacredTextMedium)
                             .foregroundColor(skyBiasColor(sky))
                         Image(systemName: "chevron.right")
                             .font(.sacredSmall)
@@ -136,9 +129,9 @@ struct WiseCatView: View {
 
     private func skyBiasLabel(_ sky: WiseCatViewModel.TodaysSky) -> String {
         let avg = (sky.userNatal.score + sky.panchang.score) / 2
-        if avg > 0.15 { return "BENEFIC" }
-        if avg < -0.15 { return "CAUTIOUS" }
-        return "NEUTRAL"
+        if avg > 0.15 { return "Benefic" }
+        if avg < -0.15 { return "Cautious" }
+        return "Neutral"
     }
 
     private func skyBiasColor(_ sky: WiseCatViewModel.TodaysSky) -> Color {
@@ -208,9 +201,8 @@ private struct WiseCatRow: View {
                             actionChip(signal)
                             if let label = convictionLabel(signal) {
                                 Text(label)
-                                    .font(.sacredFinePrint)
+                                    .font(.sacredSmall)
                                     .foregroundColor(.sacredMuted)
-                                    .tracking(2)
                             }
                         }
                     } else if generating {
@@ -249,9 +241,9 @@ private struct WiseCatRow: View {
     private func convictionLabel(_ s: TradingSignal) -> String? {
         guard WiseCatAction.from(s.action) != .hold else { return nil }
         switch s.conviction {
-        case ..<0.5: return "SOFT"
-        case ..<0.8: return "CLEAR"
-        default: return "STRONG"
+        case ..<0.5: return "soft"
+        case ..<0.8: return "clear"
+        default: return "strong"
         }
     }
 

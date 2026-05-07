@@ -51,16 +51,10 @@ struct WiseCatWatchlistEditView: View {
     }
 
     private var headerHero: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("WISE CAT")
-                .font(.sacredSectionLabel)
-                .tracking(3)
-                .foregroundColor(.sacredLabel)
-            Text("Watchlist")
-                .font(.sacredTitle)
-                .foregroundColor(.sacredText)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        Text("Watchlist")
+            .font(.sacredTitle)
+            .foregroundColor(.sacredText)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var searchField: some View {

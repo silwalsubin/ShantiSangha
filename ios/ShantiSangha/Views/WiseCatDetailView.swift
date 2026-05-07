@@ -57,16 +57,10 @@ struct WiseCatDetailView: View {
     }
 
     private var headerHero: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("WISE CAT")
-                .font(.sacredSectionLabel)
-                .tracking(3)
-                .foregroundColor(.sacredLabel)
-            Text(ticker)
-                .font(.sacredTitle)
-                .foregroundColor(.sacredText)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        Text(ticker)
+            .font(.sacredTitle)
+            .foregroundColor(.sacredText)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var chartCard: some View {
@@ -89,17 +83,15 @@ struct WiseCatDetailView: View {
             HStack(alignment: .center, spacing: SacredSpacing.m) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Today's call")
-                        .font(.sacredSectionLabel)
-                        .tracking(3)
-                        .foregroundColor(.sacredLabel)
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredMuted)
                     Text(s.action)
                         .font(.sacredSubheading)
                         .foregroundColor(color)
                 }
                 Spacer()
                 Text(convictionLabel(s.conviction))
-                    .font(.sacredSmallSemibold)
-                    .tracking(2)
+                    .font(.sacredTextMedium)
                     .foregroundColor(.sacredTextSecondary)
             }
             .padding(SacredSpacing.lux)
@@ -196,9 +188,9 @@ struct WiseCatDetailView: View {
 
     private func convictionLabel(_ c: Double) -> String {
         switch c {
-        case ..<0.5: return "SOFT"
-        case ..<0.8: return "CLEAR"
-        default: return "STRONG"
+        case ..<0.5: return "soft"
+        case ..<0.8: return "clear"
+        default: return "strong"
         }
     }
 

@@ -8,16 +8,9 @@ struct WiseCatHomeCard: View {
         NavigationLink(destination: WiseCatView()) {
             LuxCard {
                 VStack(alignment: .leading, spacing: SacredSpacing.s) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("Wise Cat")
-                            .font(.sacredSubheading)
-                            .foregroundColor(.sacredText)
-                        Spacer()
-                        Text("Today's read")
-                            .font(.sacredSectionLabel)
-                            .tracking(3)
-                            .foregroundColor(.sacredLabel)
-                    }
+                    Text("Wise Cat")
+                        .font(.sacredSubheading)
+                        .foregroundColor(.sacredText)
 
                     if vm.watchlist.isEmpty {
                         Text("Add a ticker to begin reading the markets each day.")
@@ -36,13 +29,13 @@ struct WiseCatHomeCard: View {
                                         .foregroundColor(.sacredText)
                                     Spacer()
                                     Text(sig.action)
-                                        .font(.sacredSmallSemibold)
+                                        .font(.sacredTextMedium)
                                         .foregroundColor(actionColor(sig.action))
                                 }
                             }
                             if vm.hasStrongCalls {
                                 Text("Strong call today")
-                                    .font(.sacredSmallSemibold)
+                                    .font(.sacredTextMedium)
                                     .foregroundColor(.sacredGold)
                                     .padding(.top, SacredSpacing.xxs)
                             }

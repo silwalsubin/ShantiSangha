@@ -106,10 +106,10 @@ struct WiseCatChartView: View {
 
     private func statsRow(_ agg: ChartAggregates) -> some View {
         HStack(alignment: .top, spacing: SacredSpacing.l) {
-            statBlock(label: "52W HIGH", value: agg.weekHigh52)
-            statBlock(label: "52W LOW", value: agg.weekLow52)
-            statBlock(label: "ALL-TIME HIGH", value: agg.allTimeHigh)
-            statBlock(label: "ALL-TIME LOW", value: agg.allTimeLow)
+            statBlock(label: "52w high", value: agg.weekHigh52)
+            statBlock(label: "52w low", value: agg.weekLow52)
+            statBlock(label: "All-time high", value: agg.allTimeHigh)
+            statBlock(label: "All-time low", value: agg.allTimeLow)
         }
         .padding(.top, SacredSpacing.xs)
     }
@@ -117,11 +117,10 @@ struct WiseCatChartView: View {
     private func statBlock(label: String, value: Double?) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.sacredMicroBold)
-                .tracking(2)
-                .foregroundColor(.sacredLabel)
+                .font(.sacredSmall)
+                .foregroundColor(.sacredMuted)
             Text(value.map { formatPrice($0) } ?? "—")
-                .font(.sacredSmallSemibold)
+                .font(.sacredTextMedium)
                 .foregroundColor(.sacredText)
         }
     }
@@ -204,8 +203,7 @@ struct WiseCatChartView: View {
                     Task { await load(r) }
                 } label: {
                     Text(r.label)
-                        .font(.sacredSmallSemibold)
-                        .tracking(1)
+                        .font(.sacredTextMedium)
                         .foregroundColor(r == range ? .sacredGold : .sacredMuted)
                         .frame(maxWidth: .infinity, minHeight: 36)
                         .background(
