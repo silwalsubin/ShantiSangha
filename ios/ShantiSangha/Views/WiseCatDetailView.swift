@@ -16,7 +16,7 @@ struct WiseCatDetailView: View {
                 VStack(alignment: .leading, spacing: SacredSpacing.l) {
                     // Chart loads independently — kicks off as soon as the view
                     // appears, in parallel with the signal fetch.
-                    chartCard
+                    WiseCatChartView(ticker: ticker)
 
                     if loading {
                         ProgressView()
@@ -51,13 +51,6 @@ struct WiseCatDetailView: View {
             self.error = nil
         } catch {
             self.error = error.localizedDescription
-        }
-    }
-
-    private var chartCard: some View {
-        LuxCard {
-            WiseCatChartView(ticker: ticker)
-                .padding(SacredSpacing.lux)
         }
     }
 

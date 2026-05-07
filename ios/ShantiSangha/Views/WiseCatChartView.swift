@@ -165,30 +165,8 @@ struct WiseCatChartView: View {
             }
         }
         .chartYScale(domain: .automatic(includesZero: false))
-        .chartXAxis {
-            AxisMarks(preset: .aligned, values: .automatic(desiredCount: 4)) { value in
-                if let date = value.as(Date.self) {
-                    AxisValueLabel {
-                        Text(formatAxisDate(date))
-                            .font(.sacredFinePrint)
-                            .foregroundStyle(Color.sacredMuted)
-                    }
-                }
-                AxisGridLine().foregroundStyle(Color.sacredMutedLight.opacity(0.15))
-            }
-        }
-        .chartYAxis {
-            AxisMarks(position: .trailing, values: .automatic(desiredCount: 4)) { value in
-                if let v = value.as(Double.self) {
-                    AxisValueLabel {
-                        Text(formatPrice(v))
-                            .font(.sacredFinePrint)
-                            .foregroundStyle(Color.sacredMuted)
-                    }
-                }
-                AxisGridLine().foregroundStyle(Color.sacredMutedLight.opacity(0.15))
-            }
-        }
+        .chartXAxis(.hidden)
+        .chartYAxis(.hidden)
         .chartXSelection(value: $selectedDate)
     }
 
@@ -245,17 +223,6 @@ struct WiseCatChartView: View {
             return String(format: "$%,.0f", v)
         }
         return String(format: "$%.2f", v)
-    }
-
-    private func formatAxisDate(_ d: Date) -> String {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        switch range {
-        case .oneMonth, .sixMonth: f.dateFormat = "MMM d"
-        case .oneYear: f.dateFormat = "MMM"
-        case .fiveYear, .max: f.dateFormat = "yyyy"
-        }
-        return f.string(from: d)
     }
 
     private func formatLongDate(_ d: Date) -> String {
