@@ -91,4 +91,19 @@ public class WiseCatController(
         var bars = await marketData.GetHistoryAsync(ticker, fromDate, ct);
         return Ok(bars);
     }
+
+    [HttpGet("chart/{ticker}")]
+    public async Task<IActionResult> GetChart(string ticker, string period = "1y", CancellationToken ct = default)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+
+        var validPeriods = new HashSet<string> { "1mo", "6mo", "1y", "5y", "max" };
+        var normalized = period.ToLowerInvariant();
+        if (!validPeriods.Contains(normalized))
+            return BadRequest(new { error = $"period must be one of: {string.Join(", ", validPeriods)}" });
+
+        var result = await marketData.GetChartHistoryAsync(ticker, normalized, ct);
+        return result is null ? NotFound() : Ok(result);
+    }
 }

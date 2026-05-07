@@ -16,11 +16,14 @@ struct WiseCatDetailView: View {
                 VStack(alignment: .leading, spacing: SacredSpacing.l) {
                     headerHero
 
+                    // Chart loads independently — kicks off as soon as the view
+                    // appears, in parallel with the signal fetch.
+                    chartCard
+
                     if loading {
                         ProgressView()
                             .frame(maxWidth: .infinity, minHeight: 200)
                     } else if let signal {
-                        priceHeader(signal)
                         actionSummary(signal)
                         scoresBlock(signal)
                         technicalBlock(signal)
@@ -66,16 +69,10 @@ struct WiseCatDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func priceHeader(_ s: TradingSignal) -> some View {
-        VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
-            if let price = s.price {
-                Text(String(format: "$%.2f", price))
-                    .font(.sacredDisplayNumber)
-                    .foregroundColor(.sacredText)
-            }
-            Text(s.date)
-                .font(.sacredSmall)
-                .foregroundColor(.sacredMuted)
+    private var chartCard: some View {
+        LuxCard {
+            WiseCatChartView(ticker: ticker)
+                .padding(SacredSpacing.lux)
         }
     }
 

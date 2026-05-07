@@ -49,6 +49,36 @@ public class MarketDataClient(
         return new QuoteSnapshot(resp.Ticker, resp.Price.Value, null, null, null);
     }
 
+    public async Task<ChartHistoryResult?> GetChartHistoryAsync(string ticker, string period, CancellationToken ct = default)
+    {
+        var resp = await InvokeAsync<ChartHistoryResponseDto>(new
+        {
+            action = "chartHistory",
+            ticker,
+            period,
+        }, ct);
+
+        if (resp is null) return null;
+        var bars = (resp.Bars ?? new())
+            .Select(b => new ChartBar(DateOnly.Parse(b.Date), b.Open, b.High, b.Low, b.Close, b.Volume))
+            .ToList();
+        ChartAggregates? agg = null;
+        if (resp.Aggregates is { } a)
+        {
+            agg = new ChartAggregates(
+                a.CurrentPrice,
+                a.PreviousClose,
+                a.WeekHigh52,
+                a.WeekLow52,
+                a.AllTimeHigh,
+                a.AllTimeLow,
+                DateOnly.Parse(a.FirstDate),
+                DateOnly.Parse(a.LatestDate)
+            );
+        }
+        return new ChartHistoryResult(resp.Ticker, resp.Period, bars, agg);
+    }
+
     public async Task<IReadOnlyList<SymbolMatch>> SearchSymbolsAsync(string query, int limit = 10, CancellationToken ct = default)
     {
         var resp = await InvokeAsync<SymbolSearchResponseDto>(new
@@ -163,6 +193,24 @@ public class MarketDataClient(
 
     private record SymbolSearchResponseDto(List<SymbolMatchDto>? Results);
     private record SymbolMatchDto(string Symbol, string Description, string Type);
+
+    private record ChartHistoryResponseDto(
+        string Ticker,
+        string Period,
+        List<ChartBarDto>? Bars,
+        ChartAggregatesDto? Aggregates);
+
+    private record ChartBarDto(string Date, decimal Open, decimal High, decimal Low, decimal Close, long Volume);
+
+    private record ChartAggregatesDto(
+        [property: JsonPropertyName("currentPrice")] decimal CurrentPrice,
+        [property: JsonPropertyName("previousClose")] decimal? PreviousClose,
+        [property: JsonPropertyName("weekHigh52")] decimal? WeekHigh52,
+        [property: JsonPropertyName("weekLow52")] decimal? WeekLow52,
+        [property: JsonPropertyName("allTimeHigh")] decimal AllTimeHigh,
+        [property: JsonPropertyName("allTimeLow")] decimal AllTimeLow,
+        [property: JsonPropertyName("firstDate")] string FirstDate,
+        [property: JsonPropertyName("latestDate")] string LatestDate);
 }
 
 public record WisecatLambdaConfig(string FunctionName);

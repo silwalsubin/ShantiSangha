@@ -27,4 +27,8 @@ enum WiseCatAPI {
         let escaped = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
         return try await ApiService.shared.get("/wisecat/symbols/search?q=\(escaped)&limit=\(limit)")
     }
+
+    static func getChart(_ ticker: String, range: ChartRange) async throws -> ChartHistory {
+        try await ApiService.shared.get("/wisecat/chart/\(ticker)?period=\(range.rawValue)")
+    }
 }

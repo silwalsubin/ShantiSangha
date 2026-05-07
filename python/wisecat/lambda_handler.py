@@ -25,6 +25,7 @@ from .finnhub_client import (
 )
 from .scoring import score_ticker
 from .settings import settings
+from .yfinance_client import YFinanceUnavailable, get_full_history
 
 logging.basicConfig(level=settings.log_level.upper())
 logger = logging.getLogger("wisecat.lambda")
@@ -45,6 +46,8 @@ def handler(event: dict, context: Any) -> dict:
         return _quote(event)
     if action == "symbolSearch":
         return _symbol_search(event)
+    if action == "chartHistory":
+        return _chart_history(event)
 
     raise ValueError(f"unknown action: {action}")
 
@@ -110,6 +113,71 @@ def _history(event: dict) -> dict:
         for row in df.itertuples()
     ]
     return {"ticker": ticker, "bars": bars}
+
+
+_PERIOD_DAYS = {
+    "1mo": 31,
+    "6mo": 184,
+    "1y": 365,
+    "5y": 1826,
+    # "max" handled separately
+}
+
+
+def _chart_history(event: dict) -> dict:
+    """Returns chart-display bars for the requested period plus an `aggregates`
+    block computed off the FULL available history (so 52w / all-time stats are
+    independent of the selected period)."""
+    from datetime import date as _date, timedelta
+
+    ticker = event.get("ticker")
+    if not ticker:
+        raise ValueError("'ticker' required")
+    period = (event.get("period") or "1y").lower()
+    if period not in _PERIOD_DAYS and period != "max":
+        raise ValueError(f"unknown period: {period}")
+
+    try:
+        df = get_full_history(ticker)
+    except YFinanceUnavailable as e:
+        raise RuntimeError(f"yfinance unavailable: {e}") from e
+
+    if df.empty:
+        return {"ticker": ticker, "period": period, "bars": [], "aggregates": None}
+
+    # Aggregates from full history.
+    today = _date.today()
+    last52 = df[df["date"] >= (today - timedelta(days=365))]
+    aggregates = {
+        "currentPrice": float(df["close"].iloc[-1]),
+        "previousClose": float(df["close"].iloc[-2]) if len(df) >= 2 else None,
+        "weekHigh52": float(last52["close"].max()) if not last52.empty else None,
+        "weekLow52": float(last52["close"].min()) if not last52.empty else None,
+        "allTimeHigh": float(df["close"].max()),
+        "allTimeLow": float(df["close"].min()),
+        "firstDate": df["date"].iloc[0].isoformat(),
+        "latestDate": df["date"].iloc[-1].isoformat(),
+    }
+
+    # Filter to requested period for the bars.
+    if period == "max":
+        bars_df = df
+    else:
+        cutoff = today - timedelta(days=_PERIOD_DAYS[period])
+        bars_df = df[df["date"] >= cutoff]
+
+    bars = [
+        {
+            "date": row.date.isoformat(),
+            "open": float(row.open),
+            "high": float(row.high),
+            "low": float(row.low),
+            "close": float(row.close),
+            "volume": int(row.volume) if row.volume == row.volume else 0,  # NaN guard
+        }
+        for row in bars_df.itertuples()
+    ]
+    return {"ticker": ticker, "period": period, "bars": bars, "aggregates": aggregates}
 
 
 def _symbol_search(event: dict) -> dict:

@@ -14,6 +14,21 @@ public record ScoreInput(string Ticker, IReadOnlyList<MarketBar> Bars, decimal? 
 
 public record SymbolMatch(string Symbol, string Description, string Type);
 
+public record ChartBar(DateOnly Date, decimal Open, decimal High, decimal Low, decimal Close, long Volume);
+
+public record ChartAggregates(
+    decimal CurrentPrice,
+    decimal? PreviousClose,
+    decimal? WeekHigh52,
+    decimal? WeekLow52,
+    decimal AllTimeHigh,
+    decimal AllTimeLow,
+    DateOnly FirstDate,
+    DateOnly LatestDate
+);
+
+public record ChartHistoryResult(string Ticker, string Period, IReadOnlyList<ChartBar> Bars, ChartAggregates? Aggregates);
+
 /// <summary>
 /// Wraps the Python wisecat service. The .NET side owns the durable bar cache;
 /// this client only uses Python for (a) computing technical scores from bars
@@ -32,4 +47,7 @@ public interface IMarketDataClient
 
     /// <summary>Symbol search — used for watchlist add validation + iOS suggestions.</summary>
     Task<IReadOnlyList<SymbolMatch>> SearchSymbolsAsync(string query, int limit = 10, CancellationToken ct = default);
+
+    /// <summary>Long-range chart data + 52w / all-time aggregates. yfinance-backed (free, unlimited).</summary>
+    Task<ChartHistoryResult?> GetChartHistoryAsync(string ticker, string period, CancellationToken ct = default);
 }
