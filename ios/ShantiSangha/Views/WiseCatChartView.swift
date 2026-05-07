@@ -97,7 +97,7 @@ struct WiseCatChartView: View {
             Text(formatPrice(bar.close))
                 .font(.sacredDisplayNumber)
                 .foregroundColor(.sacredText)
-            Text(formatLongDate(bar.parsedDate))
+            Text(range.isIntraday ? formatTime(bar.parsedDate) : formatLongDate(bar.parsedDate))
                 .font(.sacredSmall)
                 .foregroundColor(.sacredMuted)
         }
@@ -135,13 +135,15 @@ struct WiseCatChartView: View {
                             statRow("52-week low", agg.weekLow52.map { formatPrice($0) } ?? "—")
                             statRow("All-time high", formatPrice(agg.allTimeHigh))
                             statRow("All-time low", formatPrice(agg.allTimeLow))
-                            if let lastBar = chart?.bars.last {
-                                statRow("Today's open", formatPrice(lastBar.open))
-                                statRow("Today's high", formatPrice(lastBar.high))
-                                statRow("Today's low", formatPrice(lastBar.low))
-                                statRow("Today's volume", formatVolume(lastBar.volume))
+                            if let today = todaysOHLCV {
+                                statRow("Today's open", formatPrice(today.open))
+                                statRow("Today's high", formatPrice(today.high))
+                                statRow("Today's low", formatPrice(today.low))
+                                statRow("Today's volume", formatVolume(today.volume))
                             }
-                            if let avg = avgVolume20 {
+                            // Avg-volume rolling window only makes sense with
+                            // daily bars; intraday's last 20 bars = 100 min.
+                            if !range.isIntraday, let avg = avgVolume20 {
                                 statRow("Avg volume (20d)", formatVolume(avg))
                             }
                         }
@@ -170,6 +172,23 @@ struct WiseCatChartView: View {
         let last20 = bars.suffix(20)
         let total = last20.reduce(0) { $0 + $1.volume }
         return total / last20.count
+    }
+
+    /// Today's OHLCV — derived differently per range. In 1D mode the rendered
+    /// bars *are* today's intraday session, so open is the first bar and
+    /// high/low/volume aggregate across all bars. In daily modes the last bar
+    /// IS today, so use it directly.
+    private var todaysOHLCV: (open: Double, high: Double, low: Double, volume: Int)? {
+        guard let bars = chart?.bars, !bars.isEmpty else { return nil }
+        if range.isIntraday {
+            let open = bars.first!.open
+            let high = bars.map(\.high).max() ?? open
+            let low = bars.map(\.low).min() ?? open
+            let volume = bars.reduce(0) { $0 + $1.volume }
+            return (open, high, low, volume)
+        }
+        let last = bars.last!
+        return (last.open, last.high, last.low, last.volume)
     }
 
     private func formatVolume(_ v: Int) -> String {
@@ -284,6 +303,13 @@ struct WiseCatChartView: View {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.dateFormat = "MMM d, yyyy"
+        return f.string(from: d)
+    }
+
+    private func formatTime(_ d: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale.current
+        f.dateFormat = "h:mm a"
         return f.string(from: d)
     }
 }

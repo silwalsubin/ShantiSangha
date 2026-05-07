@@ -60,7 +60,7 @@ public class MarketDataClient(
 
         if (resp is null) return null;
         var bars = (resp.Bars ?? new())
-            .Select(b => new ChartBar(DateOnly.Parse(b.Date), b.Open, b.High, b.Low, b.Close, b.Volume))
+            .Select(b => new ChartBar(b.Date, b.Open, b.High, b.Low, b.Close, b.Volume))
             .ToList();
         ChartAggregates? agg = null;
         if (resp.Aggregates is { } a)

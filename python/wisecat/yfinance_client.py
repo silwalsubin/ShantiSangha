@@ -48,3 +48,44 @@ def get_full_history(ticker: str) -> pd.DataFrame:
     })
     df = df[["date", "open", "high", "low", "close", "volume"]].sort_values("date").reset_index(drop=True)
     return df
+
+
+def get_intraday_history(ticker: str) -> pd.DataFrame:
+    """Returns 5-minute intraday bars for the most recent trading day. The
+    DataFrame includes a `timestamp` column (timezone-aware datetime in
+    UTC) — daily-only callers should not use this; it's chart-only.
+    """
+    try:
+        import yfinance as yf
+    except ImportError as e:
+        raise YFinanceUnavailable(f"yfinance not installed: {e}") from e
+
+    try:
+        t = yf.Ticker(ticker)
+        # Pull the last 5 trading days at 5-min resolution then filter to the
+        # most recent date — handles weekends/holidays gracefully (returns the
+        # last actual session instead of an empty result).
+        df = t.history(period="5d", interval="5m", prepost=False, raise_errors=False)
+    except Exception as e:
+        raise YFinanceUnavailable(f"yfinance intraday error for {ticker}: {e}") from e
+
+    if df.empty:
+        raise YFinanceUnavailable(f"yfinance returned no intraday rows for {ticker}")
+
+    df = df.reset_index()
+    # Intraday index column is named "Datetime" in current yfinance.
+    ts_col = "Datetime" if "Datetime" in df.columns else "Date"
+    df["timestamp"] = pd.to_datetime(df[ts_col], utc=True)
+    df = df.rename(columns={
+        "Open": "open",
+        "High": "high",
+        "Low": "low",
+        "Close": "close",
+        "Volume": "volume",
+    })
+
+    # Filter to the most recent session present in the result.
+    last_date = df["timestamp"].dt.date.max()
+    df = df[df["timestamp"].dt.date == last_date]
+    df = df[["timestamp", "open", "high", "low", "close", "volume"]].sort_values("timestamp").reset_index(drop=True)
+    return df

@@ -14,7 +14,12 @@ public record ScoreInput(string Ticker, IReadOnlyList<MarketBar> Bars, decimal? 
 
 public record SymbolMatch(string Symbol, string Description, string Type);
 
-public record ChartBar(DateOnly Date, decimal Open, decimal High, decimal Low, decimal Close, long Volume);
+/// <summary>
+/// `Date` is a passthrough string — daily bars use "yyyy-MM-dd", intraday
+/// bars use full ISO timestamps. iOS handles both formats; the .NET layer
+/// doesn't parse, so adding new resolutions doesn't require schema changes.
+/// </summary>
+public record ChartBar(string Date, decimal Open, decimal High, decimal Low, decimal Close, long Volume);
 
 public record ChartAggregates(
     decimal CurrentPrice,

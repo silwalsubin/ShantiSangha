@@ -25,7 +25,7 @@ from .finnhub_client import (
 )
 from .scoring import score_ticker
 from .settings import settings
-from .yfinance_client import YFinanceUnavailable, get_full_history
+from .yfinance_client import YFinanceUnavailable, get_full_history, get_intraday_history
 
 logging.basicConfig(level=settings.log_level.upper())
 logger = logging.getLogger("wisecat.lambda")
@@ -135,7 +135,7 @@ def _chart_history(event: dict) -> dict:
     if not ticker:
         raise ValueError("'ticker' required")
     period = (event.get("period") or "1y").lower()
-    if period not in _PERIOD_DAYS and period not in ("max", "ytd"):
+    if period not in _PERIOD_DAYS and period not in ("max", "ytd", "1d"):
         raise ValueError(f"unknown period: {period}")
 
     try:
@@ -160,7 +160,29 @@ def _chart_history(event: dict) -> dict:
         "latestDate": df["date"].iloc[-1].isoformat(),
     }
 
-    # Filter to requested period for the bars.
+    # 1D path: pull intraday bars (5-min) instead of filtering daily history.
+    # Aggregates still come from the daily history above (52w/all-time are not
+    # intraday concepts).
+    if period == "1d":
+        try:
+            intraday = get_intraday_history(ticker)
+        except YFinanceUnavailable as e:
+            raise RuntimeError(f"yfinance intraday unavailable: {e}") from e
+
+        bars = [
+            {
+                "date": row.timestamp.isoformat(),  # full ISO incl. timezone
+                "open": float(row.open),
+                "high": float(row.high),
+                "low": float(row.low),
+                "close": float(row.close),
+                "volume": int(row.volume) if row.volume == row.volume else 0,
+            }
+            for row in intraday.itertuples()
+        ]
+        return {"ticker": ticker, "period": period, "bars": bars, "aggregates": aggregates}
+
+    # Daily-resolution paths.
     from datetime import date as _date_cls
     if period == "max":
         bars_df = df
