@@ -6,6 +6,7 @@ struct WiseCatDetailView: View {
     @State private var signal: TradingSignal?
     @State private var loading = true
     @State private var error: String?
+    @State private var selectedHorizon: WiseCatHorizon = .oneWeek
 
     var body: some View {
         ZStack {
@@ -25,10 +26,8 @@ struct WiseCatDetailView: View {
                             ProgressView()
                                 .frame(maxWidth: .infinity, minHeight: 200)
                         } else if let signal {
-                            alignmentStrip(signal)
-                            ForEach(WiseCatHorizon.allCases) { horizon in
-                                horizonCard(horizon: horizon, read: signal.read(for: horizon))
-                            }
+                            horizonSelector(signal)
+                            horizonCard(read: signal.read(for: selectedHorizon))
                         } else if let error {
                             Text(error)
                                 .font(.sacredText)
@@ -58,39 +57,54 @@ struct WiseCatDetailView: View {
         }
     }
 
-    // MARK: - Alignment strip
+    // MARK: - Horizon selector
 
-    /// One-line summary of all three horizons' verdicts so divergence reads
-    /// without scrolling. Example: "1W Hold · 1M Sell · 1Y Sell".
-    private func alignmentStrip(_ s: TradingSignal) -> some View {
-        HStack(spacing: SacredSpacing.s) {
+    /// Three pills — one per horizon — each showing that horizon's verdict
+    /// in its action color. Tap to swap which horizon's card is rendered
+    /// below; divergence still reads at a glance from the strip itself.
+    private func horizonSelector(_ s: TradingSignal) -> some View {
+        HStack(spacing: SacredSpacing.xxs) {
             ForEach(WiseCatHorizon.allCases) { horizon in
                 let read = s.read(for: horizon)
                 let action = WiseCatAction.from(read.action)
-                HStack(spacing: SacredSpacing.xxs) {
-                    Text(horizon.label)
-                        .font(.sacredCaption)
-                        .foregroundColor(.sacredMuted)
-                    Text(read.action)
-                        .font(.sacredCaption)
-                        .foregroundColor(actionColor(action))
+                let isSelected = horizon == selectedHorizon
+
+                Button {
+                    selectedHorizon = horizon
+                } label: {
+                    HStack(spacing: SacredSpacing.xxs) {
+                        Text(horizon.label)
+                            .font(.sacredTextMedium)
+                            .foregroundColor(isSelected ? .sacredGold : .sacredMuted)
+                        Text(read.action)
+                            .font(.sacredTextMedium)
+                            .foregroundColor(actionColor(action))
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 36)
+                    .background(
+                        RoundedRectangle(cornerRadius: SacredRadius.pill)
+                            .fill(isSelected ? Color.sacredGold.opacity(0.12) : Color.clear)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: SacredRadius.pill)
+                            .stroke(
+                                isSelected ? Color.sacredGold.opacity(0.45)
+                                           : Color.sacredMutedLight.opacity(0.25),
+                                lineWidth: 1
+                            )
+                    )
                 }
-                if horizon != WiseCatHorizon.allCases.last {
-                    Text("·")
-                        .font(.sacredCaption)
-                        .foregroundColor(.sacredMuted)
-                }
+                .buttonStyle(.plain)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - One horizon card
 
-    private func horizonCard(horizon: WiseCatHorizon, read: HorizonRead) -> some View {
+    private func horizonCard(read: HorizonRead) -> some View {
         LuxCard {
             VStack(alignment: .leading, spacing: SacredSpacing.l) {
-                horizonHero(horizon: horizon, read: read)
+                horizonHero(read: read)
                 Divider()
                     .background(Color.sacredMuted.opacity(0.2))
                 technicalBlock(read: read)
@@ -103,13 +117,9 @@ struct WiseCatDetailView: View {
         }
     }
 
-    private func horizonHero(horizon: WiseCatHorizon, read: HorizonRead) -> some View {
+    private func horizonHero(read: HorizonRead) -> some View {
         let action = WiseCatAction.from(read.action)
         return VStack(spacing: SacredSpacing.s) {
-            Text(horizon.label.uppercased())
-                .font(.sacredSectionLabel)
-                .tracking(3)
-                .foregroundColor(.sacredLabel)
             ConvictionMeter(
                 conviction: read.conviction,
                 color: actionColor(action),
