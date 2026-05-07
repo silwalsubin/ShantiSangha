@@ -11,14 +11,17 @@ struct WiseCatChartView: View {
     @State private var loading = false
     @State private var error: String?
     @State private var selectedDate: Date?
+    @State private var statsExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: SacredSpacing.s) {
-            statsStrip
+            headline
 
             chartArea
 
             rangeSelector
+
+            statsCard
         }
         .task { await load(range) }
     }
@@ -52,19 +55,15 @@ struct WiseCatChartView: View {
         .padding(.vertical, SacredSpacing.s)
     }
 
-    // MARK: - Stats strip
+    // MARK: - Headline
 
     @ViewBuilder
-    private var statsStrip: some View {
+    private var headline: some View {
         if let agg = chart?.aggregates {
-            VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-                if let selected = selectedBar {
-                    selectedReadout(selected)
-                } else {
-                    headlineReadout(agg)
-                }
-
-                statsRow(agg)
+            if let selected = selectedBar {
+                selectedReadout(selected)
+            } else {
+                headlineReadout(agg)
             }
         }
     }
@@ -104,25 +103,81 @@ struct WiseCatChartView: View {
         }
     }
 
-    private func statsRow(_ agg: ChartAggregates) -> some View {
-        HStack(alignment: .top, spacing: SacredSpacing.l) {
-            statBlock(label: "52w high", value: agg.weekHigh52)
-            statBlock(label: "52w low", value: agg.weekLow52)
-            statBlock(label: "All-time high", value: agg.allTimeHigh)
-            statBlock(label: "All-time low", value: agg.allTimeLow)
+    // MARK: - Stats card (collapsible, below the chart)
+
+    @ViewBuilder
+    private var statsCard: some View {
+        if let agg = chart?.aggregates {
+            LuxCard {
+                VStack(alignment: .leading, spacing: SacredSpacing.s) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.22)) {
+                            statsExpanded.toggle()
+                        }
+                    } label: {
+                        HStack {
+                            Text("Stats")
+                                .font(.sacredSubheading)
+                                .foregroundColor(.sacredText)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.sacredSmall)
+                                .foregroundColor(.sacredMuted)
+                                .rotationEffect(.degrees(statsExpanded ? 90 : 0))
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    if statsExpanded {
+                        VStack(spacing: SacredSpacing.xs) {
+                            statRow("52-week high", agg.weekHigh52.map { formatPrice($0) } ?? "—")
+                            statRow("52-week low", agg.weekLow52.map { formatPrice($0) } ?? "—")
+                            statRow("All-time high", formatPrice(agg.allTimeHigh))
+                            statRow("All-time low", formatPrice(agg.allTimeLow))
+                            if let lastBar = chart?.bars.last {
+                                statRow("Today's open", formatPrice(lastBar.open))
+                                statRow("Today's high", formatPrice(lastBar.high))
+                                statRow("Today's low", formatPrice(lastBar.low))
+                                statRow("Today's volume", formatVolume(lastBar.volume))
+                            }
+                            if let avg = avgVolume20 {
+                                statRow("Avg volume (20d)", formatVolume(avg))
+                            }
+                        }
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+                }
+                .padding(SacredSpacing.lux)
+            }
         }
-        .padding(.top, SacredSpacing.xs)
     }
 
-    private func statBlock(label: String, value: Double?) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+    private func statRow(_ label: String, _ value: String) -> some View {
+        HStack {
             Text(label)
-                .font(.sacredSmall)
-                .foregroundColor(.sacredMuted)
-            Text(value.map { formatPrice($0) } ?? "—")
+                .font(.sacredText)
+                .foregroundColor(.sacredTextSecondary)
+            Spacer()
+            Text(value)
                 .font(.sacredTextMedium)
                 .foregroundColor(.sacredText)
         }
+    }
+
+    private var avgVolume20: Int? {
+        guard let bars = chart?.bars, bars.count >= 20 else { return nil }
+        let last20 = bars.suffix(20)
+        let total = last20.reduce(0) { $0 + $1.volume }
+        return total / last20.count
+    }
+
+    private func formatVolume(_ v: Int) -> String {
+        let d = Double(v)
+        if d >= 1_000_000_000 { return String(format: "%.2fB", d / 1_000_000_000) }
+        if d >= 1_000_000 { return String(format: "%.1fM", d / 1_000_000) }
+        if d >= 1_000 { return String(format: "%.0fK", d / 1_000) }
+        return String(v)
     }
 
     // MARK: - Chart canvas
