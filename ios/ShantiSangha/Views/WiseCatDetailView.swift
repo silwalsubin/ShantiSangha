@@ -14,8 +14,6 @@ struct WiseCatDetailView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: SacredSpacing.l) {
-                    headerHero
-
                     // Chart loads independently — kicks off as soon as the view
                     // appears, in parallel with the signal fetch.
                     chartCard
@@ -54,13 +52,6 @@ struct WiseCatDetailView: View {
         } catch {
             self.error = error.localizedDescription
         }
-    }
-
-    private var headerHero: some View {
-        Text(ticker)
-            .font(.sacredTitle)
-            .foregroundColor(.sacredText)
-            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var chartCard: some View {

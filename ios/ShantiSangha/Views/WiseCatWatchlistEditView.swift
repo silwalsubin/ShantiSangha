@@ -18,8 +18,6 @@ struct WiseCatWatchlistEditView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: SacredSpacing.m) {
-                        headerHero
-
                         searchField
 
                         if !query.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -48,13 +46,6 @@ struct WiseCatWatchlistEditView: View {
                 }
             }
         }
-    }
-
-    private var headerHero: some View {
-        Text("Watchlist")
-            .font(.sacredTitle)
-            .foregroundColor(.sacredText)
-            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var searchField: some View {
