@@ -4,6 +4,7 @@ import SwiftUI
 struct WiseCatView: View {
     @StateObject private var vm = WiseCatViewModel()
     @State private var showWatchlistEdit = false
+    @State private var skyExpanded = false
 
     var body: some View {
         ZStack {
@@ -80,21 +81,39 @@ struct WiseCatView: View {
     private func todaysSkyCard(_ sky: WiseCatViewModel.TodaysSky) -> some View {
         LuxCard {
             VStack(alignment: .leading, spacing: SacredSpacing.s) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Today's sky")
-                        .font(.sacredSubheading)
-                        .foregroundColor(.sacredText)
-                    Spacer()
-                    Text(skyBiasLabel(sky))
-                        .font(.sacredSmallSemibold)
-                        .foregroundColor(skyBiasColor(sky))
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        skyExpanded.toggle()
+                    }
+                } label: {
+                    HStack(alignment: .center, spacing: SacredSpacing.s) {
+                        Text("Today's sky")
+                            .font(.sacredSubheading)
+                            .foregroundColor(.sacredText)
+                        Spacer()
+                        Text(skyBiasLabel(sky))
+                            .font(.sacredSmallSemibold)
+                            .tracking(2)
+                            .foregroundColor(skyBiasColor(sky))
+                        Image(systemName: "chevron.right")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
+                            .rotationEffect(.degrees(skyExpanded ? 90 : 0))
+                    }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
 
-                if !sky.userNatal.highlights.isEmpty && sky.userNatal.highlights.first != "no data" {
-                    skyAngleSection(title: "Your transits", highlights: sky.userNatal.highlights)
-                }
-                if !sky.panchang.highlights.isEmpty {
-                    skyAngleSection(title: "Panchang", highlights: sky.panchang.highlights)
+                if skyExpanded {
+                    VStack(alignment: .leading, spacing: SacredSpacing.s) {
+                        if !sky.userNatal.highlights.isEmpty && sky.userNatal.highlights.first != "no data" {
+                            skyAngleSection(title: "Your transits", highlights: sky.userNatal.highlights)
+                        }
+                        if !sky.panchang.highlights.isEmpty {
+                            skyAngleSection(title: "Panchang", highlights: sky.panchang.highlights)
+                        }
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
             .padding(SacredSpacing.lux)
