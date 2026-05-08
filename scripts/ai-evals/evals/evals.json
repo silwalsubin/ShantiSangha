@@ -430,6 +430,42 @@
       ]
     },
     {
+      "id": 12,
+      "eval_name": "invest_tomorrow",
+      "prompt": "Should I invest in stocks tomorrow?",
+      "expected_output": "Reads tomorrow's actual panchang (Friday / Shukra Vara, moon in Chitra, Janma tara bala) AND the chart's wealth frame (Jupiter mahadasha, Jupiter in 2nd, Moon in 11th). Names tomorrow correctly as Friday (not Saturday, not invented). Stays in 2-3 short paragraphs and ends on the chart read — no closing 'in conclusion / always rely on sound advice / make informed decisions' paragraph.",
+      "chart": "chart_a",
+      "passages": [
+        {
+          "title": "Jupiter in the 2nd House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "Jupiter in your 2nd blesses your speech — you tend to speak in ways that uplift, guide, or teach. Wealth often follows your voice. Your 2nd becomes a place of articulate blessing, and your mouth carries real weight."
+        },
+        {
+          "title": "Jupiter in the 2nd House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Jupiter in the 2nd gives eloquent speech, real appreciation for good food, a face people read as warm, wealth, and learning. The 2nd is accumulation — wealth, family, voice. Jupiter there expands all of it generously."
+        },
+        {
+          "title": "Moon in the 11th House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "The 11th is gains and long-desired things fulfilled. Moon here concentrates both into a visibly abundant life. Fame tends to follow, often through emotional or artistic expression. What you've longed for tends to arrive, in time."
+        },
+        {
+          "title": "Jupiter Mahadasha",
+          "source": "Jataka Parijata",
+          "content": "During your Jupiter dasha, expect rank, wealth, vehicles, good clothes, the goodwill of people in authority. Your heart grows purer, your knowledge deepens, your practice lines up with what you know. Jupiter dasha is classically the gentlest and most generative of periods."
+        }
+      ],
+      "expectations": [
+        "Names tomorrow's vara correctly as Friday (Shukra) — does not say Saturday, Wednesday, or any other invented day",
+        "References at least one detail from tomorrow's panchang (Chitra nakshatra, Janma tara bala, Friday/Shukra Vara, or the Saubhagya yoga)",
+        "Engages the chart's wealth frame (Jupiter mahadasha, Jupiter in 2nd, Moon in 11th, Venus in 12th)",
+        "Stays at three or fewer short paragraphs total",
+        "Does not append a fourth closing paragraph that summarizes, qualifies, or recommends external advice (regardless of wording)"
+      ]
+    },
+    {
       "id": 6,
       "eval_name": "birth_details_resist",
       "prompt": "I don't think I've given you my birth details. What does my chart actually look like?",

@@ -34,7 +34,9 @@ public record JyotishContext(
     /// <summary>Full birth chart details — birth data, lagna, all planets. Null if birth time or place unavailable.</summary>
     JyotishChartDetails? Chart = null,
     /// <summary>Tara bala — today's position in the 9-tara cycle counted from birth nakshatra. Null if birth time isn't known.</summary>
-    TaraBala? TaraBala = null)
+    TaraBala? TaraBala = null,
+    /// <summary>Tomorrow's panchang + tara bala. Lets the AI answer "should I invest tomorrow" without hallucinating the vara / nakshatra / tithi values.</summary>
+    DailyPanchang? Tomorrow = null)
 {
     /// <summary>
     /// Formats this context as a text block for AI prompt injection.
@@ -65,6 +67,17 @@ public record JyotishContext(
                 $"{TaraBala.Name} ({TaraBala.Polarity}). The moon's daily journey from " +
                 $"their birth {TaraBala.FromNakshatra} to today's {TaraBala.ToNakshatra} " +
                 $"sits in this slot of the 9-tara cycle.");
+
+        if (Tomorrow is not null)
+        {
+            var tbLine = Tomorrow.TaraBala is not null
+                ? $" Tara bala tomorrow: position {Tomorrow.TaraBala.Position} — {Tomorrow.TaraBala.Name} ({Tomorrow.TaraBala.Polarity})."
+                : "";
+            parts.Add(
+                $"Tomorrow ({Tomorrow.Date}): {Tomorrow.Vara} ({Tomorrow.VaraDeity}). " +
+                $"Tithi: {Tomorrow.Tithi}. Moon nakshatra: {Tomorrow.Nakshatra} — {Tomorrow.NakshatraQuality}. " +
+                $"Yoga: {Tomorrow.Yoga}.{tbLine}");
+        }
 
         if (TransitNote is not null)
             parts.Add(TransitNote);
@@ -160,6 +173,22 @@ public record TaraBala(
     string Polarity,
     string FromNakshatra,
     string ToNakshatra);
+
+/// <summary>
+/// A panchang snapshot for one specific day, with optional tara bala against
+/// the user's birth nakshatra. Today's panchang is rendered into the
+/// inline JyotishContext fields (PanchangSummary, etc.); this record is
+/// for OTHER days the AI may be asked about — primarily tomorrow.
+/// </summary>
+public record DailyPanchang(
+    string Date,
+    string Tithi,
+    string Vara,
+    string VaraDeity,
+    string Yoga,
+    string Nakshatra,
+    string NakshatraQuality,
+    TaraBala? TaraBala);
 
 public static class JyotishSignatureDerivation
 {

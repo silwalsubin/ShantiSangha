@@ -19,6 +19,13 @@ public class JyotishContextService(IProfileQueryService profileQuery) : IJyotish
         var (tithi, tithiQuality, vara, varaDeity, yoga, todayNakshatra, todayNakshatraQuality, todayNakshatraIndex) =
             VedicCalendar.GetPanchang(today);
 
+        // Tomorrow's panchang — same compute, +1 day. Adding this here means
+        // every chat / prompt / job that consumes JyotishContext can answer
+        // "should I do X tomorrow" without hallucinating the vara or nakshatra.
+        var tomorrow = today.AddDays(1);
+        var (tmTithi, _, tmVara, tmVaraDeity, tmYoga, tmNakshatra, tmNakshatraQuality, tmNakshatraIndex) =
+            VedicCalendar.GetPanchang(tomorrow);
+
         string? sunRashi = null;
         string? moonRashi = null;
         string? birthNakshatra = null;
@@ -29,6 +36,7 @@ public class JyotishContextService(IProfileQueryService profileQuery) : IJyotish
         DateTime? antardashaStart = null;
         JyotishChartDetails? chartDetails = null;
         TaraBala? taraBala = null;
+        TaraBala? tomorrowTaraBala = null;
 
         if (birth.BirthDate is not null)
         {
@@ -88,6 +96,19 @@ public class JyotishContextService(IProfileQueryService profileQuery) : IJyotish
                     FromNakshatra: name,
                     ToNakshatra: todayNakshatra);
 
+                // Same calculation for tomorrow's nakshatra so "should I do X
+                // tomorrow" questions get a real tara bala value rather than
+                // an inferred one.
+                var (tmPos, tmNum, tmTaraName, tmTaraPolarity) =
+                    VedicCalendar.GetTaraBala(nakshatraIndex, tmNakshatraIndex);
+                tomorrowTaraBala = new TaraBala(
+                    Position: tmPos,
+                    Number: tmNum,
+                    Name: tmTaraName,
+                    Polarity: tmTaraPolarity,
+                    FromNakshatra: name,
+                    ToNakshatra: tmNakshatra);
+
                 chartDetails = BuildChartDetails(birth, birthDateTime, sunTropical, lat, lon);
             }
 
@@ -118,7 +139,16 @@ public class JyotishContextService(IProfileQueryService profileQuery) : IJyotish
             AntardashaStart: antardashaStart,
             BirthNakshatraName: birthNakshatraName,
             Chart: chartDetails,
-            TaraBala: taraBala);
+            TaraBala: taraBala,
+            Tomorrow: new DailyPanchang(
+                Date: tomorrow.ToString("yyyy-MM-dd 'is' dddd"),
+                Tithi: tmTithi,
+                Vara: tmVara,
+                VaraDeity: tmVaraDeity,
+                Yoga: tmYoga,
+                Nakshatra: tmNakshatra,
+                NakshatraQuality: tmNakshatraQuality,
+                TaraBala: tomorrowTaraBala));
     }
 
     private static JyotishChartDetails BuildChartDetails(

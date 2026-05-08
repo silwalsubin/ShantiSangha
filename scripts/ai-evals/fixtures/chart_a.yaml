@@ -28,6 +28,25 @@ tara_bala:
   polarity: "favorable"
   from_nakshatra: "Mrigashirsha"
   to_nakshatra: "Hasta"
+# Tomorrow (one day after the fixture's "today"): moon advances Hasta → Chitra,
+# vara is Friday (Shukra). Tara count Mrigashirsha → Chitra = position 10,
+# cycle slot 1 = Janma (neutral). Pre-computed here so the eval mirrors what
+# the C# JyotishContextService now ships.
+tomorrow:
+  date: "2026-05-08 is Friday"
+  vara: "Friday"
+  vara_deity: "Shukra"
+  tithi: "Shukla Saptami"
+  yoga: "Saubhagya"
+  nakshatra: "Chitra"
+  nakshatra_quality: "brilliance and independence"
+  tara_bala:
+    position: 10
+    number: 1
+    name: "Janma"
+    polarity: "neutral"
+    from_nakshatra: "Mrigashirsha"
+    to_nakshatra: "Chitra"
 transit_note: "Saturn is currently transiting their 7th house, echoing its natal placement."
 
 details:
