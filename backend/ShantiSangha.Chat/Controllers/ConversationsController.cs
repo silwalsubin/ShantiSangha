@@ -18,6 +18,7 @@ namespace ShantiSangha.Chat.Controllers;
 public class ConversationsController(
     ChatDbContext db,
     IChatService chatService,
+    IBirthDetailShareService shareService,
     ICurrentUser currentUser) : ControllerBase
 {
     [HttpGet]
@@ -62,9 +63,31 @@ public class ConversationsController(
         var title = request?.Title?.Trim();
         if (string.IsNullOrWhiteSpace(title)) title = null;
 
-        var type = string.Equals(request?.Type?.Trim(), ConversationType.Chart, StringComparison.OrdinalIgnoreCase)
-            ? ConversationType.Chart
-            : ConversationType.General;
+        var rawType = request?.Type?.Trim();
+        var type = ConversationType.General;
+        if (string.Equals(rawType, ConversationType.Chart, StringComparison.OrdinalIgnoreCase))
+            type = ConversationType.Chart;
+        else if (string.Equals(rawType, ConversationType.Pair, StringComparison.OrdinalIgnoreCase))
+            type = ConversationType.Pair;
+
+        Guid? subjectUserId = null;
+        if (type == ConversationType.Pair)
+        {
+            // A pair conversation is meaningless without a subject; bail
+            // before creating an orphan row.
+            if (request?.SubjectUserId is null || request.SubjectUserId == Guid.Empty)
+                return BadRequest(new { error = "subjectUserId required for pair conversations" });
+
+            if (request.SubjectUserId == user.Id)
+                return BadRequest(new { error = "subject must be another user" });
+
+            // Same gate as the pair-reading endpoint: viewer must have an
+            // active BirthDetailShare from the subject.
+            if (!await shareService.HasAccessAsync(user.Id, request.SubjectUserId.Value, ct))
+                return Forbid();
+
+            subjectUserId = request.SubjectUserId.Value;
+        }
 
         var conversation = new Conversation
         {
@@ -72,6 +95,7 @@ public class ConversationsController(
             UserId = user.Id,
             Title = title,
             Type = type,
+            SubjectUserId = subjectUserId,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -79,10 +103,11 @@ public class ConversationsController(
         db.Conversations.Add(conversation);
         await db.SaveChangesAsync(ct);
 
-        return Created($"/conversations/{conversation.Id}", new { conversation.Id, conversation.Title, conversation.Type, conversation.CreatedAt });
+        return Created($"/conversations/{conversation.Id}",
+            new { conversation.Id, conversation.Title, conversation.Type, conversation.SubjectUserId, conversation.CreatedAt });
     }
 
-    public record CreateConversationRequest(string? Title, string? Type = null);
+    public record CreateConversationRequest(string? Title, string? Type = null, Guid? SubjectUserId = null);
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetConversation(Guid id, CancellationToken ct = default)
@@ -146,6 +171,21 @@ public class ConversationsController(
         {
             HttpContext.Response.StatusCode = 404;
             return;
+        }
+
+        // Pair conversations re-check share access on every send so that a
+        // revoked grant stops the data flow immediately, even on a
+        // pre-existing conversation row. The row itself stays — the private
+        // user-side history isn't subject's data — but the LLM stops being
+        // given the subject's chart facts.
+        if (conversation.Type == ConversationType.Pair && conversation.SubjectUserId is { } subjectId)
+        {
+            var stillShared = await shareService.HasAccessAsync(user.Id, subjectId, cancellationToken);
+            if (!stillShared)
+            {
+                HttpContext.Response.StatusCode = 403;
+                return;
+            }
         }
 
         // SSE headers

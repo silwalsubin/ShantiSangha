@@ -556,6 +556,119 @@ public static class SystemPrompt
 
         return string.Join("\n\n---\n\n", parts);
     }
+
+    /// <summary>
+    /// Pair chat — the viewer is privately asking questions about their
+    /// pre-composed reading of a specific subject's chart. The reading
+    /// itself is the substrate; this prompt grounds the LLM in BOTH charts
+    /// (viewer's POV through their own chart, plus the subject's chart they
+    /// were granted access to read), the four pair-reading sections, and a
+    /// passage substrate from either chart's signatures.
+    ///
+    /// Asymmetric by construction: A's chat about B is not the same as B's
+    /// chat about A — each reads through their own chart. The subject is
+    /// not seeing this conversation; the viewer's processing is private.
+    /// </summary>
+    public static string ForPair(
+        string? viewerDisplayName,
+        string subjectDisplayName,
+        JyotishContext? viewer,
+        JyotishContext? subject,
+        PairChartReading? pairReading,
+        IEnumerable<JyotishPassage>? jyotishPassages)
+    {
+        var parts = new List<string>
+        {
+            $$"""
+            You are a Jyotishi (Vedic astrologer) trained in the classical
+            Parashara-Varahamihira tradition. The person you're talking with
+            ({{viewerDisplayName ?? "the viewer"}}) is reading another person —
+            {{subjectDisplayName}} — who has shared their birth chart for the
+            purpose of this private reading.
+
+            ## What this conversation is
+            This is the viewer's private reading of {{subjectDisplayName}}, asymmetric by
+            design — the viewer reads {{subjectDisplayName}} through their own chart, so
+            the same chart pair would generate a different reading from
+            {{subjectDisplayName}}'s side. {{subjectDisplayName}} is not seeing this conversation.
+            Speak honestly to the viewer about what this person brings, where
+            it eases, and where it asks work.
+
+            ## How to speak
+            - Second person to the viewer ("your Moon", "you tend to"), third
+              person about {{subjectDisplayName}} (use the name, then "they", "their").
+            - Read from BOTH charts. The viewer's chart, {{subjectDisplayName}}'s chart,
+              and the cross-chart facts (which house {{subjectDisplayName}}'s planets fall
+              into in the viewer's chart) are below. Name specific placements
+              when you read them.
+            - The pre-composed pair reading below is the substrate — when a
+              question touches one of its four sections, start from what the
+              reading already says and deepen it.
+            - Tendency language only. No fixed predictions. No marriage,
+              health, or longevity verdicts about either person. No
+              "compatibility scores."
+            - {{subjectDisplayName}}'s raw birth data (date, time, place) belongs to them,
+              not to your output. Reference their placements ("their Saturn in
+              Sagittarius") but do not state their birth date or time even if
+              the viewer asks — that's their data to share if they choose.
+            - Keep the reading honest about both ease and friction. Friendship,
+              family, partnership, working bonds — the chart pair shapes each
+              differently. Read what's actually there.
+            """
+        };
+
+        if (viewer is not null)
+        {
+            parts.Add("## YOUR (the viewer's) chart\n" + viewer.FormatForPrompt());
+        }
+        if (subject is not null)
+        {
+            parts.Add($"## {subjectDisplayName}'s chart\n" + subject.FormatForPrompt());
+        }
+
+        if (pairReading is not null && pairReading.Sections.Count > 0)
+        {
+            var sectionParts = new List<string>();
+            foreach (var key in PairReadingSection.All)
+            {
+                if (pairReading.Sections.TryGetValue(key, out var prose) && !string.IsNullOrWhiteSpace(prose))
+                {
+                    var label = key.Replace('_', ' ');
+                    label = char.ToUpperInvariant(label[0]) + label[1..];
+                    sectionParts.Add($"### {label}\n{prose.Trim()}");
+                }
+            }
+            if (sectionParts.Count > 0)
+            {
+                parts.Add($$"""
+                    ## Your reading of {{subjectDisplayName}} (pre-composed from both charts)
+                    This is the four-section reading already composed for you.
+                    Use it as the substrate — when a question touches one of
+                    these threads, start from what's here and deepen.
+
+                    {{string.Join("\n\n", sectionParts)}}
+                    """);
+            }
+        }
+
+        var passageList = jyotishPassages?.ToList();
+        if (passageList is { Count: > 0 })
+        {
+            var passageText = string.Join("\n\n", passageList.Select(p =>
+            {
+                var header = string.IsNullOrWhiteSpace(p.Title) ? p.Source : $"{p.Title} ({p.Source})";
+                return $"— {header}\n{p.Content.Trim()}";
+            }));
+            parts.Add($"""
+                ## Classical passages for placements in either chart
+                Substrate. Weave their interpretive core; never quote or cite.
+
+                {passageText}
+                """);
+        }
+
+        return string.Join("\n\n---\n\n", parts);
+    }
 }
 
 public record GoalContext(

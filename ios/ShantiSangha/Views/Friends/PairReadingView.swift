@@ -14,6 +14,13 @@ struct PairReadingView: View {
     @State private var error: String?
     @State private var expanded: Set<String> = []
 
+    // Pair-chat ("Ask about Name") state. Creating the conversation hits the
+    // backend; once we have an id we navigate to the existing ChatView.
+    // String id matches ChatView's signature and the existing chart-chat path.
+    @State private var pendingChatId: String?
+    @State private var startingChat: Bool = false
+    @State private var chatError: String?
+
     /// Section keys + display titles in canonical order. Match the backend's
     /// `PairReadingSection` constants.
     private let sections: [(key: String, title: String)] = [
@@ -34,6 +41,17 @@ struct PairReadingView: View {
                     errorCard(error)
                 }
 
+                if reading != nil {
+                    askChatButton
+                    if let chatError {
+                        Text(chatError)
+                            .font(.sacredMicro)
+                            .foregroundColor(.sacredRed)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, SacredSpacing.m)
+                    }
+                }
+
                 Text("This reading is private to you. \(subjectName) is not seeing it.")
                     .font(.sacredMicro)
                     .foregroundColor(.sacredMuted)
@@ -48,6 +66,56 @@ struct PairReadingView: View {
         .navigationTitle("\(subjectName) through your chart")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
+        .navigationDestination(item: $pendingChatId) { id in
+            ChatView(conversationId: id, title: "About \(subjectName)")
+        }
+    }
+
+    private var askChatButton: some View {
+        Button {
+            Task { await startPairChat() }
+        } label: {
+            HStack(spacing: 8) {
+                if startingChat {
+                    ProgressView().tint(.white).controlSize(.small)
+                } else {
+                    Image(systemName: "bubble.left")
+                        .font(.sacredText)
+                }
+                Text(startingChat ? "Opening…" : "Ask about \(subjectName)")
+                    .font(.sacredTextMedium)
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .goldShine()
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+        .disabled(startingChat)
+        .padding(.horizontal, SacredSpacing.s)
+    }
+
+    private func startPairChat() async {
+        guard !startingChat else { return }
+        startingChat = true
+        defer { startingChat = false }
+        do {
+            let conv = try await PairChartReadingAPI.startChat(
+                subjectUserId: subjectUserId,
+                subjectName: subjectName)
+            pendingChatId = conv.id
+            chatError = nil
+        } catch let apiError as ApiError {
+            switch apiError {
+            case .httpError(statusCode: 403, _):
+                chatError = "\(subjectName) hasn't shared their chart with you anymore."
+            default:
+                chatError = "Couldn't open the chat. Try again."
+            }
+        } catch {
+            chatError = "Couldn't open the chat. Try again."
+        }
     }
 
     // MARK: - States
@@ -119,7 +187,7 @@ struct PairReadingView: View {
             default:
                 error = "Couldn't load this reading. Try again in a moment."
             }
-        } catch {
+        } catch _ {
             error = "Couldn't load this reading. Try again in a moment."
         }
     }

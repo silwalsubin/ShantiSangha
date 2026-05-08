@@ -24,4 +24,26 @@ enum PairChartReadingAPI {
         try await ApiService.shared.delete(
             "/jyotish/reading/of/\(subjectUserId.uuidString.lowercased())")
     }
+
+    /// Creates a pair conversation scoped to (current user, subject) and
+    /// returns its id. Backend gates on the BirthDetailShare grant — same
+    /// 403 behaviour as the reading endpoint when the share is gone.
+    /// id is a string because ChatView's conversationId is a string and
+    /// navigationDestination(item:) needs the same hashable type round-trip.
+    struct PairConversation: Decodable {
+        let id: String
+    }
+
+    static func startChat(subjectUserId: UUID, subjectName: String) async throws -> PairConversation {
+        struct CreateBody: Encodable {
+            let title: String
+            let type: String
+            let subjectUserId: String
+        }
+        let body = CreateBody(
+            title: "About \(subjectName)",
+            type: "pair",
+            subjectUserId: subjectUserId.uuidString.lowercased())
+        return try await ApiService.shared.post("/conversations", body: body)
+    }
 }

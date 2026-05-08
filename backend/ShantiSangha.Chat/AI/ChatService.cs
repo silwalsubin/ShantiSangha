@@ -25,6 +25,7 @@ public class ChatService(
     IJyotishContextService jyotishService,
     IJyotishKnowledgeService jyotishKnowledge,
     IChartReadingService chartReadingService,
+    IPairChartReadingService pairReadingService,
     IEventBus eventBus,
     ILogger<ChatService> logger) : IChatService
 {
@@ -156,13 +157,28 @@ public class ChatService(
         string? currentMessage = null)
     {
         // Determine conversation type up-front — chart conversations use a
-        // tighter, corpus-bounded prompt; general conversations use the
-        // broader spiritual-companion prompt with full personal context.
-        var conversationType = await db.Conversations
+        // tighter, corpus-bounded prompt; pair conversations load BOTH the
+        // viewer's chart and the subject's chart plus the pre-composed pair
+        // reading; general conversations use the broader spiritual-companion
+        // prompt with full personal context.
+        var conversationMeta = await db.Conversations
             .Where(c => c.Id == conversationId)
-            .Select(c => c.Type)
-            .FirstOrDefaultAsync(cancellationToken) ?? ConversationType.General;
+            .Select(c => new { c.Type, c.SubjectUserId })
+            .FirstOrDefaultAsync(cancellationToken);
+        var conversationType = conversationMeta?.Type ?? ConversationType.General;
+        var subjectUserId = conversationMeta?.SubjectUserId;
         var isChart = conversationType == ConversationType.Chart;
+        var isPair = conversationType == ConversationType.Pair && subjectUserId.HasValue;
+
+        // Pair chat is composed in its own dedicated path below — different
+        // prompt builder, two charts loaded, pair reading as substrate. Bail
+        // out of the standard path early so the chart/general logic stays
+        // single-purpose.
+        if (isPair)
+        {
+            return await BuildPairChatHistoryAsync(
+                userId, conversationId, subjectUserId!.Value, currentMessage, cancellationToken);
+        }
 
         // Load all context in parallel — each task is fault-tolerant so a single
         // failure (e.g. embedding search) doesn't kill the entire conversation.
@@ -296,6 +312,98 @@ public class ChatService(
                 goals: goalContexts,
                 jyotish: jyotish,
                 jyotishPassages: passages);
+
+        var history = new ChatHistory(systemPrompt);
+
+        var recentMessages = await db.Messages
+            .Where(m => m.ConversationId == conversationId)
+            .OrderByDescending(m => m.CreatedAt)
+            .Take(RecentMessageCount)
+            .OrderBy(m => m.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        foreach (var msg in recentMessages)
+        {
+            if (msg.Role == MessageRole.User)
+                history.AddUserMessage(msg.Content);
+            else
+                history.AddAssistantMessage(msg.Content);
+        }
+
+        return history;
+    }
+
+    private async Task<ChatHistory> BuildPairChatHistoryAsync(
+        Guid viewerUserId,
+        Guid conversationId,
+        Guid subjectUserId,
+        string? currentMessage,
+        CancellationToken cancellationToken)
+    {
+        // Load everything in parallel — each task is fault-tolerant so a
+        // single failure (e.g. embedding search) doesn't kill the convo.
+        var viewerNameTask = profileQuery.GetDisplayNameAsync(viewerUserId, cancellationToken);
+        var subjectNameTask = profileQuery.GetDisplayNameAsync(subjectUserId, cancellationToken);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var viewerJyotishTask = jyotishService.GetContextAsync(viewerUserId, today, cancellationToken);
+        var subjectJyotishTask = jyotishService.GetContextAsync(subjectUserId, today, cancellationToken);
+        var pairReadingTask = pairReadingService.GetAsync(viewerUserId, subjectUserId, cancellationToken);
+
+        string? viewerName = null;
+        string subjectName = "your friend";
+        JyotishContext? viewerJyotish = null;
+        JyotishContext? subjectJyotish = null;
+        PairChartReading? pairReading = null;
+        try
+        {
+            await Task.WhenAll(viewerNameTask, subjectNameTask, viewerJyotishTask, subjectJyotishTask, pairReadingTask);
+            viewerName = viewerNameTask.Result;
+            subjectName = subjectNameTask.Result ?? subjectName;
+            viewerJyotish = viewerJyotishTask.Result;
+            subjectJyotish = subjectJyotishTask.Result;
+            pairReading = pairReadingTask.Result;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Pair chat: partial context load for conversation {ConversationId}", conversationId);
+        }
+
+        // Passages: union of both chart's signatures, capped to keep the
+        // prompt tight. Topic-rerank against the current message so the
+        // passages most relevant to the question land first.
+        IReadOnlyList<JyotishPassage> passages = Array.Empty<JyotishPassage>();
+        try
+        {
+            var viewerSigs = viewerJyotish?.DeriveSignatures() ?? Enumerable.Empty<string>();
+            var subjectSigs = subjectJyotish?.DeriveSignatures() ?? Enumerable.Empty<string>();
+            var combined = viewerSigs.Concat(subjectSigs)
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (combined.Count > 0)
+            {
+                var fetched = await jyotishKnowledge.GetPassagesAsync(combined, cancellationToken);
+                if (!string.IsNullOrWhiteSpace(currentMessage) && fetched.Count > 0)
+                    fetched = ChartTopicRouter.Rerank(currentMessage, fetched);
+                // Tighter cap than solo chart chat — pair chat is talking about
+                // a relationship, not delivering a label tour through both
+                // charts. The pair reading itself already weaves the corpus
+                // for the relational threads.
+                passages = fetched.Take(MaxChartPassagesWhenReading).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Pair chat: passage retrieval failed for conversation {ConversationId}", conversationId);
+        }
+
+        var systemPrompt = SystemPrompt.ForPair(
+            viewerDisplayName: viewerName,
+            subjectDisplayName: subjectName,
+            viewer: viewerJyotish,
+            subject: subjectJyotish,
+            pairReading: pairReading,
+            jyotishPassages: passages);
 
         var history = new ChatHistory(systemPrompt);
 

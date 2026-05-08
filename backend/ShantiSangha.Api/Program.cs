@@ -267,6 +267,8 @@ try
         var chatDb = sp.GetRequiredService<ShantiSangha.Chat.Data.ChatDbContext>();
         await chatDb.Database.ExecuteSqlRawAsync(
             "ALTER TABLE \"Conversations\" ADD COLUMN IF NOT EXISTS \"Type\" text NOT NULL DEFAULT 'general';");
+        await chatDb.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE \"Conversations\" ADD COLUMN IF NOT EXISTS \"SubjectUserId\" uuid NULL;");
 
         // Insights has been retired. Drop its derived-data tables if they still
         // exist in an older environment; these are safe to remove because no
