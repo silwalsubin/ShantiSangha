@@ -242,6 +242,16 @@ public static class JyotishSignatureDerivation
             var mahadashaPlanet = ctx.Mahadasha.ToLowerInvariant();
             sigs.Add($"{mahadashaPlanet}_mahadasha");
 
+            // Mahadasha + Antardasha pair (e.g. jupiter_md_moon_ad). The corpus
+            // carries 81 dasha-pair phalas from Phaladeepika; without this
+            // emission, the pair passages are never reachable from a chart
+            // reading and the active short-period influence is invisible.
+            if (!string.IsNullOrWhiteSpace(ctx.Antardasha))
+            {
+                var antardashaPlanet = ctx.Antardasha.ToLowerInvariant();
+                sigs.Add($"{mahadashaPlanet}_md_{antardashaPlanet}_ad");
+            }
+
             // Bhava-lord dasha signatures: for each house whose lord is the
             // current mahadasha planet, emit dasha_of_lord_of_h{N}.
             if (ctx.Chart?.Lagna is not null)

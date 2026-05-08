@@ -35,7 +35,7 @@ public class ChartReadingService(
     /// retrieved per section, or the underlying corpus is materially updated.
     /// Each bump invalidates every user's cached reading — next GET regenerates.
     /// </summary>
-    private const string ReadingVersion = "v4-2026-04-20-softer-prompt-with-retries";
+    private const string ReadingVersion = "v5-2026-05-07-antardasha-jupiter-venus";
 
     public async Task<ChartReading?> GetAsync(Guid userId, CancellationToken ct = default)
     {
@@ -263,10 +263,22 @@ public class ChartReadingService(
         // sections stay focused — no throwing everything at every section.
         var names = section switch
         {
-            ChartReadingSection.Essence => new[] { "Sun" },
-            ChartReadingSection.EmotionalNature => new[] { "Moon" },
+            // Essence carries the dharmic core: Sun (animating fire), Jupiter
+            // (the wisdom that orients toward meaning), and the lagna itself.
+            // Jupiter is added here so its signatures (placement, sign,
+            // for-lagna, conjunctions) actually reach the prompt — without
+            // this, a chart with Jupiter in lagna or as mahadasha lord drops
+            // its strongest planet from every section.
+            ChartReadingSection.Essence => new[] { "Sun", "Jupiter" },
+            // Emotional nature pairs the Moon (inner weather) with Venus
+            // (capacity for pleasure, beauty, connection). Venus belongs here
+            // classically as the karaka of rasa — the felt life, the heart's
+            // taste — and was previously not a focus of any section.
+            ChartReadingSection.EmotionalNature => new[] { "Moon", "Venus" },
             ChartReadingSection.MindAndVoice => new[] { "Mercury" },
-            ChartReadingSection.DriveAndAction => new[] { "Mars", "Sun" },
+            // Mars only — Sun moved to Essence to avoid double-counting its
+            // signatures across sections.
+            ChartReadingSection.DriveAndAction => new[] { "Mars" },
             ChartReadingSection.PathOfGrowth => new[] { "Saturn", "Rahu", "Ketu" },
             ChartReadingSection.Season => Array.Empty<string>(),  // dasha-driven
             _ => Array.Empty<string>()
@@ -332,11 +344,15 @@ public class ChartReadingService(
                 break;
 
             case ChartReadingSection.Season:
-                // Mahadasha + bhava-lord-dasha signatures are the heart of
-                // this section. Pull in all dasha-* signatures unconditionally.
+                // Mahadasha + dasha-pair (md/ad) + bhava-lord-dasha signatures
+                // are the heart of this section. The dasha-pair pattern
+                // ({md}_md_{ad}_ad) doesn't begin with a focus-planet prefix,
+                // so it would otherwise fall through the planet filter.
                 foreach (var sig in allSignatures.Where(s =>
                     s.EndsWith("_mahadasha", StringComparison.OrdinalIgnoreCase) ||
-                    s.StartsWith("dasha_of_lord_of_", StringComparison.OrdinalIgnoreCase)))
+                    s.StartsWith("dasha_of_lord_of_", StringComparison.OrdinalIgnoreCase) ||
+                    (s.Contains("_md_", StringComparison.OrdinalIgnoreCase) &&
+                     s.EndsWith("_ad", StringComparison.OrdinalIgnoreCase))))
                 {
                     keep.Add(sig);
                 }
@@ -365,17 +381,17 @@ public class ChartReadingService(
         var focusText = section switch
         {
             ChartReadingSection.Essence =>
-                "Core identity — how this person shows up in the world. Read the ascendant (lagna) as the shape of the self, and the Sun as its animating fire. This is the opening of the reading — set the tone, not the full story.",
+                "Core identity — how this person shows up in the world. Read the ascendant (lagna) as the shape of the self, the Sun as its animating fire, and Jupiter as the wisdom that orients them toward meaning. This is the opening of the reading — set the tone, not the full story.",
             ChartReadingSection.EmotionalNature =>
-                "The emotional life. Read the Moon — its sign, nakshatra, house, and dignity — as the inner weather this person lives in. Include the nakshatra's quality. Note if the Moon is exalted, debilitated, in its own sign, or otherwise dignified.",
+                "The felt life. Read the Moon — sign, nakshatra, house, dignity — as the inner weather this person lives in, and Venus as the heart's capacity for pleasure, beauty, and connection. Include the moon's nakshatra quality. Note any planet that is exalted, debilitated, in its own sign, or otherwise dignified.",
             ChartReadingSection.MindAndVoice =>
                 "The thinking and speaking life. Read Mercury — its placement, dignity, and any conjunctions or closeness to the Sun (combust). Speech, analysis, learning, communication.",
             ChartReadingSection.DriveAndAction =>
-                "Energy, initiative, and will. Read Mars (and the Sun's drive). Notice dignity, retrograde, house. How this person pushes into the world, fights for what matters, takes risk.",
+                "Energy, initiative, and will. Read Mars — dignity, retrograde, sign, house. How this person pushes into the world, fights for what matters, takes risk.",
             ChartReadingSection.PathOfGrowth =>
                 "The long work of becoming. Read Saturn (discipline, structure, maturation) and the Rahu–Ketu axis (the karmic line of evolution). Where does this person meet resistance that eventually teaches them?",
             ChartReadingSection.Season =>
-                $"The current chapter of life, shaped by the running Mahadasha and Antardasha ({jyotish.Mahadasha ?? "(unknown)"}/{jyotish.Antardasha ?? "(unknown)"}). What is this season asking of them? If the mahadasha lord rules specific houses, lean on that bhava-lord dasha context.",
+                $"The current chapter of life, shaped by the running Mahadasha and Antardasha ({jyotish.Mahadasha ?? "(unknown)"}/{jyotish.Antardasha ?? "(unknown)"}). The mahadasha sets the long arc; the antardasha is the active short-period weather inside it — give the antardasha real weight, since it's what's most alive right now. If the mahadasha lord rules specific houses, lean on that bhava-lord dasha context.",
             _ => "Read what the chart shows."
         };
 
