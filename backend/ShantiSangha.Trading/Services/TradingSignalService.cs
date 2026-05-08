@@ -117,6 +117,7 @@ public class TradingSignalService(
 
         existing.ReasoningJson = reasoningJson;
         existing.PriceAtSignal = price;
+        existing.LastBarDate = bars.Count > 0 ? bars[^1].Date : date;
         existing.CreatedAt = DateTime.UtcNow;
 
         await db.SaveChangesAsync(ct);
@@ -196,6 +197,10 @@ public class TradingSignalService(
         return new TradingSignalDto(
             Ticker: s.Ticker,
             Date: s.Date,
+            // LastBarDate may be the migration default (= s.Date) for rows
+            // upserted before tomorrow's first batch — that's fine; one
+            // refresh later it converges to the real last-bar date.
+            LastBarDate: s.LastBarDate,
             // Legacy top-level fields = 1M view.
             Action: horizon1M.Action,
             Conviction: horizon1M.Conviction,

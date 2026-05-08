@@ -13,6 +13,14 @@ public class TradingSignal
     public string Ticker { get; set; } = string.Empty;
     public DateOnly Date { get; set; }
 
+    /// <summary>
+    /// Date of the most recent EOD bar that fed this score. Surfaced on the
+    /// iOS detail view as "as of {LastBarDate}" so users understand why the
+    /// gauge doesn't tick with the live chart — scores reflect last close.
+    /// On weekends / holidays this lags `Date` by 1–3 days.
+    /// </summary>
+    public DateOnly LastBarDate { get; set; }
+
     // Legacy single-horizon columns — kept in lockstep with the 1M values.
     public TradingAction Action { get; set; }
     public double Conviction { get; set; }

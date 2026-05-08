@@ -31,6 +31,7 @@ public record HorizonReadDto(
 public record TradingSignalDto(
     string Ticker,
     DateOnly Date,
+    DateOnly LastBarDate,     // EOD bar that fed the score (≤ Date on weekends/holidays)
     string Action,            // "Buy" | "Sell" | "Hold" — equals Horizon1M.Action
     double Conviction,        // equals Horizon1M.Conviction
     double TechnicalScore,    // equals Horizon1M.TechnicalScore

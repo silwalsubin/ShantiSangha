@@ -26,6 +26,7 @@ struct WiseCatDetailView: View {
                             ProgressView()
                                 .frame(maxWidth: .infinity, minHeight: 200)
                         } else if let signal {
+                            asOfCaption(signal)
                             horizonSelector(signal)
                             horizonCard(read: signal.read(for: selectedHorizon))
                         } else if let error {
@@ -56,6 +57,41 @@ struct WiseCatDetailView: View {
             self.error = error.localizedDescription
         }
     }
+
+    // MARK: - As-of caption
+
+    /// Tells the user the scores below reflect data through the last EOD
+    /// close — explains the disconnect between the live chart above and a
+    /// gauge that doesn't tick intraday. Falls back to the signal's
+    /// calendar date for legacy responses that predate `lastBarDate`.
+    private func asOfCaption(_ s: TradingSignal) -> some View {
+        let raw = s.lastBarDate ?? s.date
+        return Text("Scores as of \(formatAsOf(raw))")
+            .font(.sacredCaption)
+            .foregroundColor(.sacredMuted)
+            .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    private func formatAsOf(_ ymd: String) -> String {
+        guard let date = Self.ymdParser.date(from: ymd) else { return ymd }
+        return Self.asOfDisplay.string(from: date)
+    }
+
+    private static let ymdParser: DateFormatter = {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
+    private static let asOfDisplay: DateFormatter = {
+        let f = DateFormatter()
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "MMM d"
+        return f
+    }()
 
     // MARK: - Horizon selector
 
@@ -231,6 +267,7 @@ struct WiseCatDetailView: View {
         switch raw {
         case "trend_50_200":      return "Trend (50/200 EMA)"
         case "ts_momentum_12_1":  return "Time-series momentum (12-1)"
+        case "fast_trend_5_20":   return "Fast trend (5/20 EMA)"
         case "rsi_14":            return "Momentum (RSI-14)"
         case "bollinger_pctb":    return "Mean reversion (Bollinger)"
         case "volume_confirm":    return "Volume confirmation"

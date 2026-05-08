@@ -64,6 +64,7 @@ def test_run_backtest_reports_per_strategy_hit_rate():
     expected_strategies = {
         "trend_50_200",
         "ts_momentum_12_1",
+        "fast_trend_5_20",
     }
     assert set(result.per_strategy_hit_rate.keys()) == expected_strategies
     for name, hit in result.per_strategy_hit_rate.items():

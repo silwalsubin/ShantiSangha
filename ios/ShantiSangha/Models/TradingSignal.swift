@@ -7,7 +7,8 @@ import Foundation
 /// `horizon1W / horizon1M / horizon1Y` to render three stacked meters.
 struct TradingSignal: Codable, Identifiable, Hashable {
     let ticker: String
-    let date: String                  // "yyyy-MM-dd"
+    let date: String                  // "yyyy-MM-dd" — calendar date the signal row was generated for
+    let lastBarDate: String?          // "yyyy-MM-dd" — last EOD bar that fed the score; absent on legacy responses
     let action: String                // "Buy" | "Sell" | "Hold" — equals horizon1M.action
     let conviction: Double            // equals horizon1M.conviction
     let technicalScore: Double        // equals horizon1M.technicalScore
@@ -24,6 +25,7 @@ struct TradingSignal: Codable, Identifiable, Hashable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         ticker = try c.decode(String.self, forKey: .ticker)
         date = try c.decode(String.self, forKey: .date)
+        lastBarDate = try c.decodeIfPresent(String.self, forKey: .lastBarDate)
         action = try c.decode(String.self, forKey: .action)
         conviction = try c.decode(Double.self, forKey: .conviction)
         technicalScore = try c.decode(Double.self, forKey: .technicalScore)
