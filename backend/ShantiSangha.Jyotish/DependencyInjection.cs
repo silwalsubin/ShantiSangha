@@ -21,6 +21,7 @@ public static class DependencyInjection
         services.AddScoped<IJyotishKnowledgeService>(sp =>
             sp.GetRequiredService<JyotishKnowledgeService>());
         services.AddScoped<IChartReadingService, ChartReadingService>();
+        services.AddScoped<IPairChartReadingService, PairChartReadingService>();
         return services;
     }
 }

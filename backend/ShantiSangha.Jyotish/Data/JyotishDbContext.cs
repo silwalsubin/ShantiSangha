@@ -7,6 +7,7 @@ public class JyotishDbContext(DbContextOptions<JyotishDbContext> options) : DbCo
 {
     public DbSet<JyotishPassageEntity> Passages => Set<JyotishPassageEntity>();
     public DbSet<ChartReadingEntity> Readings => Set<ChartReadingEntity>();
+    public DbSet<PairReadingEntity> PairReadings => Set<PairReadingEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -18,6 +19,19 @@ public class JyotishDbContext(DbContextOptions<JyotishDbContext> options) : DbCo
             e.HasKey(x => x.Id);
             e.HasIndex(x => x.UserId).IsUnique();  // one reading per user
             e.Property(x => x.ChartHash).IsRequired().HasMaxLength(64);
+            e.Property(x => x.SectionsJson).HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.PassageUsageJson).HasColumnType("jsonb").IsRequired();
+        });
+
+        modelBuilder.Entity<PairReadingEntity>(e =>
+        {
+            e.ToTable("jyotish_pair_readings");
+            e.HasKey(x => x.Id);
+            // One row per (viewer, subject) pair. Viewer-side lookup hits the
+            // composite index; subject-side lookup is rare and acceptable.
+            e.HasIndex(x => new { x.ViewerUserId, x.SubjectUserId }).IsUnique();
+            e.HasIndex(x => x.SubjectUserId);
+            e.Property(x => x.ChartHashPair).IsRequired().HasMaxLength(64);
             e.Property(x => x.SectionsJson).HasColumnType("jsonb").IsRequired();
             e.Property(x => x.PassageUsageJson).HasColumnType("jsonb").IsRequired();
         });

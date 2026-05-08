@@ -19,6 +19,7 @@ public class FriendsDbContext(DbContextOptions<FriendsDbContext> options) : DbCo
     public DbSet<FriendshipAnnotation> FriendshipAnnotations => Set<FriendshipAnnotation>();
     public DbSet<Person> Persons => Set<Person>();
     public DbSet<Connection> Connections => Set<Connection>();
+    public DbSet<BirthDetailShare> BirthDetailShares => Set<BirthDetailShare>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -86,6 +87,17 @@ public class FriendsDbContext(DbContextOptions<FriendsDbContext> options) : DbCo
             e.HasIndex(c => c.OwnerUserId);
             e.HasIndex(c => new { c.OwnerUserId, c.PersonId }).IsUnique();
             e.HasIndex(c => c.FriendshipId);
+        });
+
+        mb.Entity<BirthDetailShare>(e =>
+        {
+            e.ToTable("BirthDetailShares");
+            // One row per (grantor, grantee) directional grant. The grantor
+            // controls the row; revocation deletes it.
+            e.HasIndex(s => new { s.GrantorUserId, s.GranteeUserId }).IsUnique();
+            // Grantee-side lookup: "who has shared with me?" — used to surface
+            // the readable-friend list in the iOS Friends tab.
+            e.HasIndex(s => s.GranteeUserId);
         });
 
         mb.Entity<FriendRequest>(e =>
