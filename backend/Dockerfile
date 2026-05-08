@@ -10,7 +10,6 @@ COPY ShantiSangha.Goals/ShantiSangha.Goals.csproj ShantiSangha.Goals/
 COPY ShantiSangha.Chat/ShantiSangha.Chat.csproj ShantiSangha.Chat/
 COPY ShantiSangha.Journal/ShantiSangha.Journal.csproj ShantiSangha.Journal/
 COPY ShantiSangha.Wellness/ShantiSangha.Wellness.csproj ShantiSangha.Wellness/
-COPY ShantiSangha.Jyotish/ShantiSangha.Jyotish.csproj ShantiSangha.Jyotish/
 COPY ShantiSangha.Friends/ShantiSangha.Friends.csproj ShantiSangha.Friends/
 COPY ShantiSangha.Notifications/ShantiSangha.Notifications.csproj ShantiSangha.Notifications/
 COPY ShantiSangha.Trading/ShantiSangha.Trading.csproj ShantiSangha.Trading/
