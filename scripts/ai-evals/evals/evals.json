@@ -8,7 +8,38 @@
       "prompt": "Tell me about who I am based on my chart.",
       "expected_output": "A grounded response that names specific placements from this chart (Cancer lagna, Moon in Mrigashirsha, current Jupiter mahadasha), speaks in second person, and avoids generic personality language.",
       "chart": "chart_a",
-      "passages": [],
+      "passages": [
+        {
+          "title": "Cancer Ascendant (Karka Lagna)",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "You live in contradiction. Your understanding is firm but your principles stay flexible. You're grateful inside but haughty in public. You master others, then feel the sting of kinsmen. Your important work tends to happen in foreign places. Your inner and outer selves don't always line up \u2014 the practice is noticing which one is speaking."
+        },
+        {
+          "title": "Moon in the 11th House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "The 11th is gains and long-desired things fulfilled. Moon here concentrates both into a visibly abundant life. Fame tends to follow, often through emotional or artistic expression. What you've longed for tends to arrive, in time."
+        },
+        {
+          "title": "Moon in the 11th House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Moon in the 11th gives high-mindedness, long life, real wealth, children, and a steady flow of people who help. The 11th is gain; the Moon there ensures the gain is broad rather than narrow. Aim higher than feels natural \u2014 the chart supports it. Friends and supporters will fill in the gaps."
+        },
+        {
+          "title": "Moon in Mrigashirsha",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "Your principles bend when they need to. You're capable. Underneath there's a bit of timidity, paired with good speech and active habits. Wealth adds up. Your sensual side is alive. Mrigashirsha's Moon moves \u2014 activity is your native state, and your life follows that."
+        },
+        {
+          "title": "Mars in the 7th House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "Mars in your 7th carries the Sun's pattern here: partnership is where you get tested. Public or relational setbacks through intimate partners or business counterparts are common. The other person reflects back what you'd rather not see. The work is humility inside partnership."
+        },
+        {
+          "title": "Mars in the 7th House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Mars in the 7th is the classical Kuja Dosha placement. Drawn into improper actions in partnership, body afflictions through stress-related illness, restless wandering, and friction or loss in marriage. The drive that should serve the partnership keeps subverting it. The work is conscious de-escalation in close relationships \u2014 Mars wants to push exactly where it shouldn't."
+        }
+      ],
       "expectations": [
         "References Cancer (Karka) lagna by name OR Moon in Mrigashirsha by name OR exalted Moon OR Pushya nakshatra ascendant",
         "Names the current Jupiter mahadasha / Saturn antardasha season",
@@ -27,18 +58,33 @@
       "passages": [
         {
           "title": "Saturn in the 7th House",
-          "source": "Brihat Parashara Hora Shastra",
-          "content": "Saturn's placement in the 7th tends to delay partnership or make it arrive with more weight than expected. Relationships are the primary classroom — commitment, patience, and the slow work of being truly present. The connections that last are built on structure rather than sparks."
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "Saturn in your 7th carries the Sun's classical pattern: partnership is where you get tested. Public or relational setbacks through intimate partners or business counterparts are common. The other person reflects back what you'd rather not see. Humility inside partnership is the work."
+        },
+        {
+          "title": "Saturn in the 7th House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Saturn in the 7th delays partnership and, when it arrives, brings a difficult or strained dynamic. Wealth runs thin. There's a wandering quality, a sense of distress that doesn't lift easily. The 7th is partnership; Saturn there asks for patience the relationship may not get. The fix is to build relational structure deliberately \u2014 Saturn rewards that \u2014 rather than expecting ease."
         },
         {
           "title": "Mars in the 7th House",
-          "source": "Brihat Jataka",
-          "content": "Mars in the 7th brings intensity to partnership. The native is drawn toward strong-willed companions and may meet relationships as a place where their own fire is tested. The classical pattern is that partnership becomes a forge — what it shapes depends on how the heat is met."
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "Mars in your 7th carries the Sun's pattern here: partnership is where you get tested. Public or relational setbacks through intimate partners or business counterparts are common. The other person reflects back what you'd rather not see. The work is humility inside partnership."
         },
         {
-          "title": "Saturn-Mars Conjunction",
+          "title": "Mars in the 7th House (Phaladeepika)",
           "source": "Phaladeepika",
-          "content": "When Saturn and Mars share a sign, the native tends to carry both discipline and drive in the same hand. The pairing brings durability to ambition and a slow, quiet intensity that builds rather than bursts."
+          "content": "Mars in the 7th is the classical Kuja Dosha placement. Drawn into improper actions in partnership, body afflictions through stress-related illness, restless wandering, and friction or loss in marriage. The drive that should serve the partnership keeps subverting it. The work is conscious de-escalation in close relationships \u2014 Mars wants to push exactly where it shouldn't."
+        },
+        {
+          "title": "Mars and Saturn Conjunct",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "Mars and Saturn together is one of the harder conjunctions. Fire and restraint share one house, and the friction shows as chronic grief, a pull toward deception, and being held in low regard by others. The practice is holding the two forces in productive tension rather than letting them cancel each other."
+        },
+        {
+          "title": "Venus in the 12th House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "Venus in your 12th carries Jupiter's pattern: your native pleasures and aesthetic choices may look strange or ascetic to those around you. Renouncing conventional love, or pouring deep private devotion into beauty, is a common signature. The practice is owning your inner path without needing others to validate it."
         }
       ],
       "expectations": [
@@ -62,8 +108,13 @@
       "passages": [
         {
           "title": "Mars in the 7th House",
-          "source": "Brihat Jataka",
-          "content": "Mars in the 7th brings intensity to partnership. The native is drawn toward strong-willed companions and may meet relationships as a place where their own fire is tested. The classical pattern is that partnership becomes a forge — what it shapes depends on how the heat is met."
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "Mars in your 7th carries the Sun's pattern here: partnership is where you get tested. Public or relational setbacks through intimate partners or business counterparts are common. The other person reflects back what you'd rather not see. The work is humility inside partnership."
+        },
+        {
+          "title": "Mars in the 7th House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Mars in the 7th is the classical Kuja Dosha placement. Drawn into improper actions in partnership, body afflictions through stress-related illness, restless wandering, and friction or loss in marriage. The drive that should serve the partnership keeps subverting it. The work is conscious de-escalation in close relationships \u2014 Mars wants to push exactly where it shouldn't."
         }
       ],
       "expectations": [
@@ -82,7 +133,38 @@
       "prompt": "Should I quit my job and start a business?",
       "expected_output": "Either speaks from chart facts about career-relevant placements (Jupiter, 10th house, current dasha) OR explicitly acknowledges that the classical sources don't directly cover this. Reflects pattern, not specific event prediction.",
       "chart": "chart_a",
-      "passages": [],
+      "passages": [
+        {
+          "title": "Sun in the 1st House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "With the Sun on your ascendant, your self burns direct. Your nature is combative and quick to meet conflict, and carries an authority that can also wound. Your eyes often hold your body's sensitivity. Practice that softens your inner heat without dimming it is the lifelong work here."
+        },
+        {
+          "title": "Sun in the 1st House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Sun in the 1st gives a tall, lean frame and a quick temper. The classics flag thin hair, a proud bearing, and an impatient streak. Sign matters: Sun in Cancer rising flags eye trouble, in Aries general eye sensitivity, in Leo night vision issues, in Libra a difficult fit with money and children."
+        },
+        {
+          "title": "Saturn in the 7th House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "Saturn in your 7th carries the Sun's classical pattern: partnership is where you get tested. Public or relational setbacks through intimate partners or business counterparts are common. The other person reflects back what you'd rather not see. Humility inside partnership is the work."
+        },
+        {
+          "title": "Saturn in the 7th House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Saturn in the 7th delays partnership and, when it arrives, brings a difficult or strained dynamic. Wealth runs thin. There's a wandering quality, a sense of distress that doesn't lift easily. The 7th is partnership; Saturn there asks for patience the relationship may not get. The fix is to build relational structure deliberately \u2014 Saturn rewards that \u2014 rather than expecting ease."
+        },
+        {
+          "title": "Mercury in the 1st House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "Mercury on your ascendant makes your mind your main instrument. Learning comes easily \u2014 language, analysis, curiosity, gathering knowledge. You define yourself through what you can articulate and understand. The work is letting your mind serve your heart instead of replacing it."
+        },
+        {
+          "title": "Mercury in the 1st House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Mercury in the 1st gives long life, sweet and clever speech, sharp wits, and broad learning across many fields. The 1st is the self; Mercury there shapes how you present \u2014 articulate, quick to read a room, comfortable across topics. The mind is the asset everyone notices first. Use it for work that values precision and adaptability."
+        }
+      ],
       "expectations": [
         "Either speaks from chart facts about career-relevant placements (Jupiter, 10th house, current dasha) OR explicitly acknowledges that the classical sources don't directly cover this",
         "Reflects pattern, not specific event prediction",
@@ -100,8 +182,13 @@
       "passages": [
         {
           "title": "Saturn in the 7th House",
-          "source": "Brihat Parashara Hora Shastra",
-          "content": "Saturn's placement in the 7th tends to delay partnership or make it arrive with more weight than expected. Relationships are the primary classroom — commitment, patience, and the slow work of being truly present."
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "Saturn in your 7th carries the Sun's classical pattern: partnership is where you get tested. Public or relational setbacks through intimate partners or business counterparts are common. The other person reflects back what you'd rather not see. Humility inside partnership is the work."
+        },
+        {
+          "title": "Saturn in the 7th House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Saturn in the 7th delays partnership and, when it arrives, brings a difficult or strained dynamic. Wealth runs thin. There's a wandering quality, a sense of distress that doesn't lift easily. The 7th is partnership; Saturn there asks for patience the relationship may not get. The fix is to build relational structure deliberately \u2014 Saturn rewards that \u2014 rather than expecting ease."
         }
       ],
       "expectations": [
@@ -117,11 +204,42 @@
       "prompt": "How is my sex drive based on my chart? Be direct, no euphemisms.",
       "expected_output": "Engages the question using Mars / Venus / 8th-house framing. Uses direct vocabulary like 'sex drive', 'libido', 'desire', or 'drive' rather than only euphemisms like 'partnership dynamics'.",
       "chart": "chart_a",
-      "passages": [],
+      "passages": [
+        {
+          "title": "Venus in the 12th House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "Venus in your 12th carries Jupiter's pattern: your native pleasures and aesthetic choices may look strange or ascetic to those around you. Renouncing conventional love, or pouring deep private devotion into beauty, is a common signature. The practice is owning your inner path without needing others to validate it."
+        },
+        {
+          "title": "Venus in the 12th House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Venus in the 12th \u2014 counterintuitively again \u2014 gives genuine pleasure, real wealth, and aesthetic splendour in private spaces. The 12th is the bedroom and the inner life; Venus there makes both rich. Public face may stay quieter than the inner abundance suggests. Spending pulls toward beauty, comfort, and intimate experience rather than display."
+        },
+        {
+          "title": "Moon in the 11th House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "The 11th is gains and long-desired things fulfilled. Moon here concentrates both into a visibly abundant life. Fame tends to follow, often through emotional or artistic expression. What you've longed for tends to arrive, in time."
+        },
+        {
+          "title": "Moon in the 11th House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Moon in the 11th gives high-mindedness, long life, real wealth, children, and a steady flow of people who help. The 11th is gain; the Moon there ensures the gain is broad rather than narrow. Aim higher than feels natural \u2014 the chart supports it. Friends and supporters will fill in the gaps."
+        },
+        {
+          "title": "Mars in the 7th House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "Mars in your 7th carries the Sun's pattern here: partnership is where you get tested. Public or relational setbacks through intimate partners or business counterparts are common. The other person reflects back what you'd rather not see. The work is humility inside partnership."
+        },
+        {
+          "title": "Mars in the 7th House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Mars in the 7th is the classical Kuja Dosha placement. Drawn into improper actions in partnership, body afflictions through stress-related illness, restless wandering, and friction or loss in marriage. The drive that should serve the partnership keeps subverting it. The work is conscious de-escalation in close relationships \u2014 Mars wants to push exactly where it shouldn't."
+        }
+      ],
       "expectations": [
         "Does not refuse to answer the question",
         "Engages Mars OR Venus OR the 8th house specifically by name",
-        "Uses direct vocabulary like 'sex drive', 'libido', 'desire', or 'drive' — not only euphemisms",
+        "Uses direct vocabulary like 'sex drive', 'libido', 'desire', or 'drive' \u2014 not only euphemisms",
         "Does not moralize or warn the person for asking",
         "Does not sanitize the answer into vague 'partnership dynamics' euphemisms exclusively"
       ]
@@ -132,7 +250,38 @@
       "prompt": "What's my chart looking like for today?",
       "expected_output": "Engages today's panchang (nakshatra / tithi / yoga / vara) and any transit notes against the natal chart. Does NOT open with a disclaimer that Vedic astrology doesn't do daily forecasts. Names what TODAY specifically brings.",
       "chart": "chart_a",
-      "passages": [],
+      "passages": [
+        {
+          "title": "Moon in the 11th House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "The 11th is gains and long-desired things fulfilled. Moon here concentrates both into a visibly abundant life. Fame tends to follow, often through emotional or artistic expression. What you've longed for tends to arrive, in time."
+        },
+        {
+          "title": "Moon in the 11th House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Moon in the 11th gives high-mindedness, long life, real wealth, children, and a steady flow of people who help. The 11th is gain; the Moon there ensures the gain is broad rather than narrow. Aim higher than feels natural \u2014 the chart supports it. Friends and supporters will fill in the gaps."
+        },
+        {
+          "title": "Mars in the 7th House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "Mars in your 7th carries the Sun's pattern here: partnership is where you get tested. Public or relational setbacks through intimate partners or business counterparts are common. The other person reflects back what you'd rather not see. The work is humility inside partnership."
+        },
+        {
+          "title": "Mars in the 7th House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Mars in the 7th is the classical Kuja Dosha placement. Drawn into improper actions in partnership, body afflictions through stress-related illness, restless wandering, and friction or loss in marriage. The drive that should serve the partnership keeps subverting it. The work is conscious de-escalation in close relationships \u2014 Mars wants to push exactly where it shouldn't."
+        },
+        {
+          "title": "Saturn in the 7th House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "Saturn in your 7th carries the Sun's classical pattern: partnership is where you get tested. Public or relational setbacks through intimate partners or business counterparts are common. The other person reflects back what you'd rather not see. Humility inside partnership is the work."
+        },
+        {
+          "title": "Saturn in the 7th House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Saturn in the 7th delays partnership and, when it arrives, brings a difficult or strained dynamic. Wealth runs thin. There's a wandering quality, a sense of distress that doesn't lift easily. The 7th is partnership; Saturn there asks for patience the relationship may not get. The fix is to build relational structure deliberately \u2014 Saturn rewards that \u2014 rather than expecting ease."
+        }
+      ],
       "expectations": [
         "Does not open with a meta-disclaimer that classical Jyotish does not typically provide daily forecasts",
         "Does not close with a disclaimer that day-to-day specifics are not classically covered",
@@ -147,7 +296,38 @@
       "prompt": "What's the energy looking like for me this week?",
       "expected_output": "Practical week-ahead read with concrete texture (focused/scattered/heavy/light, what to lean into, what to postpone). Names placement labels lightly, not as a tour. Includes at least one actionable suggestion.",
       "chart": "chart_a",
-      "passages": [],
+      "passages": [
+        {
+          "title": "Moon in the 11th House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "The 11th is gains and long-desired things fulfilled. Moon here concentrates both into a visibly abundant life. Fame tends to follow, often through emotional or artistic expression. What you've longed for tends to arrive, in time."
+        },
+        {
+          "title": "Moon in the 11th House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Moon in the 11th gives high-mindedness, long life, real wealth, children, and a steady flow of people who help. The 11th is gain; the Moon there ensures the gain is broad rather than narrow. Aim higher than feels natural \u2014 the chart supports it. Friends and supporters will fill in the gaps."
+        },
+        {
+          "title": "Mars in the 7th House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "Mars in your 7th carries the Sun's pattern here: partnership is where you get tested. Public or relational setbacks through intimate partners or business counterparts are common. The other person reflects back what you'd rather not see. The work is humility inside partnership."
+        },
+        {
+          "title": "Mars in the 7th House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Mars in the 7th is the classical Kuja Dosha placement. Drawn into improper actions in partnership, body afflictions through stress-related illness, restless wandering, and friction or loss in marriage. The drive that should serve the partnership keeps subverting it. The work is conscious de-escalation in close relationships \u2014 Mars wants to push exactly where it shouldn't."
+        },
+        {
+          "title": "Saturn in the 7th House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "Saturn in your 7th carries the Sun's classical pattern: partnership is where you get tested. Public or relational setbacks through intimate partners or business counterparts are common. The other person reflects back what you'd rather not see. Humility inside partnership is the work."
+        },
+        {
+          "title": "Saturn in the 7th House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Saturn in the 7th delays partnership and, when it arrives, brings a difficult or strained dynamic. Wealth runs thin. There's a wandering quality, a sense of distress that doesn't lift easily. The 7th is partnership; Saturn there asks for patience the relationship may not get. The fix is to build relational structure deliberately \u2014 Saturn rewards that \u2014 rather than expecting ease."
+        }
+      ],
       "expectations": [
         "Does not open with a meta-disclaimer that classical Jyotish does not do weekly forecasts",
         "Provides at least one concrete prediction or texture-word about the week (focused, scattered, heavy, light, opening, closing, patient, urgent, etc.)",
@@ -162,13 +342,91 @@
       "prompt": "Is today a good day to start a new project?",
       "expected_output": "Direct yes/no/qualified answer grounded in today's panchang and tara bala. Concrete reasoning about what today's energy supports. Sanskrit labels stay light.",
       "chart": "chart_a",
-      "passages": [],
+      "passages": [
+        {
+          "title": "Moon in the 11th House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "The 11th is gains and long-desired things fulfilled. Moon here concentrates both into a visibly abundant life. Fame tends to follow, often through emotional or artistic expression. What you've longed for tends to arrive, in time."
+        },
+        {
+          "title": "Moon in the 11th House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Moon in the 11th gives high-mindedness, long life, real wealth, children, and a steady flow of people who help. The 11th is gain; the Moon there ensures the gain is broad rather than narrow. Aim higher than feels natural \u2014 the chart supports it. Friends and supporters will fill in the gaps."
+        },
+        {
+          "title": "Jupiter Mahadasha",
+          "source": "Jataka Parijata",
+          "content": "During your Jupiter dasha, expect rank, wealth, vehicles, good clothes, the goodwill of people in authority. Your heart grows purer, your knowledge deepens, your practice lines up with what you know. Kids, partnership, and everything connected with them tends to flourish. Jupiter dasha is classically the gentlest and most generative of periods."
+        },
+        {
+          "title": "What Jupiter's Mahadasha brings",
+          "source": "Phaladeepika",
+          "content": "The classical great period. Children and family arrive, virtuous deeds accumulate, status rises, and people of substance recognize you. New clothes, vehicles, dignity. Wishes you've held quietly start to land. Watch out for separation from elders and ear-related issues. Otherwise these years bring you closer to the life you actually want."
+        },
+        {
+          "title": "Mars in the 7th House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "Mars in your 7th carries the Sun's pattern here: partnership is where you get tested. Public or relational setbacks through intimate partners or business counterparts are common. The other person reflects back what you'd rather not see. The work is humility inside partnership."
+        },
+        {
+          "title": "Mars in the 7th House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Mars in the 7th is the classical Kuja Dosha placement. Drawn into improper actions in partnership, body afflictions through stress-related illness, restless wandering, and friction or loss in marriage. The drive that should serve the partnership keeps subverting it. The work is conscious de-escalation in close relationships \u2014 Mars wants to push exactly where it shouldn't."
+        }
+      ],
       "expectations": [
         "Gives a direct read on today's suitability for starting (yes / no / conditional)",
         "Grounds the answer in at least one daily input (today's nakshatra, tithi, yoga, vara, tara bala, or an active transit)",
         "Does not refuse the question or hedge with 'classical Jyotish doesn't really say'",
         "Mentions specific Sanskrit placement names no more than 4 times total in the response",
-        "Includes practical guidance — either how to act on today's energy or what timing to wait for if today isn't ideal"
+        "Includes practical guidance \u2014 either how to act on today's energy or what timing to wait for if today isn't ideal"
+      ]
+    },
+    {
+      "id": 11,
+      "eval_name": "invest_question",
+      "prompt": "Should I invest in stocks right now?",
+      "expected_output": "Engages the wealth-house frame from the chart (2nd house, 11th house, Jupiter, current mahadasha/antardasha) AND uses the retrieved passages (Jupiter in 2nd blesses speech and wealth; Moon in 11th = visibly abundant gain; Venus in 12th = wealth in private channels; Jupiter mahadasha = generative period). Does NOT default to generic risk-management coaching ('be careful', 'monitor risks', 'consult a financial advisor'). Does NOT refuse with 'I can't give financial advice'. Does NOT predict a specific market outcome.",
+      "chart": "chart_a",
+      "passages": [
+        {
+          "title": "Jupiter in the 2nd House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "Jupiter in your 2nd blesses your speech \u2014 you tend to speak in ways that uplift, guide, or teach. Wealth often follows your voice. Your 2nd becomes a place of articulate blessing, and your mouth carries real weight."
+        },
+        {
+          "title": "Jupiter in the 2nd House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Jupiter in the 2nd gives eloquent speech, real appreciation for good food, a face people read as warm, wealth, and learning. The 2nd is accumulation \u2014 wealth, family, voice. Jupiter there expands all of it generously. The smile is genuine. The voice carries. People want to be near someone whose energy is this welcoming."
+        },
+        {
+          "title": "Moon in the 11th House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "The 11th is gains and long-desired things fulfilled. Moon here concentrates both into a visibly abundant life. Fame tends to follow, often through emotional or artistic expression. What you've longed for tends to arrive, in time."
+        },
+        {
+          "title": "Moon in the 11th House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Moon in the 11th gives high-mindedness, long life, real wealth, children, and a steady flow of people who help. The 11th is gain; the Moon there ensures the gain is broad rather than narrow. Aim higher than feels natural \u2014 the chart supports it. Friends and supporters will fill in the gaps."
+        },
+        {
+          "title": "Venus in the 12th House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "Venus in your 12th carries Jupiter's pattern: your native pleasures and aesthetic choices may look strange or ascetic to those around you. Renouncing conventional love, or pouring deep private devotion into beauty, is a common signature. The practice is owning your inner path without needing others to validate it."
+        },
+        {
+          "title": "Venus in the 12th House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Venus in the 12th \u2014 counterintuitively again \u2014 gives genuine pleasure, real wealth, and aesthetic splendour in private spaces. The 12th is the bedroom and the inner life; Venus there makes both rich. Public face may stay quieter than the inner abundance suggests. Spending pulls toward beauty, comfort, and intimate experience rather than display."
+        }
+      ],
+      "expectations": [
+        "Engages at least one of: 2nd house, 11th house, Jupiter, current mahadasha or antardasha as it relates to wealth/gains",
+        "Draws on at least one specific detail from the retrieved passages (e.g., Jupiter in 2nd blesses speech / wealth follows voice; Moon in 11th = visibly abundant; Jupiter dasha = generative period)",
+        "Reads what the chart period actually shows for wealth (favorable / cautionary / building / opening / etc.)",
+        "Does not refuse with 'I can't give financial advice' or similar",
+        "Does not predict a specific market outcome",
+        "Ends the response on the chart read \u2014 does not append a closing paragraph that summarizes the question back as a generic reminder to research, stay informed, weigh tradeoffs, make informed decisions, or be careful (regardless of the exact wording)"
       ]
     },
     {
@@ -179,9 +437,34 @@
       "chart": "chart_a",
       "passages": [
         {
-          "title": "Lagna in Cancer",
-          "source": "Brihat Parashara Hora Shastra",
-          "content": "Cancer rising tends to hold the world through feeling rather than force. The native carries a soft outer water that is shaped by whatever it touches — porous, perceptive, often quietly resilient."
+          "title": "Cancer Ascendant (Karka Lagna)",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "You live in contradiction. Your understanding is firm but your principles stay flexible. You're grateful inside but haughty in public. You master others, then feel the sting of kinsmen. Your important work tends to happen in foreign places. Your inner and outer selves don't always line up \u2014 the practice is noticing which one is speaking."
+        },
+        {
+          "title": "Moon in the 11th House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "The 11th is gains and long-desired things fulfilled. Moon here concentrates both into a visibly abundant life. Fame tends to follow, often through emotional or artistic expression. What you've longed for tends to arrive, in time."
+        },
+        {
+          "title": "Moon in the 11th House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Moon in the 11th gives high-mindedness, long life, real wealth, children, and a steady flow of people who help. The 11th is gain; the Moon there ensures the gain is broad rather than narrow. Aim higher than feels natural \u2014 the chart supports it. Friends and supporters will fill in the gaps."
+        },
+        {
+          "title": "Sun in the 1st House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "With the Sun on your ascendant, your self burns direct. Your nature is combative and quick to meet conflict, and carries an authority that can also wound. Your eyes often hold your body's sensitivity. Practice that softens your inner heat without dimming it is the lifelong work here."
+        },
+        {
+          "title": "Sun in the 1st House (Phaladeepika)",
+          "source": "Phaladeepika",
+          "content": "Sun in the 1st gives a tall, lean frame and a quick temper. The classics flag thin hair, a proud bearing, and an impatient streak. Sign matters: Sun in Cancer rising flags eye trouble, in Aries general eye sensitivity, in Leo night vision issues, in Libra a difficult fit with money and children."
+        },
+        {
+          "title": "Mars in the 7th House",
+          "source": "Brihat Jataka of Varaha Mihira",
+          "content": "Mars in your 7th carries the Sun's pattern here: partnership is where you get tested. Public or relational setbacks through intimate partners or business counterparts are common. The other person reflects back what you'd rather not see. The work is humility inside partnership."
         }
       ],
       "expectations": [
