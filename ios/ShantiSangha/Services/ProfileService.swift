@@ -12,9 +12,6 @@ struct ProfileResponse: Codable, Equatable {
     let reminderHour: Int?
     let notifyOnFriendMessages: Bool
     let onboardingCompleted: Bool
-    let birthDate: String?
-    let birthTime: String?
-    let birthPlace: String?
     let country: String?
     let state: String?
     let city: String?
@@ -35,9 +32,6 @@ struct ProfileResponse: Codable, Equatable {
         reminderHour: nil,
         notifyOnFriendMessages: true,
         onboardingCompleted: false,
-        birthDate: nil,
-        birthTime: nil,
-        birthPlace: nil,
         country: nil,
         state: nil,
         city: nil,
@@ -64,10 +58,6 @@ struct UpdateMeRequest: Encodable {
     var notifyOnFriendMessages: Bool? = nil
     var onboardingCompleted: Bool? = nil
     var clearReminderHour: Bool? = nil
-    var birthDate: String? = nil
-    var birthTime: String? = nil
-    var birthPlace: String? = nil
-    var clearBirthDetails: Bool? = nil
     var country: String? = nil
     var state: String? = nil
     var city: String? = nil

@@ -9,9 +9,7 @@ struct Person: Codable, Identifiable, Equatable, Hashable {
     let id: UUID
     let userId: UUID?
     let displayName: String
-    let birthDate: String?      // ISO 'yyyy-MM-dd' from backend's DateOnly
-    let birthTime: String?
-    let birthPlace: String?
+    let birthDate: String?      // ISO 'yyyy-MM-dd' from backend's DateOnly — kept as a contact birthday
     let phoneNumber: String?
     let email: String?
     let country: String?
@@ -112,8 +110,6 @@ struct CreateConnectionRequest: Encodable {
     var nickname: String? = nil
     var privateNotes: String? = nil
     var birthDate: String? = nil
-    var birthTime: String? = nil
-    var birthPlace: String? = nil
     var phoneNumber: String? = nil
     var email: String? = nil
     var country: String? = nil
@@ -135,8 +131,6 @@ struct UpdateConnectionRequest: Encodable {
 struct UpdatePersonRequest: Encodable {
     var displayName: String? = nil
     var birthDate: String? = nil
-    var birthTime: String? = nil
-    var birthPlace: String? = nil
     var phoneNumber: String? = nil
     var email: String? = nil
     var country: String? = nil
@@ -144,8 +138,6 @@ struct UpdatePersonRequest: Encodable {
     var city: String? = nil
     var address: String? = nil
     var clearBirthDate: Bool? = nil
-    var clearBirthTime: Bool? = nil
-    var clearBirthPlace: Bool? = nil
     var clearPhoneNumber: Bool? = nil
     var clearEmail: Bool? = nil
     var clearCountry: Bool? = nil

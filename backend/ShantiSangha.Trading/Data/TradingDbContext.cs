@@ -6,7 +6,6 @@ namespace ShantiSangha.Trading.Data;
 public class TradingDbContext(DbContextOptions<TradingDbContext> options) : DbContext(options)
 {
     public DbSet<WatchlistItem> WatchlistItems => Set<WatchlistItem>();
-    public DbSet<StockNatalChart> StockNatalCharts => Set<StockNatalChart>();
     public DbSet<TickerDailyClose> TickerDailyCloses => Set<TickerDailyClose>();
     public DbSet<TradingSignal> TradingSignals => Set<TradingSignal>();
 
@@ -18,15 +17,6 @@ public class TradingDbContext(DbContextOptions<TradingDbContext> options) : DbCo
             e.HasIndex(w => w.UserId);
             e.HasIndex(w => new { w.UserId, w.Ticker }).IsUnique();
             e.Property(w => w.Ticker).HasMaxLength(16).IsRequired();
-        });
-
-        modelBuilder.Entity<StockNatalChart>(e =>
-        {
-            e.HasKey(s => s.Ticker);
-            e.Property(s => s.Ticker).HasMaxLength(16);
-            e.Property(s => s.IpoTimeEt).HasMaxLength(8);
-            e.Property(s => s.Exchange).HasMaxLength(16);
-            e.Property(s => s.SignaturesJson).HasColumnType("jsonb");
         });
 
         modelBuilder.Entity<TickerDailyClose>(e =>

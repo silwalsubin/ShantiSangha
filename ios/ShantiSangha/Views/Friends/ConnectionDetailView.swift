@@ -44,14 +44,6 @@ struct ConnectionDetailView: View {
     @State private var showContactPicker = false
     @State private var linkedContact: LinkedContactSnapshot?
 
-    // Birth-chart sharing — directional. `iShared` = current user has shared
-    // their chart with this friend. `theyShared` = friend has shared with
-    // current user; gates the "[Name] through your chart" affordance below.
-    @State private var iShared: Bool = false
-    @State private var theyShared: Bool = false
-    @State private var loadingShareState: Bool = true
-    @State private var togglingShare: Bool = false
-
     private var connection: Connection? {
         vm.connections.first(where: { $0.id == connectionId })
     }
@@ -68,9 +60,6 @@ struct ConnectionDetailView: View {
                     aboutSection(connection)
                     if let linkedContact {
                         linkedContactSection(linkedContact)
-                    }
-                    if connection.messageable {
-                        birthChartSection(connection)
                     }
                     relationSection
                     nicknameSection
@@ -90,12 +79,10 @@ struct ConnectionDetailView: View {
         .onAppear {
             seedDrafts()
             linkedContact = LinkedContactStore.snapshot(for: connectionId)
-            Task { await loadShareState() }
         }
         .onChange(of: connection?.id) { _, _ in
             seedDrafts(force: true)
             linkedContact = LinkedContactStore.snapshot(for: connectionId)
-            Task { await loadShareState() }
         }
         .sheet(item: $contactToSave) { item in
             AddContactSheet(contact: item.contact) {
@@ -470,78 +457,6 @@ struct ConnectionDetailView: View {
         }
     }
 
-    @ViewBuilder
-    private func birthChartSection(_ c: Connection) -> some View {
-        // Only meaningful when the friend has a real ShantiSangha userId; the
-        // toggle gates on .messageable upstream so this assertion is safe.
-        let friendUserId = c.person.userId
-
-        VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-            sectionLabel("BIRTH CHART")
-
-            SacredListCard {
-                VStack(spacing: 0) {
-                    HStack(alignment: .top, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Share my chart with \(c.displayLabel)")
-                                .font(.sacredTextMedium)
-                                .foregroundColor(.sacredText)
-                            Text("They can read your chart privately. Your raw birth data isn't shown.")
-                                .font(.sacredMicro)
-                                .foregroundColor(.sacredMuted)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        Spacer(minLength: 8)
-                        if togglingShare {
-                            ProgressView()
-                                .controlSize(.small)
-                                .tint(.sacredGold)
-                                .frame(width: 51, height: 31)
-                        } else if let friendUserId {
-                            Toggle("", isOn: Binding(
-                                get: { iShared },
-                                set: { newValue in
-                                    Task { await setShare(to: newValue, friendUserId: friendUserId) }
-                                }))
-                                .labelsHidden()
-                                .tint(.sacredGold)
-                                .disabled(loadingShareState)
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
-
-                    if theyShared, let friendUserId {
-                        Divider().padding(.leading, 16)
-                        NavigationLink(destination: PairReadingView(
-                            subjectUserId: friendUserId,
-                            subjectName: c.displayLabel)) {
-                            HStack(spacing: 10) {
-                                Image(systemName: "sparkles")
-                                    .foregroundColor(.sacredGold)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("\(c.displayLabel) through your chart")
-                                        .font(.sacredTextMedium)
-                                        .foregroundColor(.sacredText)
-                                    Text("A private four-section reading")
-                                        .font(.sacredMicro)
-                                        .foregroundColor(.sacredMuted)
-                                }
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 12, weight: .medium))
-                                    .foregroundColor(.sacredMutedLight)
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 14)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-    }
-
     private func removeSection(_ c: Connection) -> some View {
         VStack(spacing: SacredSpacing.s) {
             if let saveError {
@@ -702,42 +617,6 @@ struct ConnectionDetailView: View {
         stateDraft = c.person.state ?? ""
         countryDraft = c.person.country ?? ""
         didSeed = true
-    }
-
-    private func loadShareState() async {
-        guard let c = connection, c.messageable, let friendUserId = c.person.userId else {
-            iShared = false; theyShared = false
-            loadingShareState = false
-            return
-        }
-        loadingShareState = true
-        defer { loadingShareState = false }
-        do {
-            let shares = try await BirthDetailSharesAPI.myShares()
-            iShared = shares.grantedTo.contains(friendUserId)
-            theyShared = shares.receivedFrom.contains(friendUserId)
-        } catch {
-            // Non-critical — leave defaults; the UI just shows the off state
-            // until the next refresh.
-        }
-    }
-
-    private func setShare(to newValue: Bool, friendUserId: UUID) async {
-        let prev = iShared
-        iShared = newValue            // optimistic UI
-        togglingShare = true
-        defer { togglingShare = false }
-        do {
-            if newValue {
-                _ = try await BirthDetailSharesAPI.grant(to: friendUserId)
-            } else {
-                try await BirthDetailSharesAPI.revoke(from: friendUserId)
-            }
-            saveError = nil
-        } catch {
-            iShared = prev            // revert on failure
-            saveError = "Couldn't update sharing. Try again."
-        }
     }
 
     private func saveNickname() async {

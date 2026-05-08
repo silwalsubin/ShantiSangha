@@ -42,9 +42,6 @@ namespace ShantiSangha.Identity.Migrations
             modelBuilder.Entity("ShantiSangha.Identity.Models.Profile", b =>
                 {
                     b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
-                    b.Property<DateOnly?>("BirthDate").HasColumnType("date");
-                    b.Property<string>("BirthPlace").HasColumnType("text");
-                    b.Property<string>("BirthTime").HasColumnType("text");
                     b.Property<string>("City").HasColumnType("text");
                     b.Property<string>("Country").HasColumnType("text");
                     b.Property<DateTime>("CreatedAt").HasColumnType("timestamp with time zone");

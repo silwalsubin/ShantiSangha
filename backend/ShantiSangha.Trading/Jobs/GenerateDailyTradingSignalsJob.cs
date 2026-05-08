@@ -9,8 +9,8 @@ namespace ShantiSangha.Trading.Jobs;
 
 /// <summary>
 /// After RefreshMarketDataJob has populated the cache: for each user with a
-/// non-empty watchlist, generate today's signals (technical + per-user astro)
-/// and dispatch a push for any high-conviction call.
+/// non-empty watchlist, generate today's signals (technical) and dispatch
+/// a push for any high-conviction call.
 /// </summary>
 public class GenerateDailyTradingSignalsJob(
     TradingDbContext db,

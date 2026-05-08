@@ -6,7 +6,6 @@ using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using ShantiSangha.Shared;
 using ShantiSangha.Shared.Interfaces;
-using ShantiSangha.Shared.Jyotish;
 using ShantiSangha.Wellness.Data;
 using ShantiSangha.Wellness.Models;
 
@@ -14,7 +13,7 @@ namespace ShantiSangha.Wellness.Jobs;
 
 /// <summary>
 /// Generates a living portrait of the user — who they are through the lens of
-/// their practice, their patterns, and their Vedic identity. Cached per user,
+/// their practice, their patterns, and their reflections. Cached per user,
 /// regenerated when the underlying context changes meaningfully.
 /// </summary>
 public class GeneratePortraitJob(
@@ -22,8 +21,6 @@ public class GeneratePortraitJob(
     Kernel kernel,
     IGoalQueryService goalQuery,
     IProfileQueryService profileQuery,
-    IJyotishContextService jyotishService,
-    IJyotishKnowledgeService jyotishKnowledge,
     ILogger<GeneratePortraitJob> logger)
 {
     public async Task RunAsync(Guid userId)
@@ -34,7 +31,6 @@ public class GeneratePortraitJob(
             var displayName = await profileQuery.GetDisplayNameAsync(userId);
             var goals = await goalQuery.GetActiveGoalsForContextAsync(userId, today);
 
-            // Previous reflections — for understanding their arc
             var recentReflections = await db.DailyReflections
                 .Where(r => r.UserId == userId)
                 .OrderByDescending(r => r.Date)
@@ -42,47 +38,9 @@ public class GeneratePortraitJob(
                 .Select(r => new { r.Content, r.Date })
                 .ToListAsync();
 
-            // Count total reflections (proxy for how long they've been using the app)
             var totalReflections = await db.DailyReflections
                 .CountAsync(r => r.UserId == userId);
 
-            // Vedic context — and 3 chart-matched corpus passages so the
-            // portrait carries the tradition's voice, not just the user's
-            // data. Passages rotate by (userId, day) so regenerating on
-            // different days surfaces different classical angles.
-            string? birthNakshatra = null;
-            string? moonRashi = null;
-            List<string> vedicPassageLines = [];
-            try
-            {
-                var jyotish = await jyotishService.GetContextAsync(userId, today);
-                if (jyotish is not null)
-                {
-                    birthNakshatra = jyotish.BirthNakshatra;
-                    moonRashi = jyotish.MoonRashi;
-
-                    var signatures = jyotish.DeriveSignatures()
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .ToList();
-                    if (signatures.Count > 0)
-                    {
-                        var allPassages = await jyotishKnowledge.GetPassagesAsync(signatures);
-                        if (allPassages.Count > 0)
-                        {
-                            var chosen = allPassages.Rotate(userId, today, count: 3);
-                            vedicPassageLines = chosen
-                                .Select(p => $"  - [{p.Polarity}] {p.Content}")
-                                .ToList();
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to load Vedic context for portrait — continuing without it");
-            }
-
-            // Build context
             var contextParts = new List<string>();
 
             if (displayName is not null)
@@ -90,26 +48,6 @@ public class GeneratePortraitJob(
 
             contextParts.Add($"They have been using the app for {totalReflections} days.");
 
-            // Vedic identity
-            if (birthNakshatra is not null || moonRashi is not null)
-            {
-                var vedicLines = new List<string>();
-                if (moonRashi is not null)
-                    vedicLines.Add($"Moon rashi (Vedic moon sign): {moonRashi}");
-                if (birthNakshatra is not null)
-                    vedicLines.Add($"Birth nakshatra: {birthNakshatra}");
-                contextParts.Add($"Vedic identity:\n{string.Join("\n", vedicLines)}");
-            }
-
-            if (vedicPassageLines.Count > 0)
-            {
-                contextParts.Add(
-                    "Classical Vedic wisdom for their chart (ground the portrait in this — " +
-                    "never quote, never cite sources, never use Sanskrit terms from these):\n" +
-                    string.Join("\n", vedicPassageLines));
-            }
-
-            // Goals and practice patterns
             if (goals.Count > 0)
             {
                 var goalLines = goals.Select(g =>
@@ -121,7 +59,6 @@ public class GeneratePortraitJob(
                 contextParts.Add($"Active practices and goals:\n{string.Join("\n", goalLines)}");
             }
 
-            // Recent reflections for arc
             if (recentReflections.Count > 0)
             {
                 var reflLines = recentReflections.Select(r =>
@@ -131,7 +68,6 @@ public class GeneratePortraitJob(
 
             var context = string.Join("\n\n", contextParts);
 
-            // Check if context has changed since last portrait
             var contextHash = ComputeHash(context);
             var existing = await db.Portraits
                 .FirstOrDefaultAsync(p => p.UserId == userId);
@@ -142,9 +78,8 @@ public class GeneratePortraitJob(
                 return;
             }
 
-            // Generate portrait
             var chatCompletion = kernel.GetRequiredService<IChatCompletionService>(AiModels.FastServiceId);
-            var history = new ChatHistory(BuildSystemPrompt(totalReflections, birthNakshatra is not null));
+            var history = new ChatHistory(BuildSystemPrompt(totalReflections));
 
             history.AddUserMessage($"Everything known about this person:\n{context}");
 
@@ -181,11 +116,11 @@ public class GeneratePortraitJob(
         }
     }
 
-    private static string BuildSystemPrompt(int totalDays, bool hasVedicIdentity)
+    private static string BuildSystemPrompt(int totalDays)
     {
         var dayContext = totalDays switch
         {
-            0 => "This person just started. You know almost nothing yet. Write a seed portrait based on their nakshatra qualities and what they've chosen to practice. End with: 'As you practice, this portrait will grow with you.'",
+            0 => "This person just started. You know almost nothing yet. Write a seed portrait based on what they've chosen to practice. End with: 'As you practice, this portrait will grow with you.'",
             < 7 => "This person is new. You have limited data. Write what you can see so far — their chosen practices, their early patterns. Keep it grounded in what's real, not what you imagine.",
             < 30 => "You have a few weeks of data. You can start to see patterns — which practices stick, which daily reflections keep echoing, how they show up. Name what you notice.",
             _ => "You have deep history. You can see arcs, shifts, contradictions, and growth. This portrait should feel like it could only describe THIS person — specific, earned, true."
@@ -193,26 +128,20 @@ public class GeneratePortraitJob(
 
         return $"""
             You write a living portrait of a person — who they are as seen through
-            their spiritual practice, their patterns, and their Vedic identity.
+            their spiritual practice, their patterns, and their reflections.
 
-            This portrait appears at the top of their Journey page. It is not a
-            horoscope. It is not a personality test result. It is the app telling
-            them who they are, based on everything it knows. The reader should
-            think: "yes, that's me" — or better, "I hadn't thought of it that way."
+            This portrait appears at the top of their Journey page. It is the app
+            telling them who they are, based on everything it knows. The reader
+            should think: "yes, that's me" — or better, "I hadn't thought of it
+            that way."
 
             {dayContext}
 
             Rules:
             - 3 to 5 sentences. No more. Every word must earn its place.
             - Write in second person ("You are..." / "You carry..." / "Your practice...")
-            - Blend Vedic identity with practice data seamlessly. Not "Your nakshatra
-              is Mrigashirsha and also you meditate." Instead: "You carry the seeker's
-              restlessness of Mrigashirsha — and your 47-day meditation streak suggests
-              you've learned to make that restlessness sit still."
-            - If Vedic identity is available, let it anchor the portrait. The nakshatra
-              quality should feel like the foundation of who they are, with practice
-              data as evidence.
-            - If no Vedic identity, anchor in practice patterns and daily reflections.
+            - Anchor in practice patterns and daily reflections — what they actually do
+              and what's actually been observed about them.
             - Reference specific numbers (streak days, practice counts) naturally.
             - Name thematic threads only when they are visible in the provided
               reflections or practice history.
@@ -221,8 +150,6 @@ public class GeneratePortraitJob(
             - Never give advice. Never instruct. Only observe and reflect back.
             - Never use exclamation marks. Never be peppy.
             - Do not use their name.
-            - Do not label anything as "Vedic astrology" or "according to your chart."
-              Speak with that knowledge naturally, as if you simply know.
             - The portrait should make them feel SEEN — known in a way that no other
               app or tool could replicate. This is the sunk cost made visible.
 

@@ -10,11 +10,8 @@ namespace ShantiSangha.Trading.Services;
 public class TradingSignalService(
     TradingDbContext db,
     IMarketDataClient marketData,
-    IAstroSignalService astro,
     ILogger<TradingSignalService> logger) : ITradingSignalService
 {
-    private const double TechnicalWeight = 0.6;
-    private const double AstroWeight = 0.4;
     private const double BuyThreshold = 0.5;
     private const double SellThreshold = -0.5;
 
@@ -62,13 +59,10 @@ public class TradingSignalService(
         var tech1M = techScore?.Horizon1M ?? new HorizonTechnicalScore(0.0, Array.Empty<TechnicalSignalContribution>());
         var tech1Y = techScore?.Horizon1Y ?? new HorizonTechnicalScore(0.0, Array.Empty<TechnicalSignalContribution>());
 
-        // Per-horizon astro composites.
-        var astroResult = await astro.ComputeAsync(userId, ticker, DateTime.UtcNow, ct);
-
-        // Per-horizon composites.
-        var composite1W = ClampComposite(TechnicalWeight * tech1W.Score + AstroWeight * astroResult.Composite1W);
-        var composite1M = ClampComposite(TechnicalWeight * tech1M.Score + AstroWeight * astroResult.Composite1M);
-        var composite1Y = ClampComposite(TechnicalWeight * tech1Y.Score + AstroWeight * astroResult.Composite1Y);
+        // Composite is purely technical now.
+        var composite1W = ClampComposite(tech1W.Score);
+        var composite1M = ClampComposite(tech1M.Score);
+        var composite1Y = ClampComposite(tech1Y.Score);
 
         var action1W = ToAction(composite1W);
         var action1M = ToAction(composite1M);
@@ -83,9 +77,6 @@ public class TradingSignalService(
                 .ToList(),
             Technical1Y: tech1Y.Contributions
                 .Select(c => new StrategyContributionDto(c.Name, c.Value, c.Contribution, c.Weight))
-                .ToList(),
-            Astro: astroResult.Angles
-                .Select(a => new AstroAngleScoreDto(a.Name, a.Score, a.Highlights))
                 .ToList()
         );
         var reasoningJson = JsonSerializer.Serialize(reasoning);
@@ -114,9 +105,6 @@ public class TradingSignalService(
         existing.Technical1W = tech1W.Score;
         existing.Technical1M = tech1M.Score;
         existing.Technical1Y = tech1Y.Score;
-        existing.Astro1W = astroResult.Composite1W;
-        existing.Astro1M = astroResult.Composite1M;
-        existing.Astro1Y = astroResult.Composite1Y;
         existing.Composite1W = composite1W;
         existing.Composite1M = composite1M;
         existing.Composite1Y = composite1Y;
@@ -125,7 +113,6 @@ public class TradingSignalService(
         existing.Action = action1M;
         existing.Conviction = Math.Abs(composite1M);
         existing.TechnicalScore = tech1M.Score;
-        existing.AstroScore = astroResult.Composite1M;
         existing.CompositeScore = composite1M;
 
         existing.ReasoningJson = reasoningJson;
@@ -181,15 +168,13 @@ public class TradingSignalService(
         var reasoning = new SignalReasoning(
             Technical1W: raw?.Technical1W ?? Array.Empty<StrategyContributionDto>(),
             Technical1M: raw?.Technical1M ?? Array.Empty<StrategyContributionDto>(),
-            Technical1Y: raw?.Technical1Y ?? Array.Empty<StrategyContributionDto>(),
-            Astro:       raw?.Astro       ?? Array.Empty<AstroAngleScoreDto>()
+            Technical1Y: raw?.Technical1Y ?? Array.Empty<StrategyContributionDto>()
         );
 
         var horizon1W = new HorizonReadDto(
             Action: s.Action1W.ToString(),
             Conviction: s.Conviction1W,
             TechnicalScore: s.Technical1W,
-            AstroScore: s.Astro1W,
             CompositeScore: s.Composite1W,
             TechnicalSignals: reasoning.Technical1W
         );
@@ -197,7 +182,6 @@ public class TradingSignalService(
             Action: s.Action1M.ToString(),
             Conviction: s.Conviction1M,
             TechnicalScore: s.Technical1M,
-            AstroScore: s.Astro1M,
             CompositeScore: s.Composite1M,
             TechnicalSignals: reasoning.Technical1M
         );
@@ -205,7 +189,6 @@ public class TradingSignalService(
             Action: s.Action1Y.ToString(),
             Conviction: s.Conviction1Y,
             TechnicalScore: s.Technical1Y,
-            AstroScore: s.Astro1Y,
             CompositeScore: s.Composite1Y,
             TechnicalSignals: reasoning.Technical1Y
         );
@@ -217,11 +200,9 @@ public class TradingSignalService(
             Action: horizon1M.Action,
             Conviction: horizon1M.Conviction,
             TechnicalScore: horizon1M.TechnicalScore,
-            AstroScore: horizon1M.AstroScore,
             CompositeScore: horizon1M.CompositeScore,
             Price: s.PriceAtSignal,
             TechnicalSignals: horizon1M.TechnicalSignals,
-            AstroAngles: reasoning.Astro,
             Horizon1W: horizon1W,
             Horizon1M: horizon1M,
             Horizon1Y: horizon1Y

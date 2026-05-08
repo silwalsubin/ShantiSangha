@@ -7,7 +7,6 @@ namespace ShantiSangha.Trading.Services;
 
 public class WatchlistService(
     TradingDbContext db,
-    IStockChartService stockChart,
     IMarketDataClient marketData) : IWatchlistService
 {
     public async Task<IReadOnlyList<WatchlistItemDto>> ListAsync(Guid userId, CancellationToken ct = default)
@@ -40,10 +39,6 @@ public class WatchlistService(
         var item = new WatchlistItem { UserId = userId, Ticker = exact.Symbol, AddedAt = DateTime.UtcNow };
         db.WatchlistItems.Add(item);
         await db.SaveChangesAsync(ct);
-
-        // Best-effort: warm the natal chart cache so the daily job doesn't have to.
-        try { await stockChart.GetOrCreateAsync(exact.Symbol, ct); }
-        catch { /* non-fatal */ }
 
         return new WatchlistItemDto(item.Ticker, item.AddedAt);
     }

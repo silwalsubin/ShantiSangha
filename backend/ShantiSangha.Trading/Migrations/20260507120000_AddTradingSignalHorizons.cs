@@ -23,9 +23,6 @@ namespace ShantiSangha.Trading.Migrations
                     ADD COLUMN IF NOT EXISTS ""Technical1W"" double precision NOT NULL DEFAULT 0,
                     ADD COLUMN IF NOT EXISTS ""Technical1M"" double precision NOT NULL DEFAULT 0,
                     ADD COLUMN IF NOT EXISTS ""Technical1Y"" double precision NOT NULL DEFAULT 0,
-                    ADD COLUMN IF NOT EXISTS ""Astro1W""     double precision NOT NULL DEFAULT 0,
-                    ADD COLUMN IF NOT EXISTS ""Astro1M""     double precision NOT NULL DEFAULT 0,
-                    ADD COLUMN IF NOT EXISTS ""Astro1Y""     double precision NOT NULL DEFAULT 0,
                     ADD COLUMN IF NOT EXISTS ""Composite1W"" double precision NOT NULL DEFAULT 0,
                     ADD COLUMN IF NOT EXISTS ""Composite1M"" double precision NOT NULL DEFAULT 0,
                     ADD COLUMN IF NOT EXISTS ""Composite1Y"" double precision NOT NULL DEFAULT 0;
@@ -45,9 +42,6 @@ namespace ShantiSangha.Trading.Migrations
                     DROP COLUMN IF EXISTS ""Technical1W"",
                     DROP COLUMN IF EXISTS ""Technical1M"",
                     DROP COLUMN IF EXISTS ""Technical1Y"",
-                    DROP COLUMN IF EXISTS ""Astro1W"",
-                    DROP COLUMN IF EXISTS ""Astro1M"",
-                    DROP COLUMN IF EXISTS ""Astro1Y"",
                     DROP COLUMN IF EXISTS ""Composite1W"",
                     DROP COLUMN IF EXISTS ""Composite1M"",
                     DROP COLUMN IF EXISTS ""Composite1Y"";

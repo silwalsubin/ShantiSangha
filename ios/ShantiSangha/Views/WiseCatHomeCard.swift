@@ -44,8 +44,7 @@ struct WiseCatHomeCard: View {
     private var headerSubtitle: String {
         if vm.watchlist.isEmpty { return "Add a ticker to begin." }
         if vm.signals.isEmpty { return "Today's reading is being prepared." }
-        if let bias = skyBias() { return bias.label }
-        return ""
+        return "Today's reading"
     }
 
     private var statsRow: some View {
@@ -82,16 +81,4 @@ struct WiseCatHomeCard: View {
         return (buy, hold, sell)
     }
 
-    private struct SkyBias {
-        let label: String
-        let color: Color
-    }
-
-    private func skyBias() -> SkyBias? {
-        guard let sky = vm.todaysSky else { return nil }
-        let avg = (sky.userNatal.score + sky.panchang.score) / 2
-        if avg > 0.15 { return SkyBias(label: "Benefic sky", color: .sacredGold) }
-        if avg < -0.15 { return SkyBias(label: "Cautious sky", color: .sacredGoldDark) }
-        return SkyBias(label: "Neutral sky", color: .sacredMuted)
-    }
 }

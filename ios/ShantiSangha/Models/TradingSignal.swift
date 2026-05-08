@@ -11,11 +11,9 @@ struct TradingSignal: Codable, Identifiable, Hashable {
     let action: String                // "Buy" | "Sell" | "Hold" — equals horizon1M.action
     let conviction: Double            // equals horizon1M.conviction
     let technicalScore: Double        // equals horizon1M.technicalScore
-    let astroScore: Double            // equals horizon1M.astroScore
     let compositeScore: Double        // equals horizon1M.compositeScore
     let price: Double?
     let technicalSignals: [StrategyContribution] // equals horizon1M.technicalSignals
-    let astroAngles: [AstroAngleScore]
     let horizon1W: HorizonRead
     let horizon1M: HorizonRead
     let horizon1Y: HorizonRead
@@ -29,11 +27,9 @@ struct TradingSignal: Codable, Identifiable, Hashable {
         action = try c.decode(String.self, forKey: .action)
         conviction = try c.decode(Double.self, forKey: .conviction)
         technicalScore = try c.decode(Double.self, forKey: .technicalScore)
-        astroScore = try c.decode(Double.self, forKey: .astroScore)
         compositeScore = try c.decode(Double.self, forKey: .compositeScore)
         price = try c.decodeIfPresent(Double.self, forKey: .price)
         technicalSignals = try c.decodeArrayLenient(forKey: .technicalSignals)
-        astroAngles = try c.decodeArrayLenient(forKey: .astroAngles)
         horizon1W = try c.decode(HorizonRead.self, forKey: .horizon1W)
         horizon1M = try c.decode(HorizonRead.self, forKey: .horizon1M)
         horizon1Y = try c.decode(HorizonRead.self, forKey: .horizon1Y)
@@ -41,13 +37,11 @@ struct TradingSignal: Codable, Identifiable, Hashable {
 }
 
 /// One horizon's read of (ticker, date) — Buy/Hold/Sell, composite, conviction,
-/// the technical / astro split, and the per-strategy contributions for that
-/// horizon's weight vector.
+/// and the per-strategy contributions for that horizon's weight vector.
 struct HorizonRead: Codable, Hashable {
     let action: String                // "Buy" | "Sell" | "Hold"
     let conviction: Double
     let technicalScore: Double
-    let astroScore: Double
     let compositeScore: Double
     let technicalSignals: [StrategyContribution]
 
@@ -56,7 +50,6 @@ struct HorizonRead: Codable, Hashable {
         action = try c.decode(String.self, forKey: .action)
         conviction = try c.decode(Double.self, forKey: .conviction)
         technicalScore = try c.decode(Double.self, forKey: .technicalScore)
-        astroScore = try c.decode(Double.self, forKey: .astroScore)
         compositeScore = try c.decode(Double.self, forKey: .compositeScore)
         technicalSignals = try c.decodeArrayLenient(forKey: .technicalSignals)
     }
@@ -79,9 +72,6 @@ enum WiseCatHorizon: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 
     var label: String { rawValue }
-
-    var weightInTechnical: Double { 0.6 }   // same Technical/Astro split across horizons.
-    var weightInAstro: Double     { 0.4 }
 }
 
 extension TradingSignal {
@@ -99,12 +89,6 @@ struct StrategyContribution: Codable, Hashable {
     let value: Double
     let contribution: Double
     let weight: Double
-}
-
-struct AstroAngleScore: Codable, Hashable {
-    let angle: String                 // "user_natal" | "panchang" | "stock_natal"
-    let score: Double
-    let highlights: [String]
 }
 
 struct WatchlistEntry: Codable, Identifiable, Hashable {

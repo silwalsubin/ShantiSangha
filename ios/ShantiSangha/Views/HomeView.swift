@@ -728,13 +728,6 @@ struct ProfileMenuSheet: View {
 
             Divider().padding(.leading, 52)
 
-            NavigationLink(destination: VedicChartView()) {
-                menuRow(icon: "moon.stars", label: "Birth chart", subtitle: "Your Vedic Astrological Analysis")
-            }
-            .buttonStyle(.plain)
-
-            Divider().padding(.leading, 52)
-
             NavigationLink(destination: SettingsView()) {
                 menuRow(icon: "gearshape", label: "Settings", subtitle: "Preferences")
             }

@@ -17,12 +17,7 @@ public static class DependencyInjection
         services.AddDbContext<TradingDbContext>(options =>
             options.UseNpgsql(connectionString));
 
-        services.AddSingleton<IIpoChartCsvLoader, IpoChartCsvLoader>();
-
         services.AddScoped<IWatchlistService, WatchlistService>();
-        services.AddScoped<IStockChartService, StockChartService>();
-        services.AddSingleton<ITransitAspectService, TransitAspectService>();
-        services.AddScoped<IAstroSignalService, AstroSignalService>();
         services.AddScoped<ITradingSignalService, TradingSignalService>();
         services.AddScoped<IMarketDataClient, MarketDataClient>();
 

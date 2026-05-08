@@ -10,7 +10,6 @@ using ShantiSangha.Chat.Services;
 using ShantiSangha.Shared;
 using ShantiSangha.Shared.Events;
 using ShantiSangha.Shared.Interfaces;
-using ShantiSangha.Shared.Jyotish;
 using ShantiSangha.Shared.Models;
 
 namespace ShantiSangha.Chat.AI;
@@ -22,27 +21,10 @@ public class ChatService(
     IGoalQueryService goalQuery,
     IReflectionQueryService reflectionQuery,
     IProfileQueryService profileQuery,
-    IJyotishContextService jyotishService,
-    IJyotishKnowledgeService jyotishKnowledge,
-    IChartReadingService chartReadingService,
-    IPairChartReadingService pairReadingService,
     IEventBus eventBus,
     ILogger<ChatService> logger) : IChatService
 {
     private const int RecentMessageCount = 20;
-    private const int PassageCount = 4;
-
-    // A full chart emits 30–40 signature matches, each pulling a passage.
-    // Sending all of them to the LLM bloats the prompt with low-relevance
-    // material. After topic-rerank we cap to the top slice — keeps tokens
-    // tight without losing the passages that actually answer the question.
-    private const int MaxChartPassagesWhenNoReading = 12;
-
-    // When a pre-composed chart reading is present, the reading already
-    // synthesises the corpus — so we only need a handful of topic-matched
-    // passages to let the model deepen the specific thread being asked
-    // about. Smaller cap here is intentional.
-    private const int MaxChartPassagesWhenReading = 6;
 
     public async IAsyncEnumerable<string> StreamResponseAsync(
         Guid userId,
@@ -156,138 +138,27 @@ public class ChatService(
         CancellationToken cancellationToken,
         string? currentMessage = null)
     {
-        // Determine conversation type up-front — chart conversations use a
-        // tighter, corpus-bounded prompt; pair conversations load BOTH the
-        // viewer's chart and the subject's chart plus the pre-composed pair
-        // reading; general conversations use the broader spiritual-companion
-        // prompt with full personal context.
-        var conversationMeta = await db.Conversations
-            .Where(c => c.Id == conversationId)
-            .Select(c => new { c.Type, c.SubjectUserId })
-            .FirstOrDefaultAsync(cancellationToken);
-        var conversationType = conversationMeta?.Type ?? ConversationType.General;
-        var subjectUserId = conversationMeta?.SubjectUserId;
-        var isChart = conversationType == ConversationType.Chart;
-        var isPair = conversationType == ConversationType.Pair && subjectUserId.HasValue;
-
-        // Pair chat is composed in its own dedicated path below — different
-        // prompt builder, two charts loaded, pair reading as substrate. Bail
-        // out of the standard path early so the chart/general logic stays
-        // single-purpose.
-        if (isPair)
-        {
-            return await BuildPairChatHistoryAsync(
-                userId, conversationId, subjectUserId!.Value, currentMessage, cancellationToken);
-        }
-
         // Load all context in parallel — each task is fault-tolerant so a single
-        // failure (e.g. embedding search) doesn't kill the entire conversation.
+        // failure doesn't kill the entire conversation.
         string? displayName = null;
         string? todaysReflection = null;
         IReadOnlyList<GoalSummaryDto> goalDtos = [];
-        JyotishContext? jyotish = null;
-        IReadOnlyList<JyotishPassage> passages = [];
 
         try
         {
-            // For chart conversations we skip goals and reflection context
-            // entirely — they dilute the corpus grounding and aren't what
-            // the person is asking about. Chart chat is Jyotish-only.
             var displayNameTask = profileQuery.GetDisplayNameAsync(userId, cancellationToken);
-            var jyotishTask = jyotishService.GetContextAsync(userId, DateOnly.FromDateTime(DateTime.UtcNow), cancellationToken);
+            var goalsTask = goalQuery.GetActiveGoalsForContextAsync(userId, ct: cancellationToken);
+            var reflectionTask = reflectionQuery.GetRecentReflectionAsync(userId, cancellationToken);
 
-            if (isChart)
-            {
-                await Task.WhenAll(displayNameTask, jyotishTask);
-                displayName = displayNameTask.Result;
-                jyotish = jyotishTask.Result;
-            }
-            else
-            {
-                var goalsTask = goalQuery.GetActiveGoalsForContextAsync(userId, ct: cancellationToken);
-                var reflectionTask = reflectionQuery.GetRecentReflectionAsync(userId, cancellationToken);
+            await Task.WhenAll(displayNameTask, goalsTask, reflectionTask);
 
-                await Task.WhenAll(displayNameTask, goalsTask, reflectionTask, jyotishTask);
-
-                displayName = displayNameTask.Result;
-                goalDtos = goalsTask.Result;
-                todaysReflection = reflectionTask.Result;
-                jyotish = jyotishTask.Result;
-            }
+            displayName = displayNameTask.Result;
+            goalDtos = goalsTask.Result;
+            todaysReflection = reflectionTask.Result;
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to load some context for conversation {ConversationId} — continuing with partial context", conversationId);
-        }
-
-        // Chart conversations read from the pre-composed chart reading when
-        // one exists. If no reading is cached yet, we skip it here (lazy-
-        // generating on every chat turn would be too expensive); the iOS
-        // chart page's GET /api/jyotish/reading triggers generation
-        // separately when the user opens the chart.
-        ChartReading? chartReading = null;
-        if (isChart)
-        {
-            try
-            {
-                chartReading = await chartReadingService.GetAsync(userId, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to load chart reading for conversation {ConversationId}", conversationId);
-            }
-        }
-
-        // Retrieve Jyotish passages. Chart conversations rely exclusively on
-        // signature-based retrieval from the user's actual chart. General
-        // conversations supplement with semantic search for thematic gaps.
-        try
-        {
-            var chartPassages = Array.Empty<JyotishPassage>() as IReadOnlyList<JyotishPassage>;
-            if (jyotish is not null)
-            {
-                var signatures = jyotish.DeriveSignatures().Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-                if (signatures.Count > 0)
-                    chartPassages = await jyotishKnowledge.GetPassagesAsync(signatures, cancellationToken);
-            }
-
-            IReadOnlyList<JyotishPassage> semanticPassages = Array.Empty<JyotishPassage>();
-            if (!isChart && !string.IsNullOrWhiteSpace(currentMessage))
-                semanticPassages = await jyotishKnowledge.SearchSemanticAsync(currentMessage, topK: PassageCount, ct: cancellationToken);
-
-            // Topic routing: on chart conversations, rerank chart passages so
-            // the ones matching the user's question topic bubble to the top.
-            // This is what makes "how does my chart say about investing?"
-            // prioritize wealth/career-house passages over, e.g., siblings.
-            if (isChart && !string.IsNullOrWhiteSpace(currentMessage) && chartPassages.Count > 0)
-                chartPassages = ChartTopicRouter.Rerank(currentMessage!, chartPassages);
-
-            // Cap chart passages to keep the prompt tight. When the pre-
-            // composed reading is present it already weaves the full corpus,
-            // so we only need a handful of topic-matched passages here; when
-            // no reading is cached we allow a wider slice so the model still
-            // has the tradition to speak from.
-            if (isChart && chartPassages.Count > 0)
-            {
-                var cap = chartReading is not null
-                    ? MaxChartPassagesWhenReading
-                    : MaxChartPassagesWhenNoReading;
-                if (chartPassages.Count > cap)
-                    chartPassages = chartPassages.Take(cap).ToList();
-            }
-
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var merged = new List<JyotishPassage>();
-            foreach (var p in chartPassages.Concat(semanticPassages))
-            {
-                if (seen.Add(p.Id))
-                    merged.Add(p);
-            }
-            passages = merged;
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Jyotish RAG retrieval failed for conversation {ConversationId} — continuing without passages", conversationId);
         }
 
         var goalContexts = goalDtos.Select(g => new GoalContext(
@@ -300,110 +171,10 @@ public class ChatService(
             IsCompleted: g.IsCompleted,
             DeeperWhy: g.DeeperWhy)).ToList();
 
-        var systemPrompt = isChart
-            ? SystemPrompt.ForChart(
-                displayName: displayName,
-                jyotish: jyotish,
-                jyotishPassages: passages,
-                reading: chartReading)
-            : SystemPrompt.WithContext(
-                displayName: displayName,
-                todaysReflection: todaysReflection,
-                goals: goalContexts,
-                jyotish: jyotish,
-                jyotishPassages: passages);
-
-        var history = new ChatHistory(systemPrompt);
-
-        var recentMessages = await db.Messages
-            .Where(m => m.ConversationId == conversationId)
-            .OrderByDescending(m => m.CreatedAt)
-            .Take(RecentMessageCount)
-            .OrderBy(m => m.CreatedAt)
-            .ToListAsync(cancellationToken);
-
-        foreach (var msg in recentMessages)
-        {
-            if (msg.Role == MessageRole.User)
-                history.AddUserMessage(msg.Content);
-            else
-                history.AddAssistantMessage(msg.Content);
-        }
-
-        return history;
-    }
-
-    private async Task<ChatHistory> BuildPairChatHistoryAsync(
-        Guid viewerUserId,
-        Guid conversationId,
-        Guid subjectUserId,
-        string? currentMessage,
-        CancellationToken cancellationToken)
-    {
-        // Load everything in parallel — each task is fault-tolerant so a
-        // single failure (e.g. embedding search) doesn't kill the convo.
-        var viewerNameTask = profileQuery.GetDisplayNameAsync(viewerUserId, cancellationToken);
-        var subjectNameTask = profileQuery.GetDisplayNameAsync(subjectUserId, cancellationToken);
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var viewerJyotishTask = jyotishService.GetContextAsync(viewerUserId, today, cancellationToken);
-        var subjectJyotishTask = jyotishService.GetContextAsync(subjectUserId, today, cancellationToken);
-        var pairReadingTask = pairReadingService.GetAsync(viewerUserId, subjectUserId, cancellationToken);
-
-        string? viewerName = null;
-        string subjectName = "your friend";
-        JyotishContext? viewerJyotish = null;
-        JyotishContext? subjectJyotish = null;
-        PairChartReading? pairReading = null;
-        try
-        {
-            await Task.WhenAll(viewerNameTask, subjectNameTask, viewerJyotishTask, subjectJyotishTask, pairReadingTask);
-            viewerName = viewerNameTask.Result;
-            subjectName = subjectNameTask.Result ?? subjectName;
-            viewerJyotish = viewerJyotishTask.Result;
-            subjectJyotish = subjectJyotishTask.Result;
-            pairReading = pairReadingTask.Result;
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex,
-                "Pair chat: partial context load for conversation {ConversationId}", conversationId);
-        }
-
-        // Passages: union of both chart's signatures, capped to keep the
-        // prompt tight. Topic-rerank against the current message so the
-        // passages most relevant to the question land first.
-        IReadOnlyList<JyotishPassage> passages = Array.Empty<JyotishPassage>();
-        try
-        {
-            var viewerSigs = viewerJyotish?.DeriveSignatures() ?? Enumerable.Empty<string>();
-            var subjectSigs = subjectJyotish?.DeriveSignatures() ?? Enumerable.Empty<string>();
-            var combined = viewerSigs.Concat(subjectSigs)
-                .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            if (combined.Count > 0)
-            {
-                var fetched = await jyotishKnowledge.GetPassagesAsync(combined, cancellationToken);
-                if (!string.IsNullOrWhiteSpace(currentMessage) && fetched.Count > 0)
-                    fetched = ChartTopicRouter.Rerank(currentMessage, fetched);
-                // Tighter cap than solo chart chat — pair chat is talking about
-                // a relationship, not delivering a label tour through both
-                // charts. The pair reading itself already weaves the corpus
-                // for the relational threads.
-                passages = fetched.Take(MaxChartPassagesWhenReading).ToList();
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex,
-                "Pair chat: passage retrieval failed for conversation {ConversationId}", conversationId);
-        }
-
-        var systemPrompt = SystemPrompt.ForPair(
-            viewerDisplayName: viewerName,
-            subjectDisplayName: subjectName,
-            viewer: viewerJyotish,
-            subject: subjectJyotish,
-            pairReading: pairReading,
-            jyotishPassages: passages);
+        var systemPrompt = SystemPrompt.WithContext(
+            displayName: displayName,
+            todaysReflection: todaysReflection,
+            goals: goalContexts);
 
         var history = new ChatHistory(systemPrompt);
 

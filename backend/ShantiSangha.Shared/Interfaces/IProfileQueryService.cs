@@ -4,8 +4,6 @@ public record UserTimezoneInfo(Guid UserId, string? Timezone);
 
 public record UserReminderInfo(Guid UserId, string? Timezone, int? ReminderHour);
 
-public record UserBirthInfo(DateOnly? BirthDate, string? BirthTime, string? BirthPlace);
-
 public record UserLocationInfo(string? Country, string? State, string? City);
 
 /// <summary>
@@ -30,12 +28,6 @@ public interface IProfileQueryService
     /// means "presign failed but we still know the key".
     /// </summary>
     Task<UserAvatarInfo> GetAvatarInfoAsync(Guid userId, CancellationToken ct = default);
-
-    /// <summary>
-    /// Returns birth details for Jyotish context computation.
-    /// Returns null fields if the user hasn't provided birth data.
-    /// </summary>
-    Task<UserBirthInfo> GetBirthInfoAsync(Guid userId, CancellationToken ct = default);
 
     /// <summary>
     /// Returns the user's Country / State / City for display on a friend's

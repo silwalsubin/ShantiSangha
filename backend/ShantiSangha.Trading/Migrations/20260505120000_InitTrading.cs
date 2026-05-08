@@ -23,18 +23,6 @@ namespace ShantiSangha.Trading.Migrations
                 CREATE UNIQUE INDEX IF NOT EXISTS ""IX_WatchlistItems_UserId_Ticker""
                     ON ""WatchlistItems"" (""UserId"", ""Ticker"");
 
-                CREATE TABLE IF NOT EXISTS ""StockNatalCharts"" (
-                    ""Ticker"" varchar(16) NOT NULL,
-                    ""IpoDate"" date NOT NULL,
-                    ""IpoTimeEt"" varchar(8) NULL,
-                    ""IpoLatitude"" double precision NOT NULL,
-                    ""IpoLongitude"" double precision NOT NULL,
-                    ""Exchange"" varchar(16) NOT NULL DEFAULT '',
-                    ""SignaturesJson"" jsonb NOT NULL DEFAULT '[]'::jsonb,
-                    ""ComputedAt"" timestamp with time zone NOT NULL,
-                    CONSTRAINT ""PK_StockNatalCharts"" PRIMARY KEY (""Ticker"")
-                );
-
                 CREATE TABLE IF NOT EXISTS ""TickerDailyCloses"" (
                     ""Ticker"" varchar(16) NOT NULL,
                     ""Date"" date NOT NULL,
@@ -54,7 +42,6 @@ namespace ShantiSangha.Trading.Migrations
                     ""Action"" varchar(8) NOT NULL,
                     ""Conviction"" double precision NOT NULL,
                     ""TechnicalScore"" double precision NOT NULL,
-                    ""AstroScore"" double precision NOT NULL,
                     ""CompositeScore"" double precision NOT NULL,
                     ""ReasoningJson"" jsonb NOT NULL DEFAULT '{}'::jsonb,
                     ""PriceAtSignal"" numeric(18,4) NULL,
@@ -75,7 +62,6 @@ namespace ShantiSangha.Trading.Migrations
             migrationBuilder.Sql(@"
                 DROP TABLE IF EXISTS ""TradingSignals"";
                 DROP TABLE IF EXISTS ""TickerDailyCloses"";
-                DROP TABLE IF EXISTS ""StockNatalCharts"";
                 DROP TABLE IF EXISTS ""WatchlistItems"";
             ");
         }

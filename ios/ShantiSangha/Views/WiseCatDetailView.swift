@@ -108,9 +108,6 @@ struct WiseCatDetailView: View {
                 Divider()
                     .background(Color.sacredMuted.opacity(0.2))
                 technicalBlock(read: read)
-                Divider()
-                    .background(Color.sacredMuted.opacity(0.2))
-                astroBlock(read: read, angles: signal?.astroAngles ?? [])
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(SacredSpacing.lux)
@@ -136,7 +133,7 @@ struct WiseCatDetailView: View {
         .frame(maxWidth: .infinity)
     }
 
-    // MARK: - Technical / Astro blocks
+    // MARK: - Technical block
 
     private func technicalBlock(read: HorizonRead) -> some View {
         // Sort by weight desc so the strategies driving this horizon's
@@ -150,7 +147,6 @@ struct WiseCatDetailView: View {
         return VStack(alignment: .leading, spacing: SacredSpacing.s) {
             sectionHeader(
                 title: "Technical",
-                weightInComposite: 0.6,
                 score: read.technicalScore
             )
 
@@ -182,41 +178,6 @@ struct WiseCatDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func astroBlock(read: HorizonRead, angles: [AstroAngleScore]) -> some View {
-        let stockChart = angles.first(where: { $0.angle == "stock_natal" })
-        let hasStockData = stockChart != nil
-            && !(stockChart?.highlights.first == "no data")
-            && !(stockChart?.highlights.isEmpty ?? true)
-
-        return VStack(alignment: .leading, spacing: SacredSpacing.s) {
-            sectionHeader(
-                title: "Astrological",
-                weightInComposite: 0.4,
-                score: read.astroScore
-            )
-
-            if let stockChart, hasStockData {
-                VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
-                    Text("Transits to \(ticker)'s IPO chart")
-                        .font(.sacredSmall)
-                        .foregroundColor(.sacredMuted)
-                    ForEach(stockChart.highlights, id: \.self) { h in
-                        Text("· \(h)")
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredMuted)
-                    }
-                }
-                .padding(.top, SacredSpacing.xxs)
-            } else {
-                Text("Today's read for this stock comes from your transits and the panchang — see Today's sky on the Stocks page.")
-                    .font(.sacredSmall)
-                    .foregroundColor(.sacredMuted)
-                    .padding(.top, SacredSpacing.xxs)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
     // MARK: - Helpers
 
     private func actionColor(_ action: WiseCatAction) -> Color {
@@ -233,20 +194,15 @@ struct WiseCatDetailView: View {
         return .sacredText
     }
 
-    private func sectionHeader(title: String, weightInComposite: Double, score: Double) -> some View {
-        VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(title)
-                    .font(.sacredSubheading)
-                    .foregroundColor(.sacredText)
-                Spacer()
-                Text(String(format: "%+.2f", score))
-                    .font(.sacredSubheading)
-                    .foregroundColor(scoreColor(score))
-            }
-            Text(String(format: "%.0f%% weight in composite", weightInComposite * 100))
-                .font(.sacredSmall)
-                .foregroundColor(.sacredMuted)
+    private func sectionHeader(title: String, score: Double) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title)
+                .font(.sacredSubheading)
+                .foregroundColor(.sacredText)
+            Spacer()
+            Text(String(format: "%+.2f", score))
+                .font(.sacredSubheading)
+                .foregroundColor(scoreColor(score))
         }
     }
 

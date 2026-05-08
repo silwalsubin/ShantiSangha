@@ -18,13 +18,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ShantiSangha.Shared\ShantiSangha.Shared.csproj" />
-    <ProjectReference Include="..\ShantiSangha.Jyotish\ShantiSangha.Jyotish.csproj" />
     <ProjectReference Include="..\ShantiSangha.Identity\ShantiSangha.Identity.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Update="Data\ipo_first_trades.csv">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
 </Project>

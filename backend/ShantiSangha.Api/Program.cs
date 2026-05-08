@@ -17,7 +17,6 @@ using ShantiSangha.Friends.Realtime;
 using ShantiSangha.Identity;
 using ShantiSangha.Goals;
 using ShantiSangha.Journal;
-using ShantiSangha.Jyotish;
 using ShantiSangha.Notifications;
 using ShantiSangha.Shared;
 using ShantiSangha.Trading;
@@ -100,7 +99,6 @@ try
     builder.Services.AddChatModule(vectorDataSource);
     builder.Services.AddJournalModule(vectorDataSource);
     builder.Services.AddWellnessModule(connStr, appConfig.VoiceBucketName);
-    builder.Services.AddJyotishModule(vectorDataSource);
     builder.Services.AddFriendsModule(connStr, appConfig.FriendsMediaBucketName, appConfig.RedisUrl);
     builder.Services.AddNotificationsModule(connStr);
 
@@ -120,7 +118,6 @@ try
         .AddApplicationPart(typeof(ShantiSangha.Chat.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Journal.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Wellness.DependencyInjection).Assembly)
-        .AddApplicationPart(typeof(ShantiSangha.Jyotish.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Friends.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Notifications.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Trading.DependencyInjection).Assembly)
@@ -253,7 +250,6 @@ try
         await sp.GetRequiredService<ShantiSangha.Chat.Data.ChatDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Journal.Data.JournalDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Wellness.Data.WellnessDbContext>().Database.MigrateAsync();
-        await sp.GetRequiredService<ShantiSangha.Jyotish.Data.JyotishDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Friends.Data.FriendsDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Notifications.Data.NotificationsDbContext>().Database.MigrateAsync();
         if (appConfig.WisecatEnabled)
@@ -267,12 +263,10 @@ try
         var chatDb = sp.GetRequiredService<ShantiSangha.Chat.Data.ChatDbContext>();
         await chatDb.Database.ExecuteSqlRawAsync(
             "ALTER TABLE \"Conversations\" ADD COLUMN IF NOT EXISTS \"Type\" text NOT NULL DEFAULT 'general';");
-        await chatDb.Database.ExecuteSqlRawAsync(
-            "ALTER TABLE \"Conversations\" ADD COLUMN IF NOT EXISTS \"SubjectUserId\" uuid NULL;");
 
-        // Insights has been retired. Drop its derived-data tables if they still
-        // exist in an older environment; these are safe to remove because no
-        // remaining domain owns or reads them.
+        // Astrology removal: drop the tables, columns, and the chart-pair
+        // conversation-routing column added during the Vedic-feature build.
+        // All idempotent (IF EXISTS) so this is safe to re-run on every deploy.
         var identityDb = sp.GetRequiredService<ShantiSangha.Identity.Data.IdentityDbContext>();
         await identityDb.Database.ExecuteSqlRawAsync(
             """
@@ -280,6 +274,40 @@ try
             DROP TABLE IF EXISTS "Summaries" CASCADE;
             ALTER TABLE IF EXISTS "Messages" DROP COLUMN IF EXISTS "Embedding";
             ALTER TABLE IF EXISTS "Journals" DROP COLUMN IF EXISTS "Embedding";
+
+            -- Vedic / Jyotish corpus + chart readings
+            DROP TABLE IF EXISTS "jyotish_passages" CASCADE;
+            DROP TABLE IF EXISTS "jyotish_readings" CASCADE;
+            DROP TABLE IF EXISTS "jyotish_pair_readings" CASCADE;
+
+            -- Per-friend birth-detail share grants (Vedic pair-reading feature)
+            DROP TABLE IF EXISTS "BirthDetailShares" CASCADE;
+
+            -- Daily Vedic reading (separate from DailyReflection, which stays)
+            DROP TABLE IF EXISTS "DailyReadings" CASCADE;
+
+            -- Per-stock IPO chart cache and per-horizon astro scores on signals
+            DROP TABLE IF EXISTS "StockNatalCharts" CASCADE;
+            ALTER TABLE IF EXISTS "TradingSignals"
+                DROP COLUMN IF EXISTS "AstroScore",
+                DROP COLUMN IF EXISTS "Astro1W",
+                DROP COLUMN IF EXISTS "Astro1M",
+                DROP COLUMN IF EXISTS "Astro1Y";
+
+            -- Pair-chat routing column on Conversations
+            ALTER TABLE IF EXISTS "Conversations" DROP COLUMN IF EXISTS "SubjectUserId";
+
+            -- User profile birth fields (used only for Jyotish chart computation)
+            ALTER TABLE IF EXISTS "Profiles"
+                DROP COLUMN IF EXISTS "BirthDate",
+                DROP COLUMN IF EXISTS "BirthTime",
+                DROP COLUMN IF EXISTS "BirthPlace";
+
+            -- Friends-side Person carries a contact birthday (BirthDate stays);
+            -- BirthTime/BirthPlace were Vedic-only.
+            ALTER TABLE IF EXISTS "Persons"
+                DROP COLUMN IF EXISTS "BirthTime",
+                DROP COLUMN IF EXISTS "BirthPlace";
             """);
 
     }
@@ -294,13 +322,6 @@ try
         // local timezone so first-open is instant.
         recurring.AddOrUpdate<ShantiSangha.Wellness.Jobs.ScheduleDailyReflectionsJob>(
             "pregenerate-daily-reflections",
-            job => job.RunAsync(),
-            "0 * * * *");
-
-        // Runs hourly; at midnight in each user's local timezone, generates
-        // today's Vedic daily reading so it's ready when they open the app.
-        recurring.AddOrUpdate<ShantiSangha.Wellness.Jobs.ScheduleDailyReadingsJob>(
-            "pregenerate-daily-readings",
             job => job.RunAsync(),
             "0 * * * *");
 
@@ -482,30 +503,6 @@ try
 
         jobs.Enqueue<ShantiSangha.Wellness.Jobs.GenerateDailyReflectionJob>(j => j.RunAsync(userId, (DateOnly?)null));
         return Results.Ok(new { triggered = "GenerateDailyReflectionJob", userId, deleted = existing.Count });
-    }).RequireAuthorization();
-
-    // Debug: Force-regenerate today's daily reading (deletes existing, re-enqueues job)
-    app.MapPost("/api/debug/hangfire/test-daily-reading", async (HttpContext ctx, IBackgroundJobClient jobs) =>
-    {
-        var currentUser = ctx.RequestServices.GetRequiredService<ShantiSangha.Shared.Interfaces.ICurrentUser>();
-        var user = await currentUser.GetAsync();
-        var userId = user!.Id;
-        var utcToday = DateOnly.FromDateTime(DateTime.UtcNow);
-        var yesterday = utcToday.AddDays(-1);
-        var tomorrow = utcToday.AddDays(1);
-
-        var wellnessDb = ctx.RequestServices.GetRequiredService<ShantiSangha.Wellness.Data.WellnessDbContext>();
-        var existing = await wellnessDb.DailyReadings
-            .Where(r => r.UserId == userId && r.Date >= yesterday && r.Date <= tomorrow)
-            .ToListAsync();
-        if (existing.Count > 0)
-        {
-            wellnessDb.DailyReadings.RemoveRange(existing);
-            await wellnessDb.SaveChangesAsync();
-        }
-
-        jobs.Enqueue<ShantiSangha.Wellness.Jobs.GenerateDailyReadingJob>(j => j.RunAsync(userId, (DateOnly?)null));
-        return Results.Ok(new { triggered = "GenerateDailyReadingJob", userId, deleted = existing.Count });
     }).RequireAuthorization();
 
     // Health check at root (no /api prefix)

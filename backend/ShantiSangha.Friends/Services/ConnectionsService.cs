@@ -104,8 +104,6 @@ public class ConnectionsService(
             UserId = null,
             DisplayName = (req.DisplayName ?? string.Empty).Trim(),
             BirthDate = req.BirthDate,
-            BirthTime = NullIfEmpty(req.BirthTime),
-            BirthPlace = NullIfEmpty(req.BirthPlace),
             PhoneNumber = NullIfEmpty(req.PhoneNumber),
             Email = NullIfEmpty(req.Email),
             Country = NullIfEmpty(req.Country),
@@ -231,12 +229,6 @@ public class ConnectionsService(
         if (req.ClearBirthDate == true) person.BirthDate = null;
         else if (req.BirthDate is not null) person.BirthDate = req.BirthDate;
 
-        if (req.ClearBirthTime == true) person.BirthTime = null;
-        else if (req.BirthTime is not null) person.BirthTime = NullIfEmpty(req.BirthTime);
-
-        if (req.ClearBirthPlace == true) person.BirthPlace = null;
-        else if (req.BirthPlace is not null) person.BirthPlace = NullIfEmpty(req.BirthPlace);
-
         if (req.ClearPhoneNumber == true) person.PhoneNumber = null;
         else if (req.PhoneNumber is not null) person.PhoneNumber = NullIfEmpty(req.PhoneNumber);
 
@@ -323,14 +315,11 @@ public class ConnectionsService(
             var displayName = await profileQuery.GetDisplayNameAsync(uid, ct) ?? p.DisplayName;
             var avatar = await profileQuery.GetAvatarInfoAsync(uid, ct);
             var location = await profileQuery.GetLocationAsync(uid, ct);
-            var birth = await profileQuery.GetBirthInfoAsync(uid, ct);
             return new PersonResponse(
                 p.Id,
                 p.UserId,
                 displayName,
-                birth.BirthDate,
-                birth.BirthTime,
-                birth.BirthPlace,
+                p.BirthDate,
                 p.PhoneNumber,
                 p.Email,
                 location.Country,
@@ -346,8 +335,6 @@ public class ConnectionsService(
             null,
             p.DisplayName,
             p.BirthDate,
-            p.BirthTime,
-            p.BirthPlace,
             p.PhoneNumber,
             p.Email,
             p.Country,

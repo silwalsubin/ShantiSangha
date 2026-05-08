@@ -11,14 +11,6 @@ public class Profile
     public bool NotifyOnFriendMessages { get; set; } = true;
     public bool OnboardingCompleted { get; set; }
 
-    // Birth details — used for invisible Vedic astrology context in reflections and chat.
-    // All optional. More data = richer context. Birth time enables nakshatra/lagna precision.
-    public DateOnly? BirthDate { get; set; }
-    /// <summary>Birth time as "HH:mm" in 24h format. Null = unknown (sun sign only).</summary>
-    public string? BirthTime { get; set; }
-    /// <summary>Birth place as "lat,lng" (e.g. "27.7172,85.3240"). Used for lagna/nakshatra calculation.</summary>
-    public string? BirthPlace { get; set; }
-
     // Where the user lives — captured by the LocationGate during onboarding.
     // Display strings sourced from MapKit/CoreLocation placemark fields:
     // `country`, `administrativeArea`, `locality`. All required (non-empty)
