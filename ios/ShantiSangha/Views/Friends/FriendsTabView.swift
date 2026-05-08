@@ -8,6 +8,7 @@ struct FriendsTabView: View {
     /// The main connection list moved to `circleVM`.
     @StateObject private var vm = FriendsViewModel()
     @StateObject private var circleVM = CircleViewModel()
+    @StateObject private var deepLinks = DeepLinkRouter.shared
     @State private var showShare = false
     @State private var shareItems: [Any] = []
     @State private var showAddLocal = false
@@ -214,10 +215,18 @@ struct FriendsTabView: View {
         .task {
             await vm.refresh()
             await circleVM.refresh()
+            // After cold-start refresh, retry any pending friend deep link.
+            // The push-tap handler may have set this before connections were
+            // loaded; without this, the deep link would only resolve once
+            // the user themselves changed something.
+            handlePendingFriendDeepLink(deepLinks.pendingFriendUserId)
         }
         .refreshable {
             await vm.refresh()
             await circleVM.refresh()
+        }
+        .onChange(of: deepLinks.pendingFriendUserId) { _, newValue in
+            handlePendingFriendDeepLink(newValue)
         }
         .sheet(isPresented: $showShare) { ShareSheet(items: shareItems) }
         .sheet(isPresented: $showAddLocal) {
@@ -592,6 +601,30 @@ struct FriendsTabView: View {
 
     private var inlineErrorMessage: String? {
         circleVM.errorMessage ?? vm.errorMessage
+    }
+
+    /// Resolves a pending "open this friend's profile" deep link by finding
+    /// the connection whose linked Person matches the userId and pushing its
+    /// detail. Called from both `.task` (after cold-start refresh) and
+    /// `.onChange` (live receipt during a session). If the userId isn't in
+    /// the current circle (e.g. the share arrived from a brand-new friend
+    /// added on the other device), kicks off a refresh and retries once.
+    private func handlePendingFriendDeepLink(_ pendingId: UUID?) {
+        guard let pendingId else { return }
+        if let conn = circleVM.connections.first(where: { $0.person.userId == pendingId }) {
+            navTarget = .detail(conn.id)
+            deepLinks.clearFriend()
+            return
+        }
+        Task {
+            await circleVM.refresh()
+            if let conn = circleVM.connections.first(where: { $0.person.userId == pendingId }) {
+                navTarget = .detail(conn.id)
+                deepLinks.clearFriend()
+            }
+            // If still missing after refresh, leave the field set so a
+            // later refresh (e.g. friendship_created push) can resolve it.
+        }
     }
 
     private func onInvite() async {

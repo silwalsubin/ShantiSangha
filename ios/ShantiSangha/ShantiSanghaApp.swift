@@ -129,6 +129,17 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
         let type = userInfo["type"] as? String ?? "unknown"
         AppLogger.shared.info("Push", "didReceive response: \(type)")
 
+        // Tap-time deep link: birth_details_shared opens the grantor's
+        // profile in the Friends tab. Other notification types continue to
+        // route through SilentPushHandler for the data refresh.
+        if type == "birth_details_shared",
+           let raw = userInfo["grantorUserId"] as? String,
+           let grantorId = UUID(uuidString: raw) {
+            Task { @MainActor in
+                DeepLinkRouter.shared.pendingFriendUserId = grantorId
+            }
+        }
+
         Task {
             await SilentPushHandler.handle(userInfo: userInfo)
         }

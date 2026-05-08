@@ -112,6 +112,13 @@ struct MainTabView: View {
         .onChange(of: selectedTab) { _, _ in
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
+        .onChange(of: deepLinks.pendingFriendUserId) { _, newValue in
+            // A pending friend deep link (e.g. birth_details_shared push tap)
+            // belongs in the Friends tab. The tab itself observes the same
+            // state and pushes the matching profile detail when its
+            // connections list resolves the user id to a connection row.
+            if newValue != nil { selectedTab = 3 }
+        }
         .onAppear { MotionManager.shared.start() }
         .onDisappear { MotionManager.shared.stop() }
     }
