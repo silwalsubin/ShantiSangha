@@ -256,60 +256,6 @@ try
         {
             await sp.GetRequiredService<ShantiSangha.Trading.Data.TradingDbContext>().Database.MigrateAsync();
         }
-
-        // Chat module has no EF migrations folder — schema was bootstrapped
-        // pre-migration-framework. Apply lightweight additive changes via
-        // idempotent SQL here until Chat gets a proper migration baseline.
-        var chatDb = sp.GetRequiredService<ShantiSangha.Chat.Data.ChatDbContext>();
-        await chatDb.Database.ExecuteSqlRawAsync(
-            "ALTER TABLE \"Conversations\" ADD COLUMN IF NOT EXISTS \"Type\" text NOT NULL DEFAULT 'general';");
-
-        // Astrology removal: drop the tables, columns, and the chart-pair
-        // conversation-routing column added during the Vedic-feature build.
-        // All idempotent (IF EXISTS) so this is safe to re-run on every deploy.
-        var identityDb = sp.GetRequiredService<ShantiSangha.Identity.Data.IdentityDbContext>();
-        await identityDb.Database.ExecuteSqlRawAsync(
-            """
-            DROP TABLE IF EXISTS "SavedInsights" CASCADE;
-            DROP TABLE IF EXISTS "Summaries" CASCADE;
-            ALTER TABLE IF EXISTS "Messages" DROP COLUMN IF EXISTS "Embedding";
-            ALTER TABLE IF EXISTS "Journals" DROP COLUMN IF EXISTS "Embedding";
-
-            -- Vedic / Jyotish corpus + chart readings
-            DROP TABLE IF EXISTS "jyotish_passages" CASCADE;
-            DROP TABLE IF EXISTS "jyotish_readings" CASCADE;
-            DROP TABLE IF EXISTS "jyotish_pair_readings" CASCADE;
-
-            -- Per-friend birth-detail share grants (Vedic pair-reading feature)
-            DROP TABLE IF EXISTS "BirthDetailShares" CASCADE;
-
-            -- Daily Vedic reading (separate from DailyReflection, which stays)
-            DROP TABLE IF EXISTS "DailyReadings" CASCADE;
-
-            -- Per-stock IPO chart cache and per-horizon astro scores on signals
-            DROP TABLE IF EXISTS "StockNatalCharts" CASCADE;
-            ALTER TABLE IF EXISTS "TradingSignals"
-                DROP COLUMN IF EXISTS "AstroScore",
-                DROP COLUMN IF EXISTS "Astro1W",
-                DROP COLUMN IF EXISTS "Astro1M",
-                DROP COLUMN IF EXISTS "Astro1Y";
-
-            -- Pair-chat routing column on Conversations
-            ALTER TABLE IF EXISTS "Conversations" DROP COLUMN IF EXISTS "SubjectUserId";
-
-            -- User profile birth fields (used only for Jyotish chart computation)
-            ALTER TABLE IF EXISTS "Profiles"
-                DROP COLUMN IF EXISTS "BirthDate",
-                DROP COLUMN IF EXISTS "BirthTime",
-                DROP COLUMN IF EXISTS "BirthPlace";
-
-            -- Friends-side Person carries a contact birthday (BirthDate stays);
-            -- BirthTime/BirthPlace were Vedic-only.
-            ALTER TABLE IF EXISTS "Persons"
-                DROP COLUMN IF EXISTS "BirthTime",
-                DROP COLUMN IF EXISTS "BirthPlace";
-            """);
-
     }
 
     // Recurring jobs — use the DI-resolved manager since static JobStorage.Current
