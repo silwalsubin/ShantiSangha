@@ -182,7 +182,9 @@ struct ConnectionDetailView: View {
 
     private var relationSection: some View {
         VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-            sectionLabel("CIRCLES")
+            sectionLabel(
+                "CIRCLES",
+                help: "Tag this person with one or more circles — Friend, Coworker, Family, anything you want.")
 
             SacredListCard {
                 VStack(spacing: 0) {
@@ -201,11 +203,6 @@ struct ConnectionDetailView: View {
                     }
                 }
             }
-
-            Text("Tag this person with one or more circles — Friend, Coworker, Family, anything you want.")
-                .font(.sacredMicro)
-                .foregroundColor(.sacredMuted)
-                .padding(.horizontal, 4)
 
             PrivateFootnote()
         }
@@ -233,7 +230,9 @@ struct ConnectionDetailView: View {
 
     private func datesSection(_ c: Connection) -> some View {
         VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-            sectionLabel("IMPORTANT DATES")
+            sectionLabel(
+                "IMPORTANT DATES",
+                help: "Birthday, anniversary, the day you met — anything you want to remember.")
             if c.dates.isEmpty {
                 emptyDatesPresets
             } else {
@@ -369,7 +368,9 @@ struct ConnectionDetailView: View {
 
     private var nicknameSection: some View {
         VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-            sectionLabel("NICKNAME")
+            sectionLabel(
+                "NICKNAME",
+                help: "Replaces their name everywhere on your end.")
 
             SacredListCard {
                 HStack(spacing: 10) {
@@ -389,11 +390,6 @@ struct ConnectionDetailView: View {
                     }
                 }
             }
-
-            Text("Replaces their name everywhere on your end.")
-                .font(.sacredMicro)
-                .foregroundColor(.sacredMuted)
-                .padding(.horizontal, 4)
 
             PrivateFootnote()
         }
@@ -533,11 +529,16 @@ struct ConnectionDetailView: View {
         .padding(.bottom, 10)
     }
 
-    private func sectionLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.sacredSectionLabel)
-            .foregroundColor(.sacredLabel)
-            .padding(.horizontal, 4)
+    private func sectionLabel(_ text: String, help: String? = nil) -> some View {
+        HStack(spacing: 4) {
+            Text(text)
+                .font(.sacredSectionLabel)
+                .foregroundColor(.sacredLabel)
+            if let help {
+                SectionHelpInfo(text: help)
+            }
+        }
+        .padding(.horizontal, 4)
     }
 
     // MARK: - Save flows
