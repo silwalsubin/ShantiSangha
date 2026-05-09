@@ -107,8 +107,22 @@ jobs:
           retrain workflow; python-deploy is dispatched explicitly in the
           next step (push events fired by GITHUB_TOKEN do not cascade)."
 
-          git push origin main
-          echo "committed=true" >> "$GITHUB_OUTPUT"
+          # Training takes ~4h; main may have advanced. Rebase the artifact
+          # commit onto fresh main and retry the push a few times to absorb
+          # races. Artifacts live in their own paths (models/gbm_*.joblib,
+          # data/context/*.parquet) so rebase has no conflict surface.
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git rebase origin/main || { git rebase --abort; exit 1; }
+            if git push origin main; then
+              echo "committed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Push attempt $attempt rejected — refetching and retrying"
+            sleep 5
+          done
+          echo "Push failed after 5 attempts" >&2
+          exit 1
 
       - name: Trigger python-deploy
         # Pushes made by GITHUB_TOKEN do not trigger downstream workflows
