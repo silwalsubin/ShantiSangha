@@ -10,8 +10,10 @@ struct ConnectionAttachmentsScreen: View {
 
     var body: some View {
         ScrollView {
+            // No horizontal padding here — the media grid renders edge-to-edge
+            // (Apple Photos aesthetic). The files / empty-state sections add
+            // their own horizontal padding internally.
             ConnectionAttachmentsView(connectionId: connectionId)
-                .padding(.horizontal, SacredSpacing.m)
                 .padding(.vertical, SacredSpacing.l)
         }
         .background(SacredBackground().ignoresSafeArea())

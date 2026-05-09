@@ -46,22 +46,32 @@ struct ConnectionAttachmentsView: View {
             }
             if !fileItems.isEmpty || !pendingFileItems.isEmpty {
                 filesSection
+                    .padding(.horizontal, SacredSpacing.m)
             }
             if attachments.isEmpty && pendingItems.isEmpty && didLoadOnce && !loading {
                 emptyCTA
-            }
-            if !attachments.isEmpty || !pendingItems.isEmpty {
-                addRow
+                    .padding(.horizontal, SacredSpacing.m)
             }
             if let errorMessage {
                 Text(errorMessage)
                     .font(.sacredMicro)
                     .foregroundColor(.sacredRed)
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, SacredSpacing.m)
             }
         }
         .task(id: connectionId) {
             await load()
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showAddSheet = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.sacredGold)
+                }
+            }
         }
         .sheet(isPresented: $showAddSheet) {
             SacredChoiceSheet(
@@ -131,19 +141,19 @@ struct ConnectionAttachmentsView: View {
     // MARK: - Sections
 
     private var mediaSection: some View {
-        VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-            sectionLabel("MEDIA")
-            LazyVGrid(columns: gridColumns, spacing: 4) {
-                ForEach(pendingMediaItems) { pending in
-                    PendingMediaTile(pending: pending)
-                }
-                ForEach(mediaItems) { item in
-                    MediaTile(
-                        attachment: item,
-                        isSavingOffline: savingOfflineIds.contains(item.id))
-                        .onTapGesture { mediaViewerTarget = item }
-                        .contextMenu { contextActions(for: item) }
-                }
+        // Edge-to-edge Apple-Photos-style grid: 3 cols, 2pt gutters, square
+        // tiles with no corner radius or border. The screen title carries
+        // the section name so we don't render an inline "MEDIA" header.
+        LazyVGrid(columns: gridColumns, spacing: 2) {
+            ForEach(pendingMediaItems) { pending in
+                PendingMediaTile(pending: pending)
+            }
+            ForEach(mediaItems) { item in
+                MediaTile(
+                    attachment: item,
+                    isSavingOffline: savingOfflineIds.contains(item.id))
+                    .onTapGesture { mediaViewerTarget = item }
+                    .contextMenu { contextActions(for: item) }
             }
         }
     }
@@ -174,32 +184,10 @@ struct ConnectionAttachmentsView: View {
         }
     }
 
-    private var addRow: some View {
-        Button {
-            showAddSheet = true
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "plus")
-                    .font(.system(size: 11, weight: .bold))
-                Text("Add media or files")
-                    .font(.sacredSmallSemibold)
-                Spacer()
-            }
-            .foregroundColor(.sacredGold)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.sacredGold.opacity(0.4), style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
     private var emptyCTA: some View {
+        // Screen title already says "Media & Files" — no inline section
+        // header needed. Empty state is its own focused moment.
         VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-            sectionLabel("MEDIA & FILES")
             SacredCard {
                 SacredEmptyState(
                     icon: "photo.on.rectangle.angled",
@@ -279,7 +267,9 @@ struct ConnectionAttachmentsView: View {
     }
 
     private var gridColumns: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: 4), count: 3)
+        // 3-column Apple-Photos grid. 2pt gutters match the LazyVGrid
+        // row spacing for a uniform tight checkerboard look.
+        Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
     }
 
     // MARK: - Derived state
@@ -538,10 +528,7 @@ private struct MediaTile: View {
         }
         .frame(maxWidth: .infinity)
         .aspectRatio(1, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.sacredGold.opacity(0.18), lineWidth: 0.5))
+        .clipped()
         .task(id: thumbnailTaskKey) {
             if let cached = cache.cachedThumbnail(for: attachment.id) {
                 thumbnail = cached
@@ -653,10 +640,7 @@ private struct PendingMediaTile: View {
         }
         .frame(maxWidth: .infinity)
         .aspectRatio(1, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(Color.sacredGold.opacity(0.18), lineWidth: 0.5))
+        .clipped()
     }
 
     @ViewBuilder
