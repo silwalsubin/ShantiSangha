@@ -26,7 +26,6 @@ struct ConnectionAttachmentsView: View {
     @State private var didLoadOnce = false
     @State private var errorMessage: String?
 
-    @State private var showAddDialog = false
     @State private var showPhotoPicker = false
     @State private var showFilePicker = false
     @State private var photoSelections: [PhotosPickerItem] = []
@@ -62,15 +61,6 @@ struct ConnectionAttachmentsView: View {
         }
         .task(id: connectionId) {
             await load()
-        }
-        .confirmationDialog(
-            "Add a keepsake",
-            isPresented: $showAddDialog,
-            titleVisibility: .visible
-        ) {
-            Button("Photo or video") { showPhotoPicker = true }
-            Button("File") { showFilePicker = true }
-            Button("Cancel", role: .cancel) {}
         }
         .photosPicker(
             isPresented: $showPhotoPicker,
@@ -168,8 +158,21 @@ struct ConnectionAttachmentsView: View {
     }
 
     private var addRow: some View {
-        Button {
-            showAddDialog = true
+        // SwiftUI Menu instead of a confirmationDialog-driven Button —
+        // confirmationDialog renders as a tail-anchored popover on iOS 26
+        // when triggered from inline buttons; Menu is the iOS-native pattern
+        // for "tap reveals choices" and reads cleanly as a dropdown.
+        Menu {
+            Button {
+                showPhotoPicker = true
+            } label: {
+                Label("Photo or video", systemImage: "photo")
+            }
+            Button {
+                showFilePicker = true
+            } label: {
+                Label("File", systemImage: "doc")
+            }
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "plus")
@@ -187,7 +190,6 @@ struct ConnectionAttachmentsView: View {
                     .stroke(Color.sacredGold.opacity(0.4), style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
     }
 
     private var emptyCTA: some View {
@@ -197,8 +199,8 @@ struct ConnectionAttachmentsView: View {
                 SacredEmptyState(
                     icon: "photo.on.rectangle.angled",
                     title: "Hold onto a moment.",
-                    subtitle: "Photos, videos, or files you want to remember about them.",
-                    actionLabel: "Add something") { showAddDialog = true }
+                    subtitle: "Photos and videos you want to remember about them.",
+                    actionLabel: "Add a photo") { showPhotoPicker = true }
             }
 
             PrivateFootnote()
