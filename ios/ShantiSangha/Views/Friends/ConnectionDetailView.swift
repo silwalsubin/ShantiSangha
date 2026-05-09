@@ -82,7 +82,7 @@ struct ConnectionDetailView: View {
             }
             .ignoresSafeArea()
         }
-        .navigationTitle("Profile")
+        .navigationTitle(connection?.displayLabel ?? "Profile")
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
         .onAppear { seedDrafts() }
