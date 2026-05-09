@@ -2,15 +2,13 @@ import SwiftUI
 
 /// Add / edit a single "important date" on a Connection — birthday,
 /// anniversary, day-we-met, etc. Free-form label paired with a date
-/// picker; preset label chips offered as a starting point so the
-/// fastest add is one tap.
+/// picker.
 ///
 /// The parent owns persistence; this sheet only collects the values
 /// and calls back via `onSave`. `onDelete` is non-nil only for the
 /// edit path so the destructive button stays out of the add flow.
 struct ConnectionDateEditSheet: View {
     let target: ConnectionDateEditTarget
-    let existing: [ConnectionDate]
     let onSave: (_ label: String, _ date: String) async -> Void
     let onDelete: (() async -> Void)?
 
@@ -22,16 +20,6 @@ struct ConnectionDateEditSheet: View {
     @State private var deleting = false
     @State private var didSeed = false
     @State private var showDeleteConfirm = false
-
-    /// Suggested labels — common picks shown as one-tap chips. Trim
-    /// out anything the user has already added to avoid suggesting
-    /// duplicates.
-    private let presets = ["Birthday", "Anniversary", "Day we met"]
-
-    private var availablePresets: [String] {
-        let inUse = Set(existing.map { $0.label.lowercased() })
-        return presets.filter { !inUse.contains($0.lowercased()) }
-    }
 
     private var canSave: Bool {
         !labelDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -93,31 +81,7 @@ struct ConnectionDateEditSheet: View {
                     .submitLabel(.done)
                     .textInputAutocapitalization(.sentences)
             }
-
-            if !target.isEditing && !availablePresets.isEmpty {
-                WrapHStack(spacing: 8, lineSpacing: 8) {
-                    ForEach(availablePresets, id: \.self) { preset in
-                        presetChip(preset)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 4)
-                .padding(.top, 4)
-            }
         }
-    }
-
-    private func presetChip(_ preset: String) -> some View {
-        Button { labelDraft = preset } label: {
-            Text(preset)
-                .font(.sacredSmallSemibold)
-                .foregroundColor(.sacredGold)
-                .padding(.horizontal, 12)
-                .frame(minHeight: 32)
-                .background(Capsule().fill(Color.sacredGold.opacity(0.12)))
-                .overlay(Capsule().stroke(Color.sacredGold.opacity(0.3), lineWidth: 1))
-        }
-        .buttonStyle(.plain)
     }
 
     private var dateSection: some View {

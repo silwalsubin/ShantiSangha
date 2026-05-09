@@ -76,7 +76,6 @@ struct ConnectionDetailView: View {
         .sheet(item: $dateEditTarget) { target in
             ConnectionDateEditSheet(
                 target: target,
-                existing: connection?.dates ?? [],
                 onSave: { label, date in
                     await saveDate(target: target, label: label, date: date)
                 },
