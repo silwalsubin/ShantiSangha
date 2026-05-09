@@ -69,12 +69,25 @@ struct Connection: Codable, Identifiable, Equatable, Hashable {
     let lastMessagePreview: String?
     let lastMessageAt: String?
     let unreadCount: Int
+    /// Owner-private "my version" avatar. When set, shadows the linked
+    /// `person.avatarUrl` everywhere the owner sees this connection;
+    /// the linked in-app person never sees it. Presigned GET URL — the
+    /// backend re-issues on every read so a list refresh keeps it live.
+    let privateAvatarUrl: String?
 
     /// What we render anywhere this connection's name shows up. Falls
     /// back to the Person's display name when no nickname is set.
     var displayLabel: String {
         if let n = nickname?.trimmingCharacters(in: .whitespaces), !n.isEmpty { return n }
         return person.displayName
+    }
+
+    /// Avatar URL the owner should see — owner-private one wins, falls
+    /// back to the linked Person's public avatar (or nil for locals
+    /// without one, in which case `SacredAvatar` shows initials).
+    var ownerVisibleAvatarUrl: String? {
+        if let p = privateAvatarUrl, !p.isEmpty { return p }
+        return person.avatarUrl
     }
 
     /// Comma-joined chip text. Empty string when the user hasn't tagged
@@ -111,8 +124,18 @@ struct UpdateConnectionRequest: Encodable {
     var circles: [String]? = nil
     var nickname: String? = nil
     var privateNotes: String? = nil
+    /// Owner-private avatar S3 key from the upload-url handshake.
+    /// nil = leave alone; pair with `clearPrivateAvatar = true` to drop.
+    var privateAvatarKey: String? = nil
     var clearNickname: Bool? = nil
     var clearPrivateNotes: Bool? = nil
+    var clearPrivateAvatar: Bool? = nil
+}
+
+struct CreateConnectionAvatarUploadResponse: Decodable {
+    let objectKey: String
+    let uploadUrl: String
+    let uploadUrlExpiresAt: String
 }
 
 struct AddConnectionDateRequest: Encodable {

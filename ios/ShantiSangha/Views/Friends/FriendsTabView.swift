@@ -688,7 +688,7 @@ private struct ConnectionRow: View {
             Button(action: onTapAvatar) {
                 SacredAvatar(
                     displayName: connection.displayLabel,
-                    avatarUrl: connection.person.avatarUrl,
+                    avatarUrl: connection.ownerVisibleAvatarUrl,
                     size: 40)
                     .frame(width: 44, height: 44)
             }

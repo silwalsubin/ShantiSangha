@@ -159,7 +159,11 @@ public record ConnectionResponse(
     IReadOnlyList<ConnectionDateResponse> Dates,
     string? LastMessagePreview,
     DateTime? LastMessageAt,
-    int UnreadCount);
+    int UnreadCount,
+    // Owner-private "my version" avatar; presigned GET URL re-issued on
+    // every read. Null when the owner hasn't set one — clients fall back
+    // to `Person.AvatarUrl` (in-app users) or initials (local persons).
+    string? PrivateAvatarUrl);
 
 /// Single owner-private "important date" attached to a Connection.
 /// Order in the parent list is Date ascending. `Recurrence` tells the
@@ -253,12 +257,28 @@ public record CreateConnectionRequest(
 /// Updates Connection-overlay fields only. Person fields go through
 /// `UpdatePersonRequest`. `Circles` is null = leave alone, [] = clear,
 /// otherwise replace. The other fields keep the existing Clear* pattern.
+/// `PrivateAvatarKey` is the owner-private avatar S3 key produced by
+/// the dedicated upload-url endpoint; the service swaps in the new key
+/// and deletes the old object out-of-band.
 public record UpdateConnectionRequest(
     IReadOnlyList<string>? Circles = null,
     string? Nickname = null,
     string? PrivateNotes = null,
+    string? PrivateAvatarKey = null,
     bool? ClearNickname = null,
-    bool? ClearPrivateNotes = null);
+    bool? ClearPrivateNotes = null,
+    bool? ClearPrivateAvatar = null);
+
+/// Step 1 of the per-Connection private-avatar upload handshake.
+/// Mirrors the attachment upload-url shape so the iOS layer can reuse
+/// the same orchestration helper, but the resulting key is committed
+/// via `PATCH /connections/{id}` (not a separate commit endpoint).
+public record CreateConnectionAvatarUploadRequest(string ContentType);
+
+public record CreateConnectionAvatarUploadResponse(
+    string ObjectKey,
+    string UploadUrl,
+    DateTime UploadUrlExpiresAt);
 
 /// Updates the underlying Person row (only allowed when caller owns
 /// the local Person OR Person.UserId == caller). Same Clear* pattern.

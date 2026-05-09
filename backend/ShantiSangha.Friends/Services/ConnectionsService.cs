@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using ShantiSangha.Friends.Contracts;
 using ShantiSangha.Friends.Data;
 using ShantiSangha.Friends.Models;
+using ShantiSangha.Friends.Storage;
 using ShantiSangha.Shared.Interfaces;
 
 namespace ShantiSangha.Friends.Services;
@@ -10,8 +12,23 @@ public class ConnectionsService(
     FriendsDbContext db,
     IFriendsService friends,
     IProfileQueryService profileQuery,
-    IConnectionAttachmentsService attachments) : IConnectionsService
+    IConnectionAttachmentsService attachments,
+    FriendsMediaStorage storage,
+    ILogger<ConnectionsService> logger) : IConnectionsService
 {
+    private static readonly TimeSpan AvatarUploadUrlLifetime = TimeSpan.FromMinutes(15);
+    private static readonly TimeSpan AvatarDownloadUrlLifetime = TimeSpan.FromHours(1);
+
+    private static readonly HashSet<string> AllowedAvatarContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/heic",
+        "image/heif",
+        "image/webp"
+    };
+
     public async Task<List<ConnectionResponse>> ListAsync(Guid userId, CancellationToken ct = default)
     {
         var rows = await db.Connections
@@ -178,6 +195,41 @@ public class ConnectionsService(
             conn.PrivateNotes = string.IsNullOrEmpty(req.PrivateNotes) ? null : req.PrivateNotes;
         }
 
+        // Avatar swap. Defense in depth: only accept keys that the
+        // dedicated upload-url endpoint could have produced for this
+        // (owner, connection) pair. When the key changes, fire-and-forget
+        // delete the previous S3 object so we don't accumulate orphans.
+        var previousAvatarKey = conn.PrivateAvatarKey;
+        if (req.ClearPrivateAvatar == true)
+        {
+            conn.PrivateAvatarKey = null;
+        }
+        else if (req.PrivateAvatarKey is not null)
+        {
+            var trimmedKey = req.PrivateAvatarKey.Trim();
+            if (trimmedKey.Length == 0)
+            {
+                conn.PrivateAvatarKey = null;
+            }
+            else
+            {
+                var expectedPrefix = $"connections/{userId}/{connectionId}/avatar/";
+                if (!trimmedKey.StartsWith(expectedPrefix, StringComparison.Ordinal))
+                {
+                    throw new FriendsServiceException(
+                        "forbidden",
+                        "Avatar key does not belong to this connection.");
+                }
+                conn.PrivateAvatarKey = trimmedKey;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(previousAvatarKey)
+            && previousAvatarKey != conn.PrivateAvatarKey)
+        {
+            _ = SafeDeleteAvatarAsync(previousAvatarKey);
+        }
+
         conn.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
 
@@ -248,17 +300,21 @@ public class ConnectionsService(
         // Sweep S3 keepsakes BEFORE the row cascade fires — once the
         // Connections rows are gone, we'd have nothing to read the
         // ObjectKeys from. For paired connections, both sides'
-        // attachments need to be purged because EndFriendshipAsync
-        // removes both Connection rows.
+        // attachments and private avatars need to be purged because
+        // EndFriendshipAsync removes both Connection rows.
         if (conn.FriendshipId is { } fsId)
         {
-            var pairedIds = await db.Connections
+            var paired = await db.Connections
                 .Where(c => c.FriendshipId == fsId)
-                .Select(c => c.Id)
+                .Select(c => new { c.Id, c.PrivateAvatarKey })
                 .ToListAsync(ct);
-            foreach (var id in pairedIds)
+            foreach (var p in paired)
             {
-                await attachments.PurgeForConnectionAsync(id, ct);
+                await attachments.PurgeForConnectionAsync(p.Id, ct);
+                if (!string.IsNullOrWhiteSpace(p.PrivateAvatarKey))
+                {
+                    _ = SafeDeleteAvatarAsync(p.PrivateAvatarKey);
+                }
             }
             // Paired: end the friendship — that path also removes both
             // Connection rows, which cascade-deletes the now-empty
@@ -268,6 +324,10 @@ public class ConnectionsService(
         }
 
         await attachments.PurgeForConnectionAsync(connectionId, ct);
+        if (!string.IsNullOrWhiteSpace(conn.PrivateAvatarKey))
+        {
+            _ = SafeDeleteAvatarAsync(conn.PrivateAvatarKey);
+        }
 
         // Local: removing the Connection cascades to the Person via
         // ON DELETE CASCADE.
@@ -385,6 +445,28 @@ public class ConnectionsService(
         var dateDtos = dates
             .Select(d => new ConnectionDateResponse(d.Id, d.Label, d.Date, d.Recurrence))
             .ToList();
+
+        // Fresh presigned GET URL on every read; never persist the URL
+        // because S3 expires it. Failures are non-fatal — the iOS layer
+        // will fall back to the linked Person avatar or initials.
+        string? privateAvatarUrl = null;
+        if (!string.IsNullOrWhiteSpace(conn.PrivateAvatarKey))
+        {
+            try
+            {
+                privateAvatarUrl = await storage.GetPresignedDownloadUrlAsync(
+                    conn.PrivateAvatarKey,
+                    AvatarDownloadUrlLifetime);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(
+                    ex,
+                    "Failed to presign private avatar for connection {ConnectionId}",
+                    conn.Id);
+            }
+        }
+
         return new ConnectionResponse(
             conn.Id,
             conn.OwnerUserId,
@@ -400,8 +482,59 @@ public class ConnectionsService(
             dateDtos,
             preview,
             sentAt,
-            unread);
+            unread,
+            privateAvatarUrl);
     }
+
+    public async Task<CreateConnectionAvatarUploadResponse?> CreateAvatarUploadUrlAsync(
+        Guid userId,
+        Guid connectionId,
+        CreateConnectionAvatarUploadRequest req,
+        CancellationToken ct = default)
+    {
+        var owns = await db.Connections
+            .AnyAsync(c => c.Id == connectionId && c.OwnerUserId == userId, ct);
+        if (!owns) return null;
+
+        var contentType = (req.ContentType ?? string.Empty).Trim();
+        if (!AllowedAvatarContentTypes.Contains(contentType))
+        {
+            throw new FriendsServiceException(
+                "unsupported_type",
+                "Avatar must be a JPEG, PNG, HEIC, or WebP image.");
+        }
+
+        var ext = ExtensionForAvatarContentType(contentType);
+        var key = $"connections/{userId}/{connectionId}/avatar/{Guid.NewGuid()}{ext}";
+        var url = await storage.GetPresignedUploadUrlAsync(key, contentType, AvatarUploadUrlLifetime);
+        return new CreateConnectionAvatarUploadResponse(
+            key,
+            url,
+            DateTime.UtcNow.Add(AvatarUploadUrlLifetime));
+    }
+
+    private async Task SafeDeleteAvatarAsync(string key)
+    {
+        try
+        {
+            await storage.DeleteAsync(key);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to delete superseded private avatar {Key}", key);
+        }
+    }
+
+    private static string ExtensionForAvatarContentType(string contentType) =>
+        contentType.ToLowerInvariant() switch
+        {
+            "image/jpeg" or "image/jpg" => ".jpg",
+            "image/png" => ".png",
+            "image/heic" => ".heic",
+            "image/heif" => ".heif",
+            "image/webp" => ".webp",
+            _ => string.Empty
+        };
 
     private async Task<IReadOnlyList<ConnectionDate>> LoadDatesAsync(
         Guid connectionId,

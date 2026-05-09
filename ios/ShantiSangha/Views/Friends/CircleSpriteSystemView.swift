@@ -883,7 +883,7 @@ final class PlanetSprite: SKNode {
         applyRecency(connection: connection)
         applyUnread(connection: connection)
         applyInAppBadge(connection: connection)
-        loadAvatarIfNeeded(url: connection.person.avatarUrl)
+        loadAvatarIfNeeded(url: connection.ownerVisibleAvatarUrl)
 
         lastConnection = connection
     }

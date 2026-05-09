@@ -276,7 +276,7 @@ struct FriendChatView: View {
                             message: msg,
                             fromFriend: vm.isFromFriend(msg),
                             friendDisplayName: currentConnection.displayLabel,
-                            friendAvatarUrl: currentConnection.person.avatarUrl,
+                            friendAvatarUrl: currentConnection.ownerVisibleAvatarUrl,
                             showAvatar: shouldShowAvatar(at: idx),
                             currentUserId: profile.currentUserId,
                             isHighlighted: highlightedMessageId == msg.id,

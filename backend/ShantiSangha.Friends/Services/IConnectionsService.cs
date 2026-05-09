@@ -63,4 +63,15 @@ public interface IConnectionsService
         Guid connectionId,
         Guid dateId,
         CancellationToken ct = default);
+
+    /// Step 1 of the owner-private avatar upload — hand back a
+    /// presigned PUT URL the client uses to ship JPEG bytes directly
+    /// to S3, plus the object key the client round-trips back via
+    /// `PATCH /connections/{id}` (PrivateAvatarKey field). Returns null
+    /// when the connection isn't owned by `userId`.
+    Task<CreateConnectionAvatarUploadResponse?> CreateAvatarUploadUrlAsync(
+        Guid userId,
+        Guid connectionId,
+        CreateConnectionAvatarUploadRequest req,
+        CancellationToken ct = default);
 }

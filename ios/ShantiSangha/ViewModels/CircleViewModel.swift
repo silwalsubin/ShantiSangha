@@ -162,6 +162,19 @@ final class CircleViewModel: ObservableObject {
         replaceInPlace(refreshed)
     }
 
+    /// Owner-private avatar for this connection. The upload returns the
+    /// refreshed `Connection` carrying a fresh presigned download URL,
+    /// so we splice it in place rather than re-fetching.
+    func uploadPrivateAvatar(connectionId: UUID, jpegData: Data) async throws {
+        let refreshed = try await ConnectionsAPI.uploadPrivateAvatar(connectionId, jpegData: jpegData)
+        replaceInPlace(refreshed)
+    }
+
+    func clearPrivateAvatar(connectionId: UUID) async throws {
+        let refreshed = try await ConnectionsAPI.clearPrivateAvatar(connectionId)
+        replaceInPlace(refreshed)
+    }
+
     private func replaceInPlace(_ updated: Connection) {
         if let i = connections.firstIndex(where: { $0.id == updated.id }) {
             connections[i] = updated

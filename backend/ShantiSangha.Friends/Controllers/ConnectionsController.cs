@@ -162,4 +162,30 @@ public class ConnectionsController(
         var ok = await service.DeleteDateAsync(user.Id, connectionId, dateId, ct);
         return ok ? NoContent() : NotFound();
     }
+
+    // ── Owner-private avatar ────────────────────────────────────────
+    // Step 1 of the avatar upload — hand back a presigned PUT URL the
+    // client uses to ship JPEG bytes directly to S3. Step 2 is the
+    // existing `PATCH /api/connections/{id}` with `PrivateAvatarKey`.
+    // Removal also goes through PATCH with `ClearPrivateAvatar = true`.
+
+    [HttpPost("{connectionId:guid}/avatar/upload-url")]
+    public async Task<IActionResult> CreateAvatarUploadUrl(
+        Guid connectionId,
+        [FromBody] CreateConnectionAvatarUploadRequest body,
+        CancellationToken ct)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+
+        try
+        {
+            var result = await service.CreateAvatarUploadUrlAsync(user.Id, connectionId, body, ct);
+            return result is null ? NotFound() : Ok(result);
+        }
+        catch (FriendsServiceException ex)
+        {
+            return UnprocessableEntity(new { error = ex.Code, message = ex.Message });
+        }
+    }
 }

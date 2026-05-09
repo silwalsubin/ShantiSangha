@@ -148,4 +148,44 @@ enum ConnectionsAPI {
             throw ApiError.invalidResponse
         }
     }
+
+    // ── Owner-private avatar ────────────────────────────────────────
+
+    /// Three-step private-avatar upload, mirroring `uploadAttachment`:
+    /// 1. Ask the backend for a presigned PUT URL.
+    /// 2. PUT JPEG bytes directly to S3.
+    /// 3. PATCH the connection with the new key (backend deletes the
+    ///    superseded S3 object out-of-band).
+    /// Returns the refreshed `Connection` so callers can update local
+    /// state with the new presigned download URL.
+    static func uploadPrivateAvatar(
+        _ connectionId: UUID,
+        jpegData data: Data
+    ) async throws -> Connection {
+        let upload: CreateConnectionAvatarUploadResponse = try await ApiService.shared.post(
+            "/connections/\(connectionId.uuidString.lowercased())/avatar/upload-url",
+            body: CreateConnectionAvatarUploadRequest(contentType: "image/jpeg"))
+
+        try await putAttachmentBytes(
+            uploadUrl: upload.uploadUrl,
+            contentType: "image/jpeg",
+            data: data)
+
+        return try await update(
+            connectionId,
+            request: UpdateConnectionRequest(privateAvatarKey: upload.objectKey))
+    }
+
+    /// Drops the owner-private avatar; the linked Person's public
+    /// avatar (if any) takes over again. The backend deletes the S3
+    /// object out-of-band.
+    static func clearPrivateAvatar(_ connectionId: UUID) async throws -> Connection {
+        try await update(
+            connectionId,
+            request: UpdateConnectionRequest(clearPrivateAvatar: true))
+    }
+}
+
+struct CreateConnectionAvatarUploadRequest: Encodable {
+    let contentType: String
 }

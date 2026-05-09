@@ -38,6 +38,12 @@ struct ConnectionDetailView: View {
     @State private var removing = false
     @State private var didSeed = false
 
+    // Owner-private avatar editor — confirmation dialog opens on tap,
+    // then routes into the shared `AvatarPickerBody` sheet.
+    @State private var showAvatarActionSheet = false
+    @State private var showAvatarPickerSheet = false
+    @State private var clearingPrivateAvatar = false
+
     // nil = sheet closed; .new = adding; .edit(id) = editing existing
     @State private var dateEditTarget: ConnectionDateEditTarget?
     @State private var datesExpanded = false
@@ -76,7 +82,7 @@ struct ConnectionDetailView: View {
             ZStack {
                 SacredBackground()
                 if let connection {
-                    AvatarBackdrop(avatarUrl: connection.person.avatarUrl)
+                    AvatarBackdrop(avatarUrl: connection.ownerVisibleAvatarUrl)
                 }
             }
             .ignoresSafeArea()
@@ -100,32 +106,115 @@ struct ConnectionDetailView: View {
                     ? { await deleteDate(target: target) }
                     : nil)
         }
+        .confirmationDialog(
+            "Private picture",
+            isPresented: $showAvatarActionSheet,
+            titleVisibility: .visible
+        ) {
+            Button("Change picture") { showAvatarPickerSheet = true }
+            if connection?.privateAvatarUrl != nil {
+                Button("Remove picture", role: .destructive) {
+                    Task { await removePrivateAvatar() }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(privateAvatarDialogMessage)
+        }
+        .sheet(isPresented: $showAvatarPickerSheet) {
+            privateAvatarPickerSheet
+        }
+    }
+
+    /// Phrasing for the confirmation dialog under the avatar — slightly
+    /// different copy for in-app vs. local connections so the user
+    /// understands what "private" means in each case.
+    private var privateAvatarDialogMessage: String {
+        guard let c = connection else { return "Only you can see this." }
+        return c.person.userId == nil
+            ? "Only you can see this."
+            : "Only you will see this. They'll keep showing as their normal photo."
+    }
+
+    @ViewBuilder
+    private var privateAvatarPickerSheet: some View {
+        if let c = connection {
+            NavigationStack {
+                ScrollView {
+                    AvatarPickerBody(
+                        initialAvatarUrl: c.ownerVisibleAvatarUrl,
+                        submitLabel: "Save private picture",
+                        upload: { data in
+                            try await vm.uploadPrivateAvatar(
+                                connectionId: c.id,
+                                jpegData: data)
+                        },
+                        onSaved: { showAvatarPickerSheet = false },
+                        footnote: AnyView(PrivateFootnote(privateAvatarDialogMessage))
+                    )
+                    .padding(.horizontal, SacredSpacing.m)
+                    .padding(.vertical, SacredSpacing.l)
+                }
+                .background(SacredBackground().ignoresSafeArea())
+                .navigationTitle("Private picture")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Cancel") { showAvatarPickerSheet = false }
+                    }
+                }
+            }
+        }
+    }
+
+    private func removePrivateAvatar() async {
+        guard let c = connection, !clearingPrivateAvatar else { return }
+        clearingPrivateAvatar = true
+        defer { clearingPrivateAvatar = false }
+        do {
+            try await vm.clearPrivateAvatar(connectionId: c.id)
+        } catch {
+            saveError = (error as? LocalizedError)?.errorDescription
+                ?? "We couldn't remove the picture. Try again."
+        }
     }
 
     // MARK: - Sections
 
     private func header(_ c: Connection) -> some View {
         VStack(spacing: SacredSpacing.s) {
-            ZStack(alignment: .bottomTrailing) {
-                SacredAvatar(
-                    displayName: c.person.displayName,
-                    avatarUrl: c.person.avatarUrl,
-                    size: 120)
+            // Tap-to-edit the owner-private avatar. The actual edit UI
+            // is a confirmation-dialog → sheet flow declared on the
+            // root view body so it doesn't replay header rebuilds.
+            Button {
+                showAvatarActionSheet = true
+            } label: {
+                ZStack(alignment: .bottomTrailing) {
+                    SacredAvatar(
+                        displayName: c.person.displayName,
+                        avatarUrl: c.ownerVisibleAvatarUrl,
+                        size: 120)
 
-                // Small gold atom overlay marks linked Persons (those with
-                // an actual ShantiSangha account, distinct from local
-                // contacts the user added by hand). Replaces the now-gone
-                // ABOUT THEM section's "they control this" disclosure.
-                if c.person.userId != nil {
-                    Image(systemName: "atom")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(.sacredGold)
-                        .frame(width: 28, height: 28)
-                        .background(Circle().fill(Color.sacredBg))
-                        .overlay(Circle().stroke(Color.sacredGold.opacity(0.5), lineWidth: 1.5))
-                        .offset(x: -4, y: -4)
+                    // Small gold atom overlay marks linked Persons (those with
+                    // an actual ShantiSangha account, distinct from local
+                    // contacts the user added by hand). Replaces the now-gone
+                    // ABOUT THEM section's "they control this" disclosure.
+                    if c.person.userId != nil {
+                        Image(systemName: "atom")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.sacredGold)
+                            .frame(width: 28, height: 28)
+                            .background(Circle().fill(Color.sacredBg))
+                            .overlay(Circle().stroke(Color.sacredGold.opacity(0.5), lineWidth: 1.5))
+                            .offset(x: -4, y: -4)
+                    }
                 }
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                c.privateAvatarUrl == nil
+                    ? "Add a private picture for this person"
+                    : "Change or remove your private picture for this person")
 
             Text(c.person.displayName)
                 .font(.sacredHeading)
