@@ -4,22 +4,39 @@ import Foundation
 /// inner = family, middle = close, outer = broader. Originally part of
 /// the RealityKit solar system; the SpriteKit view reuses the same
 /// taxonomy.
+///
+/// With circle tags being free-form, ring placement now goes by a
+/// known-name lookup: the historical defaults (Spouse, Parent, Child →
+/// inner; Sibling, Friend → middle) keep their orbits, anything else
+/// falls to the outer ring. A connection with multiple circles uses the
+/// innermost ring any of its circles maps to.
 enum SacredRing: Int, CaseIterable {
     case inner = 0
     case middle
     case outer
 
-    static func ring(for type: ConnectionType) -> SacredRing {
-        switch type {
-        case .spouse, .parent, .child: return .inner
-        case .sibling, .friend:        return .middle
-        case .colleague, .other:       return .outer
+    /// Resolve a single tag name to a ring. Case-insensitive.
+    static func ring(forCircleName name: String) -> SacredRing {
+        switch name.lowercased() {
+        case "spouse", "parent", "child", "family":
+            return .inner
+        case "sibling", "friend", "close":
+            return .middle
+        default:
+            return .outer
         }
     }
 
-    static func ring(forRawType raw: String) -> SacredRing {
-        let type = ConnectionType(rawValue: raw.lowercased()) ?? .other
-        return ring(for: type)
+    /// Pick the closest ring across a list of circle tags. Empty list
+    /// (a connection with no tags yet) falls to outer.
+    static func ring(forCircles circles: [String]) -> SacredRing {
+        var best: SacredRing = .outer
+        for name in circles {
+            let r = ring(forCircleName: name)
+            if r.rawValue < best.rawValue { best = r }
+            if best == .inner { return best }
+        }
+        return best
     }
 
     /// Angular speed in radians per second. Inner rings orbit faster
@@ -41,7 +58,7 @@ enum RingAssignment {
             .inner: [], .middle: [], .outer: [],
         ]
         for conn in connections {
-            let ring = SacredRing.ring(forRawType: conn.relationType)
+            let ring = SacredRing.ring(forCircles: conn.circles)
             buckets[ring, default: []].append(conn)
         }
         return buckets

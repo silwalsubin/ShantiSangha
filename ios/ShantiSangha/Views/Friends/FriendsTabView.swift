@@ -428,10 +428,20 @@ struct FriendsTabView: View {
         .overlay(Capsule().stroke(Color.sacredGold.opacity(0.12)))
     }
 
+    /// Static chips first, then the user's circles ranked by usage.
+    /// Capped at 6 dynamic chips so the row stays scrollable but doesn't
+    /// fan out into a wall of tags for someone with dozens of circles.
+    private var availableFilters: [CircleFilter] {
+        var filters: [CircleFilter] = [.all, .unread, .onApp, .local]
+        let topCircles = circleVM.circleCatalog.prefix(6).map { CircleFilter.circle($0.name) }
+        filters.append(contentsOf: topCircles)
+        return filters
+    }
+
     private var filterChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: SacredSpacing.xs) {
-                ForEach(CircleFilter.allCases) { filter in
+                ForEach(availableFilters, id: \.self) { filter in
                     Button {
                         withAnimation(.easeOut(duration: 0.2)) {
                             selectedFilter = filter
@@ -625,16 +635,16 @@ private struct CircleDirectoryEntry {
     let lastMessageDate: Date?
 }
 
-private enum CircleFilter: String, CaseIterable, Identifiable {
+/// Circle directory filter chips. The four `static` cases are always
+/// present; `.circle(name)` cases are auto-derived per session from the
+/// user's actual circle tags so the chip row reflects how *they*
+/// organize their people, not a hardcoded taxonomy.
+private enum CircleFilter: Hashable {
     case all
     case unread
     case onApp
     case local
-    case family
-    case close
-    case broader
-
-    var id: String { rawValue }
+    case circle(String)
 
     var label: String {
         switch self {
@@ -642,9 +652,7 @@ private enum CircleFilter: String, CaseIterable, Identifiable {
         case .unread: return "Unread"
         case .onApp: return "On app"
         case .local: return "Local"
-        case .family: return "Family"
-        case .close: return "Close"
-        case .broader: return "Broader"
+        case .circle(let name): return name
         }
     }
 
@@ -658,12 +666,10 @@ private enum CircleFilter: String, CaseIterable, Identifiable {
             return connection.messageable
         case .local:
             return connection.person.userId == nil
-        case .family:
-            return [.spouse, .parent, .child].contains(connection.parsedRelationType)
-        case .close:
-            return [.sibling, .friend].contains(connection.parsedRelationType)
-        case .broader:
-            return [.colleague, .other].contains(connection.parsedRelationType)
+        case .circle(let name):
+            return connection.circles.contains {
+                $0.caseInsensitiveCompare(name) == .orderedSame
+            }
         }
     }
 }
@@ -917,26 +923,23 @@ private struct OutgoingRequestRow: View {
 }
 
 private extension Connection {
-    var parsedRelationType: ConnectionType {
-        ConnectionType(rawValue: relationType.lowercased()) ?? .other
-    }
-
     func matchesCircleSearch(_ query: String) -> Bool {
-        [
+        let searchableStrings: [String?] = [
             displayLabel,
-            relationLabel,
+            circles.joined(separator: " "),
             person.locationString,
             person.city,
             person.state,
             person.country
         ]
-        .compactMap { $0 }
-        .contains { value in
-            value.range(
-                of: query,
-                options: [.caseInsensitive, .diacriticInsensitive]
-            ) != nil
-        }
+        return searchableStrings
+            .compactMap { $0 }
+            .contains { value in
+                value.range(
+                    of: query,
+                    options: [.caseInsensitive, .diacriticInsensitive]
+                ) != nil
+            }
     }
 }
 

@@ -84,7 +84,10 @@ struct CircleSpriteSystemView: View {
     }
 
     private func accessibilityLabel(for connection: Connection) -> String {
-        var parts: [String] = [connection.displayLabel, connection.relationLabel.lowercased()]
+        var parts: [String] = [connection.displayLabel]
+        if !connection.circlesLabel.isEmpty {
+            parts.append(connection.circlesLabel.lowercased())
+        }
         if connection.unreadCount > 0 {
             parts.append("\(connection.unreadCount) unread")
         }

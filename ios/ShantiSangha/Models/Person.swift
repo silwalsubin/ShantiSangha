@@ -30,36 +30,16 @@ struct Person: Codable, Identifiable, Equatable, Hashable {
     }
 }
 
-enum ConnectionType: String, Codable, CaseIterable, Identifiable {
-    case spouse, parent, sibling, child, friend, colleague, other
-
-    var id: String { rawValue }
-
-    /// Display label for the relation chip / picker. `other` is special
-    /// — the UI shows the user's `customRelationLabel` instead when set.
-    var label: String {
-        switch self {
-        case .spouse: return "Spouse"
-        case .parent: return "Parent"
-        case .sibling: return "Sibling"
-        case .child: return "Child"
-        case .friend: return "Friend"
-        case .colleague: return "Colleague"
-        case .other: return "Other"
-        }
-    }
-}
-
 /// Mirror of the backend `ConnectionResponse`. Each row in the user's
 /// circle. `messageable` is the boolean the iOS layer uses to gate the
 /// chat affordance — true iff `person.userId != nil` AND
-/// `friendshipId != nil`.
+/// `friendshipId != nil`. `circles` is the free-form tag set the owner
+/// has applied (empty array allowed — no labels yet).
 struct Connection: Codable, Identifiable, Equatable, Hashable {
     let id: UUID
     let ownerUserId: UUID
     let personId: UUID
-    let relationType: String
-    let customRelationLabel: String?
+    let circles: [String]
     let nickname: String?
     let privateNotes: String?
     let friendshipId: UUID?
@@ -78,19 +58,10 @@ struct Connection: Codable, Identifiable, Equatable, Hashable {
         return person.displayName
     }
 
-    /// User-facing chip text for the relation type. Custom label wins
-    /// when type is 'other' and a label is set; otherwise the enum's
-    /// localized label, or the raw string if it's an unknown enum.
-    var relationLabel: String {
-        if relationType.lowercased() == ConnectionType.other.rawValue,
-           let custom = customRelationLabel?.trimmingCharacters(in: .whitespaces),
-           !custom.isEmpty {
-            return custom
-        }
-        if let parsed = ConnectionType(rawValue: relationType.lowercased()) {
-            return parsed.label
-        }
-        return relationType.capitalized
+    /// Comma-joined chip text. Empty string when the user hasn't tagged
+    /// this connection yet — call sites should hide the chip in that case.
+    var circlesLabel: String {
+        circles.joined(separator: ", ")
     }
 
     /// Whether the viewer is allowed to edit the underlying Person
@@ -105,8 +76,7 @@ struct Connection: Codable, Identifiable, Equatable, Hashable {
 
 struct CreateConnectionRequest: Encodable {
     let displayName: String
-    let relationType: String
-    var customRelationLabel: String? = nil
+    var circles: [String]? = nil
     var nickname: String? = nil
     var privateNotes: String? = nil
     var birthDate: String? = nil
@@ -119,11 +89,10 @@ struct CreateConnectionRequest: Encodable {
 }
 
 struct UpdateConnectionRequest: Encodable {
-    var relationType: String? = nil
-    var customRelationLabel: String? = nil
+    /// nil = leave alone, [] = clear all circles, otherwise replace.
+    var circles: [String]? = nil
     var nickname: String? = nil
     var privateNotes: String? = nil
-    var clearCustomRelationLabel: Bool? = nil
     var clearNickname: Bool? = nil
     var clearPrivateNotes: Bool? = nil
 }

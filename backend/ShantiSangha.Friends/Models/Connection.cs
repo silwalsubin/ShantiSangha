@@ -6,13 +6,16 @@ namespace ShantiSangha.Friends.Models;
 /// pointing at the same mom Person), but the `(OwnerUserId, PersonId)`
 /// pair is unique. When `FriendshipId` is set the relationship is also
 /// messageable via the existing Friendship-conversation path.
+///
+/// `Circles` is a free-form, owner-defined tag set ("Family", "Coworker",
+/// "Yoga", etc.) — a person can belong to several circles at once. Empty
+/// is allowed (no labels yet). Stored as a Postgres `text[]`.
 public class Connection
 {
     public Guid Id { get; set; }
     public Guid OwnerUserId { get; set; }
     public Guid PersonId { get; set; }
-    public ConnectionType RelationType { get; set; }
-    public string? CustomRelationLabel { get; set; }
+    public string[] Circles { get; set; } = [];
     public string? Nickname { get; set; }
     public string? PrivateNotes { get; set; }
     public Guid? FriendshipId { get; set; }

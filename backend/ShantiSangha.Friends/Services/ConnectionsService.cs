@@ -95,8 +95,6 @@ public class ConnectionsService(
         CreateConnectionRequest req,
         CancellationToken ct = default)
     {
-        ValidateRelationType(req.RelationType, req.CustomRelationLabel);
-
         var now = DateTime.UtcNow;
         var person = new Person
         {
@@ -121,8 +119,7 @@ public class ConnectionsService(
             Id = Guid.NewGuid(),
             OwnerUserId = userId,
             PersonId = person.Id,
-            RelationType = ParseRelationType(req.RelationType),
-            CustomRelationLabel = NullIfEmpty(req.CustomRelationLabel)?.Trim(),
+            Circles = NormalizeCircles(req.Circles),
             Nickname = NullIfEmpty(req.Nickname)?.Trim(),
             PrivateNotes = string.IsNullOrEmpty(req.PrivateNotes) ? null : req.PrivateNotes,
             FriendshipId = null,
@@ -147,33 +144,12 @@ public class ConnectionsService(
             .FirstOrDefaultAsync(c => c.Id == connectionId && c.OwnerUserId == userId, ct);
         if (conn is null) return null;
 
-        if (req.RelationType is not null)
+        // null = leave alone, [] = clear, otherwise replace with the
+        // normalized set. Treating [] explicitly as "clear" keeps the
+        // contract symmetric with the iOS chip-input UX.
+        if (req.Circles is not null)
         {
-            conn.RelationType = ParseRelationType(req.RelationType);
-        }
-
-        if (req.ClearCustomRelationLabel == true)
-        {
-            conn.CustomRelationLabel = null;
-        }
-        else if (req.CustomRelationLabel is not null)
-        {
-            conn.CustomRelationLabel = NullIfEmpty(req.CustomRelationLabel)?.Trim();
-        }
-
-        // If the type ended up as Other, we need a custom label; if it
-        // ended up as anything else, the custom label is meaningless and
-        // gets dropped to keep the row consistent.
-        if (conn.RelationType == ConnectionType.Other &&
-            string.IsNullOrWhiteSpace(conn.CustomRelationLabel))
-        {
-            throw new FriendsServiceException(
-                "custom_relation_label_required",
-                "Pick a label for this 'Other' relationship.");
-        }
-        if (conn.RelationType != ConnectionType.Other)
-        {
-            conn.CustomRelationLabel = null;
+            conn.Circles = NormalizeCircles(req.Circles);
         }
 
         if (req.ClearNickname == true) conn.Nickname = null;
@@ -289,8 +265,7 @@ public class ConnectionsService(
             conn.Id,
             conn.OwnerUserId,
             conn.PersonId,
-            conn.RelationType.ToString().ToLowerInvariant(),
-            conn.CustomRelationLabel,
+            conn.Circles ?? [],
             conn.Nickname,
             conn.PrivateNotes,
             conn.FriendshipId,
@@ -346,22 +321,34 @@ public class ConnectionsService(
             null);
     }
 
-    private static void ValidateRelationType(string relationType, string? customLabel)
+    /// Trim, drop empties, dedupe case-insensitively (keep first-seen casing
+    /// so "Family" wins over "family"), cap label length at 64 chars and
+    /// the array at 16 entries — both are sanity bounds rather than product
+    /// rules; raise them later if the UX wants more headroom.
+    private static string[] NormalizeCircles(IReadOnlyList<string>? raw)
     {
-        var parsed = ParseRelationType(relationType);
-        if (parsed == ConnectionType.Other && string.IsNullOrWhiteSpace(customLabel))
-        {
-            throw new FriendsServiceException(
-                "custom_relation_label_required",
-                "Pick a label for this 'Other' relationship.");
-        }
-    }
+        if (raw is null || raw.Count == 0) return [];
 
-    private static ConnectionType ParseRelationType(string raw)
-    {
-        if (Enum.TryParse<ConnectionType>(raw, ignoreCase: true, out var ok)) return ok;
-        throw new FriendsServiceException("invalid_relation_type",
-            $"'{raw}' is not a valid relationship type.");
+        const int MaxCircles = 16;
+        const int MaxLabelLength = 64;
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new List<string>(Math.Min(raw.Count, MaxCircles));
+
+        foreach (var item in raw)
+        {
+            if (item is null) continue;
+            var trimmed = item.Trim();
+            if (trimmed.Length == 0) continue;
+            if (trimmed.Length > MaxLabelLength) trimmed = trimmed[..MaxLabelLength];
+            if (seen.Add(trimmed))
+            {
+                result.Add(trimmed);
+                if (result.Count >= MaxCircles) break;
+            }
+        }
+
+        return result.ToArray();
     }
 
     private static string? NullIfEmpty(string? s) =>

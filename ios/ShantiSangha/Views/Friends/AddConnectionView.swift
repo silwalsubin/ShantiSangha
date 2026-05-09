@@ -13,8 +13,8 @@ struct AddConnectionView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var name: String = ""
-    @State private var relationType: ConnectionType = .friend
-    @State private var customLabel: String = ""
+    @State private var circles: [String] = []
+    @State private var showCirclesPicker = false
     @State private var showOptional = false
     @State private var birthDate: Date?
     @State private var phone: String = ""
@@ -67,11 +67,7 @@ struct AddConnectionView: View {
 
     private var canSave: Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty { return false }
-        if relationType == .other && customLabel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return false
-        }
-        return true
+        return !trimmed.isEmpty
     }
 
     private var nameSection: some View {
@@ -91,32 +87,35 @@ struct AddConnectionView: View {
 
     private var relationSection: some View {
         VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-            sectionLabel("RELATIONSHIP")
+            sectionLabel("CIRCLES")
             SacredListCard {
-                VStack(spacing: 0) {
-                    Picker("Type", selection: $relationType) {
-                        ForEach(ConnectionType.allCases) { type in
-                            Text(type.label).tag(type)
+                CircleChipsRow(
+                    circles: circles,
+                    onRemove: { name in
+                        circles.removeAll {
+                            $0.caseInsensitiveCompare(name) == .orderedSame
                         }
-                    }
-                    .pickerStyle(.menu)
-                    .tint(.sacredGold)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    if relationType == .other {
-                        Divider().padding(.leading, 16)
-                        TextField("Custom label (e.g. neighbor, mentor)",
-                                  text: $customLabel)
-                            .font(.sacredText)
-                            .foregroundColor(.sacredText)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 14)
-                            .textInputAutocapitalization(.words)
-                    }
-                }
+                    },
+                    onAdd: { showCirclesPicker = true })
             }
+            Text("Tag this person with one or more circles — Friend, Coworker, Family, anything you want. Optional, you can add later.")
+                .font(.sacredMicro)
+                .foregroundColor(.sacredMuted)
+                .padding(.horizontal, 4)
+        }
+        .sheet(isPresented: $showCirclesPicker) {
+            CirclesPickerSheet(
+                catalog: vm.circleCatalog,
+                alreadyAdded: Set(circles),
+                onPick: { name in
+                    let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty
+                        && !circles.contains(where: { $0.caseInsensitiveCompare(trimmed) == .orderedSame }) {
+                        circles.append(trimmed)
+                    }
+                    showCirclesPicker = false
+                },
+                onCancel: { showCirclesPicker = false })
         }
     }
 
@@ -214,10 +213,7 @@ struct AddConnectionView: View {
         do {
             let req = CreateConnectionRequest(
                 displayName: name.trimmingCharacters(in: .whitespacesAndNewlines),
-                relationType: relationType.rawValue,
-                customRelationLabel: relationType == .other
-                    ? customLabel.trimmingCharacters(in: .whitespacesAndNewlines)
-                    : nil,
+                circles: circles.isEmpty ? nil : circles,
                 birthDate: birthDate.flatMap(formatISODate),
                 phoneNumber: phone.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
                 country: country.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,

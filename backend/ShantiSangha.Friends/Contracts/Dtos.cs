@@ -139,13 +139,13 @@ public record PersonResponse(
 /// The "how I know them" — owner-scoped relationship overlay. The
 /// embedded `Person` carries identity. `Messageable` is true iff
 /// `Person.UserId` is set AND `FriendshipId` is set; the iOS layer
-/// uses it to gate the chat affordance.
+/// uses it to gate the chat affordance. `Circles` is the free-form
+/// tag set the owner has applied (empty array allowed).
 public record ConnectionResponse(
     Guid Id,
     Guid OwnerUserId,
     Guid PersonId,
-    string RelationType,
-    string? CustomRelationLabel,
+    IReadOnlyList<string> Circles,
     string? Nickname,
     string? PrivateNotes,
     Guid? FriendshipId,
@@ -158,11 +158,12 @@ public record ConnectionResponse(
     int UnreadCount);
 
 /// Creates a local Person + Connection in one call. Backend sets
-/// `Person.UserId = NULL` and `Connection.FriendshipId = NULL`.
+/// `Person.UserId = NULL` and `Connection.FriendshipId = NULL`. An
+/// empty/missing `Circles` array is allowed — the user can label the
+/// connection later.
 public record CreateConnectionRequest(
     string DisplayName,
-    string RelationType,
-    string? CustomRelationLabel = null,
+    IReadOnlyList<string>? Circles = null,
     string? Nickname = null,
     string? PrivateNotes = null,
     DateOnly? BirthDate = null,
@@ -174,14 +175,12 @@ public record CreateConnectionRequest(
     string? Address = null);
 
 /// Updates Connection-overlay fields only. Person fields go through
-/// `UpdatePersonRequest`. Same Clear* pattern as the Identity service:
-/// null value = leave alone, clear-flag = true = set to null.
+/// `UpdatePersonRequest`. `Circles` is null = leave alone, [] = clear,
+/// otherwise replace. The other fields keep the existing Clear* pattern.
 public record UpdateConnectionRequest(
-    string? RelationType = null,
-    string? CustomRelationLabel = null,
+    IReadOnlyList<string>? Circles = null,
     string? Nickname = null,
     string? PrivateNotes = null,
-    bool? ClearCustomRelationLabel = null,
     bool? ClearNickname = null,
     bool? ClearPrivateNotes = null);
 

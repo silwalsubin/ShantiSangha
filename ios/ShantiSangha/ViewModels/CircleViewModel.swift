@@ -55,28 +55,48 @@ final class CircleViewModel: ObservableObject {
         return created
     }
 
+    /// `circles` follows the backend contract: nil = leave alone,
+    /// `[]` = clear, otherwise replace the full set.
     @discardableResult
     func updateOverlay(
         connectionId: UUID,
-        relationType: ConnectionType? = nil,
-        customRelationLabel: String? = nil,
+        circles: [String]? = nil,
         nickname: String? = nil,
         privateNotes: String? = nil,
-        clearCustomRelationLabel: Bool = false,
         clearNickname: Bool = false,
         clearPrivateNotes: Bool = false
     ) async throws -> Connection {
         let req = UpdateConnectionRequest(
-            relationType: relationType?.rawValue,
-            customRelationLabel: customRelationLabel,
+            circles: circles,
             nickname: nickname,
             privateNotes: privateNotes,
-            clearCustomRelationLabel: clearCustomRelationLabel ? true : nil,
             clearNickname: clearNickname ? true : nil,
             clearPrivateNotes: clearPrivateNotes ? true : nil)
         let updated = try await ConnectionsAPI.update(connectionId, request: req)
         replaceInPlace(updated)
         return updated
+    }
+
+    /// Union of every circle currently in use across the user's
+    /// connections, with the count of how many connections carry each
+    /// label. Drives the auto-derived filter chips on FriendsTabView and
+    /// the "existing circles" suggestions on the chip-input sheet.
+    /// Sorted by frequency desc, then name asc.
+    var circleCatalog: [(name: String, count: Int)] {
+        var counts: [String: Int] = [:]
+        for conn in connections {
+            for c in conn.circles {
+                let key = c.trimmingCharacters(in: .whitespaces)
+                guard !key.isEmpty else { continue }
+                counts[key, default: 0] += 1
+            }
+        }
+        return counts
+            .map { (name: $0.key, count: $0.value) }
+            .sorted { lhs, rhs in
+                if lhs.count != rhs.count { return lhs.count > rhs.count }
+                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+            }
     }
 
     @discardableResult

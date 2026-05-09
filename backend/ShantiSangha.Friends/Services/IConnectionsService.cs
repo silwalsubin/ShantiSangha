@@ -12,8 +12,7 @@ public interface IConnectionsService
     Task<ConnectionResponse?> GetAsync(Guid userId, Guid connectionId, CancellationToken ct = default);
 
     /// Creates a new local Person + Connection in one transaction.
-    /// `req.RelationType` must parse to `ConnectionType`; `Other`
-    /// requires `CustomRelationLabel`.
+    /// `req.Circles` is a free-form tag set; null/empty is allowed.
     Task<ConnectionResponse> CreateLocalAsync(
         Guid userId,
         CreateConnectionRequest req,

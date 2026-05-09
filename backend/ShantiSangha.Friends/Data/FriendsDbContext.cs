@@ -82,7 +82,11 @@ public class FriendsDbContext(DbContextOptions<FriendsDbContext> options) : DbCo
         mb.Entity<Connection>(e =>
         {
             e.ToTable("Connections");
-            e.Property(c => c.RelationType).HasConversion<string>();
+            // Postgres text[] — Npgsql maps string[] natively. The GIN
+            // index on `Circles` (defined in the migration) keeps
+            // ARRAY-contains queries cheap when the iOS layer derives
+            // filter chips from the union of in-use circle names.
+            e.Property(c => c.Circles).HasColumnType("text[]");
             e.HasIndex(c => c.OwnerUserId);
             e.HasIndex(c => new { c.OwnerUserId, c.PersonId }).IsUnique();
             e.HasIndex(c => c.FriendshipId);

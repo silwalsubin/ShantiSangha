@@ -1,6 +1,4 @@
 import SwiftUI
-import Contacts
-import ContactsUI
 
 /// Per-connection detail screen — shows Person identity at the top
 /// (real name, location, optional birthday/contact), then editable
@@ -20,8 +18,8 @@ struct ConnectionDetailView: View {
     // Connection overlay drafts
     @State private var nicknameDraft: String = ""
     @State private var notesDraft: String = ""
-    @State private var relationType: ConnectionType = .friend
-    @State private var customRelationDraft: String = ""
+    @State private var circlesDraft: [String] = []
+    @State private var showCirclesPicker = false
 
     // Person drafts (only used when canEditPerson is true)
     @State private var displayNameDraft: String = ""
@@ -40,9 +38,6 @@ struct ConnectionDetailView: View {
     @State private var showRemoveConfirm = false
     @State private var removing = false
     @State private var didSeed = false
-    @State private var contactToSave: ContactItem?
-    @State private var showContactPicker = false
-    @State private var linkedContact: LinkedContactSnapshot?
 
     private var connection: Connection? {
         vm.connections.first(where: { $0.id == connectionId })
@@ -58,9 +53,6 @@ struct ConnectionDetailView: View {
                 VStack(spacing: SacredSpacing.l) {
                     header(connection)
                     aboutSection(connection)
-                    if let linkedContact {
-                        linkedContactSection(linkedContact)
-                    }
                     relationSection
                     nicknameSection
                     notesSection
@@ -76,36 +68,8 @@ struct ConnectionDetailView: View {
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
-        .onAppear {
-            seedDrafts()
-            linkedContact = LinkedContactStore.snapshot(for: connectionId)
-        }
-        .onChange(of: connection?.id) { _, _ in
-            seedDrafts(force: true)
-            linkedContact = LinkedContactStore.snapshot(for: connectionId)
-        }
-        .sheet(item: $contactToSave) { item in
-            AddContactSheet(contact: item.contact) {
-                contactToSave = nil
-            }
-            .ignoresSafeArea()
-        }
-        .sheet(isPresented: $showContactPicker) {
-            ContactPickerSheet { picked in
-                showContactPicker = false
-                applyPickedContact(picked)
-            } onCancel: {
-                showContactPicker = false
-            }
-            .ignoresSafeArea()
-        }
-    }
-
-    /// Identifiable wrapper so the contact sheet can drive its presentation
-    /// via `.sheet(item:)` — `CNContact` doesn't conform to Identifiable.
-    private struct ContactItem: Identifiable {
-        let id = UUID()
-        let contact: CNContact
+        .onAppear { seedDrafts() }
+        .onChange(of: connection?.id) { _, _ in seedDrafts(force: true) }
     }
 
     // MARK: - Sections
@@ -122,155 +86,32 @@ struct ConnectionDetailView: View {
                 .foregroundColor(.sacredText)
                 .multilineTextAlignment(.center)
 
-            Text(c.relationLabel)
-                .font(.sacredMicroBold)
-                .foregroundColor(.sacredGold)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 3)
-                .background(Capsule().stroke(Color.sacredGold.opacity(0.3), lineWidth: 1))
+            if !c.circlesLabel.isEmpty {
+                Text(c.circlesLabel)
+                    .font(.sacredMicroBold)
+                    .foregroundColor(.sacredGold)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 3)
+                    .background(Capsule().stroke(Color.sacredGold.opacity(0.3), lineWidth: 1))
+            }
 
             headerActions(c)
                 .padding(.top, SacredSpacing.xs)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, SacredSpacing.m)
+        .background(AvatarBackdrop(avatarUrl: c.person.avatarUrl))
     }
 
     @ViewBuilder
     private func headerActions(_ c: Connection) -> some View {
-        HStack(spacing: SacredSpacing.s) {
-            if c.messageable {
-                NavigationLink(destination: FriendChatView(connection: c, circleVM: vm)) {
-                    HeaderActionPill(icon: "bubble.left.and.bubble.right", label: "Message")
-                }
-                .buttonStyle(.plain)
-            }
-
-            Button {
-                contactToSave = ContactItem(contact: contactFromPerson(c.person, displayLabel: c.displayLabel))
-            } label: {
-                HeaderActionPill(icon: "person.crop.circle.badge.plus", label: "Save")
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                showContactPicker = true
-            } label: {
-                HeaderActionPill(
-                    icon: linkedContact == nil ? "link" : "link.circle.fill",
-                    label: linkedContact == nil ? "Link" : "Linked")
+        if c.messageable {
+            NavigationLink(destination: FriendChatView(connection: c, circleVM: vm)) {
+                HeaderActionPill(icon: "bubble.left.and.bubble.right", label: "Message")
             }
             .buttonStyle(.plain)
         }
-    }
-
-    /// Snapshots the picked iPhone contact's fields into local storage,
-    /// keyed by this connection's id. Never touches the backend Person
-    /// record — paired ShantiSangha users own their own data, and even
-    /// for local persons we prefer to keep "your view" of someone
-    /// separate from "what they share".
-    private func applyPickedContact(_ contact: CNContact) {
-        let snapshot = LinkedContactSnapshot(from: contact)
-        LinkedContactStore.setSnapshot(snapshot, for: connectionId)
-        linkedContact = snapshot
-    }
-
-    private func unlinkContact() {
-        LinkedContactStore.setSnapshot(nil, for: connectionId)
-        linkedContact = nil
-    }
-
-    @ViewBuilder
-    private func linkedContactSection(_ snapshot: LinkedContactSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-            sectionLabel("LINKED CONTACT")
-
-            SacredListCard {
-                VStack(spacing: 0) {
-                    readOnlyRow("Name", value: snapshot.fullName)
-                    if let phone = snapshot.phoneNumber {
-                        Divider().padding(.leading, 16)
-                        readOnlyRow("Phone", value: phone)
-                    }
-                    if let email = snapshot.email {
-                        Divider().padding(.leading, 16)
-                        readOnlyRow("Email", value: email)
-                    }
-                    if let address = snapshot.address {
-                        Divider().padding(.leading, 16)
-                        readOnlyRow("Address", value: address)
-                    }
-                    if let bd = snapshot.birthDate {
-                        Divider().padding(.leading, 16)
-                        readOnlyRow("Birthday", value: bd)
-                    }
-
-                    Divider().padding(.leading, 16)
-                    Button { unlinkContact() } label: {
-                        Text("Unlink contact")
-                            .font(.sacredTextMedium)
-                            .foregroundColor(.sacredRed)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
-                }
-            }
-
-            Text("Only you see this — pulled from your iPhone contacts and stored on this device.")
-                .font(.sacredMicro)
-                .foregroundColor(.sacredMuted)
-                .padding(.horizontal, SacredSpacing.xs)
-        }
-    }
-
-    private func contactFromPerson(_ person: Person, displayLabel: String) -> CNContact {
-        let contact = CNMutableContact()
-
-        let parts = displayLabel.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
-        contact.givenName = parts.first.map(String.init) ?? displayLabel
-        if parts.count > 1 { contact.familyName = String(parts[1]) }
-
-        if let phone = person.phoneNumber?.trimmingCharacters(in: .whitespacesAndNewlines), !phone.isEmpty {
-            contact.phoneNumbers = [
-                CNLabeledValue(label: CNLabelPhoneNumberMain, value: CNPhoneNumber(stringValue: phone))
-            ]
-        }
-
-        if let email = person.email?.trimmingCharacters(in: .whitespacesAndNewlines), !email.isEmpty {
-            contact.emailAddresses = [
-                CNLabeledValue(label: CNLabelHome, value: email as NSString)
-            ]
-        }
-
-        let street = person.address?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let city = person.city?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let state = person.state?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let country = person.country?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if !(street.isEmpty && city.isEmpty && state.isEmpty && country.isEmpty) {
-            let addr = CNMutablePostalAddress()
-            addr.street = street
-            addr.city = city
-            addr.state = state
-            addr.country = country
-            contact.postalAddresses = [
-                CNLabeledValue(label: CNLabelHome, value: addr)
-            ]
-        }
-
-        if let bd = person.birthDate {
-            let df = DateFormatter()
-            df.dateFormat = "yyyy-MM-dd"
-            df.locale = Locale(identifier: "en_US_POSIX")
-            df.timeZone = TimeZone(secondsFromGMT: 0)
-            if let date = df.date(from: bd) {
-                contact.birthday = Calendar(identifier: .gregorian)
-                    .dateComponents([.year, .month, .day], from: date)
-            }
-        }
-
-        return contact
     }
 
     @ViewBuilder
@@ -323,72 +164,51 @@ struct ConnectionDetailView: View {
 
     private var relationSection: some View {
         VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-            sectionLabel("RELATIONSHIP")
+            sectionLabel("CIRCLES")
 
             SacredListCard {
                 VStack(spacing: 0) {
-                    Menu {
-                        // Pinned-down menu items, with a checkmark on the
-                        // current selection so the open menu reads like a
-                        // sacred-styled list rather than a system Picker.
-                        ForEach(ConnectionType.allCases) { type in
-                            Button {
-                                relationType = type
-                                // Custom-label reset is handled server-side when
-                                // type moves away from .other; sending the change
-                                // immediately keeps the row consistent without
-                                // waiting for a separate save action.
-                                Task { await saveRelation() }
-                            } label: {
-                                if relationType == type {
-                                    Label(type.label, systemImage: "checkmark")
-                                } else {
-                                    Text(type.label)
-                                }
+                    CircleChipsRow(
+                        circles: circlesDraft,
+                        onRemove: { name in
+                            circlesDraft.removeAll {
+                                $0.caseInsensitiveCompare(name) == .orderedSame
                             }
-                        }
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "person.2.fill")
-                                .font(.sacredSmallSemibold)
-                                .foregroundColor(.sacredGold)
-                                .frame(width: 28, height: 28)
-                                .background(Circle().fill(Color.sacredGold.opacity(0.12)))
-
-                            Text(relationType.label)
-                                .font(.sacredTextSemibold)
-                                .foregroundColor(.sacredText)
-
-                            Spacer(minLength: 4)
-
-                            Image(systemName: "chevron.up.chevron.down")
-                                .font(.sacredMicro)
-                                .foregroundColor(.sacredMuted)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-
-                    if relationType == .other {
-                        Divider().padding(.leading, 16)
-                        TextField("Custom label (e.g. neighbor, mentor)",
-                                  text: $customRelationDraft)
-                            .font(.sacredText)
-                            .foregroundColor(.sacredText)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 14)
-                            .submitLabel(.done)
-                            .onSubmit { Task { await saveRelation() } }
-                    }
+                            Task { await saveCircles() }
+                        },
+                        onAdd: { showCirclesPicker = true })
 
                     if savingRelation {
                         savingFooter
                     }
                 }
             }
+
+            Text("Tag this person with one or more circles — Friend, Coworker, Family, anything you want.")
+                .font(.sacredMicro)
+                .foregroundColor(.sacredMuted)
+                .padding(.horizontal, 4)
         }
+        .sheet(isPresented: $showCirclesPicker) {
+            CirclesPickerSheet(
+                catalog: vm.circleCatalog,
+                alreadyAdded: Set(circlesDraft),
+                onPick: { name in
+                    addCircle(name)
+                    showCirclesPicker = false
+                },
+                onCancel: { showCirclesPicker = false })
+        }
+    }
+
+    private func addCircle(_ name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        if circlesDraft.contains(where: { $0.caseInsensitiveCompare(trimmed) == .orderedSame }) {
+            return
+        }
+        circlesDraft.append(trimmed)
+        Task { await saveCircles() }
     }
 
     private var nicknameSection: some View {
@@ -607,8 +427,7 @@ struct ConnectionDetailView: View {
         guard !didSeed || force else { return }
         nicknameDraft = c.nickname ?? ""
         notesDraft = c.privateNotes ?? ""
-        relationType = ConnectionType(rawValue: c.relationType.lowercased()) ?? .friend
-        customRelationDraft = c.customRelationLabel ?? ""
+        circlesDraft = c.circles
         displayNameDraft = c.person.displayName
         birthDateDraft = parseISODate(c.person.birthDate)
         phoneDraft = c.person.phoneNumber ?? ""
@@ -667,33 +486,18 @@ struct ConnectionDetailView: View {
         }
     }
 
-    private func saveRelation() async {
+    private func saveCircles() async {
         guard let c = connection else { return }
+        if c.circles.elementsEqual(circlesDraft, by: { $0 == $1 }) { return }
         savingRelation = true
         defer { savingRelation = false }
         do {
-            let label: String?
-            let clearLabel: Bool
-            if relationType == .other {
-                let trimmed = customRelationDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-                if trimmed.isEmpty {
-                    // Don't push an "other" with no label — backend would 422.
-                    return
-                }
-                label = trimmed
-                clearLabel = false
-            } else {
-                label = nil
-                clearLabel = c.customRelationLabel != nil
-            }
             _ = try await vm.updateOverlay(
                 connectionId: c.id,
-                relationType: relationType,
-                customRelationLabel: label,
-                clearCustomRelationLabel: clearLabel)
+                circles: circlesDraft)
             saveError = nil
         } catch {
-            saveError = "Couldn't update relationship. Try again."
+            saveError = "Couldn't update circles. Try again."
         }
     }
 
@@ -777,91 +581,42 @@ private extension String {
     }
 }
 
-/// Snapshot of an iPhone contact taken at link time. Persisted on
-/// device only — nothing flows to the backend, so paired users'
-/// records stay untouched.
-private struct LinkedContactSnapshot: Codable, Equatable {
-    let identifier: String
-    let givenName: String
-    let familyName: String
-    let phoneNumber: String?
-    let email: String?
-    let address: String?
-    let birthDate: String?
+/// Soft, blurred bloom of the connection's avatar painted behind the header.
+/// Faded out via a radial mask so the warm sacred background still shows
+/// through at the edges — the photo reads as ambient atmosphere, not a
+/// second image.
+private struct AvatarBackdrop: View {
+    let avatarUrl: String?
+    @State private var image: UIImage?
 
-    var fullName: String {
-        let parts = [givenName, familyName]
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        return parts.isEmpty ? "Linked contact" : parts.joined(separator: " ")
-    }
-
-    init(from contact: CNContact) {
-        self.identifier = contact.identifier
-        self.givenName = contact.givenName
-        self.familyName = contact.familyName
-
-        let phone = contact.phoneNumbers.first?.value.stringValue
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        self.phoneNumber = (phone?.isEmpty == false) ? phone : nil
-
-        let mail = (contact.emailAddresses.first?.value as String?)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        self.email = (mail?.isEmpty == false) ? mail : nil
-
-        if let pa = contact.postalAddresses.first?.value {
-            let parts = [pa.street, pa.city, pa.state, pa.country]
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
-            self.address = parts.isEmpty ? nil : parts.joined(separator: ", ")
-        } else {
-            self.address = nil
+    var body: some View {
+        GeometryReader { geo in
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .blur(radius: 50)
+                    .opacity(0.22)
+                    .mask {
+                        RadialGradient(
+                            colors: [.black, .black.opacity(0.55), .clear],
+                            center: .center,
+                            startRadius: 20,
+                            endRadius: max(geo.size.width, geo.size.height) * 0.55)
+                    }
+            }
         }
-
-        if let bd = contact.birthday,
-           let date = Calendar(identifier: .gregorian).date(from: bd) {
-            let f = DateFormatter()
-            f.dateFormat = "yyyy-MM-dd"
-            f.locale = Locale(identifier: "en_US_POSIX")
-            f.timeZone = TimeZone(secondsFromGMT: 0)
-            self.birthDate = f.string(from: date)
-        } else {
-            self.birthDate = nil
-        }
-    }
-}
-
-/// Per-connection iPhone-contact links, persisted in UserDefaults as
-/// a single JSON-encoded `[connectionId: snapshot]` blob. Local-only
-/// — nothing here ever leaves the device.
-private enum LinkedContactStore {
-    private static let key = "linked_contacts_v1"
-
-    static func snapshot(for connectionId: UUID) -> LinkedContactSnapshot? {
-        loadAll()[connectionId.uuidString]
-    }
-
-    static func setSnapshot(_ snapshot: LinkedContactSnapshot?,
-                            for connectionId: UUID) {
-        var dict = loadAll()
-        if let snapshot {
-            dict[connectionId.uuidString] = snapshot
-        } else {
-            dict.removeValue(forKey: connectionId.uuidString)
-        }
-        save(dict)
-    }
-
-    private static func loadAll() -> [String: LinkedContactSnapshot] {
-        guard let data = UserDefaults.standard.data(forKey: key),
-              let dict = try? JSONDecoder().decode([String: LinkedContactSnapshot].self, from: data)
-        else { return [:] }
-        return dict
-    }
-
-    private static func save(_ dict: [String: LinkedContactSnapshot]) {
-        if let data = try? JSONEncoder().encode(dict) {
-            UserDefaults.standard.set(data, forKey: key)
+        .clipped()
+        .allowsHitTesting(false)
+        .task(id: avatarUrl) {
+            guard let urlString = avatarUrl,
+                  !urlString.isEmpty,
+                  let url = URL(string: urlString) else {
+                image = nil
+                return
+            }
+            image = await AvatarImageCache.shared.image(for: url)
         }
     }
 }
@@ -886,71 +641,145 @@ private struct HeaderActionPill: View {
     }
 }
 
-/// Wraps `CNContactPickerViewController` so the user can pick an
-/// existing iPhone contact. iOS hands back a `CNContact` with only
-/// the keys we ask for — no permission prompt is needed for the
-/// picker itself; the system gates field access via the picker.
-private struct ContactPickerSheet: UIViewControllerRepresentable {
-    let onPick: (CNContact) -> Void
-    let onCancel: () -> Void
+/// Horizontal flow of circle chips with an "+ Add circle" trailing pill.
+/// Each chip has an ✕ that fires `onRemove`. Tapping the add pill fires
+/// `onAdd` so the parent can present `CirclesPickerSheet`.
+struct CircleChipsRow: View {
+    let circles: [String]
+    let onRemove: (String) -> Void
+    let onAdd: () -> Void
 
-    func makeUIViewController(context: Context) -> CNContactPickerViewController {
-        let picker = CNContactPickerViewController()
-        picker.delegate = context.coordinator
-        picker.displayedPropertyKeys = [
-            CNContactGivenNameKey,
-            CNContactFamilyNameKey,
-            CNContactPhoneNumbersKey,
-            CNContactEmailAddressesKey,
-            CNContactPostalAddressesKey,
-            CNContactBirthdayKey
-        ]
-        return picker
+    var body: some View {
+        WrapHStack(spacing: 8, lineSpacing: 8) {
+            ForEach(circles, id: \.self) { name in
+                chip(name)
+            }
+            addButton
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 
-    func updateUIViewController(_ vc: CNContactPickerViewController, context: Context) {}
-
-    func makeCoordinator() -> Coordinator { Coordinator(onPick: onPick, onCancel: onCancel) }
-
-    final class Coordinator: NSObject, CNContactPickerDelegate {
-        let onPick: (CNContact) -> Void
-        let onCancel: () -> Void
-        init(onPick: @escaping (CNContact) -> Void, onCancel: @escaping () -> Void) {
-            self.onPick = onPick
-            self.onCancel = onCancel
+    private func chip(_ name: String) -> some View {
+        HStack(spacing: 6) {
+            Text(name)
+                .font(.sacredSmallSemibold)
+                .foregroundColor(.sacredGold)
+            Button { onRemove(name) } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(.sacredGold.opacity(0.7))
+                    .frame(width: 18, height: 18)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
-        func contactPicker(_ picker: CNContactPickerViewController, didSelect contact: CNContact) {
-            onPick(contact)
+        .padding(.leading, 12)
+        .padding(.trailing, 4)
+        .frame(minHeight: 32)
+        .background(Capsule().fill(Color.sacredGold.opacity(0.12)))
+        .overlay(Capsule().stroke(Color.sacredGold.opacity(0.3), lineWidth: 1))
+    }
+
+    private var addButton: some View {
+        Button(action: onAdd) {
+            HStack(spacing: 4) {
+                Image(systemName: "plus")
+                    .font(.system(size: 11, weight: .bold))
+                Text(circles.isEmpty ? "Add circle" : "Add")
+                    .font(.sacredSmallSemibold)
+            }
+            .foregroundColor(.sacredGold)
+            .padding(.horizontal, 12)
+            .frame(minHeight: 32)
+            .overlay(Capsule().stroke(Color.sacredGold.opacity(0.4), style: StrokeStyle(lineWidth: 1, dash: [3, 3])))
         }
-        func contactPickerDidCancel(_ picker: CNContactPickerViewController) {
-            onCancel()
+        .buttonStyle(.plain)
+    }
+}
+
+/// Minimal flow layout — wraps children onto new lines when they overflow
+/// the available width. Used by `CircleChipsRow` so chip count doesn't
+/// blow past the card edge. SwiftUI's `Layout` API would also work, but
+/// this lighter `GeometryReader` + measurement approach keeps the file
+/// self-contained.
+struct WrapHStack<Content: View>: View {
+    let spacing: CGFloat
+    let lineSpacing: CGFloat
+    let content: () -> Content
+
+    init(spacing: CGFloat = 8, lineSpacing: CGFloat = 8, @ViewBuilder content: @escaping () -> Content) {
+        self.spacing = spacing
+        self.lineSpacing = lineSpacing
+        self.content = content
+    }
+
+    var body: some View {
+        WrapLayout(spacing: spacing, lineSpacing: lineSpacing) {
+            content()
         }
     }
 }
 
-/// Wraps `CNContactViewController(forNewContact:)` in a navigation
-/// controller so it can be presented as a SwiftUI sheet. The system
-/// handles the contacts permission prompt when the user taps Done.
-private struct AddContactSheet: UIViewControllerRepresentable {
-    let contact: CNContact
-    let onDismiss: () -> Void
+private struct WrapLayout: Layout {
+    let spacing: CGFloat
+    let lineSpacing: CGFloat
 
-    func makeUIViewController(context: Context) -> UINavigationController {
-        let vc = CNContactViewController(forNewContact: contact)
-        vc.delegate = context.coordinator
-        return UINavigationController(rootViewController: vc)
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .greatestFiniteMagnitude
+        let lines = layout(maxWidth: maxWidth, subviews: subviews)
+        let totalHeight = lines.reduce(0) { partial, line in
+            partial + (line.height) + (partial == 0 ? 0 : lineSpacing)
+        }
+        let totalWidth = lines.map(\.width).max() ?? 0
+        return CGSize(width: min(totalWidth, maxWidth), height: totalHeight)
     }
 
-    func updateUIViewController(_ vc: UINavigationController, context: Context) {}
-
-    func makeCoordinator() -> Coordinator { Coordinator(onDismiss: onDismiss) }
-
-    final class Coordinator: NSObject, CNContactViewControllerDelegate {
-        let onDismiss: () -> Void
-        init(onDismiss: @escaping () -> Void) { self.onDismiss = onDismiss }
-        func contactViewController(_ viewController: CNContactViewController,
-                                   didCompleteWith contact: CNContact?) {
-            onDismiss()
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let lines = layout(maxWidth: bounds.width, subviews: subviews)
+        var y = bounds.minY
+        for line in lines {
+            var x = bounds.minX
+            for entry in line.entries {
+                let size = entry.size
+                subviews[entry.index].place(
+                    at: CGPoint(x: x, y: y),
+                    anchor: .topLeading,
+                    proposal: ProposedViewSize(size))
+                x += size.width + spacing
+            }
+            y += line.height + lineSpacing
         }
     }
+
+    private func layout(maxWidth: CGFloat, subviews: Subviews) -> [Line] {
+        var lines: [Line] = []
+        var current = Line()
+
+        for (index, subview) in subviews.enumerated() {
+            let size = subview.sizeThatFits(.unspecified)
+            let projected = current.entries.isEmpty ? size.width : current.width + spacing + size.width
+            if projected > maxWidth && !current.entries.isEmpty {
+                lines.append(current)
+                current = Line()
+            }
+            let xOffset = current.entries.isEmpty ? 0 : current.width + spacing
+            current.entries.append(.init(index: index, size: size))
+            current.width = xOffset + size.width
+            current.height = max(current.height, size.height)
+        }
+        if !current.entries.isEmpty { lines.append(current) }
+        return lines
+    }
+
+    private struct Line {
+        var entries: [Entry] = []
+        var width: CGFloat = 0
+        var height: CGFloat = 0
+    }
+    private struct Entry {
+        let index: Int
+        let size: CGSize
+    }
 }
+

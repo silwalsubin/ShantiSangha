@@ -314,7 +314,7 @@ public class FriendRequestsService(
             Id = Guid.NewGuid(),
             OwnerUserId = userA,
             PersonId = personB,
-            RelationType = ConnectionType.Friend,
+            Circles = ["Friend"],
             FriendshipId = friendshipId,
             CreatedAt = now,
             UpdatedAt = now
@@ -324,7 +324,7 @@ public class FriendRequestsService(
             Id = Guid.NewGuid(),
             OwnerUserId = userB,
             PersonId = personA,
-            RelationType = ConnectionType.Friend,
+            Circles = ["Friend"],
             FriendshipId = friendshipId,
             CreatedAt = now,
             UpdatedAt = now
