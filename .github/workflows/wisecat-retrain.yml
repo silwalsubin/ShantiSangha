@@ -37,7 +37,8 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: write   # push the new model artifact
+  actions: write    # `gh workflow run` to trigger python-deploy
 
 jobs:
   retrain:
@@ -83,6 +84,7 @@ jobs:
             --allow-network
 
       - name: Commit artifacts if changed
+        id: commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -94,6 +96,7 @@ jobs:
 
           if git diff --cached --quiet; then
             echo "No artifact diff — nothing to commit"
+            echo "committed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -101,10 +104,22 @@ jobs:
           git commit -m "WiseCat: monthly retrain ${DATE}
 
           Triggered by ${{ github.event_name }}. Auto-pushed by GitHub Actions
-          retrain workflow; the python-deploy workflow will rebuild the Lambda
-          image on this push."
+          retrain workflow; python-deploy is dispatched explicitly in the
+          next step (push events fired by GITHUB_TOKEN do not cascade)."
 
           git push origin main
+          echo "committed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Trigger python-deploy
+        # Pushes made by GITHUB_TOKEN do not trigger downstream workflows
+        # (GitHub's recursion guard). workflow_dispatch IS one of the
+        # exceptions, so we fire python-deploy explicitly here. Skipped
+        # when there's no artifact change to ship.
+        if: steps.commit.outputs.committed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run python-deploy.yml --ref main
 
       - name: Summary
         if: always()
