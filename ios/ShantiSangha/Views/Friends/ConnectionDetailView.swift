@@ -397,7 +397,7 @@ struct ConnectionDetailView: View {
 
     private var notesSection: some View {
         VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-            sectionLabel("PRIVATE NOTES")
+            sectionLabel("NOTES")
 
             SacredListCard {
                 ZStack(alignment: .topLeading) {
