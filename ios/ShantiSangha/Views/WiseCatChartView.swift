@@ -81,7 +81,16 @@ struct WiseCatChartView: View {
     }
 
     private func headlineReadout(_ chart: ChartHistory) -> some View {
-        let current = chart.aggregates?.currentPrice ?? chart.bars.last?.close ?? 0
+        // Intraday: prefer the most recent bar (which may be extended-hours)
+        // so the headline reflects the *actual* last trade. Aggregates are
+        // computed from the daily series and would lag by hours during
+        // pre-market or after-hours.
+        let current: Double = {
+            if range.isIntraday, let last = chart.bars.last?.close {
+                return last
+            }
+            return chart.aggregates?.currentPrice ?? chart.bars.last?.close ?? 0
+        }()
         let baseline = baselineForRange(chart) ?? current
         let change = current - baseline
         let changePct = baseline != 0 ? (change / baseline) * 100 : 0
@@ -243,8 +252,13 @@ struct WiseCatChartView: View {
     private var chartCanvas: some View {
         let bars = chart?.bars ?? []
         let split = splitForExtendedHours(bars)
+        let extendedDash = StrokeStyle(lineWidth: 2, dash: [3, 3])
+        let solid = StrokeStyle(lineWidth: 2)
         return Chart {
-            // Regular-session line + filled area underneath.
+            // Regular-session — solid gold line. No area fill (Apple Stocks
+            // intraday is line-only; the area gradient created a visible
+            // vertical band where the regular hours started/ended that read
+            // as a UI artifact, not a chart feature).
             ForEach(split.regular) { bar in
                 LineMark(
                     x: .value("Date", bar.parsedDate),
@@ -252,42 +266,33 @@ struct WiseCatChartView: View {
                     series: .value("Series", "regular")
                 )
                 .foregroundStyle(Color.sacredGold)
-                .interpolationMethod(.linear)
-
-                AreaMark(
-                    x: .value("Date", bar.parsedDate),
-                    y: .value("Price", bar.close)
-                )
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [Color.sacredGold.opacity(0.18), Color.sacredGold.opacity(0)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
+                .lineStyle(solid)
                 .interpolationMethod(.linear)
             }
 
-            // Pre-market — faded line, bridged into the regular open so the
-            // segments visually connect.
+            // Pre-market — same color, dashed stroke. Bridged into the
+            // regular open via splitForExtendedHours so the segments
+            // visually connect at the boundary.
             ForEach(split.preMarket) { bar in
                 LineMark(
                     x: .value("Date", bar.parsedDate),
                     y: .value("Price", bar.close),
                     series: .value("Series", "extended-pre")
                 )
-                .foregroundStyle(Color.sacredGold.opacity(0.4))
+                .foregroundStyle(Color.sacredGold)
+                .lineStyle(extendedDash)
                 .interpolationMethod(.linear)
             }
 
-            // After-hours — same treatment, bridged from the regular close.
+            // After-hours — same treatment.
             ForEach(split.afterHours) { bar in
                 LineMark(
                     x: .value("Date", bar.parsedDate),
                     y: .value("Price", bar.close),
                     series: .value("Series", "extended-post")
                 )
-                .foregroundStyle(Color.sacredGold.opacity(0.4))
+                .foregroundStyle(Color.sacredGold)
+                .lineStyle(extendedDash)
                 .interpolationMethod(.linear)
             }
 
@@ -299,7 +304,7 @@ struct WiseCatChartView: View {
                     x: .value("Date", bar.parsedDate),
                     y: .value("Price", bar.close)
                 )
-                .foregroundStyle(bar.extendedHours == true ? Color.sacredGold.opacity(0.6) : Color.sacredGold)
+                .foregroundStyle(Color.sacredGold)
                 .symbolSize(70)
             }
         }
