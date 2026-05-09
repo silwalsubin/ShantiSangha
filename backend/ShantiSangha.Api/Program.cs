@@ -427,6 +427,18 @@ try
         });
     }).RequireAuthorization();
 
+    // Debug: Force-regenerate today's trading signals for every watchlisted
+    // ticker across every user. Useful right after a Lambda model upgrade —
+    // the existing Hangfire schedule only fires Mon–Fri 20:15 UTC, so a
+    // model deployed on a Friday won't reach watchlist rows until Monday
+    // evening unless this is triggered manually.
+    app.MapPost("/api/debug/hangfire/regenerate-trading-signals",
+        (IBackgroundJobClient jobs) =>
+    {
+        jobs.Enqueue<ShantiSangha.Trading.Jobs.GenerateDailyTradingSignalsJob>(j => j.RunAsync());
+        return Results.Ok(new { triggered = "GenerateDailyTradingSignalsJob" });
+    }).RequireAuthorization();
+
     // Debug: Force-regenerate reflection (deletes today's reflection, then enqueues job)
     app.MapPost("/api/debug/hangfire/test-reflection", async (HttpContext ctx, IBackgroundJobClient jobs) =>
     {
