@@ -331,6 +331,29 @@ Both scoring paths coexist behind an env flag; the wire format is uniform.
   distributions. Until then, keep the arc — it's accurate for the
   weighted-sum composite.
 
+### First trained artifact (2026-05-08)
+
+`models/gbm_1M.joblib` — 30-ticker NASDAQ-100 subset, 259,431 rows,
+21 features (SPY + VIX context populated; earnings still empty).
+
+- **Mean OOS accuracy: 37.8%** vs random 33.3% baseline (+4.5 pp).
+- 243 walk-forward folds (504-day train / 63-day eval / 21-day embargo).
+- Per-class precision / recall:
+  - Hold: 0.460 / 0.409 — strongest class
+  - Buy:  0.340 / 0.345 — about random
+  - Sell: 0.229 / 0.291 — below random
+
+**Honest read**: marginal but real edge. The model is good at "no clear
+move" (Hold), weak at directional calls. Consistent with the current
+feature set being mostly trend + cross-sectional + VIX, no earnings
+data. Adding the earnings loader is the highest-leverage next move for
+accuracy.
+
+**Per-horizon routing**: only 1M has an artifact, so 1W and 1Y stay on
+the legacy weighted-sum even with `WISECAT_GBM_ENABLED=1`. This was a
+real bug in the initial gating (all-or-nothing); fixed in the same
+commit so individual horizons can roll out independently.
+
 ### Honest caveats from the build
 
 - **`models/` is empty.** `WISECAT_GBM_ENABLED=1` with no artifacts

@@ -70,8 +70,8 @@ def _load_gbm_artifact(horizon: str) -> dict | None:
         return artifact
 
 
-def _all_horizons_have_models(horizons: tuple[str, ...]) -> bool:
-    return all(_load_gbm_artifact(h) is not None for h in horizons)
+def _has_model(horizon: str) -> bool:
+    return _load_gbm_artifact(horizon) is not None
 
 
 # ---------------------------------------------------------------------------
@@ -87,9 +87,14 @@ def score_ticker(
 ) -> TickerScore:
     """Score a ticker across all horizons.
 
-    Routes to the GBM path when enabled AND every horizon has a trained
-    artifact; otherwise the legacy weighted-sum path. Both paths return
-    a fully populated `TickerScore` with the same wire shape.
+    Per-horizon routing: a horizon uses the GBM path iff `WISECAT_GBM_ENABLED`
+    is set AND that horizon's artifact exists on disk. Other horizons fall
+    back to the legacy weighted-sum path. Lets us roll out one horizon at a
+    time without all-or-nothing gating.
+
+    Both paths return the same wire shape — pBuy / pHold / pSell /
+    expectedReturn populated everywhere, with neutral defaults
+    (`pHold = 1.0`) on the legacy path.
     """
     if df.empty:
         return TickerScore(
@@ -99,15 +104,37 @@ def score_ticker(
             error="no historical data",
         )
 
-    if _gbm_enabled() and _all_horizons_have_models(HORIZONS):
-        try:
-            return _score_gbm(ticker, df, price, context or FeatureContext())
-        except Exception as e:
-            # GBM path failures fall back to legacy rather than 500'ing the
-            # Lambda — neutral prob fields still ship a usable signal.
-            logger.warning("GBM scoring failed for %s, falling back: %s", ticker, e)
+    gbm_on = _gbm_enabled()
 
-    return _score_legacy(ticker, df, price)
+    # Compute legacy first (cheap, runs on the same DataFrame). Per-horizon
+    # GBM scoring overwrites individual horizons that have artifacts.
+    base = _score_legacy(ticker, df, price)
+    if not gbm_on:
+        return base
+
+    ctx = context or FeatureContext()
+    feats: dict[str, float] | None = None
+    horizons = dict(base.horizons)
+    for horizon in HORIZONS:
+        if not _has_model(horizon):
+            continue
+        try:
+            if feats is None:
+                feats = compute_all_features(ticker, df, ctx)
+            artifact = _load_gbm_artifact(horizon)
+            if artifact is None:
+                continue
+            horizons[horizon] = _score_one_horizon_gbm(artifact, feats)
+        except Exception as e:
+            # Per-horizon GBM failure falls back to that horizon's legacy
+            # entry rather than 500'ing the Lambda. The other horizons are
+            # unaffected.
+            logger.warning(
+                "GBM scoring failed for %s @ %s, falling back to legacy: %s",
+                ticker, horizon, e,
+            )
+
+    return TickerScore(ticker=ticker, price=price, horizons=horizons, error=base.error)
 
 
 # ---------------------------------------------------------------------------
@@ -154,32 +181,8 @@ def _score_legacy(ticker: str, df: pd.DataFrame, price: float | None) -> TickerS
 
 
 # ---------------------------------------------------------------------------
-# GBM path
+# GBM path (per-horizon — one model can ship at a time)
 # ---------------------------------------------------------------------------
-
-
-def _score_gbm(
-    ticker: str,
-    df: pd.DataFrame,
-    price: float | None,
-    context: FeatureContext,
-) -> TickerScore:
-    """Score via per-horizon LightGBM artifacts. Each horizon's artifact
-    carries its own feature list, label thresholds, and class encoding.
-    """
-    feats = compute_all_features(ticker, df, context)
-
-    horizons: dict[str, HorizonScore] = {}
-    for horizon in HORIZONS:
-        artifact = _load_gbm_artifact(horizon)
-        if artifact is None:
-            # Defensive — _all_horizons_have_models() should gate this, but
-            # in case of a race with cache invalidation, fall back per horizon.
-            horizons[horizon] = _neutral_horizon([])
-            continue
-        horizons[horizon] = _score_one_horizon_gbm(artifact, feats)
-
-    return TickerScore(ticker=ticker, price=price, horizons=horizons)
 
 
 def _score_one_horizon_gbm(artifact: dict, feats: dict[str, float]) -> HorizonScore:
