@@ -50,6 +50,49 @@ def get_full_history(ticker: str) -> pd.DataFrame:
     return df
 
 
+def get_earnings_dates(ticker: str) -> list:
+    """Returns historical earnings announcement dates for `ticker` as a list
+    of `datetime.date` (most recent first is fine — we sort downstream).
+
+    Uses yfinance's `Ticker.earnings_dates` property which surfaces both
+    past announcements and analyst-estimated upcoming dates. Falls back to
+    `Ticker.calendar` if `earnings_dates` is empty (some tickers expose only
+    one or the other depending on data availability).
+
+    Returns an empty list when nothing is available — callers degrade to
+    the "no earnings" branch in features/earnings.py.
+    """
+    try:
+        import yfinance as yf
+    except ImportError as e:
+        raise YFinanceUnavailable(f"yfinance not installed: {e}") from e
+
+    out: list = []
+
+    try:
+        t = yf.Ticker(ticker)
+        df = t.earnings_dates
+    except Exception as e:
+        logger.warning("earnings_dates fetch failed for %s: %s", ticker, e)
+        df = None
+
+    if df is not None and not df.empty:
+        try:
+            idx = df.index
+            # The index is a DatetimeIndex (often timezone-aware). Normalize
+            # to date-only so callers don't have to think about tz.
+            for ts in idx:
+                try:
+                    d = ts.date() if hasattr(ts, "date") else pd.Timestamp(ts).date()
+                except Exception:
+                    continue
+                out.append(d)
+        except Exception as e:
+            logger.warning("earnings_dates normalization failed for %s: %s", ticker, e)
+
+    return out
+
+
 def get_intraday_history(ticker: str) -> pd.DataFrame:
     """Returns 5-minute intraday bars for the most recent trading day. The
     DataFrame includes a `timestamp` column (timezone-aware datetime in

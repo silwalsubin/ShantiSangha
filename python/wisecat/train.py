@@ -538,21 +538,26 @@ def main(argv: list[str] | None = None) -> int:
         print("no tickers to train on", file=sys.stderr)
         return 2
 
-    # Bootstrap the cross-sectional / regime context once. With
-    # --allow-network this also writes the SPY + VIX parquet cache that
-    # the Lambda image consumes at inference time.
+    # Bootstrap the cross-sectional / regime / earnings context once. With
+    # --allow-network this also writes the parquet caches that the Lambda
+    # image consumes at inference time.
     from .context_loaders import load_default_context
-    ctx = load_default_context(allow_network=args.allow_network)
+    ctx = load_default_context(
+        allow_network=args.allow_network,
+        tickers_for_earnings=tickers,
+    )
     populated = []
     if ctx.spy_history is not None:
         populated.append("SPY")
     if ctx.vix_history is not None:
         populated.append("VIX")
+    if ctx.earnings_dates:
+        populated.append(f"earnings({len(ctx.earnings_dates)} tickers)")
     if populated:
         print(f"FeatureContext loaded: {', '.join(populated)}", file=sys.stderr)
     else:
         print("FeatureContext empty — only base technicals will contribute. "
-              "Pass --allow-network to bootstrap the SPY + VIX cache.",
+              "Pass --allow-network to bootstrap the SPY + VIX + earnings cache.",
               file=sys.stderr)
 
     for horizon in args.horizons:
