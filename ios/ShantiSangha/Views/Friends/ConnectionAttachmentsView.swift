@@ -1041,9 +1041,19 @@ private struct AttachmentMediaViewer: View {
 
     private var timestampPill: some View {
         VStack(spacing: 0) {
-            Text(timestampDay)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.white)
+            HStack(spacing: 5) {
+                // Same offline badge the grid uses, scaled to the pill.
+                // Only renders when the cache actually has the file —
+                // otherwise this is a quiet timestamp.
+                if cache.isOffline(attachment.id) {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.sacredGoldShine)
+                }
+                Text(timestampDay)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+            }
             Text(timestampTime)
                 .font(.system(size: 11))
                 .foregroundColor(.white.opacity(0.7))
