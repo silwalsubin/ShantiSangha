@@ -21,13 +21,10 @@ struct ConnectionAttachmentsView: View {
     let connectionId: UUID
 
     @State private var attachments: [ConnectionAttachment] = []
+    @State private var pendingItems: [PendingAttachment] = []
     @State private var loading = false
     @State private var didLoadOnce = false
     @State private var errorMessage: String?
-
-    @State private var uploadInFlight = 0
-    @State private var totalUploads = 0
-    @State private var currentUploadIndex = 0
 
     @State private var showAddDialog = false
     @State private var showPhotoPicker = false
@@ -44,20 +41,17 @@ struct ConnectionAttachmentsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: SacredSpacing.l) {
-            if !mediaItems.isEmpty {
+            if !mediaItems.isEmpty || !pendingMediaItems.isEmpty {
                 mediaSection
             }
-            if !fileItems.isEmpty {
+            if !fileItems.isEmpty || !pendingFileItems.isEmpty {
                 filesSection
             }
-            if attachments.isEmpty && didLoadOnce && !loading {
+            if attachments.isEmpty && pendingItems.isEmpty && didLoadOnce && !loading {
                 emptyCTA
             }
-            if !attachments.isEmpty {
+            if !attachments.isEmpty || !pendingItems.isEmpty {
                 addRow
-            }
-            if uploadInFlight > 0 {
-                uploadProgressLine
             }
             if let errorMessage {
                 Text(errorMessage)
@@ -133,6 +127,9 @@ struct ConnectionAttachmentsView: View {
         VStack(alignment: .leading, spacing: SacredSpacing.xs) {
             sectionLabel("MEDIA")
             LazyVGrid(columns: gridColumns, spacing: 4) {
+                ForEach(pendingMediaItems) { pending in
+                    PendingMediaTile(pending: pending)
+                }
                 ForEach(mediaItems) { item in
                     MediaTile(
                         attachment: item,
@@ -149,6 +146,12 @@ struct ConnectionAttachmentsView: View {
             sectionLabel("FILES")
             SacredListCard {
                 VStack(spacing: 0) {
+                    ForEach(pendingFileItems) { pending in
+                        PendingFileRow(pending: pending)
+                        if !fileItems.isEmpty || pending.id != pendingFileItems.last?.id {
+                            Divider().padding(.leading, 56)
+                        }
+                    }
                     ForEach(Array(fileItems.enumerated()), id: \.element.id) { index, item in
                         FileRow(
                             attachment: item,
@@ -200,23 +203,6 @@ struct ConnectionAttachmentsView: View {
 
             PrivateFootnote()
         }
-    }
-
-    private var uploadProgressLine: some View {
-        HStack(spacing: 8) {
-            ProgressView()
-                .controlSize(.small)
-                .tint(.sacredGold)
-            Text(uploadProgressText)
-                .font(.sacredMicro)
-                .foregroundColor(.sacredMuted)
-        }
-        .padding(.horizontal, 4)
-    }
-
-    private var uploadProgressText: String {
-        if totalUploads <= 1 { return "Uploading…" }
-        return "Uploading \(currentUploadIndex) of \(totalUploads)…"
     }
 
     @ViewBuilder
@@ -299,6 +285,14 @@ struct ConnectionAttachmentsView: View {
         attachments.filter { $0.kind == .file }
     }
 
+    private var pendingMediaItems: [PendingAttachment] {
+        pendingItems.filter { $0.kind == .media }
+    }
+
+    private var pendingFileItems: [PendingAttachment] {
+        pendingItems.filter { $0.kind == .file }
+    }
+
     private var deleteConfirmBinding: Binding<Bool> {
         Binding(
             get: { deleteTarget != nil },
@@ -331,76 +325,107 @@ struct ConnectionAttachmentsView: View {
     }
 
     private func uploadPhotoItems(_ items: [PhotosPickerItem]) async {
-        totalUploads = items.count
-        uploadInFlight = items.count
-        defer {
-            uploadInFlight = 0
-            totalUploads = 0
-            currentUploadIndex = 0
-        }
-
-        for (index, item) in items.enumerated() {
-            currentUploadIndex = index + 1
+        // Each upload runs serially so the user sees pending tiles
+        // resolve in order and we don't race the server. The pending
+        // tiles themselves provide the per-item progress feedback.
+        for item in items {
             await uploadOnePhoto(item)
-            uploadInFlight = max(0, uploadInFlight - 1)
         }
-        await load()
     }
 
     private func uploadOnePhoto(_ item: PhotosPickerItem) async {
+        let data: Data?
         do {
-            guard let data = try await item.loadTransferable(type: Data.self) else {
-                errorMessage = "Couldn't read that photo."
-                return
+            data = try await item.loadTransferable(type: Data.self)
+        } catch {
+            if !error.isCancellation {
+                errorMessage = "Couldn't read that photo. \(error.localizedDescription)"
             }
-            let (contentType, suggestedName) = mediaMetadata(for: item)
-            _ = try await ConnectionsAPI.uploadAttachment(
+            return
+        }
+        guard let data else {
+            errorMessage = "Couldn't read that photo."
+            return
+        }
+
+        let (contentType, fileName) = mediaMetadata(for: item)
+        let preview = contentType.hasPrefix("image/") ? UIImage(data: data) : nil
+
+        let pending = PendingAttachment(
+            id: UUID(),
+            kind: .media,
+            contentType: contentType,
+            fileName: fileName,
+            preview: preview)
+        pendingItems.insert(pending, at: 0)
+
+        do {
+            let real = try await ConnectionsAPI.uploadAttachment(
                 connectionId,
                 data: data,
                 contentType: contentType,
-                fileName: suggestedName)
+                fileName: fileName)
+            // Seed the cache so the real tile renders the same image
+            // the user just uploaded — no S3 round-trip on first paint.
+            if let preview {
+                cache.cacheThumbnail(preview, for: real.id)
+            }
+            attachments.insert(real, at: 0)
+            pendingItems.removeAll { $0.id == pending.id }
             errorMessage = nil
         } catch {
+            pendingItems.removeAll { $0.id == pending.id }
             if !error.isCancellation {
-                errorMessage = "Couldn't upload one of the photos. Try again."
+                errorMessage = "Couldn't upload \(fileName). Try again."
             }
         }
     }
 
     private func uploadFileURLs(_ urls: [URL]) async {
-        totalUploads = urls.count
-        uploadInFlight = urls.count
-        defer {
-            uploadInFlight = 0
-            totalUploads = 0
-            currentUploadIndex = 0
-        }
-
-        for (index, url) in urls.enumerated() {
-            currentUploadIndex = index + 1
+        for url in urls {
             await uploadOneFile(url)
-            uploadInFlight = max(0, uploadInFlight - 1)
         }
-        await load()
     }
 
     private func uploadOneFile(_ url: URL) async {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
 
+        let data: Data
         do {
-            let data = try Data(contentsOf: url)
-            let resourceValues = try? url.resourceValues(forKeys: [.contentTypeKey])
-            let contentType = resourceValues?.contentType?.preferredMIMEType ?? "application/octet-stream"
-            _ = try await ConnectionsAPI.uploadAttachment(
+            data = try Data(contentsOf: url)
+        } catch {
+            if !error.isCancellation {
+                errorMessage = "Couldn't read \(url.lastPathComponent)."
+            }
+            return
+        }
+
+        let resourceValues = try? url.resourceValues(forKeys: [.contentTypeKey])
+        let contentType = resourceValues?.contentType?.preferredMIMEType ?? "application/octet-stream"
+        let fileName = url.lastPathComponent
+
+        let pending = PendingAttachment(
+            id: UUID(),
+            kind: .file,
+            contentType: contentType,
+            fileName: fileName,
+            preview: nil)
+        pendingItems.insert(pending, at: 0)
+
+        do {
+            let real = try await ConnectionsAPI.uploadAttachment(
                 connectionId,
                 data: data,
                 contentType: contentType,
-                fileName: url.lastPathComponent)
+                fileName: fileName)
+            attachments.insert(real, at: 0)
+            pendingItems.removeAll { $0.id == pending.id }
             errorMessage = nil
         } catch {
+            pendingItems.removeAll { $0.id == pending.id }
             if !error.isCancellation {
-                errorMessage = "Couldn't upload \(url.lastPathComponent). Try again."
+                errorMessage = "Couldn't upload \(fileName). Try again."
             }
         }
     }
@@ -469,6 +494,25 @@ struct ConnectionAttachmentsView: View {
         df.timeZone = TimeZone(identifier: "UTC")
         return df
     }()
+}
+
+// MARK: - Pending (optimistic) representation
+
+/// Lightweight in-flight upload — the tile we render immediately after
+/// the user picks a photo / file, before the server has committed the
+/// row. Carries the local preview image (for photos) so the grid can
+/// show the real thing right away with a spinner overlay instead of a
+/// vague footer line.
+struct PendingAttachment: Identifiable, Equatable {
+    let id: UUID
+    let kind: ConnectionAttachmentKind
+    let contentType: String
+    let fileName: String
+    let preview: UIImage?
+
+    static func == (lhs: PendingAttachment, rhs: PendingAttachment) -> Bool {
+        lhs.id == rhs.id
+    }
 }
 
 // MARK: - Tile views
@@ -584,6 +628,48 @@ private struct MediaTile: View {
     }
 }
 
+/// Optimistic counterpart to `MediaTile` — same container chrome and
+/// caption styling, but shows the locally-decoded preview (for photos)
+/// or the warm gradient (for videos) with a centered progress spinner
+/// while the upload is in flight. Disappears as soon as the real
+/// attachment lands in the list.
+private struct PendingMediaTile: View {
+    let pending: PendingAttachment
+
+    var body: some View {
+        ZStack {
+            preview
+            Color.black.opacity(0.35)
+            ProgressView()
+                .controlSize(.regular)
+                .tint(.white)
+        }
+        .frame(maxWidth: .infinity)
+        .aspectRatio(1, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.sacredGold.opacity(0.18), lineWidth: 0.5))
+    }
+
+    @ViewBuilder
+    private var preview: some View {
+        if let image = pending.preview {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+        } else {
+            // Video — no cheap inline frame extraction during upload;
+            // use the same warm placeholder MediaTile uses for the
+            // not-yet-cached case.
+            LinearGradient(
+                colors: [Color.sacredGoldDark.opacity(0.35), Color.sacredBgCard],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing)
+        }
+    }
+}
+
 private struct FileRow: View {
     let attachment: ConnectionAttachment
     let isSavingOffline: Bool
@@ -661,7 +747,54 @@ private struct FileRow: View {
     }
 
     private var iconName: String {
-        let ct = attachment.contentType.lowercased()
+        FileIconResolver.icon(for: attachment.contentType)
+    }
+}
+
+/// Optimistic counterpart to `FileRow` — same chrome, but the trailing
+/// affordance is a spinner instead of the open-arrow / offline badge,
+/// and the row is not tappable while the upload is in flight. Falls
+/// off the screen as soon as the real attachment commits.
+private struct PendingFileRow: View {
+    let pending: PendingAttachment
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: FileIconResolver.icon(for: pending.contentType))
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(.sacredGold)
+                .frame(width: 36, height: 36)
+                .background(Circle().fill(Color.sacredGold.opacity(0.12)))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(pending.fileName)
+                    .font(.sacredTextSemibold)
+                    .foregroundColor(.sacredText)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text("Uploading…")
+                    .font(.sacredMicro)
+                    .foregroundColor(.sacredMuted)
+            }
+
+            Spacer(minLength: 0)
+
+            ProgressView()
+                .controlSize(.small)
+                .tint(.sacredGold)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .opacity(0.85)
+    }
+}
+
+/// Shared content-type → SF Symbol mapping used by both the real and
+/// pending file rows so they read as the same kind during the
+/// optimistic-to-committed handoff.
+private enum FileIconResolver {
+    static func icon(for contentType: String) -> String {
+        let ct = contentType.lowercased()
         if ct.contains("pdf") { return "doc.richtext" }
         if ct.contains("audio") { return "waveform" }
         if ct.contains("zip") || ct.contains("compressed") { return "doc.zipper" }

@@ -134,6 +134,14 @@ final class AttachmentCache: ObservableObject {
         }
     }
 
+    /// Public seed path used by the optimistic upload flow — caches the
+    /// already-decoded local image as the thumbnail for an attachment id
+    /// so the grid never has to round-trip to S3 just to redraw what the
+    /// user already saw locally.
+    func cacheThumbnail(_ image: UIImage, for attachmentId: UUID) {
+        persistThumbnail(image, for: attachmentId)
+    }
+
     private func persistThumbnail(_ image: UIImage, for attachmentId: UUID) {
         let key = attachmentId.uuidString as NSString
         thumbnailMemory.setObject(image, forKey: key)
@@ -195,36 +203,6 @@ final class AttachmentCache: ObservableObject {
         let thumb = thumbnailsDir.appendingPathComponent("\(attachment.id.uuidString).jpg")
         try? fm.removeItem(at: thumb)
         thumbnailMemory.removeObject(forKey: attachment.id.uuidString as NSString)
-    }
-
-    // MARK: - Storage size
-
-    /// Total bytes consumed by both caches. Surfaces in any future
-    /// "Manage downloads" UI; the value is computed lazily off the
-    /// main actor so a large directory doesn't block the UI.
-    nonisolated func totalDiskBytes() async -> Int64 {
-        await Task.detached(priority: .utility) {
-            let fm = FileManager.default
-            let base = fm.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("keepsakes/thumbnails")
-            let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("keepsakes/offline")
-            return Self.directorySize(at: base) + Self.directorySize(at: appSupport)
-        }.value
-    }
-
-    private static func directorySize(at url: URL) -> Int64 {
-        let fm = FileManager.default
-        guard let enumerator = fm.enumerator(
-            at: url,
-            includingPropertiesForKeys: [.fileSizeKey],
-            options: [.skipsHiddenFiles]) else { return 0 }
-        var total: Int64 = 0
-        for case let fileURL as URL in enumerator {
-            let values = try? fileURL.resourceValues(forKeys: [.fileSizeKey])
-            total += Int64(values?.fileSize ?? 0)
-        }
-        return total
     }
 
     // MARK: - Internals
