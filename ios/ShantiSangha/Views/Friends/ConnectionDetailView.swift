@@ -69,7 +69,19 @@ struct ConnectionDetailView: View {
                 Color.clear.onAppear { dismiss() }
             }
         }
-        .background(SacredBackground().ignoresSafeArea())
+        .background {
+            // Full-page parchment + a very-subtle avatar wash. The avatar
+            // backdrop used to live inside the header section; pulling it
+            // out to the page level lets the warmth of the photo flow
+            // behind every section instead of cutting off below the avatar.
+            ZStack {
+                SacredBackground()
+                if let connection {
+                    AvatarBackdrop(avatarUrl: connection.person.avatarUrl)
+                }
+            }
+            .ignoresSafeArea()
+        }
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
@@ -125,7 +137,6 @@ struct ConnectionDetailView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, SacredSpacing.m)
-        .background(AvatarBackdrop(avatarUrl: c.person.avatarUrl))
     }
 
     @ViewBuilder
@@ -782,6 +793,11 @@ private extension String {
 /// Faded out via a radial mask so the warm sacred background still shows
 /// through at the edges — the photo reads as ambient atmosphere, not a
 /// second image.
+/// Page-wide ambient wash derived from the connection's avatar — heavy
+/// blur, low opacity, vertical gradient mask that fades out toward the
+/// bottom so the page chrome at the bottom (Remove from circle, etc.)
+/// stays calm. Sized to fill its container; pair with `.ignoresSafeArea()`
+/// when used as a full-page background.
 private struct AvatarBackdrop: View {
     let avatarUrl: String?
     @State private var image: UIImage?
@@ -793,14 +809,13 @@ private struct AvatarBackdrop: View {
                     .resizable()
                     .scaledToFill()
                     .frame(width: geo.size.width, height: geo.size.height)
-                    .blur(radius: 50)
-                    .opacity(0.22)
+                    .blur(radius: 80)
+                    .opacity(0.14)
                     .mask {
-                        RadialGradient(
-                            colors: [.black, .black.opacity(0.55), .clear],
-                            center: .center,
-                            startRadius: 20,
-                            endRadius: max(geo.size.width, geo.size.height) * 0.55)
+                        LinearGradient(
+                            colors: [.black, .black.opacity(0.7), .clear],
+                            startPoint: .top,
+                            endPoint: .bottom)
                     }
             }
         }
