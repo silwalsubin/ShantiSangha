@@ -160,11 +160,28 @@ def _chart_history(event: dict) -> dict:
     if df.empty:
         return {"ticker": ticker, "period": period, "bars": [], "aggregates": None}
 
+    # Pull intraday once so the headline price reflects the most recent trade,
+    # including pre-market and after-hours. 1D needs it for chart bars; every
+    # other period uses it only to override `currentPrice` so the headline
+    # doesn't lag behind extended-hours moves.
+    intraday = None
+    try:
+        intraday = get_intraday_history(ticker)
+    except YFinanceUnavailable as e:
+        if period == "1d":
+            raise RuntimeError(f"yfinance intraday unavailable: {e}") from e
+        logger.warning("intraday unavailable for %s, falling back to daily close: %s", ticker, e)
+
     # Aggregates from full history.
     today = _date.today()
     last52 = df[df["date"] >= (today - timedelta(days=365))]
+    current_price = (
+        float(intraday["close"].iloc[-1])
+        if intraday is not None and not intraday.empty
+        else float(df["close"].iloc[-1])
+    )
     aggregates = {
-        "currentPrice": float(df["close"].iloc[-1]),
+        "currentPrice": current_price,
         "previousClose": float(df["close"].iloc[-2]) if len(df) >= 2 else None,
         "weekHigh52": float(last52["close"].max()) if not last52.empty else None,
         "weekLow52": float(last52["close"].min()) if not last52.empty else None,
@@ -174,15 +191,8 @@ def _chart_history(event: dict) -> dict:
         "latestDate": df["date"].iloc[-1].isoformat(),
     }
 
-    # 1D path: pull intraday bars (5-min) instead of filtering daily history.
-    # Aggregates still come from the daily history above (52w/all-time are not
-    # intraday concepts).
+    # 1D path: serve the intraday bars we already fetched.
     if period == "1d":
-        try:
-            intraday = get_intraday_history(ticker)
-        except YFinanceUnavailable as e:
-            raise RuntimeError(f"yfinance intraday unavailable: {e}") from e
-
         bars = [
             {
                 "date": row.timestamp.isoformat(),  # full ISO incl. timezone
