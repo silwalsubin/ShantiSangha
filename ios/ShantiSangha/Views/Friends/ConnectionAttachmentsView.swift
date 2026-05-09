@@ -2,6 +2,7 @@ import SwiftUI
 import PhotosUI
 import AVKit
 import UniformTypeIdentifiers
+import QuickLook
 
 /// Owner-private keepsakes attached to a Connection. Splits into two
 /// section cards — MEDIA (photos + videos in a thumbnail grid) and
@@ -36,6 +37,10 @@ struct ConnectionAttachmentsView: View {
     @State private var captionTarget: ConnectionAttachment?
     @State private var deleteTarget: ConnectionAttachment?
     @State private var mediaViewerTarget: ConnectionAttachment?
+    @State private var fileQuickLookURL: URL?
+    @State private var savingOfflineIds: Set<UUID> = []
+
+    @StateObject private var cache = AttachmentCache.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: SacredSpacing.l) {
@@ -105,6 +110,7 @@ struct ConnectionAttachmentsView: View {
         .sheet(item: $mediaViewerTarget) { target in
             AttachmentMediaViewer(attachment: target)
         }
+        .quickLookPreview($fileQuickLookURL)
         .confirmationDialog(
             deleteConfirmTitle,
             isPresented: deleteConfirmBinding,
@@ -128,7 +134,9 @@ struct ConnectionAttachmentsView: View {
             sectionLabel("MEDIA")
             LazyVGrid(columns: gridColumns, spacing: 4) {
                 ForEach(mediaItems) { item in
-                    MediaTile(attachment: item)
+                    MediaTile(
+                        attachment: item,
+                        isSavingOffline: savingOfflineIds.contains(item.id))
                         .onTapGesture { mediaViewerTarget = item }
                         .contextMenu { contextActions(for: item) }
                 }
@@ -142,7 +150,10 @@ struct ConnectionAttachmentsView: View {
             SacredListCard {
                 VStack(spacing: 0) {
                     ForEach(Array(fileItems.enumerated()), id: \.element.id) { index, item in
-                        FileRow(attachment: item)
+                        FileRow(
+                            attachment: item,
+                            isSavingOffline: savingOfflineIds.contains(item.id),
+                            onTap: { handleFileTap(item) })
                             .contextMenu { contextActions(for: item) }
                         if index < fileItems.count - 1 {
                             Divider().padding(.leading, 56)
@@ -216,6 +227,19 @@ struct ConnectionAttachmentsView: View {
             Label(item.caption == nil ? "Add caption" : "Edit caption",
                   systemImage: "text.alignleft")
         }
+        if cache.isOffline(item.id) {
+            Button {
+                cache.removeOffline(item)
+            } label: {
+                Label("Remove from offline", systemImage: "icloud.slash")
+            }
+        } else {
+            Button {
+                Task { await saveOffline(item) }
+            } label: {
+                Label("Save for offline", systemImage: "arrow.down.circle")
+            }
+        }
         if let url = URL(string: item.downloadUrl) {
             ShareLink(item: url) {
                 Label("Share", systemImage: "square.and.arrow.up")
@@ -225,6 +249,32 @@ struct ConnectionAttachmentsView: View {
             deleteTarget = item
         } label: {
             Label("Delete", systemImage: "trash")
+        }
+    }
+
+    private func saveOffline(_ item: ConnectionAttachment) async {
+        savingOfflineIds.insert(item.id)
+        defer { savingOfflineIds.remove(item.id) }
+        do {
+            try await cache.saveOffline(item)
+        } catch {
+            if !error.isCancellation {
+                errorMessage = "Couldn't save \(item.fileName) offline. Try again."
+            }
+        }
+    }
+
+    /// Resolves the best URL for tapping a file row. Prefers the local
+    /// offline copy when present so the file opens in QuickLook without
+    /// network; otherwise punts to the system handler (Safari for PDFs,
+    /// etc.) via the presigned URL.
+    private func handleFileTap(_ item: ConnectionAttachment) {
+        if let local = cache.offlineFileURL(for: item) {
+            fileQuickLookURL = local
+            return
+        }
+        if let url = URL(string: item.downloadUrl) {
+            UIApplication.shared.open(url)
         }
     }
 
@@ -377,6 +427,7 @@ struct ConnectionAttachmentsView: View {
         do {
             try await ConnectionsAPI.deleteAttachment(connectionId, attachmentId: id)
             attachments.removeAll { $0.id == id }
+            cache.purge(target)
             errorMessage = nil
             deleteTarget = nil
         } catch {
@@ -424,10 +475,14 @@ struct ConnectionAttachmentsView: View {
 
 private struct MediaTile: View {
     let attachment: ConnectionAttachment
+    let isSavingOffline: Bool
+
+    @State private var thumbnail: UIImage?
+    @StateObject private var cache = AttachmentCache.shared
 
     var body: some View {
         ZStack {
-            thumbnail
+            thumbnailLayer
             overlay
         }
         .frame(maxWidth: .infinity)
@@ -436,28 +491,38 @@ private struct MediaTile: View {
         .overlay(
             RoundedRectangle(cornerRadius: 8)
                 .stroke(Color.sacredGold.opacity(0.18), lineWidth: 0.5))
+        .task(id: thumbnailTaskKey) {
+            if let cached = cache.cachedThumbnail(for: attachment.id) {
+                thumbnail = cached
+                return
+            }
+            thumbnail = await cache.loadThumbnail(for: attachment)
+        }
+    }
+
+    /// Re-runs the thumbnail load when the attachment changes OR when
+    /// it transitions to/from offline (so a video tile can refresh
+    /// from "placeholder gradient" to a real frame the moment its
+    /// local copy lands on disk).
+    private var thumbnailTaskKey: String {
+        "\(attachment.id):\(cache.isOffline(attachment.id))"
     }
 
     @ViewBuilder
-    private var thumbnail: some View {
-        if attachment.contentType.hasPrefix("image/"),
-           let url = URL(string: attachment.downloadUrl) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image.resizable().scaledToFill()
-                default:
-                    Color.sacredBgCard
-                }
-            }
-        } else {
-            // Video — no cheap inline frame extraction. A warm placeholder
-            // tile reads as "media you saved"; the play overlay below
-            // makes the kind unambiguous.
+    private var thumbnailLayer: some View {
+        if let thumbnail {
+            Image(uiImage: thumbnail)
+                .resizable()
+                .scaledToFill()
+        } else if attachment.contentType.hasPrefix("video/") {
+            // Warm placeholder reads as "media you saved" while the
+            // tile waits for an offline-save to seed a real frame.
             LinearGradient(
                 colors: [Color.sacredGoldDark.opacity(0.35), Color.sacredBgCard],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing)
+        } else {
+            Color.sacredBgCard
         }
     }
 
@@ -470,37 +535,65 @@ private struct MediaTile: View {
                 .padding(10)
                 .background(Circle().fill(Color.black.opacity(0.45)))
         }
-        if let caption = attachment.caption, !caption.isEmpty {
-            VStack {
+
+        VStack {
+            HStack {
                 Spacer()
-                Text(caption)
-                    .font(.sacredMicroBold)
-                    .foregroundColor(.white)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 4)
-                    .background(
-                        LinearGradient(
-                            colors: [Color.clear, Color.black.opacity(0.55)],
-                            startPoint: .top,
-                            endPoint: .bottom))
+                offlineBadge
             }
+            Spacer()
+            captionLine
+        }
+        .padding(6)
+    }
+
+    @ViewBuilder
+    private var offlineBadge: some View {
+        if isSavingOffline {
+            ProgressView()
+                .controlSize(.small)
+                .tint(.white)
+                .padding(4)
+                .background(Circle().fill(Color.black.opacity(0.45)))
+        } else if cache.isOffline(attachment.id) {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.sacredGoldShine)
+                .padding(2)
+                .background(Circle().fill(Color.black.opacity(0.45)))
+        }
+    }
+
+    @ViewBuilder
+    private var captionLine: some View {
+        if let caption = attachment.caption, !caption.isEmpty {
+            Text(caption)
+                .font(.sacredMicroBold)
+                .foregroundColor(.white)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+                .background(
+                    LinearGradient(
+                        colors: [Color.clear, Color.black.opacity(0.55)],
+                        startPoint: .top,
+                        endPoint: .bottom))
         }
     }
 }
 
 private struct FileRow: View {
     let attachment: ConnectionAttachment
+    let isSavingOffline: Bool
+    let onTap: () -> Void
+
+    @StateObject private var cache = AttachmentCache.shared
 
     var body: some View {
-        if let url = URL(string: attachment.downloadUrl) {
-            Link(destination: url) { rowBody }
-                .buttonStyle(.plain)
-        } else {
-            rowBody
-        }
+        Button(action: onTap) { rowBody }
+            .buttonStyle(.plain)
     }
 
     private var rowBody: some View {
@@ -525,13 +618,28 @@ private struct FileRow: View {
 
             Spacer(minLength: 0)
 
-            Image(systemName: "arrow.up.right")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(.sacredMuted.opacity(0.6))
+            trailingIcon
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private var trailingIcon: some View {
+        if isSavingOffline {
+            ProgressView()
+                .controlSize(.small)
+                .tint(.sacredGold)
+        } else if cache.isOffline(attachment.id) {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.sacredGoldShine)
+        } else {
+            Image(systemName: "arrow.up.right")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(.sacredMuted.opacity(0.6))
+        }
     }
 
     private var primaryLabel: String {
@@ -659,6 +767,16 @@ private struct AttachmentMediaViewer: View {
     @State private var imageZoom: CGFloat = 1.0
     @State private var imageZoomBase: CGFloat = 1.0
 
+    /// Local file URL when the attachment is saved offline, else the
+    /// presigned remote URL. Lets full-screen viewing work without
+    /// network for offline-saved keepsakes.
+    private var sourceURL: URL? {
+        if let local = AttachmentCache.shared.offlineFileURL(for: attachment) {
+            return local
+        }
+        return URL(string: attachment.downloadUrl)
+    }
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -683,13 +801,13 @@ private struct AttachmentMediaViewer: View {
     @ViewBuilder
     private var content: some View {
         if attachment.contentType.hasPrefix("video/"),
-           let url = URL(string: attachment.downloadUrl) {
+           let url = sourceURL {
             // Lift the AVPlayer out of `body` so SwiftUI rebuilds (e.g.
             // dismissal animation, status bar updates) don't restart
             // playback by handing the player view a fresh instance.
             VideoPlayerHost(url: url)
                 .ignoresSafeArea()
-        } else if let url = URL(string: attachment.downloadUrl) {
+        } else if let url = sourceURL {
             AsyncImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
