@@ -56,6 +56,7 @@ struct ConnectionDetailView: View {
                 VStack(spacing: SacredSpacing.l) {
                     header(connection)
                     aboutSection(connection)
+                    mediaFilesRow(connection)
                     relationSection
                     datesSection(connection)
                     nicknameSection
@@ -129,15 +130,9 @@ struct ConnectionDetailView: View {
 
     @ViewBuilder
     private func headerActions(_ c: Connection) -> some View {
-        HStack(spacing: SacredSpacing.s) {
-            if c.messageable {
-                NavigationLink(destination: FriendChatView(connection: c, circleVM: vm)) {
-                    HeaderActionPill(icon: "bubble.left.and.bubble.right", label: "Message")
-                }
-                .buttonStyle(.plain)
-            }
-            NavigationLink(destination: ConnectionAttachmentsScreen(connectionId: c.id)) {
-                HeaderActionCircle(icon: "photo.on.rectangle")
+        if c.messageable {
+            NavigationLink(destination: FriendChatView(connection: c, circleVM: vm)) {
+                HeaderActionPill(icon: "bubble.left.and.bubble.right", label: "Message")
             }
             .buttonStyle(.plain)
         }
@@ -430,6 +425,22 @@ struct ConnectionDetailView: View {
                     savingFooter
                 }
             }
+
+            PrivateFootnote()
+        }
+    }
+
+    /// Tile-row that pushes to a dedicated full-screen page for media + files.
+    /// Sits right below the About section so it reads as part of the
+    /// "things you've stored about this person" cluster.
+    private func mediaFilesRow(_ c: Connection) -> some View {
+        VStack(alignment: .leading, spacing: SacredSpacing.xs) {
+            NavigationLink(destination: ConnectionAttachmentsScreen(connectionId: c.id)) {
+                SacredListCard {
+                    SacredMenuRow(icon: "photo.on.rectangle", title: "Media & Files")
+                }
+            }
+            .buttonStyle(.plain)
 
             PrivateFootnote()
         }
@@ -824,22 +835,6 @@ private struct HeaderActionPill: View {
         .frame(minHeight: 36)
         .background(Capsule().fill(Color.sacredGold.opacity(0.12)))
         .overlay(Capsule().stroke(Color.sacredGold.opacity(0.25), lineWidth: 1))
-    }
-}
-
-/// Icon-only circular sibling to HeaderActionPill — used for affordances
-/// where the icon alone is unambiguous (Media & Files) so we don't bloat
-/// the header with multiple labelled pills.
-private struct HeaderActionCircle: View {
-    let icon: String
-
-    var body: some View {
-        Image(systemName: icon)
-            .font(.sacredSmallSemibold)
-            .foregroundColor(.sacredGold)
-            .frame(width: 36, height: 36)
-            .background(Circle().fill(Color.sacredGold.opacity(0.12)))
-            .overlay(Circle().stroke(Color.sacredGold.opacity(0.25), lineWidth: 1))
     }
 }
 
