@@ -109,15 +109,9 @@ struct ConnectionDateEditSheet: View {
             sectionLabel("REPEATS")
             SacredListCard {
                 VStack(spacing: 0) {
-                    recurrenceRow(
-                        title: "Every year",
-                        subtitle: "Birthday, anniversary, day-we-met",
-                        value: .yearly)
+                    recurrenceRow(title: "Every year", value: .yearly)
                     Divider().padding(.leading, 16)
-                    recurrenceRow(
-                        title: "One-time",
-                        subtitle: "Moved cities, started a job",
-                        value: .once)
+                    recurrenceRow(title: "One-time", value: .once)
                 }
             }
         }
@@ -125,21 +119,15 @@ struct ConnectionDateEditSheet: View {
 
     private func recurrenceRow(
         title: String,
-        subtitle: String,
         value: ConnectionDateRecurrence
     ) -> some View {
         Button {
             recurrenceDraft = value
         } label: {
             HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.sacredText)
-                        .foregroundColor(.sacredText)
-                    Text(subtitle)
-                        .font(.sacredMicro)
-                        .foregroundColor(.sacredMuted)
-                }
+                Text(title)
+                    .font(.sacredText)
+                    .foregroundColor(.sacredText)
                 Spacer(minLength: 0)
                 if recurrenceDraft == value {
                     Image(systemName: "checkmark")
