@@ -3,6 +3,11 @@
 
 FROM public.ecr.aws/lambda/python:3.12
 
+# lightgbm dynamically links libgomp (OpenMP runtime) — without this the
+# joblib.load of a trained Booster fails with "libgomp.so.1: cannot open
+# shared object file" and scoring silently degrades back to legacy.
+RUN dnf install -y libgomp && dnf clean all
+
 COPY wisecat/requirements.txt ${LAMBDA_TASK_ROOT}/requirements.txt
 RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements.txt
 

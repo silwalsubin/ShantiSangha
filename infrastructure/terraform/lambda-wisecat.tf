@@ -98,6 +98,13 @@ resource "aws_lambda_function" "wisecat" {
     variables = {
       WISECAT_FINNHUB_SECRET_ID = aws_secretsmanager_secret.finnhub_api_key.name
       LOG_LEVEL                 = "INFO"
+      # Per-horizon GBM scoring. With WISECAT_GBM_ENABLED=1, scoring.py
+      # routes any horizon that has a model artifact in
+      # python/wisecat/models/gbm_<horizon>.joblib through the LightGBM
+      # path; the others stay on the legacy weighted-sum. Only 1M ships
+      # with a trained artifact today (2026-05-08); 1W and 1Y degrade to
+      # legacy until they're trained.
+      WISECAT_GBM_ENABLED = "1"
     }
   }
 
