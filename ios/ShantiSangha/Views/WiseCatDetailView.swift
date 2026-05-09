@@ -141,16 +141,60 @@ struct WiseCatDetailView: View {
         LuxCard {
             VStack(alignment: .leading, spacing: SacredSpacing.l) {
                 horizonHero(read: read)
-                Divider()
-                    .background(Color.sacredMuted.opacity(0.2))
-                technicalBlock(read: read)
+                // The technical-contribution table is the legacy weighted-sum
+                // breakdown (per-strategy weight + signed contribution). GBM
+                // horizons don't expose per-feature SHAP yet (Phase 4), so
+                // hide the block on probabilistic rows rather than render an
+                // empty "No strategies fired today" panel.
+                if !read.hasProbabilisticVerdict {
+                    Divider()
+                        .background(Color.sacredMuted.opacity(0.2))
+                    technicalBlock(read: read)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(SacredSpacing.lux)
         }
     }
 
+    @ViewBuilder
     private func horizonHero(read: HorizonRead) -> some View {
+        if read.hasProbabilisticVerdict {
+            probabilisticHero(read: read)
+        } else {
+            convictionHero(read: read)
+        }
+    }
+
+    /// GBM-served horizons: the verdict label + a three-segment probability
+    /// bar that visualizes the model's actual uncertainty. Replaces the arc
+    /// gauge because pBuy / pHold / pSell carries strictly more information
+    /// than a single conviction scalar.
+    private func probabilisticHero(read: HorizonRead) -> some View {
+        let action = WiseCatAction.from(read.action)
+        return VStack(spacing: SacredSpacing.s) {
+            Text(read.action)
+                .font(.sacredHeading)
+                .foregroundColor(actionColor(action))
+            ProbabilityBar(
+                pBuy: read.pBuy ?? 0,
+                pHold: read.pHold ?? 1,
+                pSell: read.pSell ?? 0,
+                height: 16
+            )
+            .frame(maxWidth: 280)
+            if let er = read.expectedReturn {
+                Text(String(format: "Expected return %+.2f%%", er * 100))
+                    .font(.sacredSmall)
+                    .foregroundColor(.sacredMuted)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    /// Legacy weighted-sum horizons: the original conviction arc + composite
+    /// caption. Kept as-is so non-GBM horizons read identically to today.
+    private func convictionHero(read: HorizonRead) -> some View {
         let action = WiseCatAction.from(read.action)
         return VStack(spacing: SacredSpacing.s) {
             ConvictionMeter(
