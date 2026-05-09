@@ -187,10 +187,7 @@ struct ConnectionAttachmentsView: View {
                     actionLabel: "Add something") { showAddDialog = true }
             }
 
-            Text("Only you can see this.")
-                .font(.sacredMicro)
-                .foregroundColor(.sacredMuted)
-                .padding(.horizontal, 4)
+            PrivateFootnote()
         }
     }
 

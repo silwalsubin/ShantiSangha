@@ -419,10 +419,7 @@ struct ConnectionDetailView: View {
                 }
             }
 
-            Text("Only you can see this.")
-                .font(.sacredMicro)
-                .foregroundColor(.sacredMuted)
-                .padding(.horizontal, 4)
+            PrivateFootnote()
         }
     }
 
