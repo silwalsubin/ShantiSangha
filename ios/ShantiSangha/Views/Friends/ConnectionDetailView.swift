@@ -182,9 +182,7 @@ struct ConnectionDetailView: View {
 
     private var relationSection: some View {
         VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-            sectionLabel(
-                "CIRCLES",
-                help: "Tag this person with one or more circles — Friend, Coworker, Family, anything you want.")
+            sectionLabel("CIRCLES")
 
             SacredListCard {
                 VStack(spacing: 0) {
@@ -202,6 +200,10 @@ struct ConnectionDetailView: View {
                         savingFooter
                     }
                 }
+            }
+
+            if circlesDraft.isEmpty {
+                sectionScaffold("Tag this person with one or more circles — Friend, Coworker, Family, anything you want.")
             }
 
             PrivateFootnote()
@@ -230,9 +232,7 @@ struct ConnectionDetailView: View {
 
     private func datesSection(_ c: Connection) -> some View {
         VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-            sectionLabel(
-                "IMPORTANT DATES",
-                help: "Birthday, anniversary, the day you met — anything you want to remember.")
+            sectionLabel("IMPORTANT DATES")
             if c.dates.isEmpty {
                 emptyDatesPresets
             } else {
@@ -368,9 +368,7 @@ struct ConnectionDetailView: View {
 
     private var nicknameSection: some View {
         VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-            sectionLabel(
-                "NICKNAME",
-                help: "Replaces their name everywhere on your end.")
+            sectionLabel("NICKNAME")
 
             SacredListCard {
                 HStack(spacing: 10) {
@@ -389,6 +387,10 @@ struct ConnectionDetailView: View {
                             .padding(.trailing, 14)
                     }
                 }
+            }
+
+            if nicknameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                sectionScaffold("Replaces their name everywhere on your end.")
             }
 
             PrivateFootnote()
@@ -529,16 +531,21 @@ struct ConnectionDetailView: View {
         .padding(.bottom, 10)
     }
 
-    private func sectionLabel(_ text: String, help: String? = nil) -> some View {
-        HStack(spacing: 4) {
-            Text(text)
-                .font(.sacredSectionLabel)
-                .foregroundColor(.sacredLabel)
-            if let help {
-                SectionHelpInfo(text: help)
-            }
-        }
-        .padding(.horizontal, 4)
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.sacredSectionLabel)
+            .foregroundColor(.sacredLabel)
+            .padding(.horizontal, 4)
+    }
+
+    /// Quiet scaffold line that only renders when a section is empty —
+    /// gives first-timers context without claiming real estate once
+    /// they've populated the section.
+    private func sectionScaffold(_ text: String) -> some View {
+        Text(text)
+            .font(.sacredMicro)
+            .foregroundColor(.sacredMuted)
+            .padding(.horizontal, 4)
     }
 
     // MARK: - Save flows
