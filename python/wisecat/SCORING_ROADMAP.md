@@ -307,16 +307,19 @@ Both scoring paths coexist behind an env flag; the wire format is uniform.
 ### What's pending
 
 - **Train an actual model.** Run `python -m wisecat.train --horizons 1M
-  --tickers <basket>` against ~500 NASDAQ-100 + S&P 500 names with at
-  least 5 years of history. Commit the resulting `models/gbm_1M.joblib`,
-  rebuild the Lambda image, set `WISECAT_GBM_ENABLED=1` in the Lambda
-  environment.
-- **Populate `FeatureContext`.** Today both training and inference run
-  with an empty `FeatureContext()` — only `base_technicals` actually
-  produces features. The cross-sectional / earnings / VIX feature
-  modules are wired up structurally, but won't contribute until the
-  context loaders ship (yfinance bulk pull for SPY/VIX, Finnhub earnings
-  pull for the universe).
+  --tickers <basket> --allow-network` against ~500 NASDAQ-100 + S&P 500
+  names with at least 5 years of history. Commit the resulting
+  `models/gbm_1M.joblib`, rebuild the Lambda image, set
+  `WISECAT_GBM_ENABLED=1` in the Lambda environment.
+- **Earnings + sector + multi-asset context.** SPY and VIX shipped
+  in the 2026-05-08 follow-up — see [context_loaders.py](context_loaders.py)
+  and `data/context/{spy,vix}.parquet`. With those alone, training and
+  inference now produce 21 features (vs. 6 before): the
+  `cross_sectional`, `vix_regime`, `range_position`, and `calendar`
+  modules all fire; only `earnings` is still empty. Earnings dates
+  (Finnhub `/calendar/earnings`), the sector→ETF map for finer-grained
+  cross-sectional, and the multi-asset macro pulls (TLT, DXY, HYG)
+  remain as follow-ups.
 - **A/B measurement.** No dashboard yet to compare GBM vs. legacy hit
   rates on actual user signals. Add a side-by-side log line in
   `TradingSignalService.GenerateAsync` once both paths produce real
@@ -330,17 +333,17 @@ Both scoring paths coexist behind an env flag; the wire format is uniform.
 
 ### Honest caveats from the build
 
-- **No FeatureContext loader yet.** Training will currently produce a
-  model that learns only on the three base technical features —
-  effectively a more-flexible version of the linear weighting, no
-  orthogonal information yet. Expected gain in this state is **+1 to
-  +3 pp accuracy** (the GBM-vs-linear-weights effect on the same
-  features), not the +5 to +10 pp the full Phase 1 + Phase 3 stack
-  promises. The big jump waits on the context loaders.
 - **`models/` is empty.** `WISECAT_GBM_ENABLED=1` with no artifacts
   causes the scoring path to short-circuit back to legacy via
   `_all_horizons_have_models` — by design. No production behavior change
   until artifacts land.
+- **Earnings module is silent.** The four other Phase 3 modules
+  (`cross_sectional`, `vix_regime`, `range_position`, `calendar`) now
+  contribute features after the SPY + VIX loader shipped, but
+  `earnings` returns empty until an earnings-dates loader is added.
+  Expected gain at this point is closer to +3 to +6 pp on the GBM-vs-
+  linear-weights comparison; the full +5 to +10 pp story still waits
+  on the earnings + sector + multi-asset macro loaders.
 - **Backend / iOS already deployable.** The new DB columns are
   populated with neutral defaults from the legacy path; the iOS DTO
   decodes the new fields as optional. Shipping the .NET + iOS sides

@@ -538,6 +538,23 @@ def main(argv: list[str] | None = None) -> int:
         print("no tickers to train on", file=sys.stderr)
         return 2
 
+    # Bootstrap the cross-sectional / regime context once. With
+    # --allow-network this also writes the SPY + VIX parquet cache that
+    # the Lambda image consumes at inference time.
+    from .context_loaders import load_default_context
+    ctx = load_default_context(allow_network=args.allow_network)
+    populated = []
+    if ctx.spy_history is not None:
+        populated.append("SPY")
+    if ctx.vix_history is not None:
+        populated.append("VIX")
+    if populated:
+        print(f"FeatureContext loaded: {', '.join(populated)}", file=sys.stderr)
+    else:
+        print("FeatureContext empty — only base technicals will contribute. "
+              "Pass --allow-network to bootstrap the SPY + VIX cache.",
+              file=sys.stderr)
+
     for horizon in args.horizons:
         print(f"\nBuilding dataset for {horizon} on {len(tickers)} tickers…",
               file=sys.stderr)
@@ -545,6 +562,7 @@ def main(argv: list[str] | None = None) -> int:
             tickers,
             horizon=horizon,
             allow_network=args.allow_network,
+            context=ctx,
             progress=True,
         )
         artifact = train_one_horizon(X, y, dates, horizon=horizon)

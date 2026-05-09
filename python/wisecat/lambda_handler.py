@@ -65,6 +65,12 @@ def _score(event: dict) -> dict:
     if not isinstance(items, list) or not items:
         raise ValueError("'items' must be a non-empty list")
 
+    # FeatureContext is read-only inside Lambda — the parquet cache is
+    # baked into the container image at build time. allow_network=False
+    # so we never accidentally hit yfinance from production.
+    from .context_loaders import load_default_context
+    ctx = load_default_context(allow_network=False)
+
     as_of = event.get("asOf") or date.today().isoformat()
     scores = []
     for item in items:
@@ -74,10 +80,12 @@ def _score(event: dict) -> dict:
         if not ticker:
             continue
         if not bars:
-            scores.append(_serialize_score(score_ticker(ticker, df=pd.DataFrame(), price=price)))
+            scores.append(_serialize_score(
+                score_ticker(ticker, df=pd.DataFrame(), price=price, context=ctx)
+            ))
             continue
         df = pd.DataFrame(bars).sort_values("date").reset_index(drop=True)
-        scores.append(_serialize_score(score_ticker(ticker, df, price)))
+        scores.append(_serialize_score(score_ticker(ticker, df, price, context=ctx)))
 
     return {"asOf": as_of, "scores": scores}
 
