@@ -129,11 +129,12 @@ struct ConnectionAttachmentsView: View {
         }
         .fullScreenCover(item: $mediaViewerTarget) { target in
             AttachmentMediaViewer(
-                attachment: target,
-                onCaption: { captionTarget = target; mediaViewerTarget = nil },
-                onDelete: { deleteTarget = target; mediaViewerTarget = nil },
-                onSaveOffline: { Task { await saveOffline(target) } },
-                onRemoveOffline: { cache.removeOffline(target) })
+                items: mediaItems,
+                initialId: target.id,
+                onCaption: { item in captionTarget = item; mediaViewerTarget = nil },
+                onDelete: { item in deleteTarget = item; mediaViewerTarget = nil },
+                onSaveOffline: { item in Task { await saveOffline(item) } },
+                onRemoveOffline: { item in cache.removeOffline(item) })
         }
         .quickLookPreview($fileQuickLookURL)
         .confirmationDialog(
@@ -534,20 +535,37 @@ private struct MediaTile: View {
     @StateObject private var cache = AttachmentCache.shared
 
     var body: some View {
-        ZStack {
-            thumbnailLayer
-            overlay
-        }
-        .frame(maxWidth: .infinity)
-        .aspectRatio(1, contentMode: .fit)
-        .clipped()
-        .task(id: thumbnailTaskKey) {
-            if let cached = cache.cachedThumbnail(for: attachment.id) {
-                thumbnail = cached
-                return
+        // Color.clear has no intrinsic size, so aspectRatio produces a
+        // true square that exactly fills the LazyVGrid cell. The chrome
+        // (offline badge, video play indicator, caption) attaches as
+        // anchor-aligned overlays so each piece sits in its corner
+        // without depending on a Spacer-VStack to expand inside an
+        // inner ZStack — that pattern collapses to natural size and
+        // hides the badge.
+        Color.clear
+            .aspectRatio(1, contentMode: .fit)
+            .overlay { thumbnailLayer }
+            .overlay {
+                if attachment.contentType.hasPrefix("video/") {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(10)
+                        .background(Circle().fill(Color.black.opacity(0.45)))
+                }
             }
-            thumbnail = await cache.loadThumbnail(for: attachment)
-        }
+            .overlay(alignment: .topTrailing) {
+                offlineBadge.padding(6)
+            }
+            .overlay(alignment: .bottom) { captionLine }
+            .clipped()
+            .task(id: thumbnailTaskKey) {
+                if let cached = cache.cachedThumbnail(for: attachment.id) {
+                    thumbnail = cached
+                    return
+                }
+                thumbnail = await cache.loadThumbnail(for: attachment)
+            }
     }
 
     /// Re-runs the thumbnail load when the attachment changes OR when
@@ -574,27 +592,6 @@ private struct MediaTile: View {
         } else {
             Color.sacredBgCard
         }
-    }
-
-    @ViewBuilder
-    private var overlay: some View {
-        if attachment.contentType.hasPrefix("video/") {
-            Image(systemName: "play.fill")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(.white)
-                .padding(10)
-                .background(Circle().fill(Color.black.opacity(0.45)))
-        }
-
-        VStack {
-            HStack {
-                Spacer()
-                offlineBadge
-            }
-            Spacer()
-            captionLine
-        }
-        .padding(6)
     }
 
     @ViewBuilder
@@ -643,16 +640,19 @@ private struct PendingMediaTile: View {
     let pending: PendingAttachment
 
     var body: some View {
-        ZStack {
-            preview
-            Color.black.opacity(0.35)
-            ProgressView()
-                .controlSize(.regular)
-                .tint(.white)
-        }
-        .frame(maxWidth: .infinity)
-        .aspectRatio(1, contentMode: .fit)
-        .clipped()
+        Color.clear
+            .aspectRatio(1, contentMode: .fit)
+            .overlay {
+                ZStack {
+                    preview
+                    Color.black.opacity(0.35)
+                    ProgressView()
+                        .controlSize(.regular)
+                        .tint(.white)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .clipped()
     }
 
     @ViewBuilder
@@ -897,34 +897,65 @@ private struct AttachmentCaptionSheet: View {
 // MARK: - Media viewer
 
 private struct AttachmentMediaViewer: View {
-    let attachment: ConnectionAttachment
-    let onCaption: () -> Void
-    let onDelete: () -> Void
-    let onSaveOffline: () -> Void
-    let onRemoveOffline: () -> Void
+    let items: [ConnectionAttachment]
+    let onCaption: (ConnectionAttachment) -> Void
+    let onDelete: (ConnectionAttachment) -> Void
+    let onSaveOffline: (ConnectionAttachment) -> Void
+    let onRemoveOffline: (ConnectionAttachment) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @StateObject private var cache = AttachmentCache.shared
-    @State private var imageZoom: CGFloat = 1.0
-    @State private var imageZoomBase: CGFloat = 1.0
-    @State private var imageOffset: CGSize = .zero
-    @State private var imageOffsetBase: CGSize = .zero
+    @State private var currentId: UUID
     @State private var showShareSheet = false
 
-    /// Local file URL when the attachment is saved offline, else the
-    /// presigned remote URL. Lets full-screen viewing work without
-    /// network for offline-saved attachments.
+    init(
+        items: [ConnectionAttachment],
+        initialId: UUID,
+        onCaption: @escaping (ConnectionAttachment) -> Void,
+        onDelete: @escaping (ConnectionAttachment) -> Void,
+        onSaveOffline: @escaping (ConnectionAttachment) -> Void,
+        onRemoveOffline: @escaping (ConnectionAttachment) -> Void
+    ) {
+        self.items = items
+        self.onCaption = onCaption
+        self.onDelete = onDelete
+        self.onSaveOffline = onSaveOffline
+        self.onRemoveOffline = onRemoveOffline
+        _currentId = State(initialValue: initialId)
+    }
+
+    /// Active page. Falls back to the first item if currentId can't be
+    /// matched (shouldn't happen — the parent dismisses the viewer
+    /// before mutating items — but the fallback keeps the chrome alive).
+    private var current: ConnectionAttachment {
+        items.first(where: { $0.id == currentId }) ?? items[0]
+    }
+
+    /// Local file URL when the active page is saved offline, else the
+    /// presigned remote URL. Used by the share sheet so it operates on
+    /// whichever attachment the user is currently viewing.
     private var sourceURL: URL? {
-        if let local = AttachmentCache.shared.offlineFileURL(for: attachment) {
+        if let local = AttachmentCache.shared.offlineFileURL(for: current) {
             return local
         }
-        return URL(string: attachment.downloadUrl)
+        return URL(string: current.downloadUrl)
     }
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            content
+            // .page TabView gives the Apple-Photos horizontal swipe
+            // between attachments. Per-page zoom/pan state lives on
+            // AttachmentPage so swiping reliably resets it (state is
+            // tied to the page identity).
+            TabView(selection: $currentId) {
+                ForEach(items) { item in
+                    AttachmentPage(attachment: item)
+                        .tag(item.id)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .ignoresSafeArea()
             VStack {
                 topBar
                 Spacer()
@@ -936,81 +967,6 @@ private struct AttachmentMediaViewer: View {
             if let url = sourceURL {
                 ShareSheet(items: [url])
             }
-        }
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        if attachment.contentType.hasPrefix("video/"),
-           let url = sourceURL {
-            // Lift the AVPlayer out of `body` so SwiftUI rebuilds (e.g.
-            // dismissal animation, status bar updates) don't restart
-            // playback by handing the player view a fresh instance.
-            VideoPlayerHost(url: url)
-                .ignoresSafeArea()
-        } else if let url = sourceURL {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFit()
-                        .scaleEffect(imageZoom)
-                        .offset(imageOffset)
-                        .gesture(
-                            // Simultaneous pinch + pan. Pan is only honored
-                            // when the image is zoomed in — at 1× the gesture
-                            // is a no-op so we don't fight the dismiss
-                            // affordance underneath.
-                            SimultaneousGesture(
-                                MagnificationGesture()
-                                    .onChanged { value in
-                                        imageZoom = max(1.0, min(4.0, imageZoomBase * value))
-                                    }
-                                    .onEnded { _ in
-                                        imageZoomBase = imageZoom
-                                        if imageZoom <= 1.0 {
-                                            withAnimation(.easeInOut(duration: 0.2)) {
-                                                imageOffset = .zero
-                                                imageOffsetBase = .zero
-                                            }
-                                        }
-                                    },
-                                DragGesture()
-                                    .onChanged { value in
-                                        guard imageZoom > 1.0 else { return }
-                                        imageOffset = CGSize(
-                                            width: imageOffsetBase.width + value.translation.width,
-                                            height: imageOffsetBase.height + value.translation.height)
-                                    }
-                                    .onEnded { _ in
-                                        imageOffsetBase = imageOffset
-                                    }
-                            )
-                        )
-                        .onTapGesture(count: 2) {
-                            withAnimation(.easeInOut(duration: 0.25)) {
-                                if imageZoom > 1.0 {
-                                    imageZoom = 1.0
-                                    imageZoomBase = 1.0
-                                    imageOffset = .zero
-                                    imageOffsetBase = .zero
-                                } else {
-                                    imageZoom = 2.5
-                                    imageZoomBase = 2.5
-                                }
-                            }
-                        }
-                case .failure:
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 36))
-                        .foregroundColor(.white.opacity(0.6))
-                default:
-                    ProgressView().tint(.white)
-                }
-            }
-        } else {
-            Color.black
         }
     }
 
@@ -1045,7 +1001,7 @@ private struct AttachmentMediaViewer: View {
                 // Same offline badge the grid uses, scaled to the pill.
                 // Only renders when the cache actually has the file —
                 // otherwise this is a quiet timestamp.
-                if cache.isOffline(attachment.id) {
+                if cache.isOffline(current.id) {
                     Image(systemName: "arrow.down.circle.fill")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.sacredGoldShine)
@@ -1066,26 +1022,26 @@ private struct AttachmentMediaViewer: View {
     private var chromeMenu: some View {
         Menu {
             Button {
-                onCaption()
+                onCaption(current)
             } label: {
-                Label(attachment.caption?.isEmpty == false ? "Edit caption" : "Add caption",
+                Label(current.caption?.isEmpty == false ? "Edit caption" : "Add caption",
                       systemImage: "text.bubble")
             }
-            if cache.isOffline(attachment.id) {
+            if cache.isOffline(current.id) {
                 Button {
-                    onRemoveOffline()
+                    onRemoveOffline(current)
                 } label: {
                     Label("Remove from offline", systemImage: "icloud.slash")
                 }
             } else {
                 Button {
-                    onSaveOffline()
+                    onSaveOffline(current)
                 } label: {
                     Label("Save for offline", systemImage: "arrow.down.circle")
                 }
             }
             Button(role: .destructive) {
-                onDelete()
+                onDelete(current)
             } label: {
                 Label("Delete", systemImage: "trash")
             }
@@ -1102,7 +1058,7 @@ private struct AttachmentMediaViewer: View {
     /// it stays visible while the actions are tappable.
     private var bottomBar: some View {
         VStack(spacing: SacredSpacing.s) {
-            if let caption = attachment.caption, !caption.isEmpty {
+            if let caption = current.caption, !caption.isEmpty {
                 Text(caption)
                     .font(.sacredText)
                     .foregroundColor(.white)
@@ -1115,9 +1071,9 @@ private struct AttachmentMediaViewer: View {
             HStack {
                 actionButton(systemName: "square.and.arrow.up") { showShareSheet = true }
                 Spacer()
-                actionButton(systemName: "text.bubble", action: onCaption)
+                actionButton(systemName: "text.bubble") { onCaption(current) }
                 Spacer()
-                actionButton(systemName: "trash", tint: .sacredRed, action: onDelete)
+                actionButton(systemName: "trash", tint: .sacredRed) { onDelete(current) }
             }
             .padding(.horizontal, 48)
             .padding(.bottom, SacredSpacing.l)
@@ -1137,9 +1093,9 @@ private struct AttachmentMediaViewer: View {
     private var timestampDate: Date {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = f.date(from: attachment.createdAt) { return d }
+        if let d = f.date(from: current.createdAt) { return d }
         f.formatOptions = [.withInternetDateTime]
-        return f.date(from: attachment.createdAt) ?? Date()
+        return f.date(from: current.createdAt) ?? Date()
     }
 
     private var timestampDay: String {
@@ -1156,6 +1112,109 @@ private struct AttachmentMediaViewer: View {
         formatter.locale = Locale.current
         formatter.dateFormat = "h:mm a"
         return formatter.string(from: timestampDate)
+    }
+}
+
+/// One swipeable page in the AttachmentMediaViewer carousel. Owns its own
+/// zoom/pan state so swiping to a new page resets back to fit-to-screen.
+/// The pan gesture is only attached when zoomed in — otherwise it would
+/// swallow the horizontal drag the parent TabView needs to flip pages.
+private struct AttachmentPage: View {
+    let attachment: ConnectionAttachment
+
+    @State private var imageZoom: CGFloat = 1.0
+    @State private var imageZoomBase: CGFloat = 1.0
+    @State private var imageOffset: CGSize = .zero
+    @State private var imageOffsetBase: CGSize = .zero
+
+    private var sourceURL: URL? {
+        if let local = AttachmentCache.shared.offlineFileURL(for: attachment) {
+            return local
+        }
+        return URL(string: attachment.downloadUrl)
+    }
+
+    var body: some View {
+        if attachment.contentType.hasPrefix("video/"), let url = sourceURL {
+            // Lift the AVPlayer out so SwiftUI rebuilds (e.g. dismissal
+            // animation) don't restart playback.
+            VideoPlayerHost(url: url)
+                .ignoresSafeArea()
+        } else if let url = sourceURL {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    zoomable(image)
+                case .failure:
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 36))
+                        .foregroundColor(.white.opacity(0.6))
+                default:
+                    ProgressView().tint(.white)
+                }
+            }
+        } else {
+            Color.black
+        }
+    }
+
+    @ViewBuilder
+    private func zoomable(_ image: Image) -> some View {
+        let base = image
+            .resizable()
+            .scaledToFit()
+            .scaleEffect(imageZoom)
+            .offset(imageOffset)
+            .gesture(magnificationGesture)
+            .onTapGesture(count: 2) { handleDoubleTap() }
+
+        if imageZoom > 1.0 {
+            base.simultaneousGesture(panGesture)
+        } else {
+            base
+        }
+    }
+
+    private var magnificationGesture: some Gesture {
+        MagnificationGesture()
+            .onChanged { value in
+                imageZoom = max(1.0, min(4.0, imageZoomBase * value))
+            }
+            .onEnded { _ in
+                imageZoomBase = imageZoom
+                if imageZoom <= 1.0 {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        imageOffset = .zero
+                        imageOffsetBase = .zero
+                    }
+                }
+            }
+    }
+
+    private var panGesture: some Gesture {
+        DragGesture()
+            .onChanged { value in
+                imageOffset = CGSize(
+                    width: imageOffsetBase.width + value.translation.width,
+                    height: imageOffsetBase.height + value.translation.height)
+            }
+            .onEnded { _ in
+                imageOffsetBase = imageOffset
+            }
+    }
+
+    private func handleDoubleTap() {
+        withAnimation(.easeInOut(duration: 0.25)) {
+            if imageZoom > 1.0 {
+                imageZoom = 1.0
+                imageZoomBase = 1.0
+                imageOffset = .zero
+                imageOffsetBase = .zero
+            } else {
+                imageZoom = 2.5
+                imageZoomBase = 2.5
+            }
+        }
     }
 }
 
