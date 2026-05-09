@@ -331,17 +331,37 @@ Both scoring paths coexist behind an env flag; the wire format is uniform.
   distributions. Until then, keep the arc — it's accurate for the
   weighted-sum composite.
 
-### First trained artifact (2026-05-08)
+### Trained artifacts
 
-`models/gbm_1M.joblib` — 30-ticker NASDAQ-100 subset, 259,431 rows,
-21 features (SPY + VIX context populated; earnings still empty).
+#### v1 (2026-05-08, pre-earnings) — historical baseline only
 
-- **Mean OOS accuracy: 37.8%** vs random 33.3% baseline (+4.5 pp).
-- 243 walk-forward folds (504-day train / 63-day eval / 21-day embargo).
-- Per-class precision / recall:
-  - Hold: 0.460 / 0.409 — strongest class
-  - Buy:  0.340 / 0.345 — about random
-  - Sell: 0.229 / 0.291 — below random
+30-ticker NASDAQ-100 subset, 259k rows, **21 features** (SPY + VIX
+context only).
+
+- Mean OOS accuracy: **37.8%** (+4.5 pp vs random)
+- Hold P/R 0.460/0.409, Buy 0.340/0.345, Sell 0.229/0.291
+
+#### v2 (2026-05-09, with earnings) — currently shipped
+
+Same basket, same 259k rows, **24 features** (added
+`days_since_earnings`, `days_to_earnings`, `post_earnings_drift_signal`).
+
+- Mean OOS accuracy: **38.0%** (+0.2 pp vs v1)
+- Hold P/R 0.460/0.414, Buy 0.339/0.346, Sell 0.232/0.286
+
+**Honest read on the earnings ablation**: +0.2 pp is statistical noise.
+The yfinance earnings *dates* by themselves don't add meaningful signal —
+the price-driven existing features (trend, 12-1 momentum, fast trend,
+cross-sectional vs SPY) already absorb most of what earnings events do
+to a stock.
+
+The academic literature is consistent: the actual edge in earnings data
+is the **EPS revisions** (3-month change in consensus EPS) and
+**earnings surprise** (actual vs estimate), not the calendar dates. Both
+require fundamental data (Finnhub `/stock/recommendation` for revisions,
+or Polygon/Tiingo for surprise). Adding either is the next earnings-
+related move; dates alone got us through the infrastructure but they're
+not the alpha.
 
 **Honest read**: marginal but real edge. The model is good at "no clear
 move" (Hold), weak at directional calls. Consistent with the current
