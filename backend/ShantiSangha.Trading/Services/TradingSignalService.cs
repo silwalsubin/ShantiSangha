@@ -18,8 +18,20 @@ public class TradingSignalService(
     public async Task<IReadOnlyList<TradingSignalDto>> GetTodayAsync(Guid userId, CancellationToken ct = default)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        // Filter to currently-watchlisted tickers — RemoveAsync deletes the
+        // WatchlistItem but leaves the TradingSignal row, so without this
+        // filter the home card and any consumer of GetTodayAsync would
+        // count signals from tickers the user has already removed.
+        var watchedTickers = await db.WatchlistItems
+            .Where(w => w.UserId == userId)
+            .Select(w => w.Ticker)
+            .ToListAsync(ct);
+
         var rows = await db.TradingSignals
-            .Where(s => s.UserId == userId && s.Date == today)
+            .Where(s => s.UserId == userId
+                && s.Date == today
+                && watchedTickers.Contains(s.Ticker))
             .ToListAsync(ct);
         return rows.Select(ToDto).ToList();
     }
