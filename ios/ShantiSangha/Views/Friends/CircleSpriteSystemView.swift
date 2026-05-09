@@ -934,52 +934,37 @@ final class PlanetSprite: SKNode {
         }
     }
 
-    /// Bottom-right gold-ringed atom — marks Persons that are real
+    /// Bottom-right gold-ringed dot — marks Persons that are real
     /// ShantiSangha accounts (vs. local contacts). Same signal the
     /// ConnectionDetailView avatar overlay carries; placement here is
     /// the bottom-right so it doesn't clash with the unread dot at
-    /// top-right.
+    /// top-right. Pure SKShapeNode primitives — SF Symbol via
+    /// SKTexture renders unreliably inside small sprites.
     private func applyInAppBadge(connection: Connection) {
         let needsBadge = connection.person.userId != nil
         if needsBadge && inAppBadge == nil {
             let radius = Self.diameter(for: ring) / 2
-            let badgeRadius = max(7, radius * 0.32)
+            let badgeRadius = max(6, radius * 0.26)
             let badge = SKShapeNode(circleOfRadius: badgeRadius)
             badge.fillColor = UIColor.sacredCosmicBg
-            badge.strokeColor = UIColor.sacredGoldShine.withAlphaComponent(0.85)
+            badge.strokeColor = UIColor.sacredGoldShine.withAlphaComponent(0.9)
             badge.lineWidth = 1.5
             badge.position = CGPoint(x: radius * 0.72, y: -radius * 0.72)
             badge.zPosition = 5
 
-            // Atom glyph rendered as a sprite so SpriteKit can draw it
-            // crisply at the badge size. Texture is generated lazily and
-            // cached statically across all planets.
-            if let texture = Self.atomTexture(diameter: badgeRadius * 1.6) {
-                let icon = SKSpriteNode(texture: texture)
-                icon.size = CGSize(width: badgeRadius * 1.4, height: badgeRadius * 1.4)
-                icon.zPosition = 1
-                badge.addChild(icon)
-            }
+            // Inner gold dot — reads as a "pearl" / verified marker.
+            let inner = SKShapeNode(circleOfRadius: badgeRadius * 0.48)
+            inner.fillColor = UIColor.sacredGoldShine
+            inner.strokeColor = .clear
+            inner.zPosition = 1
+            badge.addChild(inner)
+
             addChild(badge)
             inAppBadge = badge
         } else if !needsBadge, let badge = inAppBadge {
             badge.removeFromParent()
             inAppBadge = nil
         }
-    }
-
-    private static var atomTextureCache: [CGFloat: SKTexture] = [:]
-
-    private static func atomTexture(diameter: CGFloat) -> SKTexture? {
-        let key = (diameter * 10).rounded() / 10
-        if let cached = atomTextureCache[key] { return cached }
-        let cfg = UIImage.SymbolConfiguration(pointSize: diameter, weight: .bold)
-        guard let image = UIImage(systemName: "atom", withConfiguration: cfg)?
-            .withTintColor(.sacredGoldShine, renderingMode: .alwaysOriginal)
-        else { return nil }
-        let texture = SKTexture(image: image)
-        atomTextureCache[key] = texture
-        return texture
     }
 
     private func ensureCometTrail() {
