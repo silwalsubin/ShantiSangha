@@ -1,9 +1,9 @@
 import SwiftUI
 
 /// Per-connection detail screen — shows Person identity at the top
-/// (real name, location, optional birthday/contact), then editable
-/// Connection overlay (relation, nickname, private notes), then a
-/// destructive "Remove from circle" action at the bottom.
+/// (real name, location, optional contact), then editable Connection
+/// overlay (relation, nickname, private notes), then a destructive
+/// "Remove from circle" action at the bottom.
 ///
 /// For local Persons, both the About-them and Connection-overlay
 /// sections are editable. For linked Persons that aren't the caller,
@@ -23,7 +23,6 @@ struct ConnectionDetailView: View {
 
     // Person drafts (only used when canEditPerson is true)
     @State private var displayNameDraft: String = ""
-    @State private var birthDateDraft: Date?
     @State private var phoneDraft: String = ""
     @State private var emailDraft: String = ""
     @State private var cityDraft: String = ""
@@ -87,13 +86,18 @@ struct ConnectionDetailView: View {
                 .multilineTextAlignment(.center)
 
             if !c.circlesLabel.isEmpty {
-                Text(c.circlesLabel)
-                    .font(.sacredMicroBold)
-                    .foregroundColor(.sacredGold)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 3)
-                    .background(Capsule().stroke(Color.sacredGold.opacity(0.3), lineWidth: 1))
+                HStack(spacing: 5) {
+                    Image(systemName: "atom")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.sacredGold)
+                    Text(c.circlesLabel)
+                        .font(.sacredMicroBold)
+                        .foregroundColor(.sacredGold)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 3)
+                .background(Capsule().stroke(Color.sacredGold.opacity(0.3), lineWidth: 1))
             }
 
             headerActions(c)
@@ -124,8 +128,6 @@ struct ConnectionDetailView: View {
                     if canEditPerson {
                         editableRow("Name", text: $displayNameDraft, onCommit: { Task { await savePerson() } })
                         Divider().padding(.leading, 16)
-                        editableDateRow("Birthday", date: $birthDateDraft, onCommit: { Task { await savePerson() } })
-                        Divider().padding(.leading, 16)
                         editableRow("Phone", text: $phoneDraft, keyboard: .phonePad, onCommit: { Task { await savePerson() } })
                         Divider().padding(.leading, 16)
                         editableRow("Email", text: $emailDraft, keyboard: .emailAddress, onCommit: { Task { await savePerson() } })
@@ -137,10 +139,6 @@ struct ConnectionDetailView: View {
                         editableRow("Country", text: $countryDraft, onCommit: { Task { await savePerson() } })
                     } else {
                         readOnlyRow("Name", value: c.person.displayName)
-                        if let bd = c.person.birthDate, !bd.isEmpty {
-                            Divider().padding(.leading, 16)
-                            readOnlyRow("Birthday", value: bd)
-                        }
                         if let loc = c.person.locationString {
                             Divider().padding(.leading, 16)
                             readOnlyRow("Location", value: loc)
@@ -349,41 +347,6 @@ struct ConnectionDetailView: View {
         .padding(.vertical, 12)
     }
 
-    private func editableDateRow(
-        _ label: String,
-        date: Binding<Date?>,
-        onCommit: @escaping () -> Void
-    ) -> some View {
-        HStack(spacing: 12) {
-            Text(label)
-                .font(.sacredMicroBold)
-                .foregroundColor(.sacredLabel)
-                .frame(width: 80, alignment: .leading)
-            DatePicker(
-                "",
-                selection: Binding(
-                    get: { date.wrappedValue ?? Date() },
-                    set: { date.wrappedValue = $0; onCommit() }),
-                displayedComponents: [.date]
-            )
-            .labelsHidden()
-            .tint(.sacredGold)
-            Spacer(minLength: 0)
-            if date.wrappedValue != nil {
-                Button {
-                    date.wrappedValue = nil
-                    onCommit()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.sacredMuted)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-    }
-
     private func readOnlyRow(_ label: String, value: String) -> some View {
         HStack(spacing: 12) {
             Text(label)
@@ -429,7 +392,6 @@ struct ConnectionDetailView: View {
         notesDraft = c.privateNotes ?? ""
         circlesDraft = c.circles
         displayNameDraft = c.person.displayName
-        birthDateDraft = parseISODate(c.person.birthDate)
         phoneDraft = c.person.phoneNumber ?? ""
         emailDraft = c.person.email ?? ""
         cityDraft = c.person.city ?? ""
@@ -508,13 +470,11 @@ struct ConnectionDetailView: View {
         do {
             let req = UpdatePersonRequest(
                 displayName: displayNameDraft.trimmed.isEmpty ? nil : displayNameDraft.trimmed,
-                birthDate: birthDateDraft.flatMap(formatISODate),
                 phoneNumber: phoneDraft.trimmed.isEmpty ? nil : phoneDraft.trimmed,
                 email: emailDraft.trimmed.isEmpty ? nil : emailDraft.trimmed,
                 country: countryDraft.trimmed.isEmpty ? nil : countryDraft.trimmed,
                 state: stateDraft.trimmed.isEmpty ? nil : stateDraft.trimmed,
                 city: cityDraft.trimmed.isEmpty ? nil : cityDraft.trimmed,
-                clearBirthDate: birthDateDraft == nil && c.person.birthDate != nil ? true : nil,
                 clearPhoneNumber: phoneDraft.trimmed.isEmpty && c.person.phoneNumber != nil ? true : nil,
                 clearEmail: emailDraft.trimmed.isEmpty && c.person.email != nil ? true : nil,
                 clearCountry: countryDraft.trimmed.isEmpty && c.person.country != nil ? true : nil,
@@ -551,27 +511,6 @@ struct ConnectionDetailView: View {
             return "Your message thread and any media will be deleted on both sides. This can't be undone."
         }
         return "They'll no longer appear in your circle. This can't be undone."
-    }
-
-    // MARK: - Helpers
-
-    private func parseISODate(_ s: String?) -> Date? {
-        guard let s, !s.isEmpty else { return nil }
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.calendar = Calendar(identifier: .gregorian)
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.timeZone = TimeZone(identifier: "UTC")
-        return f.date(from: s)
-    }
-
-    private func formatISODate(_ d: Date) -> String {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.calendar = Calendar(identifier: .gregorian)
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.timeZone = TimeZone(identifier: "UTC")
-        return f.string(from: d)
     }
 }
 
@@ -656,12 +595,16 @@ struct CircleChipsRow: View {
             }
             addButton
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
     }
 
     private func chip(_ name: String) -> some View {
         HStack(spacing: 6) {
+            Image(systemName: "atom")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(.sacredGold)
             Text(name)
                 .font(.sacredSmallSemibold)
                 .foregroundColor(.sacredGold)
@@ -684,6 +627,8 @@ struct CircleChipsRow: View {
     private var addButton: some View {
         Button(action: onAdd) {
             HStack(spacing: 4) {
+                Image(systemName: "atom")
+                    .font(.system(size: 11, weight: .semibold))
                 Image(systemName: "plus")
                     .font(.system(size: 11, weight: .bold))
                 Text(circles.isEmpty ? "Add circle" : "Add")

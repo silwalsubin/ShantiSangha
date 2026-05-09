@@ -101,7 +101,6 @@ public class ConnectionsService(
             Id = Guid.NewGuid(),
             UserId = null,
             DisplayName = (req.DisplayName ?? string.Empty).Trim(),
-            BirthDate = req.BirthDate,
             PhoneNumber = NullIfEmpty(req.PhoneNumber),
             Email = NullIfEmpty(req.Email),
             Country = NullIfEmpty(req.Country),
@@ -202,9 +201,6 @@ public class ConnectionsService(
             person.DisplayName = trimmed;
         }
 
-        if (req.ClearBirthDate == true) person.BirthDate = null;
-        else if (req.BirthDate is not null) person.BirthDate = req.BirthDate;
-
         if (req.ClearPhoneNumber == true) person.PhoneNumber = null;
         else if (req.PhoneNumber is not null) person.PhoneNumber = NullIfEmpty(req.PhoneNumber);
 
@@ -294,7 +290,6 @@ public class ConnectionsService(
                 p.Id,
                 p.UserId,
                 displayName,
-                p.BirthDate,
                 p.PhoneNumber,
                 p.Email,
                 location.Country,
@@ -309,7 +304,6 @@ public class ConnectionsService(
             p.Id,
             null,
             p.DisplayName,
-            p.BirthDate,
             p.PhoneNumber,
             p.Email,
             p.Country,

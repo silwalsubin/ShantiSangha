@@ -120,13 +120,12 @@ public record FriendRequestResponse(
 
 /// The "who" — biographical data the owner can see about a person in
 /// their circle. For linked Persons (UserId set), biographical fields
-/// like BirthDate/Country flow from the user's Profile. For local
-/// Persons (UserId null), they're set directly by the owner.
+/// like Country flow from the user's Profile. For local Persons
+/// (UserId null), they're set directly by the owner.
 public record PersonResponse(
     Guid Id,
     Guid? UserId,
     string DisplayName,
-    DateOnly? BirthDate,
     string? PhoneNumber,
     string? Email,
     string? Country,
@@ -166,7 +165,6 @@ public record CreateConnectionRequest(
     IReadOnlyList<string>? Circles = null,
     string? Nickname = null,
     string? PrivateNotes = null,
-    DateOnly? BirthDate = null,
     string? PhoneNumber = null,
     string? Email = null,
     string? Country = null,
@@ -188,14 +186,12 @@ public record UpdateConnectionRequest(
 /// the local Person OR Person.UserId == caller). Same Clear* pattern.
 public record UpdatePersonRequest(
     string? DisplayName = null,
-    DateOnly? BirthDate = null,
     string? PhoneNumber = null,
     string? Email = null,
     string? Country = null,
     string? State = null,
     string? City = null,
     string? Address = null,
-    bool? ClearBirthDate = null,
     bool? ClearPhoneNumber = null,
     bool? ClearEmail = null,
     bool? ClearCountry = null,

@@ -12,7 +12,6 @@ public class Person
     public Guid Id { get; set; }
     public Guid? UserId { get; set; }
     public string DisplayName { get; set; } = string.Empty;
-    public DateOnly? BirthDate { get; set; }
     public string? PhoneNumber { get; set; }
     public string? Email { get; set; }
     public string? Country { get; set; }
