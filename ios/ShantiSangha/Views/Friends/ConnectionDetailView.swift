@@ -231,56 +231,59 @@ struct ConnectionDetailView: View {
 
     private func datesSection(_ c: Connection) -> some View {
         VStack(alignment: .leading, spacing: SacredSpacing.xs) {
+            sectionLabel("IMPORTANT DATES")
             if c.dates.isEmpty {
-                sectionLabel("IMPORTANT DATES")
                 emptyDatesPresets
             } else {
-                datesCollapsibleHeader(count: c.dates.count)
-                if datesExpanded {
-                    SacredListCard {
-                        VStack(spacing: 0) {
-                            ForEach(Array(c.dates.enumerated()), id: \.element.id) { index, entry in
-                                SacredDateRow(
-                                    date: parseISODate(entry.date) ?? Date(),
-                                    label: entry.label,
-                                    onTap: { dateEditTarget = .edit(entry) })
-                                if index < c.dates.count - 1 {
-                                    Divider().padding(.leading, 64)
-                                }
+                SacredListCard {
+                    VStack(spacing: 0) {
+                        // Always show the first date so the section
+                        // never reads as empty; "+ N more" lets the
+                        // rest live one tap away when the user has
+                        // accumulated several.
+                        let visible = datesExpanded ? c.dates : Array(c.dates.prefix(1))
+                        ForEach(Array(visible.enumerated()), id: \.element.id) { index, entry in
+                            SacredDateRow(
+                                date: parseISODate(entry.date) ?? Date(),
+                                label: entry.label,
+                                onTap: { dateEditTarget = .edit(entry) })
+                            if index < visible.count - 1 {
+                                Divider().padding(.leading, 64)
                             }
-                            Divider().padding(.leading, 16)
-                            addDateButton(label: "Add another")
                         }
+                        if c.dates.count > 1 {
+                            Divider().padding(.leading, 16)
+                            datesToggleRow(remaining: c.dates.count - 1)
+                        }
+                        Divider().padding(.leading, 16)
+                        addDateButton(label: "Add another")
                     }
-                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
         }
     }
 
-    /// Tappable header that doubles as a section label, count chip, and
-    /// expand/collapse affordance. The section starts collapsed because
-    /// "3 Important Dates" already conveys the gist; the rows themselves
-    /// are details the user opts into.
-    private func datesCollapsibleHeader(count: Int) -> some View {
+    /// Single row that flips between "+ N more" (collapsed) and
+    /// "Show less" (expanded) so the rest of the dates stay one tap
+    /// away in either direction without claiming a separate header
+    /// chevron.
+    private func datesToggleRow(remaining: Int) -> some View {
         Button {
             withAnimation(.easeInOut(duration: 0.2)) {
                 datesExpanded.toggle()
             }
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundColor(.sacredLabel)
-                    .rotationEffect(.degrees(datesExpanded ? 90 : 0))
-                Text("IMPORTANT DATES \u{00B7} \(count)")
-                    .font(.sacredSectionLabel)
-                    .foregroundColor(.sacredLabel)
-                Spacer(minLength: 0)
+            HStack(spacing: 8) {
+                Image(systemName: datesExpanded ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 11, weight: .semibold))
+                Text(datesExpanded ? "Show less" : "+ \(remaining) more")
+                    .font(.sacredSmallSemibold)
+                Spacer()
             }
-            .padding(.horizontal, 4)
-            .padding(.vertical, 6)
+            .foregroundColor(.sacredGold)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
