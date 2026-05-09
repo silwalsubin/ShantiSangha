@@ -177,7 +177,12 @@ struct ConnectionDateEditSheet: View {
     private func seed() {
         guard !didSeed else { return }
         didSeed = true
-        if case .edit(let entry) = target {
+        switch target {
+        case .new(let initialLabel):
+            if let initialLabel, !initialLabel.isEmpty {
+                labelDraft = initialLabel
+            }
+        case .edit(let entry):
             labelDraft = entry.label
             dateDraft = parseISODate(entry.date) ?? Date()
             recurrenceDraft = entry.recurrence

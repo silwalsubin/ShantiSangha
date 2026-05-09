@@ -40,6 +40,7 @@ struct ConnectionDetailView: View {
 
     // nil = sheet closed; .new = adding; .edit(id) = editing existing
     @State private var dateEditTarget: ConnectionDateEditTarget?
+    @State private var datesExpanded = false
 
     private var connection: Connection? {
         vm.connections.first(where: { $0.id == connectionId })
@@ -230,38 +231,119 @@ struct ConnectionDetailView: View {
 
     private func datesSection(_ c: Connection) -> some View {
         VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-            sectionLabel("IMPORTANT DATES")
-
-            SacredListCard {
-                VStack(spacing: 0) {
-                    if c.dates.isEmpty {
-                        addDateButton(label: "Add a date")
-                    } else {
-                        ForEach(Array(c.dates.enumerated()), id: \.element.id) { index, entry in
-                            SacredDateRow(
-                                date: parseISODate(entry.date) ?? Date(),
-                                label: entry.label,
-                                onTap: { dateEditTarget = .edit(entry) })
-                            if index < c.dates.count - 1 {
-                                Divider().padding(.leading, 64)
+            if c.dates.isEmpty {
+                sectionLabel("IMPORTANT DATES")
+                emptyDatesPresets
+            } else {
+                datesCollapsibleHeader(count: c.dates.count)
+                if datesExpanded {
+                    SacredListCard {
+                        VStack(spacing: 0) {
+                            ForEach(Array(c.dates.enumerated()), id: \.element.id) { index, entry in
+                                SacredDateRow(
+                                    date: parseISODate(entry.date) ?? Date(),
+                                    label: entry.label,
+                                    onTap: { dateEditTarget = .edit(entry) })
+                                if index < c.dates.count - 1 {
+                                    Divider().padding(.leading, 64)
+                                }
                             }
+                            Divider().padding(.leading, 16)
+                            addDateButton(label: "Add another")
                         }
-                        Divider().padding(.leading, 16)
-                        addDateButton(label: "Add another")
                     }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
-
-            Text("Birthday, anniversary, the day you met — anything you want to remember.")
-                .font(.sacredMicro)
-                .foregroundColor(.sacredMuted)
-                .padding(.horizontal, 4)
         }
+    }
+
+    /// Tappable header that doubles as a section label, count chip, and
+    /// expand/collapse affordance. The section starts collapsed because
+    /// "3 Important Dates" already conveys the gist; the rows themselves
+    /// are details the user opts into.
+    private func datesCollapsibleHeader(count: Int) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                datesExpanded.toggle()
+            }
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(.sacredLabel)
+                    .rotationEffect(.degrees(datesExpanded ? 90 : 0))
+                Text("IMPORTANT DATES \u{00B7} \(count)")
+                    .font(.sacredSectionLabel)
+                    .foregroundColor(.sacredLabel)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 4)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Empty-state suggestion list. Each preset opens the date sheet
+    /// pre-filled with that label so first-time users get a one-tap
+    /// path; the subtitles double as scaffolding for what each kind
+    /// of date is for.
+    private var emptyDatesPresets: some View {
+        SacredListCard {
+            VStack(spacing: 0) {
+                datePresetRow(
+                    label: "Birthday",
+                    subtitle: "Their day, every year")
+                Divider().padding(.leading, 16)
+                datePresetRow(
+                    label: "Anniversary",
+                    subtitle: "Wedding, partnership, milestone")
+                Divider().padding(.leading, 16)
+                datePresetRow(
+                    label: "Day we met",
+                    subtitle: "When your paths crossed")
+                Divider().padding(.leading, 16)
+                datePresetRow(
+                    label: nil,
+                    subtitle: "Anything else worth remembering")
+            }
+        }
+    }
+
+    private func datePresetRow(label: String?, subtitle: String) -> some View {
+        Button {
+            dateEditTarget = .new(initialLabel: label)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: label == nil ? "plus.circle" : "calendar")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.sacredGold)
+                    .frame(width: 32)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(label ?? "Custom date")
+                        .font(.sacredTextSemibold)
+                        .foregroundColor(.sacredText)
+                    Text(subtitle)
+                        .font(.sacredMicro)
+                        .foregroundColor(.sacredMuted)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundColor(.sacredMuted.opacity(0.6))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func addDateButton(label: String) -> some View {
         Button {
-            dateEditTarget = .new
+            dateEditTarget = .new()
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "plus")
@@ -633,11 +715,13 @@ struct ConnectionDetailView: View {
     }
 }
 
-/// Sheet identity for the add/edit-date flow. `.new` opens an empty
-/// form; `.edit(entry)` pre-fills with the existing row and offers a
-/// destructive "Delete" action.
+/// Sheet identity for the add/edit-date flow. `.new()` opens an empty
+/// form; `.new(initialLabel:)` pre-fills the label so the empty-state
+/// preset rows can hand the user a one-tap "Birthday" / "Anniversary"
+/// / "Day we met" path; `.edit(entry)` pre-fills the whole row and
+/// offers a destructive "Delete" action.
 enum ConnectionDateEditTarget: Identifiable {
-    case new
+    case new(initialLabel: String? = nil)
     case edit(ConnectionDate)
 
     var id: String {
@@ -650,6 +734,11 @@ enum ConnectionDateEditTarget: Identifiable {
     var isEditing: Bool {
         if case .edit = self { return true }
         return false
+    }
+
+    var initialLabel: String? {
+        if case .new(let label) = self { return label }
+        return nil
     }
 }
 
