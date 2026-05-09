@@ -288,6 +288,7 @@ public class ConnectionsService(
             ConnectionId = connectionId,
             Label = label,
             Date = req.Date,
+            Recurrence = req.Recurrence,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -298,7 +299,7 @@ public class ConnectionsService(
         conn.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
 
-        return new ConnectionDateResponse(entry.Id, entry.Label, entry.Date);
+        return new ConnectionDateResponse(entry.Id, entry.Label, entry.Date, entry.Recurrence);
     }
 
     public async Task<ConnectionDateResponse?> UpdateDateAsync(
@@ -323,11 +324,12 @@ public class ConnectionsService(
         var now = DateTime.UtcNow;
         hit.Date.Label = label;
         hit.Date.Date = req.Date;
+        hit.Date.Recurrence = req.Recurrence;
         hit.Date.UpdatedAt = now;
         hit.Conn.UpdatedAt = now;
         await db.SaveChangesAsync(ct);
 
-        return new ConnectionDateResponse(hit.Date.Id, hit.Date.Label, hit.Date.Date);
+        return new ConnectionDateResponse(hit.Date.Id, hit.Date.Label, hit.Date.Date, hit.Date.Recurrence);
     }
 
     public async Task<bool> DeleteDateAsync(
@@ -364,7 +366,7 @@ public class ConnectionsService(
     {
         var personDto = await BuildPersonResponseAsync(person, ct);
         var dateDtos = dates
-            .Select(d => new ConnectionDateResponse(d.Id, d.Label, d.Date))
+            .Select(d => new ConnectionDateResponse(d.Id, d.Label, d.Date, d.Recurrence))
             .ToList();
         return new ConnectionResponse(
             conn.Id,

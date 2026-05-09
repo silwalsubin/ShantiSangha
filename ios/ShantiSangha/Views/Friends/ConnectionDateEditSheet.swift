@@ -2,20 +2,21 @@ import SwiftUI
 
 /// Add / edit a single "important date" on a Connection — birthday,
 /// anniversary, day-we-met, etc. Free-form label paired with a date
-/// picker.
+/// picker and a recurrence toggle (annual vs one-time).
 ///
 /// The parent owns persistence; this sheet only collects the values
 /// and calls back via `onSave`. `onDelete` is non-nil only for the
 /// edit path so the destructive button stays out of the add flow.
 struct ConnectionDateEditSheet: View {
     let target: ConnectionDateEditTarget
-    let onSave: (_ label: String, _ date: String) async -> Void
+    let onSave: (_ label: String, _ date: String, _ recurrence: ConnectionDateRecurrence) async -> Void
     let onDelete: (() async -> Void)?
 
     @Environment(\.dismiss) private var dismiss
 
     @State private var labelDraft: String = ""
     @State private var dateDraft: Date = Date()
+    @State private var recurrenceDraft: ConnectionDateRecurrence = .yearly
     @State private var saving = false
     @State private var deleting = false
     @State private var didSeed = false
@@ -31,6 +32,7 @@ struct ConnectionDateEditSheet: View {
                 VStack(spacing: SacredSpacing.l) {
                     labelSection
                     dateSection
+                    recurrenceSection
                     if onDelete != nil {
                         deleteSection
                     }
@@ -102,6 +104,56 @@ struct ConnectionDateEditSheet: View {
         }
     }
 
+    private var recurrenceSection: some View {
+        VStack(alignment: .leading, spacing: SacredSpacing.xs) {
+            sectionLabel("REPEATS")
+            SacredListCard {
+                VStack(spacing: 0) {
+                    recurrenceRow(
+                        title: "Every year",
+                        subtitle: "Birthday, anniversary, day-we-met",
+                        value: .yearly)
+                    Divider().padding(.leading, 16)
+                    recurrenceRow(
+                        title: "One-time",
+                        subtitle: "Moved cities, started a job",
+                        value: .once)
+                }
+            }
+        }
+    }
+
+    private func recurrenceRow(
+        title: String,
+        subtitle: String,
+        value: ConnectionDateRecurrence
+    ) -> some View {
+        Button {
+            recurrenceDraft = value
+        } label: {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.sacredText)
+                        .foregroundColor(.sacredText)
+                    Text(subtitle)
+                        .font(.sacredMicro)
+                        .foregroundColor(.sacredMuted)
+                }
+                Spacer(minLength: 0)
+                if recurrenceDraft == value {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.sacredGold)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
     private var deleteSection: some View {
         Button(role: .destructive) {
             showDeleteConfirm = true
@@ -140,6 +192,7 @@ struct ConnectionDateEditSheet: View {
         if case .edit(let entry) = target {
             labelDraft = entry.label
             dateDraft = parseISODate(entry.date) ?? Date()
+            recurrenceDraft = entry.recurrence
         }
     }
 
@@ -148,7 +201,7 @@ struct ConnectionDateEditSheet: View {
         guard !trimmed.isEmpty else { return }
         saving = true
         defer { saving = false }
-        await onSave(trimmed, formatISODate(dateDraft))
+        await onSave(trimmed, formatISODate(dateDraft), recurrenceDraft)
     }
 
     private func delete() async {

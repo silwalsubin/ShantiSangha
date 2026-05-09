@@ -1,3 +1,5 @@
+using ShantiSangha.Friends.Models;
+
 namespace ShantiSangha.Friends.Contracts;
 
 public record FriendSummaryResponse(
@@ -160,22 +162,29 @@ public record ConnectionResponse(
     int UnreadCount);
 
 /// Single owner-private "important date" attached to a Connection.
-/// Order in the parent list is Date ascending.
+/// Order in the parent list is Date ascending. `Recurrence` tells the
+/// client whether the date repeats annually (birthday, anniversary)
+/// or pins to its absolute calendar slot (moved cities, started job).
 public record ConnectionDateResponse(
     Guid Id,
     string Label,
-    DateOnly Date);
+    DateOnly Date,
+    ConnectionDateRecurrence Recurrence);
 
 /// Add a new date to a Connection. Label is trimmed; date required.
+/// `Recurrence` defaults to `Yearly` — the most common case is
+/// birthdays/anniversaries that roll forward each year.
 public record AddConnectionDateRequest(
     string Label,
-    DateOnly Date);
+    DateOnly Date,
+    ConnectionDateRecurrence Recurrence = ConnectionDateRecurrence.Yearly);
 
-/// Update an existing date on a Connection. Both fields required —
+/// Update an existing date on a Connection. All fields required —
 /// the iOS edit sheet always submits the full row.
 public record UpdateConnectionDateRequest(
     string Label,
-    DateOnly Date);
+    DateOnly Date,
+    ConnectionDateRecurrence Recurrence = ConnectionDateRecurrence.Yearly);
 
 /// Creates a local Person + Connection in one call. Backend sets
 /// `Person.UserId = NULL` and `Connection.FriendshipId = NULL`. An

@@ -100,6 +100,9 @@ public class FriendsDbContext(DbContextOptions<FriendsDbContext> options) : DbCo
             // is declared in the migration SQL so removing a connection
             // takes its dates with it.
             e.HasIndex(d => d.ConnectionId);
+            // Store as text for forward compatibility with future
+            // recurrence kinds (monthly, custom) without DB schema churn.
+            e.Property(d => d.Recurrence).HasConversion<string>();
         });
 
         mb.Entity<FriendRequest>(e =>

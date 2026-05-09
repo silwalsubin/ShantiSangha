@@ -122,11 +122,15 @@ final class CircleViewModel: ObservableObject {
     func addDate(
         connectionId: UUID,
         label: String,
-        date: String
+        date: String,
+        recurrence: ConnectionDateRecurrence
     ) async throws -> ConnectionDate {
         let created = try await ConnectionsAPI.addDate(
             connectionId,
-            request: AddConnectionDateRequest(label: label, date: date))
+            request: AddConnectionDateRequest(
+                label: label,
+                date: date,
+                recurrence: recurrence))
         let refreshed = try await ConnectionsAPI.get(connectionId)
         replaceInPlace(refreshed)
         return created
@@ -137,12 +141,16 @@ final class CircleViewModel: ObservableObject {
         connectionId: UUID,
         dateId: UUID,
         label: String,
-        date: String
+        date: String,
+        recurrence: ConnectionDateRecurrence
     ) async throws -> ConnectionDate {
         let updated = try await ConnectionsAPI.updateDate(
             connectionId,
             dateId: dateId,
-            request: UpdateConnectionDateRequest(label: label, date: date))
+            request: UpdateConnectionDateRequest(
+                label: label,
+                date: date,
+                recurrence: recurrence))
         let refreshed = try await ConnectionsAPI.get(connectionId)
         replaceInPlace(refreshed)
         return updated

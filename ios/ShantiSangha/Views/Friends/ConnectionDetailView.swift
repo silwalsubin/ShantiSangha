@@ -76,8 +76,12 @@ struct ConnectionDetailView: View {
         .sheet(item: $dateEditTarget) { target in
             ConnectionDateEditSheet(
                 target: target,
-                onSave: { label, date in
-                    await saveDate(target: target, label: label, date: date)
+                onSave: { label, date, recurrence in
+                    await saveDate(
+                        target: target,
+                        label: label,
+                        date: date,
+                        recurrence: recurrence)
                 },
                 onDelete: target.isEditing
                     ? { await deleteDate(target: target) }
@@ -577,18 +581,28 @@ struct ConnectionDetailView: View {
         return "They'll no longer appear in your circle. This can't be undone."
     }
 
-    private func saveDate(target: ConnectionDateEditTarget, label: String, date: String) async {
+    private func saveDate(
+        target: ConnectionDateEditTarget,
+        label: String,
+        date: String,
+        recurrence: ConnectionDateRecurrence
+    ) async {
         guard let c = connection else { return }
         do {
             switch target {
             case .new:
-                _ = try await vm.addDate(connectionId: c.id, label: label, date: date)
+                _ = try await vm.addDate(
+                    connectionId: c.id,
+                    label: label,
+                    date: date,
+                    recurrence: recurrence)
             case .edit(let entry):
                 _ = try await vm.updateDate(
                     connectionId: c.id,
                     dateId: entry.id,
                     label: label,
-                    date: date)
+                    date: date,
+                    recurrence: recurrence)
             }
             saveError = nil
             dateEditTarget = nil

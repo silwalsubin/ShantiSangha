@@ -13,6 +13,7 @@ public class ConnectionDate
     public Guid ConnectionId { get; set; }
     public string Label { get; set; } = string.Empty;
     public DateOnly Date { get; set; }
+    public ConnectionDateRecurrence Recurrence { get; set; } = ConnectionDateRecurrence.Yearly;
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }
