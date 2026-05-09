@@ -206,6 +206,8 @@ struct ConnectionDetailView: View {
                 .font(.sacredMicro)
                 .foregroundColor(.sacredMuted)
                 .padding(.horizontal, 4)
+
+            PrivateFootnote()
         }
         .sheet(isPresented: $showCirclesPicker) {
             CirclesPickerSheet(
@@ -260,6 +262,8 @@ struct ConnectionDetailView: View {
                     }
                 }
             }
+
+            PrivateFootnote()
         }
     }
 
@@ -390,6 +394,8 @@ struct ConnectionDetailView: View {
                 .font(.sacredMicro)
                 .foregroundColor(.sacredMuted)
                 .padding(.horizontal, 4)
+
+            PrivateFootnote()
         }
     }
 
