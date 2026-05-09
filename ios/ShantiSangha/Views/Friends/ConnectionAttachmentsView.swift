@@ -41,6 +41,15 @@ struct ConnectionAttachmentsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: SacredSpacing.l) {
+            if didLoadOnce {
+                // Privacy reassurance up top so the user reads it before they
+                // scroll the grid — matches the placement under other
+                // owner-private sections in the profile (Nickname, Notes,
+                // Important Dates).
+                PrivateFootnote()
+                    .padding(.horizontal, SacredSpacing.m)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
             if !mediaItems.isEmpty || !pendingMediaItems.isEmpty {
                 mediaSection
             }
@@ -51,11 +60,6 @@ struct ConnectionAttachmentsView: View {
             if attachments.isEmpty && pendingItems.isEmpty && didLoadOnce && !loading {
                 emptyCTA
                     .padding(.horizontal, SacredSpacing.m)
-            }
-            if didLoadOnce {
-                PrivateFootnote()
-                    .padding(.horizontal, SacredSpacing.m)
-                    .frame(maxWidth: .infinity, alignment: .center)
             }
             if let errorMessage {
                 Text(errorMessage)

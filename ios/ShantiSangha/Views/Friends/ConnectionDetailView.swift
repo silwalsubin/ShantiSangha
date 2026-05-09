@@ -432,14 +432,19 @@ struct ConnectionDetailView: View {
 
     /// Tile-row that pushes to a dedicated full-screen page for media + files.
     /// Keeps the profile compact regardless of how much the user has saved
-    /// for this connection.
+    /// for this connection. Footnote matches the other owner-private
+    /// sections (Important Dates, Nickname, Notes).
     private func mediaFilesRow(_ c: Connection) -> some View {
-        NavigationLink(destination: ConnectionAttachmentsScreen(connectionId: c.id)) {
-            SacredListCard {
-                SacredMenuRow(icon: "photo.on.rectangle", title: "Media & Files")
+        VStack(alignment: .leading, spacing: SacredSpacing.xs) {
+            NavigationLink(destination: ConnectionAttachmentsScreen(connectionId: c.id)) {
+                SacredListCard {
+                    SacredMenuRow(icon: "photo.on.rectangle", title: "Media & Files")
+                }
             }
+            .buttonStyle(.plain)
+
+            PrivateFootnote()
         }
-        .buttonStyle(.plain)
     }
 
     private func removeSection(_ c: Connection) -> some View {
