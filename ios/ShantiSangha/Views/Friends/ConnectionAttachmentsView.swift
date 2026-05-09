@@ -127,8 +127,11 @@ struct ConnectionAttachmentsView: View {
                 attachment: target,
                 onSave: { caption in await saveCaption(target: target, caption: caption) })
         }
-        .sheet(item: $mediaViewerTarget) { target in
-            AttachmentMediaViewer(attachment: target)
+        .fullScreenCover(item: $mediaViewerTarget) { target in
+            AttachmentMediaViewer(
+                attachment: target,
+                onCaption: { captionTarget = target; mediaViewerTarget = nil },
+                onDelete: { deleteTarget = target; mediaViewerTarget = nil })
         }
         .quickLookPreview($fileQuickLookURL)
         .confirmationDialog(
@@ -893,14 +896,17 @@ private struct AttachmentCaptionSheet: View {
 
 private struct AttachmentMediaViewer: View {
     let attachment: ConnectionAttachment
+    let onCaption: () -> Void
+    let onDelete: () -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var imageZoom: CGFloat = 1.0
     @State private var imageZoomBase: CGFloat = 1.0
+    @State private var showShareSheet = false
 
     /// Local file URL when the attachment is saved offline, else the
     /// presigned remote URL. Lets full-screen viewing work without
-    /// network for offline-saved keepsakes.
+    /// network for offline-saved attachments.
     private var sourceURL: URL? {
         if let local = AttachmentCache.shared.offlineFileURL(for: attachment) {
             return local
@@ -915,18 +921,15 @@ private struct AttachmentMediaViewer: View {
             VStack {
                 topBar
                 Spacer()
-                if let caption = attachment.caption, !caption.isEmpty {
-                    Text(caption)
-                        .font(.sacredText)
-                        .foregroundColor(.white)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, SacredSpacing.l)
-                        .padding(.vertical, SacredSpacing.m)
-                        .background(Color.black.opacity(0.45))
-                }
+                bottomBar
             }
         }
         .statusBar(hidden: true)
+        .sheet(isPresented: $showShareSheet) {
+            if let url = sourceURL {
+                ShareSheet(items: [url])
+            }
+        }
     }
 
     @ViewBuilder
@@ -973,20 +976,135 @@ private struct AttachmentMediaViewer: View {
         }
     }
 
+    /// Apple-Photos-style top bar: chevron back + center timestamp pill +
+    /// trailing more menu. Pills sit on a black-glass background that reads
+    /// against any image underneath.
     private var topBar: some View {
         HStack {
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(width: 36, height: 36)
-                    .background(Circle().fill(Color.black.opacity(0.4)))
-            }
+            chromeButton(systemName: "chevron.backward") { dismiss() }
             Spacer()
+            timestampPill
+            Spacer()
+            chromeMenu
         }
         .padding(.horizontal, SacredSpacing.m)
         .padding(.top, SacredSpacing.m)
     }
+
+    private func chromeButton(systemName: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 36, height: 36)
+                .background(Circle().fill(Color.black.opacity(0.45)))
+        }
+    }
+
+    private var timestampPill: some View {
+        VStack(spacing: 0) {
+            Text(timestampDay)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white)
+            Text(timestampTime)
+                .font(.system(size: 11))
+                .foregroundColor(.white.opacity(0.7))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+        .background(Capsule().fill(Color.black.opacity(0.45)))
+    }
+
+    private var chromeMenu: some View {
+        Menu {
+            Button {
+                onCaption()
+            } label: {
+                Label(attachment.caption?.isEmpty == false ? "Edit caption" : "Add caption",
+                      systemImage: "text.bubble")
+            }
+            Button(role: .destructive) {
+                onDelete()
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 36, height: 36)
+                .background(Circle().fill(Color.black.opacity(0.45)))
+        }
+    }
+
+    /// Bottom action bar. Caption (if any) sits above the action row so
+    /// it stays visible while the actions are tappable.
+    private var bottomBar: some View {
+        VStack(spacing: SacredSpacing.s) {
+            if let caption = attachment.caption, !caption.isEmpty {
+                Text(caption)
+                    .font(.sacredText)
+                    .foregroundColor(.white)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, SacredSpacing.l)
+                    .padding(.vertical, SacredSpacing.s)
+                    .background(Capsule().fill(Color.black.opacity(0.45)))
+                    .padding(.horizontal, SacredSpacing.l)
+            }
+            HStack {
+                actionButton(systemName: "square.and.arrow.up") { showShareSheet = true }
+                Spacer()
+                actionButton(systemName: "text.bubble", action: onCaption)
+                Spacer()
+                actionButton(systemName: "trash", tint: .sacredRed, action: onDelete)
+            }
+            .padding(.horizontal, 48)
+            .padding(.bottom, SacredSpacing.l)
+        }
+    }
+
+    private func actionButton(systemName: String, tint: Color = .white, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 18, weight: .regular))
+                .foregroundColor(tint)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+    }
+
+    private var timestampDate: Date {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = f.date(from: attachment.createdAt) { return d }
+        f.formatOptions = [.withInternetDateTime]
+        return f.date(from: attachment.createdAt) ?? Date()
+    }
+
+    private var timestampDay: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        if Calendar.current.isDateInToday(timestampDate) { return "Today" }
+        if Calendar.current.isDateInYesterday(timestampDate) { return "Yesterday" }
+        formatter.dateFormat = "MMM d, yyyy"
+        return formatter.string(from: timestampDate)
+    }
+
+    private var timestampTime: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        formatter.dateFormat = "h:mm a"
+        return formatter.string(from: timestampDate)
+    }
+}
+
+/// Minimal UIActivityViewController wrapper for share-sheet presentation.
+private struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
 
 private struct VideoPlayerHost: View {
