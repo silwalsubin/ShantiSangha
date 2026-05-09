@@ -156,19 +156,23 @@ struct ReflectView: View {
             }
         }
         .sheet(isPresented: $showBeginReflection) {
-            BeginReflectionSheet(
-                onChat: {
-                    showBeginReflection = false
-                    Task { await startChat() }
-                },
-                onJournal: {
-                    showBeginReflection = false
-                    pendingNavigation = .journal
-                },
-                onVoice: {
-                    showBeginReflection = false
-                    pendingNavigation = .voice
-                }
+            SacredChoiceSheet(
+                title: "Begin Reflection",
+                prompt: "Choose the shape this reflection wants.",
+                choices: [
+                    SacredChoice(icon: "doc.text", title: "Write") {
+                        showBeginReflection = false
+                        pendingNavigation = .journal
+                    },
+                    SacredChoice(icon: "bubble.left", title: "Talk") {
+                        showBeginReflection = false
+                        Task { await startChat() }
+                    },
+                    SacredChoice(icon: "mic", title: "Speak") {
+                        showBeginReflection = false
+                        pendingNavigation = .voice
+                    },
+                ]
             )
         }
         .sacredToast($toastMessage)
@@ -385,65 +389,6 @@ enum ReflectType {
         case .journal: return .sacredGold
         case .voice: return .sacredGold
         }
-    }
-}
-
-private struct BeginReflectionSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    let onChat: () -> Void
-    let onJournal: () -> Void
-    let onVoice: () -> Void
-
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                SacredBackground()
-                    .ignoresSafeArea()
-
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("Choose the shape this reflection wants.")
-                        .font(.sacredText)
-                        .foregroundColor(.sacredTextSecondary)
-                        .lineSpacing(4)
-                        .padding(.horizontal, 20)
-                        .padding(.top, SacredSpacing.s)
-                        .padding(.bottom, SacredSpacing.l)
-
-                    SacredListCard {
-                        VStack(spacing: 0) {
-                            reflectionRow(icon: "doc.text", title: "Write", action: onJournal)
-                            Divider().padding(.leading, 56)
-                            reflectionRow(icon: "bubble.left", title: "Talk", action: onChat)
-                            Divider().padding(.leading, 56)
-                            reflectionRow(icon: "mic", title: "Speak", action: onVoice)
-                        }
-                    }
-                    .padding(.horizontal, 20)
-
-                    Spacer()
-                }
-            }
-            .navigationTitle("Begin Reflection")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                        .font(.sacredTextMedium)
-                        .foregroundColor(.sacredMuted)
-                }
-            }
-        }
-        .presentationDetents([.height(320)])
-    }
-
-    private func reflectionRow(icon: String, title: String, action: @escaping () -> Void) -> some View {
-        Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            action()
-        } label: {
-            SacredMenuRow(icon: icon, title: title)
-        }
-        .buttonStyle(.plain)
     }
 }
 
