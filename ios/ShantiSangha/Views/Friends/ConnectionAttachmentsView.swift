@@ -902,6 +902,8 @@ private struct AttachmentMediaViewer: View {
     @Environment(\.dismiss) private var dismiss
     @State private var imageZoom: CGFloat = 1.0
     @State private var imageZoomBase: CGFloat = 1.0
+    @State private var imageOffset: CGSize = .zero
+    @State private var imageOffsetBase: CGSize = .zero
     @State private var showShareSheet = false
 
     /// Local file URL when the attachment is saved offline, else the
@@ -949,18 +951,49 @@ private struct AttachmentMediaViewer: View {
                         .resizable()
                         .scaledToFit()
                         .scaleEffect(imageZoom)
+                        .offset(imageOffset)
                         .gesture(
-                            MagnificationGesture()
-                                .onChanged { value in
-                                    imageZoom = max(1.0, min(4.0, imageZoomBase * value))
-                                }
-                                .onEnded { _ in
-                                    imageZoomBase = imageZoom
-                                })
+                            // Simultaneous pinch + pan. Pan is only honored
+                            // when the image is zoomed in — at 1× the gesture
+                            // is a no-op so we don't fight the dismiss
+                            // affordance underneath.
+                            SimultaneousGesture(
+                                MagnificationGesture()
+                                    .onChanged { value in
+                                        imageZoom = max(1.0, min(4.0, imageZoomBase * value))
+                                    }
+                                    .onEnded { _ in
+                                        imageZoomBase = imageZoom
+                                        if imageZoom <= 1.0 {
+                                            withAnimation(.easeInOut(duration: 0.2)) {
+                                                imageOffset = .zero
+                                                imageOffsetBase = .zero
+                                            }
+                                        }
+                                    },
+                                DragGesture()
+                                    .onChanged { value in
+                                        guard imageZoom > 1.0 else { return }
+                                        imageOffset = CGSize(
+                                            width: imageOffsetBase.width + value.translation.width,
+                                            height: imageOffsetBase.height + value.translation.height)
+                                    }
+                                    .onEnded { _ in
+                                        imageOffsetBase = imageOffset
+                                    }
+                            )
+                        )
                         .onTapGesture(count: 2) {
                             withAnimation(.easeInOut(duration: 0.25)) {
-                                imageZoom = imageZoom > 1.0 ? 1.0 : 2.5
-                                imageZoomBase = imageZoom
+                                if imageZoom > 1.0 {
+                                    imageZoom = 1.0
+                                    imageZoomBase = 1.0
+                                    imageOffset = .zero
+                                    imageOffsetBase = .zero
+                                } else {
+                                    imageZoom = 2.5
+                                    imageZoomBase = 2.5
+                                }
                             }
                         }
                 case .failure:
