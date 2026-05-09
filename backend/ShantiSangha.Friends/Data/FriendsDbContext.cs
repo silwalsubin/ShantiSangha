@@ -92,6 +92,17 @@ public class FriendsDbContext(DbContextOptions<FriendsDbContext> options) : DbCo
             e.HasIndex(c => c.OwnerUserId);
             e.HasIndex(c => new { c.OwnerUserId, c.PersonId }).IsUnique();
             e.HasIndex(c => c.FriendshipId);
+            // Teach EF about the FK to Persons so the change tracker can
+            // order dependent inserts inside a single SaveChanges. Without
+            // this, CreateLocalAsync's Person+Connection batch sometimes
+            // inserts Connection first and trips FK_Connections_Persons.
+            // Shadow nav (no property on the model) — the FK column is
+            // PersonId, declared above; the migration owns the actual
+            // CASCADE delete behavior.
+            e.HasOne<Person>()
+                .WithMany()
+                .HasForeignKey(c => c.PersonId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         mb.Entity<ConnectionDate>(e =>
