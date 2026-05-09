@@ -65,8 +65,8 @@ struct ConnectionAttachmentsView: View {
         }
         .sheet(isPresented: $showAddSheet) {
             SacredChoiceSheet(
-                title: "Add a keepsake",
-                prompt: "Pick what you want to remember.",
+                title: "Add media or files",
+                prompt: "Choose what to add.",
                 choices: [
                     SacredChoice(icon: "photo", title: "Photo or video") {
                         showAddSheet = false
@@ -181,7 +181,7 @@ struct ConnectionAttachmentsView: View {
             HStack(spacing: 8) {
                 Image(systemName: "plus")
                     .font(.system(size: 11, weight: .bold))
-                Text("Add a keepsake")
+                Text("Add media or files")
                     .font(.sacredSmallSemibold)
                 Spacer()
             }
@@ -199,7 +199,7 @@ struct ConnectionAttachmentsView: View {
 
     private var emptyCTA: some View {
         VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-            sectionLabel("KEEPSAKES")
+            sectionLabel("MEDIA & FILES")
             SacredCard {
                 SacredEmptyState(
                     icon: "photo.on.rectangle.angled",
@@ -307,7 +307,7 @@ struct ConnectionAttachmentsView: View {
     }
 
     private var deleteConfirmTitle: String {
-        guard let deleteTarget else { return "Delete keepsake?" }
+        guard let deleteTarget else { return "Delete this?" }
         if let caption = deleteTarget.caption, !caption.isEmpty {
             return "Delete \"\(caption)\"?"
         }
@@ -325,7 +325,7 @@ struct ConnectionAttachmentsView: View {
             didLoadOnce = true
         } catch {
             if !error.isCancellation {
-                errorMessage = "Couldn't load keepsakes. Pull to refresh."
+                errorMessage = "Couldn't load. Pull to refresh."
                 didLoadOnce = true
             }
         }
