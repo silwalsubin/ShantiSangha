@@ -55,7 +55,6 @@ struct ConnectionDetailView: View {
             if let connection {
                 VStack(spacing: SacredSpacing.l) {
                     header(connection)
-                    aboutSection(connection)
                     mediaFilesRow(connection)
                     relationSection
                     datesSection(connection)
@@ -107,10 +106,26 @@ struct ConnectionDetailView: View {
 
     private func header(_ c: Connection) -> some View {
         VStack(spacing: SacredSpacing.s) {
-            SacredAvatar(
-                displayName: c.person.displayName,
-                avatarUrl: c.person.avatarUrl,
-                size: 120)
+            ZStack(alignment: .bottomTrailing) {
+                SacredAvatar(
+                    displayName: c.person.displayName,
+                    avatarUrl: c.person.avatarUrl,
+                    size: 120)
+
+                // Small gold atom overlay marks linked Persons (those with
+                // an actual ShantiSangha account, distinct from local
+                // contacts the user added by hand). Replaces the now-gone
+                // ABOUT THEM section's "they control this" disclosure.
+                if c.person.userId != nil {
+                    Image(systemName: "atom")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(.sacredGold)
+                        .frame(width: 28, height: 28)
+                        .background(Circle().fill(Color.sacredBg))
+                        .overlay(Circle().stroke(Color.sacredGold.opacity(0.5), lineWidth: 1.5))
+                        .offset(x: -4, y: -4)
+                }
+            }
 
             Text(c.person.displayName)
                 .font(.sacredHeading)
