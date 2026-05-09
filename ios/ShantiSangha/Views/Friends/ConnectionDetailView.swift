@@ -60,7 +60,7 @@ struct ConnectionDetailView: View {
                     datesSection(connection)
                     nicknameSection
                     notesSection
-                    ConnectionAttachmentsView(connectionId: connection.id)
+                    mediaFilesRow(connection)
                     removeSection(connection)
                 }
                 .padding(.horizontal, SacredSpacing.m)
@@ -428,6 +428,18 @@ struct ConnectionDetailView: View {
 
             PrivateFootnote()
         }
+    }
+
+    /// Tile-row that pushes to a dedicated full-screen page for media + files.
+    /// Keeps the profile compact regardless of how much the user has saved
+    /// for this connection.
+    private func mediaFilesRow(_ c: Connection) -> some View {
+        NavigationLink(destination: ConnectionAttachmentsScreen(connectionId: c.id)) {
+            SacredListCard {
+                SacredMenuRow(icon: "photo.on.rectangle", title: "Media & Files")
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private func removeSection(_ c: Connection) -> some View {
