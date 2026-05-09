@@ -52,6 +52,11 @@ struct ConnectionAttachmentsView: View {
                 emptyCTA
                     .padding(.horizontal, SacredSpacing.m)
             }
+            if didLoadOnce {
+                PrivateFootnote()
+                    .padding(.horizontal, SacredSpacing.m)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
             if let errorMessage {
                 Text(errorMessage)
                     .font(.sacredMicro)
@@ -186,17 +191,15 @@ struct ConnectionAttachmentsView: View {
 
     private var emptyCTA: some View {
         // Screen title already says "Media & Files" — no inline section
-        // header needed. Empty state is its own focused moment.
-        VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-            SacredCard {
-                SacredEmptyState(
-                    icon: "photo.on.rectangle.angled",
-                    title: "Hold onto a moment.",
-                    subtitle: "Photos, videos, or files you want to remember about them.",
-                    actionLabel: "Add something") { showAddSheet = true }
-            }
-
-            PrivateFootnote()
+        // header needed. Empty state is its own focused moment. The
+        // privacy footnote is rendered once at the body level so it
+        // appears in both empty and populated states.
+        SacredCard {
+            SacredEmptyState(
+                icon: "photo.on.rectangle.angled",
+                title: "Hold onto a moment.",
+                subtitle: "Photos, videos, or files you want to remember about them.",
+                actionLabel: "Add something") { showAddSheet = true }
         }
     }
 
