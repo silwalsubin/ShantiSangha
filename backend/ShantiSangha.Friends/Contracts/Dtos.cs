@@ -186,6 +186,54 @@ public record UpdateConnectionDateRequest(
     DateOnly Date,
     ConnectionDateRecurrence Recurrence = ConnectionDateRecurrence.Yearly);
 
+// ── Connection attachments (keepsakes: media + files) ───────────────
+
+/// Single attachment (photo, video, PDF, anything) attached to a
+/// Connection. `Kind` is server-assigned from `ContentType` so the
+/// client can split MEDIA from FILES without trusting itself. Each
+/// `DownloadUrl` is a fresh presigned GET that expires shortly after
+/// fetch — list again to refresh.
+public record ConnectionAttachmentResponse(
+    Guid Id,
+    Guid ConnectionId,
+    string ObjectKey,
+    string ContentType,
+    long ByteSize,
+    string FileName,
+    string Kind,
+    string? Caption,
+    string DownloadUrl,
+    DateTime CreatedAt,
+    DateTime UpdatedAt);
+
+/// Step 1 of the upload handshake — backend hands back a presigned PUT
+/// URL the client uses to ship bytes directly to S3, plus the
+/// `objectKey` it should round-trip on commit.
+public record CreateConnectionAttachmentUploadResponse(
+    string ObjectKey,
+    string UploadUrl,
+    DateTime UploadUrlExpiresAt);
+
+/// Step 1 request — the client tells us the content type and (a hint
+/// at) the file extension so the key gets a friendly suffix. We trust
+/// the type for routing/extension purposes only; final classification
+/// happens server-side from the actual stored object.
+public record CreateConnectionAttachmentUploadRequest(
+    string ContentType,
+    string? FileName = null);
+
+/// Step 2 — the client confirms the upload landed and tells us what
+/// to record. `ByteSize` is verified against S3 metadata server-side
+/// to keep clients honest.
+public record CommitConnectionAttachmentRequest(
+    string ObjectKey,
+    string ContentType,
+    string FileName,
+    string? Caption = null);
+
+/// Caption-only edit. Pass an empty string (or whitespace) to clear.
+public record UpdateConnectionAttachmentRequest(string? Caption = null);
+
 /// Creates a local Person + Connection in one call. Backend sets
 /// `Person.UserId = NULL` and `Connection.FriendshipId = NULL`. An
 /// empty/missing `Circles` array is allowed — the user can label the

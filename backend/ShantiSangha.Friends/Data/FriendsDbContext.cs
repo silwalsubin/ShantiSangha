@@ -20,6 +20,7 @@ public class FriendsDbContext(DbContextOptions<FriendsDbContext> options) : DbCo
     public DbSet<Person> Persons => Set<Person>();
     public DbSet<Connection> Connections => Set<Connection>();
     public DbSet<ConnectionDate> ConnectionDates => Set<ConnectionDate>();
+    public DbSet<ConnectionAttachment> ConnectionAttachments => Set<ConnectionAttachment>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -103,6 +104,18 @@ public class FriendsDbContext(DbContextOptions<FriendsDbContext> options) : DbCo
             // Store as text for forward compatibility with future
             // recurrence kinds (monthly, custom) without DB schema churn.
             e.Property(d => d.Recurrence).HasConversion<string>();
+        });
+
+        mb.Entity<ConnectionAttachment>(e =>
+        {
+            e.ToTable("ConnectionAttachments");
+            // Per-connection listing; cascade delete from Connections is
+            // declared in the migration SQL.
+            e.HasIndex(a => a.ConnectionId);
+            // Owner-scope index lets cleanup paths (e.g. account deletion)
+            // sweep all of a user's attachments without scanning.
+            e.HasIndex(a => a.OwnerUserId);
+            e.Property(a => a.Kind).HasConversion<string>();
         });
 
         mb.Entity<FriendRequest>(e =>

@@ -9,7 +9,8 @@ namespace ShantiSangha.Friends.Services;
 public class ConnectionsService(
     FriendsDbContext db,
     IFriendsService friends,
-    IProfileQueryService profileQuery) : IConnectionsService
+    IProfileQueryService profileQuery,
+    IConnectionAttachmentsService attachments) : IConnectionsService
 {
     public async Task<List<ConnectionResponse>> ListAsync(Guid userId, CancellationToken ct = default)
     {
@@ -244,13 +245,29 @@ public class ConnectionsService(
             .FirstOrDefaultAsync(c => c.Id == connectionId && c.OwnerUserId == userId, ct);
         if (conn is null) return false;
 
+        // Sweep S3 keepsakes BEFORE the row cascade fires — once the
+        // Connections rows are gone, we'd have nothing to read the
+        // ObjectKeys from. For paired connections, both sides'
+        // attachments need to be purged because EndFriendshipAsync
+        // removes both Connection rows.
         if (conn.FriendshipId is { } fsId)
         {
+            var pairedIds = await db.Connections
+                .Where(c => c.FriendshipId == fsId)
+                .Select(c => c.Id)
+                .ToListAsync(ct);
+            foreach (var id in pairedIds)
+            {
+                await attachments.PurgeForConnectionAsync(id, ct);
+            }
             // Paired: end the friendship — that path also removes both
-            // Connection rows because it cascades to the FK.
+            // Connection rows, which cascade-deletes the now-empty
+            // ConnectionAttachments rows via FK.
             await friends.EndFriendshipAsync(userId, fsId, ct);
             return true;
         }
+
+        await attachments.PurgeForConnectionAsync(connectionId, ct);
 
         // Local: removing the Connection cascades to the Person via
         // ON DELETE CASCADE.

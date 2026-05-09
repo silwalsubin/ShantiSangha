@@ -59,6 +59,7 @@ struct ConnectionDetailView: View {
                     datesSection(connection)
                     nicknameSection
                     notesSection
+                    ConnectionAttachmentsView(connectionId: connection.id)
                     removeSection(connection)
                 }
                 .padding(.horizontal, SacredSpacing.m)

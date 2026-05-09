@@ -33,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<IFriendsQueryService, FriendsQueryService>();
         services.AddScoped<IFriendRequestsService, FriendRequestsService>();
         services.AddScoped<IConnectionsService, ConnectionsService>();
+        services.AddScoped<IConnectionAttachmentsService, ConnectionAttachmentsService>();
 
         // Process-wide Redis multiplexer — Friends is the first consumer
         // (chat realtime fan-out). `AbortOnConnectFail = false` lets the
