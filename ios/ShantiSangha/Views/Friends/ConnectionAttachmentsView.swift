@@ -131,7 +131,9 @@ struct ConnectionAttachmentsView: View {
             AttachmentMediaViewer(
                 attachment: target,
                 onCaption: { captionTarget = target; mediaViewerTarget = nil },
-                onDelete: { deleteTarget = target; mediaViewerTarget = nil })
+                onDelete: { deleteTarget = target; mediaViewerTarget = nil },
+                onSaveOffline: { Task { await saveOffline(target) } },
+                onRemoveOffline: { cache.removeOffline(target) })
         }
         .quickLookPreview($fileQuickLookURL)
         .confirmationDialog(
@@ -898,8 +900,11 @@ private struct AttachmentMediaViewer: View {
     let attachment: ConnectionAttachment
     let onCaption: () -> Void
     let onDelete: () -> Void
+    let onSaveOffline: () -> Void
+    let onRemoveOffline: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var cache = AttachmentCache.shared
     @State private var imageZoom: CGFloat = 1.0
     @State private var imageZoomBase: CGFloat = 1.0
     @State private var imageOffset: CGSize = .zero
@@ -1055,6 +1060,19 @@ private struct AttachmentMediaViewer: View {
             } label: {
                 Label(attachment.caption?.isEmpty == false ? "Edit caption" : "Add caption",
                       systemImage: "text.bubble")
+            }
+            if cache.isOffline(attachment.id) {
+                Button {
+                    onRemoveOffline()
+                } label: {
+                    Label("Remove from offline", systemImage: "icloud.slash")
+                }
+            } else {
+                Button {
+                    onSaveOffline()
+                } label: {
+                    Label("Save for offline", systemImage: "arrow.down.circle")
+                }
             }
             Button(role: .destructive) {
                 onDelete()
