@@ -139,7 +139,9 @@ public record PersonResponse(
 /// embedded `Person` carries identity. `Messageable` is true iff
 /// `Person.UserId` is set AND `FriendshipId` is set; the iOS layer
 /// uses it to gate the chat affordance. `Circles` is the free-form
-/// tag set the owner has applied (empty array allowed).
+/// tag set the owner has applied (empty array allowed). `Dates` is
+/// the owner-private "important dates" list (birthday, anniversary,
+/// day-we-met) sorted by Date ascending.
 public record ConnectionResponse(
     Guid Id,
     Guid OwnerUserId,
@@ -152,9 +154,28 @@ public record ConnectionResponse(
     DateTime CreatedAt,
     DateTime UpdatedAt,
     PersonResponse Person,
+    IReadOnlyList<ConnectionDateResponse> Dates,
     string? LastMessagePreview,
     DateTime? LastMessageAt,
     int UnreadCount);
+
+/// Single owner-private "important date" attached to a Connection.
+/// Order in the parent list is Date ascending.
+public record ConnectionDateResponse(
+    Guid Id,
+    string Label,
+    DateOnly Date);
+
+/// Add a new date to a Connection. Label is trimmed; date required.
+public record AddConnectionDateRequest(
+    string Label,
+    DateOnly Date);
+
+/// Update an existing date on a Connection. Both fields required —
+/// the iOS edit sheet always submits the full row.
+public record UpdateConnectionDateRequest(
+    string Label,
+    DateOnly Date);
 
 /// Creates a local Person + Connection in one call. Backend sets
 /// `Person.UserId = NULL` and `Connection.FriendshipId = NULL`. An

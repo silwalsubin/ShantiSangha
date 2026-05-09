@@ -39,4 +39,28 @@ public interface IConnectionsService
     /// underlying friendship (which removes the other side's
     /// Connection too via the same path).
     Task<bool> DeleteAsync(Guid userId, Guid connectionId, CancellationToken ct = default);
+
+    /// Append a new "important date" to the Connection. Returns null
+    /// when the connection isn't owned by `userId`.
+    Task<ConnectionDateResponse?> AddDateAsync(
+        Guid userId,
+        Guid connectionId,
+        AddConnectionDateRequest req,
+        CancellationToken ct = default);
+
+    /// Replace label/date on an existing entry. Returns null when the
+    /// row doesn't exist or isn't owned by `userId`.
+    Task<ConnectionDateResponse?> UpdateDateAsync(
+        Guid userId,
+        Guid connectionId,
+        Guid dateId,
+        UpdateConnectionDateRequest req,
+        CancellationToken ct = default);
+
+    /// Drop a single entry. False when not found / not owned.
+    Task<bool> DeleteDateAsync(
+        Guid userId,
+        Guid connectionId,
+        Guid dateId,
+        CancellationToken ct = default);
 }

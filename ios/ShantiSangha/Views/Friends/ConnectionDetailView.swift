@@ -38,6 +38,9 @@ struct ConnectionDetailView: View {
     @State private var removing = false
     @State private var didSeed = false
 
+    // nil = sheet closed; .new = adding; .edit(id) = editing existing
+    @State private var dateEditTarget: ConnectionDateEditTarget?
+
     private var connection: Connection? {
         vm.connections.first(where: { $0.id == connectionId })
     }
@@ -53,6 +56,7 @@ struct ConnectionDetailView: View {
                     header(connection)
                     aboutSection(connection)
                     relationSection
+                    datesSection(connection)
                     nicknameSection
                     notesSection
                     removeSection(connection)
@@ -69,6 +73,17 @@ struct ConnectionDetailView: View {
         .scrollDismissesKeyboard(.interactively)
         .onAppear { seedDrafts() }
         .onChange(of: connection?.id) { _, _ in seedDrafts(force: true) }
+        .sheet(item: $dateEditTarget) { target in
+            ConnectionDateEditSheet(
+                target: target,
+                existing: connection?.dates ?? [],
+                onSave: { label, date in
+                    await saveDate(target: target, label: label, date: date)
+                },
+                onDelete: target.isEditing
+                    ? { await deleteDate(target: target) }
+                    : nil)
+        }
     }
 
     // MARK: - Sections
@@ -207,6 +222,56 @@ struct ConnectionDetailView: View {
         }
         circlesDraft.append(trimmed)
         Task { await saveCircles() }
+    }
+
+    private func datesSection(_ c: Connection) -> some View {
+        VStack(alignment: .leading, spacing: SacredSpacing.xs) {
+            sectionLabel("IMPORTANT DATES")
+
+            SacredListCard {
+                VStack(spacing: 0) {
+                    if c.dates.isEmpty {
+                        addDateButton(label: "Add a date")
+                    } else {
+                        ForEach(Array(c.dates.enumerated()), id: \.element.id) { index, entry in
+                            SacredDateRow(
+                                date: parseISODate(entry.date) ?? Date(),
+                                label: entry.label,
+                                onTap: { dateEditTarget = .edit(entry) })
+                            if index < c.dates.count - 1 {
+                                Divider().padding(.leading, 64)
+                            }
+                        }
+                        Divider().padding(.leading, 16)
+                        addDateButton(label: "Add another")
+                    }
+                }
+            }
+
+            Text("Birthday, anniversary, the day you met — anything you want to remember.")
+                .font(.sacredMicro)
+                .foregroundColor(.sacredMuted)
+                .padding(.horizontal, 4)
+        }
+    }
+
+    private func addDateButton(label: String) -> some View {
+        Button {
+            dateEditTarget = .new
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "plus")
+                    .font(.system(size: 11, weight: .bold))
+                Text(label)
+                    .font(.sacredSmallSemibold)
+                Spacer()
+            }
+            .foregroundColor(.sacredGold)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private var nicknameSection: some View {
@@ -511,6 +576,66 @@ struct ConnectionDetailView: View {
             return "Your message thread and any media will be deleted on both sides. This can't be undone."
         }
         return "They'll no longer appear in your circle. This can't be undone."
+    }
+
+    private func saveDate(target: ConnectionDateEditTarget, label: String, date: String) async {
+        guard let c = connection else { return }
+        do {
+            switch target {
+            case .new:
+                _ = try await vm.addDate(connectionId: c.id, label: label, date: date)
+            case .edit(let entry):
+                _ = try await vm.updateDate(
+                    connectionId: c.id,
+                    dateId: entry.id,
+                    label: label,
+                    date: date)
+            }
+            saveError = nil
+            dateEditTarget = nil
+        } catch {
+            saveError = "Couldn't save. Try again."
+        }
+    }
+
+    private func deleteDate(target: ConnectionDateEditTarget) async {
+        guard let c = connection, case .edit(let entry) = target else { return }
+        do {
+            try await vm.deleteDate(connectionId: c.id, dateId: entry.id)
+            saveError = nil
+            dateEditTarget = nil
+        } catch {
+            saveError = "Couldn't delete. Try again."
+        }
+    }
+
+    private func parseISODate(_ s: String) -> Date? {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f.date(from: s)
+    }
+}
+
+/// Sheet identity for the add/edit-date flow. `.new` opens an empty
+/// form; `.edit(entry)` pre-fills with the existing row and offers a
+/// destructive "Delete" action.
+enum ConnectionDateEditTarget: Identifiable {
+    case new
+    case edit(ConnectionDate)
+
+    var id: String {
+        switch self {
+        case .new: return "new"
+        case .edit(let entry): return entry.id.uuidString
+        }
+    }
+
+    var isEditing: Bool {
+        if case .edit = self { return true }
+        return false
     }
 }
 

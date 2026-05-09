@@ -1,0 +1,214 @@
+import SwiftUI
+
+/// Add / edit a single "important date" on a Connection — birthday,
+/// anniversary, day-we-met, etc. Free-form label paired with a date
+/// picker; preset label chips offered as a starting point so the
+/// fastest add is one tap.
+///
+/// The parent owns persistence; this sheet only collects the values
+/// and calls back via `onSave`. `onDelete` is non-nil only for the
+/// edit path so the destructive button stays out of the add flow.
+struct ConnectionDateEditSheet: View {
+    let target: ConnectionDateEditTarget
+    let existing: [ConnectionDate]
+    let onSave: (_ label: String, _ date: String) async -> Void
+    let onDelete: (() async -> Void)?
+
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var labelDraft: String = ""
+    @State private var dateDraft: Date = Date()
+    @State private var saving = false
+    @State private var deleting = false
+    @State private var didSeed = false
+    @State private var showDeleteConfirm = false
+
+    /// Suggested labels — common picks shown as one-tap chips. Trim
+    /// out anything the user has already added to avoid suggesting
+    /// duplicates.
+    private let presets = ["Birthday", "Anniversary", "Day we met"]
+
+    private var availablePresets: [String] {
+        let inUse = Set(existing.map { $0.label.lowercased() })
+        return presets.filter { !inUse.contains($0.lowercased()) }
+    }
+
+    private var canSave: Bool {
+        !labelDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: SacredSpacing.l) {
+                    labelSection
+                    dateSection
+                    if onDelete != nil {
+                        deleteSection
+                    }
+                }
+                .padding(.horizontal, SacredSpacing.m)
+                .padding(.vertical, SacredSpacing.l)
+            }
+            .background(SacredBackground().ignoresSafeArea())
+            .navigationTitle(target.isEditing ? "Edit date" : "Add date")
+            .navigationBarTitleDisplayMode(.inline)
+            .scrollDismissesKeyboard(.interactively)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundColor(.sacredMuted)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(target.isEditing ? "Save" : "Add") {
+                        Task { await save() }
+                    }
+                    .foregroundColor(canSave ? .sacredGold : .sacredMutedLight)
+                    .disabled(!canSave || saving || deleting)
+                }
+            }
+        }
+        .onAppear { seed() }
+        .confirmationDialog(
+            "Delete this date?",
+            isPresented: $showDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                Task { await delete() }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    private var labelSection: some View {
+        VStack(alignment: .leading, spacing: SacredSpacing.xs) {
+            sectionLabel("LABEL")
+            SacredListCard {
+                TextField("Birthday, anniversary…", text: $labelDraft)
+                    .font(.sacredText)
+                    .foregroundColor(.sacredText)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .submitLabel(.done)
+                    .textInputAutocapitalization(.sentences)
+            }
+
+            if !target.isEditing && !availablePresets.isEmpty {
+                WrapHStack(spacing: 8, lineSpacing: 8) {
+                    ForEach(availablePresets, id: \.self) { preset in
+                        presetChip(preset)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 4)
+                .padding(.top, 4)
+            }
+        }
+    }
+
+    private func presetChip(_ preset: String) -> some View {
+        Button { labelDraft = preset } label: {
+            Text(preset)
+                .font(.sacredSmallSemibold)
+                .foregroundColor(.sacredGold)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 32)
+                .background(Capsule().fill(Color.sacredGold.opacity(0.12)))
+                .overlay(Capsule().stroke(Color.sacredGold.opacity(0.3), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var dateSection: some View {
+        VStack(alignment: .leading, spacing: SacredSpacing.xs) {
+            sectionLabel("DATE")
+            SacredListCard {
+                DatePicker(
+                    "",
+                    selection: $dateDraft,
+                    displayedComponents: [.date]
+                )
+                .labelsHidden()
+                .datePickerStyle(.graphical)
+                .tint(.sacredGold)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+            }
+        }
+    }
+
+    private var deleteSection: some View {
+        Button(role: .destructive) {
+            showDeleteConfirm = true
+        } label: {
+            HStack {
+                if deleting {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(.sacredRed)
+                }
+                Text(deleting ? "Deleting…" : "Delete date")
+                    .font(.sacredText)
+                    .foregroundColor(.sacredRed)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.sacredRed.opacity(0.4), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .disabled(saving || deleting)
+        .padding(.top, SacredSpacing.l)
+    }
+
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.sacredSectionLabel)
+            .foregroundColor(.sacredLabel)
+            .padding(.horizontal, 4)
+    }
+
+    private func seed() {
+        guard !didSeed else { return }
+        didSeed = true
+        if case .edit(let entry) = target {
+            labelDraft = entry.label
+            dateDraft = parseISODate(entry.date) ?? Date()
+        }
+    }
+
+    private func save() async {
+        let trimmed = labelDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        saving = true
+        defer { saving = false }
+        await onSave(trimmed, formatISODate(dateDraft))
+    }
+
+    private func delete() async {
+        guard let onDelete else { return }
+        deleting = true
+        defer { deleting = false }
+        await onDelete()
+    }
+
+    private func parseISODate(_ s: String) -> Date? {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f.date(from: s)
+    }
+
+    private func formatISODate(_ d: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f.string(from: d)
+    }
+}

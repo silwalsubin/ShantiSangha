@@ -34,6 +34,16 @@ struct Person: Codable, Identifiable, Equatable, Hashable {
 /// chat affordance — true iff `person.userId != nil` AND
 /// `friendshipId != nil`. `circles` is the free-form tag set the owner
 /// has applied (empty array allowed — no labels yet).
+/// Mirror of the backend `ConnectionDateResponse`. A single owner-
+/// private "important date" attached to a connection — birthday,
+/// anniversary, day-we-met, etc. The date string arrives as ISO
+/// 'yyyy-MM-dd' from the backend's `DateOnly`.
+struct ConnectionDate: Codable, Identifiable, Equatable, Hashable {
+    let id: UUID
+    let label: String
+    let date: String
+}
+
 struct Connection: Codable, Identifiable, Equatable, Hashable {
     let id: UUID
     let ownerUserId: UUID
@@ -46,6 +56,7 @@ struct Connection: Codable, Identifiable, Equatable, Hashable {
     let createdAt: String
     let updatedAt: String
     let person: Person
+    let dates: [ConnectionDate]
     let lastMessagePreview: String?
     let lastMessageAt: String?
     let unreadCount: Int
@@ -93,6 +104,16 @@ struct UpdateConnectionRequest: Encodable {
     var privateNotes: String? = nil
     var clearNickname: Bool? = nil
     var clearPrivateNotes: Bool? = nil
+}
+
+struct AddConnectionDateRequest: Encodable {
+    let label: String
+    let date: String   // ISO 'yyyy-MM-dd'
+}
+
+struct UpdateConnectionDateRequest: Encodable {
+    let label: String
+    let date: String
 }
 
 struct UpdatePersonRequest: Encodable {

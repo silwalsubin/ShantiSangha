@@ -116,6 +116,44 @@ final class CircleViewModel: ObservableObject {
         connections.removeAll { $0.id == connectionId }
     }
 
+    /// Append a new "important date". Re-fetches the parent connection
+    /// so the embedded `dates` list reflects server-side ordering.
+    @discardableResult
+    func addDate(
+        connectionId: UUID,
+        label: String,
+        date: String
+    ) async throws -> ConnectionDate {
+        let created = try await ConnectionsAPI.addDate(
+            connectionId,
+            request: AddConnectionDateRequest(label: label, date: date))
+        let refreshed = try await ConnectionsAPI.get(connectionId)
+        replaceInPlace(refreshed)
+        return created
+    }
+
+    @discardableResult
+    func updateDate(
+        connectionId: UUID,
+        dateId: UUID,
+        label: String,
+        date: String
+    ) async throws -> ConnectionDate {
+        let updated = try await ConnectionsAPI.updateDate(
+            connectionId,
+            dateId: dateId,
+            request: UpdateConnectionDateRequest(label: label, date: date))
+        let refreshed = try await ConnectionsAPI.get(connectionId)
+        replaceInPlace(refreshed)
+        return updated
+    }
+
+    func deleteDate(connectionId: UUID, dateId: UUID) async throws {
+        try await ConnectionsAPI.deleteDate(connectionId, dateId: dateId)
+        let refreshed = try await ConnectionsAPI.get(connectionId)
+        replaceInPlace(refreshed)
+    }
+
     private func replaceInPlace(_ updated: Connection) {
         if let i = connections.firstIndex(where: { $0.id == updated.id }) {
             connections[i] = updated

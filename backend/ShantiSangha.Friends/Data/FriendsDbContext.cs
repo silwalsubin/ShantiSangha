@@ -19,6 +19,7 @@ public class FriendsDbContext(DbContextOptions<FriendsDbContext> options) : DbCo
     public DbSet<FriendshipAnnotation> FriendshipAnnotations => Set<FriendshipAnnotation>();
     public DbSet<Person> Persons => Set<Person>();
     public DbSet<Connection> Connections => Set<Connection>();
+    public DbSet<ConnectionDate> ConnectionDates => Set<ConnectionDate>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -90,6 +91,15 @@ public class FriendsDbContext(DbContextOptions<FriendsDbContext> options) : DbCo
             e.HasIndex(c => c.OwnerUserId);
             e.HasIndex(c => new { c.OwnerUserId, c.PersonId }).IsUnique();
             e.HasIndex(c => c.FriendshipId);
+        });
+
+        mb.Entity<ConnectionDate>(e =>
+        {
+            e.ToTable("ConnectionDates");
+            // FK + per-connection list query. Cascade delete from Connections
+            // is declared in the migration SQL so removing a connection
+            // takes its dates with it.
+            e.HasIndex(d => d.ConnectionId);
         });
 
         mb.Entity<FriendRequest>(e =>
