@@ -8,7 +8,22 @@ public record QuoteSnapshot(string Ticker, decimal Price, decimal? PrevClose, de
 
 public record TechnicalSignalContribution(string Name, double Value, double Contribution, double Weight);
 
-public record HorizonTechnicalScore(double Score, IReadOnlyList<TechnicalSignalContribution> Contributions);
+/// <summary>
+/// One horizon's score bundle from the wisecat Lambda.
+/// `Score` is the legacy weighted-strategy composite (still emitted today).
+/// `PBuy / PHold / PSell / ExpectedReturn` come from the GBM classifier;
+/// when the Lambda hasn't been upgraded yet, callers should default to
+/// (pBuy=0, pHold=1, pSell=0, expectedReturn=0) so the verdict reads as
+/// "fully Hold" until the model ships.
+/// </summary>
+public record HorizonTechnicalScore(
+    double Score,
+    double PBuy,
+    double PHold,
+    double PSell,
+    double ExpectedReturn,
+    IReadOnlyList<TechnicalSignalContribution> Contributions
+);
 
 public record TechnicalScore(
     string Ticker,

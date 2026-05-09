@@ -10,6 +10,7 @@ struct TaskRow: View {
     let onProgressUpdate: (Int) -> Void
     var onDueDateUpdate: ((String) -> Void)? = nil
     var hideDueDate: Bool = false
+    var showDateStamp: Bool = false
     var activeSwipeId: Binding<String?>?
 
 
@@ -136,14 +137,25 @@ struct TaskRow: View {
         }
     }
 
+    private var leadingSlotWidth: CGFloat { showDateStamp ? 36 : 24 }
+
+    @ViewBuilder
+    private var leadingSlot: some View {
+        if showDateStamp, task.type == .oneTime, let days = task.daysRemaining {
+            let date = Calendar.current.startOfDay(for: Calendar.current.date(byAdding: .day, value: days, to: Date())!)
+            DateStamp(date: date, isToday: days == 0)
+        } else {
+            Image(systemName: task.type == .recurring ? "arrow.triangle.2.circlepath" : "calendar.badge.clock")
+                .font(.sacredText)
+                .foregroundColor(.sacredGold)
+                .frame(width: leadingSlotWidth, height: leadingSlotWidth)
+        }
+    }
+
     private var taskContent: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
-                // Type icon
-                Image(systemName: task.type == .recurring ? "arrow.triangle.2.circlepath" : "calendar.badge.clock")
-                    .font(.sacredText)
-                    .foregroundColor(.sacredGold)
-                    .frame(width: 24, height: 24)
+                leadingSlot
 
                 // Title
                 Text(task.title)
@@ -180,12 +192,12 @@ struct TaskRow: View {
                         }
                     }
                     .frame(height: 6)
-                    .padding(.leading, 36)
+                    .padding(.leading, leadingSlotWidth + 12)
 
                     Text("\(task.progress)% complete")
                         .font(.sacredMicro)
                         .foregroundColor(.sacredMuted)
-                        .padding(.leading, 36)
+                        .padding(.leading, leadingSlotWidth + 12)
                 }
             }
         }
@@ -202,6 +214,36 @@ struct TaskRow: View {
                         )
                 }
             }
+        )
+    }
+}
+
+// MARK: - Date stamp — leading-slot badge for one-time goals
+
+private struct DateStamp: View {
+    let date: Date
+    let isToday: Bool
+
+    var body: some View {
+        let day = Calendar.current.component(.day, from: date)
+        let month: String = {
+            let df = DateFormatter()
+            df.dateFormat = "MMM"
+            return df.string(from: date).uppercased()
+        }()
+        VStack(spacing: 0) {
+            Text(month)
+                .font(.system(size: 8, weight: .bold, design: .serif))
+                .tracking(1)
+                .foregroundColor(.sacredMuted)
+            Text("\(day)")
+                .font(.sacredTextSemibold)
+                .foregroundColor(isToday ? .sacredGold : .sacredText)
+        }
+        .frame(width: 36, height: 36)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isToday ? Color.sacredGold.opacity(0.1) : Color.sacredBgCard)
         )
     }
 }

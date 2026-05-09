@@ -44,6 +44,30 @@ public class TradingSignal
     public double Composite1M { get; set; }
     public double Composite1Y { get; set; }
 
+    /// <summary>
+    /// Probabilistic verdict from the GBM (LightGBM) classifier — one
+    /// (pBuy, pHold, pSell) triple plus an expected forward return per
+    /// horizon. The triple sums to 1.0 when populated by a real model
+    /// run; on legacy rows (pre-GBM, pre-migration) and on Lambda
+    /// responses that omit the keys, PHold defaults to 1.0 and the
+    /// other three default to 0.0 so the verdict reads as "fully Hold"
+    /// until the model is trained.
+    /// </summary>
+    public double PBuy1W { get; set; }
+    public double PHold1W { get; set; } = 1.0;
+    public double PSell1W { get; set; }
+    public double ExpectedReturn1W { get; set; }
+
+    public double PBuy1M { get; set; }
+    public double PHold1M { get; set; } = 1.0;
+    public double PSell1M { get; set; }
+    public double ExpectedReturn1M { get; set; }
+
+    public double PBuy1Y { get; set; }
+    public double PHold1Y { get; set; } = 1.0;
+    public double PSell1Y { get; set; }
+    public double ExpectedReturn1Y { get; set; }
+
     /// <summary>JSON containing per-horizon technical contributions. Used by the iOS detail view.</summary>
     public string ReasoningJson { get; set; } = "{}";
 

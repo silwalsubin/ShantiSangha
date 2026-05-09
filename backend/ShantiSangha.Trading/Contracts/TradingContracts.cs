@@ -13,13 +13,20 @@ public record StrategyContributionDto(string Name, double Value, double Contribu
 
 /// <summary>
 /// One horizon's read of a (ticker, date): action, composite, conviction,
-/// and the per-strategy contributions that produced this horizon's technical score.
+/// the GBM-classifier probability triple + expected forward return, and
+/// the per-strategy contributions that produced this horizon's technical
+/// score. PBuy / PHold / PSell / ExpectedReturn default to (0, 1, 0, 0)
+/// for legacy rows persisted before the GBM model shipped.
 /// </summary>
 public record HorizonReadDto(
     string Action,            // "Buy" | "Sell" | "Hold"
     double Conviction,
     double TechnicalScore,
     double CompositeScore,
+    double PBuy,
+    double PHold,
+    double PSell,
+    double ExpectedReturn,
     IReadOnlyList<StrategyContributionDto> TechnicalSignals
 );
 

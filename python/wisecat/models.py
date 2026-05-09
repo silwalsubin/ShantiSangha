@@ -32,9 +32,22 @@ class StrategyContribution(BaseModel):
 
 
 class HorizonScore(BaseModel):
-    """Per-horizon technical roll-up. One per horizon (1W, 1M, 1Y)."""
+    """Per-horizon technical roll-up. One per horizon (1W, 1M, 1Y).
+
+    `score` is the legacy [-1, +1] composite from the weighted-sum path;
+    kept for backwards compatibility with the .NET `HorizonTechnicalScore`
+    deserializer that still reads it. The `p_*` triple + `expected_return`
+    are populated by the GBM scoring path. On the legacy path they default
+    to the neutral verdict `(p_hold = 1.0, others = 0.0)`.
+    """
     score: float
+    p_buy: float = Field(default=0.0, alias="pBuy")
+    p_hold: float = Field(default=1.0, alias="pHold")
+    p_sell: float = Field(default=0.0, alias="pSell")
+    expected_return: float = Field(default=0.0, alias="expectedReturn")
     signals: list[StrategyContribution]
+
+    model_config = {"populate_by_name": True}
 
 
 class TickerScore(BaseModel):

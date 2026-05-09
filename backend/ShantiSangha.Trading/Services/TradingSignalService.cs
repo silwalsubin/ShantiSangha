@@ -55,9 +55,9 @@ public class TradingSignalService(
         var scores = await marketData.ScoreAsync(
             new[] { new ScoreInput(ticker, bars, price) }, ct);
         var techScore = scores.FirstOrDefault();
-        var tech1W = techScore?.Horizon1W ?? new HorizonTechnicalScore(0.0, Array.Empty<TechnicalSignalContribution>());
-        var tech1M = techScore?.Horizon1M ?? new HorizonTechnicalScore(0.0, Array.Empty<TechnicalSignalContribution>());
-        var tech1Y = techScore?.Horizon1Y ?? new HorizonTechnicalScore(0.0, Array.Empty<TechnicalSignalContribution>());
+        var tech1W = techScore?.Horizon1W ?? new HorizonTechnicalScore(0.0, 0.0, 1.0, 0.0, 0.0, Array.Empty<TechnicalSignalContribution>());
+        var tech1M = techScore?.Horizon1M ?? new HorizonTechnicalScore(0.0, 0.0, 1.0, 0.0, 0.0, Array.Empty<TechnicalSignalContribution>());
+        var tech1Y = techScore?.Horizon1Y ?? new HorizonTechnicalScore(0.0, 0.0, 1.0, 0.0, 0.0, Array.Empty<TechnicalSignalContribution>());
 
         // Composite is purely technical now.
         var composite1W = ClampComposite(tech1W.Score);
@@ -108,6 +108,23 @@ public class TradingSignalService(
         existing.Composite1W = composite1W;
         existing.Composite1M = composite1M;
         existing.Composite1Y = composite1Y;
+
+        // GBM-classifier probabilities. Until the Python Lambda is upgraded
+        // these come back as the neutral default (pHold=1, others 0) so the
+        // verdict reads as "fully Hold" and rows are valid for downstream
+        // consumers without special-casing legacy.
+        existing.PBuy1W = tech1W.PBuy;
+        existing.PHold1W = tech1W.PHold;
+        existing.PSell1W = tech1W.PSell;
+        existing.ExpectedReturn1W = tech1W.ExpectedReturn;
+        existing.PBuy1M = tech1M.PBuy;
+        existing.PHold1M = tech1M.PHold;
+        existing.PSell1M = tech1M.PSell;
+        existing.ExpectedReturn1M = tech1M.ExpectedReturn;
+        existing.PBuy1Y = tech1Y.PBuy;
+        existing.PHold1Y = tech1Y.PHold;
+        existing.PSell1Y = tech1Y.PSell;
+        existing.ExpectedReturn1Y = tech1Y.ExpectedReturn;
 
         // Legacy single-horizon columns mirror the 1M values.
         existing.Action = action1M;
@@ -177,6 +194,10 @@ public class TradingSignalService(
             Conviction: s.Conviction1W,
             TechnicalScore: s.Technical1W,
             CompositeScore: s.Composite1W,
+            PBuy: s.PBuy1W,
+            PHold: s.PHold1W,
+            PSell: s.PSell1W,
+            ExpectedReturn: s.ExpectedReturn1W,
             TechnicalSignals: reasoning.Technical1W
         );
         var horizon1M = new HorizonReadDto(
@@ -184,6 +205,10 @@ public class TradingSignalService(
             Conviction: s.Conviction1M,
             TechnicalScore: s.Technical1M,
             CompositeScore: s.Composite1M,
+            PBuy: s.PBuy1M,
+            PHold: s.PHold1M,
+            PSell: s.PSell1M,
+            ExpectedReturn: s.ExpectedReturn1M,
             TechnicalSignals: reasoning.Technical1M
         );
         var horizon1Y = new HorizonReadDto(
@@ -191,6 +216,10 @@ public class TradingSignalService(
             Conviction: s.Conviction1Y,
             TechnicalScore: s.Technical1Y,
             CompositeScore: s.Composite1Y,
+            PBuy: s.PBuy1Y,
+            PHold: s.PHold1Y,
+            PSell: s.PSell1Y,
+            ExpectedReturn: s.ExpectedReturn1Y,
             TechnicalSignals: reasoning.Technical1Y
         );
 

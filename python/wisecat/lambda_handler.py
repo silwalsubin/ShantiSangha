@@ -255,6 +255,13 @@ def _serialize_score(score) -> dict:
     horizons = {
         h: {
             "score": hs.score,
+            # GBM fields. Legacy weighted-sum path emits neutral defaults
+            # (pHold=1.0, others 0.0) so the .NET deserializer always sees
+            # the keys regardless of which scoring path produced the row.
+            "pBuy": hs.p_buy,
+            "pHold": hs.p_hold,
+            "pSell": hs.p_sell,
+            "expectedReturn": hs.expected_return,
             "signals": [
                 {
                     "name": s.name,

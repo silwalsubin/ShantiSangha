@@ -129,12 +129,23 @@ public class MarketDataClient(
         // Lambda returns horizons keyed "1W"/"1M"/"1Y". If a key is missing
         // (e.g. older Lambda revision still in flight), fall back to the
         // legacy top-level signals so the consumer doesn't see all-zeros.
+        //
+        // The GBM classifier fields (pBuy/pHold/pSell/expectedReturn) may
+        // also be absent on older Lambda revisions — when missing we default
+        // pHold=1 (fully Hold) and the rest to 0 so the verdict reads
+        // unambiguously instead of as a 0/0/0 probability triple.
         if (dto.Horizons is { } horizons && horizons.TryGetValue(horizon, out var h) && h is not null)
         {
             var contribs = (h.Signals ?? new())
                 .Select(c => new TechnicalSignalContribution(c.Name, c.Value, c.Contribution, c.Weight))
                 .ToList();
-            return new HorizonTechnicalScore(h.Score, contribs);
+            return new HorizonTechnicalScore(
+                h.Score,
+                h.PBuy ?? 0.0,
+                h.PHold ?? 1.0,
+                h.PSell ?? 0.0,
+                h.ExpectedReturn ?? 0.0,
+                contribs);
         }
         // Fallback: legacy shape — apply only for 1M (the legacy default horizon).
         if (horizon == "1M")
@@ -142,9 +153,21 @@ public class MarketDataClient(
             var contribs = (dto.Signals ?? new())
                 .Select(c => new TechnicalSignalContribution(c.Name, c.Value, c.Contribution, c.Weight))
                 .ToList();
-            return new HorizonTechnicalScore(dto.TechnicalScore, contribs);
+            return new HorizonTechnicalScore(
+                dto.TechnicalScore,
+                PBuy: 0.0,
+                PHold: 1.0,
+                PSell: 0.0,
+                ExpectedReturn: 0.0,
+                contribs);
         }
-        return new HorizonTechnicalScore(0.0, Array.Empty<TechnicalSignalContribution>());
+        return new HorizonTechnicalScore(
+            Score: 0.0,
+            PBuy: 0.0,
+            PHold: 1.0,
+            PSell: 0.0,
+            ExpectedReturn: 0.0,
+            Contributions: Array.Empty<TechnicalSignalContribution>());
     }
 
     private async Task<T?> InvokeAsync<T>(object payload, CancellationToken ct)
@@ -214,7 +237,17 @@ public class MarketDataClient(
         List<SignalContributionDto>? Signals,
         Dictionary<string, HorizonScoreDto>? Horizons);
 
-    private record HorizonScoreDto(double Score, List<SignalContributionDto>? Signals);
+    // PBuy / PHold / PSell / ExpectedReturn arrive once the Python Lambda is
+    // upgraded to emit GBM probabilities; until then they're absent on the
+    // wire and deserialize as null. Caller substitutes the neutral default
+    // (pHold=1, others 0).
+    private record HorizonScoreDto(
+        double Score,
+        List<SignalContributionDto>? Signals,
+        [property: JsonPropertyName("pBuy")] double? PBuy,
+        [property: JsonPropertyName("pHold")] double? PHold,
+        [property: JsonPropertyName("pSell")] double? PSell,
+        [property: JsonPropertyName("expectedReturn")] double? ExpectedReturn);
 
     private record SignalContributionDto(string Name, double Value, double Contribution, double Weight);
 
