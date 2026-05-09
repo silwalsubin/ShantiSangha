@@ -46,8 +46,10 @@ public record SymbolMatch(string Symbol, string Description, string Type);
 /// `Date` is a passthrough string — daily bars use "yyyy-MM-dd", intraday
 /// bars use full ISO timestamps. iOS handles both formats; the .NET layer
 /// doesn't parse, so adding new resolutions doesn't require schema changes.
+/// `ExtendedHours` is set on 1D bars (true = pre-market or after-hours)
+/// and null on daily bars.
 /// </summary>
-public record ChartBar(string Date, decimal Open, decimal High, decimal Low, decimal Close, long Volume);
+public record ChartBar(string Date, decimal Open, decimal High, decimal Low, decimal Close, long Volume, bool? ExtendedHours = null);
 
 public record ChartAggregates(
     decimal CurrentPrice,

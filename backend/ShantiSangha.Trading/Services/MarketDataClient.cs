@@ -60,7 +60,7 @@ public class MarketDataClient(
 
         if (resp is null) return null;
         var bars = (resp.Bars ?? new())
-            .Select(b => new ChartBar(b.Date, b.Open, b.High, b.Low, b.Close, b.Volume))
+            .Select(b => new ChartBar(b.Date, b.Open, b.High, b.Low, b.Close, b.Volume, b.ExtendedHours))
             .ToList();
         ChartAggregates? agg = null;
         if (resp.Aggregates is { } a)
@@ -260,7 +260,7 @@ public class MarketDataClient(
         List<ChartBarDto>? Bars,
         ChartAggregatesDto? Aggregates);
 
-    private record ChartBarDto(string Date, decimal Open, decimal High, decimal Low, decimal Close, long Volume);
+    private record ChartBarDto(string Date, decimal Open, decimal High, decimal Low, decimal Close, long Volume, bool? ExtendedHours);
 
     private record ChartAggregatesDto(
         [property: JsonPropertyName("currentPrice")] decimal CurrentPrice,

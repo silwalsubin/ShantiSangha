@@ -7,6 +7,9 @@ struct ChartBar: Codable, Identifiable, Hashable {
     let low: Double
     let close: Double
     let volume: Int
+    /// Only set on 1D bars — true for pre-market (before 9:30 ET) and
+    /// after-hours (from 16:00 ET) prints. Nil for daily bars.
+    let extendedHours: Bool?
 
     var id: String { date }
 
@@ -18,6 +21,17 @@ struct ChartBar: Codable, Identifiable, Hashable {
         // Fallback: ISO formatter without fractional seconds
         if let d = ChartBar.isoNoFracFormatter.date(from: date) { return d }
         return .distantPast
+    }
+
+    /// "pre-market" if before 9:30 ET, "after hours" if from 16:00 ET, nil
+    /// when the bar is regular session or not intraday.
+    var extendedHoursLabel: String? {
+        guard extendedHours == true else { return nil }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "America/New_York") ?? .current
+        let comps = cal.dateComponents([.hour, .minute], from: parsedDate)
+        let mins = (comps.hour ?? 0) * 60 + (comps.minute ?? 0)
+        return mins < 570 ? "pre-market" : "after hours"
     }
 
     static let dateFormatter: DateFormatter = {

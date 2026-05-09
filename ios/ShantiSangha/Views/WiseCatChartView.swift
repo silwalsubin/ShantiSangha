@@ -126,11 +126,17 @@ struct WiseCatChartView: View {
     }
 
     private func selectedReadout(_ bar: ChartBar) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
+        let timeLabel: String = {
+            guard range.isIntraday else { return formatLongDate(bar.parsedDate) }
+            let base = formatTime(bar.parsedDate)
+            if let suffix = bar.extendedHoursLabel { return "\(base) · \(suffix)" }
+            return base
+        }()
+        return VStack(alignment: .leading, spacing: 2) {
             Text(formatPrice(bar.close))
                 .font(.sacredDisplayNumber)
                 .foregroundColor(.sacredText)
-            Text(range.isIntraday ? formatTime(bar.parsedDate) : formatLongDate(bar.parsedDate))
+            Text(timeLabel)
                 .font(.sacredSmall)
                 .foregroundColor(.sacredMuted)
         }
@@ -236,11 +242,14 @@ struct WiseCatChartView: View {
 
     private var chartCanvas: some View {
         let bars = chart?.bars ?? []
+        let split = splitForExtendedHours(bars)
         return Chart {
-            ForEach(bars) { bar in
+            // Regular-session line + filled area underneath.
+            ForEach(split.regular) { bar in
                 LineMark(
                     x: .value("Date", bar.parsedDate),
-                    y: .value("Price", bar.close)
+                    y: .value("Price", bar.close),
+                    series: .value("Series", "regular")
                 )
                 .foregroundStyle(Color.sacredGold)
                 .interpolationMethod(.linear)
@@ -259,6 +268,29 @@ struct WiseCatChartView: View {
                 .interpolationMethod(.linear)
             }
 
+            // Pre-market — faded line, bridged into the regular open so the
+            // segments visually connect.
+            ForEach(split.preMarket) { bar in
+                LineMark(
+                    x: .value("Date", bar.parsedDate),
+                    y: .value("Price", bar.close),
+                    series: .value("Series", "extended-pre")
+                )
+                .foregroundStyle(Color.sacredGold.opacity(0.4))
+                .interpolationMethod(.linear)
+            }
+
+            // After-hours — same treatment, bridged from the regular close.
+            ForEach(split.afterHours) { bar in
+                LineMark(
+                    x: .value("Date", bar.parsedDate),
+                    y: .value("Price", bar.close),
+                    series: .value("Series", "extended-post")
+                )
+                .foregroundStyle(Color.sacredGold.opacity(0.4))
+                .interpolationMethod(.linear)
+            }
+
             if let selectedDate, let bar = selectedBar {
                 RuleMark(x: .value("Selected", selectedDate))
                     .foregroundStyle(Color.sacredMuted.opacity(0.5))
@@ -267,7 +299,7 @@ struct WiseCatChartView: View {
                     x: .value("Date", bar.parsedDate),
                     y: .value("Price", bar.close)
                 )
-                .foregroundStyle(Color.sacredGold)
+                .foregroundStyle(bar.extendedHours == true ? Color.sacredGold.opacity(0.6) : Color.sacredGold)
                 .symbolSize(70)
             }
         }
@@ -275,6 +307,32 @@ struct WiseCatChartView: View {
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
         .chartXSelection(value: $selectedDate)
+    }
+
+    private struct ExtendedSplit {
+        let regular: [ChartBar]
+        let preMarket: [ChartBar]   // pre-market bars + first regular bar (bridge)
+        let afterHours: [ChartBar]  // last regular bar (bridge) + after-hours bars
+    }
+
+    /// Splits 1D intraday bars into regular vs. extended-hours segments. The
+    /// extended segments include one regular bar at the boundary so the
+    /// faded line visually connects to the solid line. Daily ranges return
+    /// everything in `regular` and leave the extended segments empty.
+    private func splitForExtendedHours(_ bars: [ChartBar]) -> ExtendedSplit {
+        guard range.isIntraday, bars.contains(where: { $0.extendedHours == true }) else {
+            return ExtendedSplit(regular: bars, preMarket: [], afterHours: [])
+        }
+        let regular = bars.filter { $0.extendedHours != true }
+
+        var preMarket = bars.filter { $0.extendedHoursLabel == "pre-market" }
+        if let firstRegular = regular.first { preMarket.append(firstRegular) }
+
+        var afterHours: [ChartBar] = []
+        if let lastRegular = regular.last { afterHours.append(lastRegular) }
+        afterHours += bars.filter { $0.extendedHoursLabel == "after hours" }
+
+        return ExtendedSplit(regular: regular, preMarket: preMarket, afterHours: afterHours)
     }
 
     private func yDomain(_ bars: [ChartBar]) -> ClosedRange<Double> {

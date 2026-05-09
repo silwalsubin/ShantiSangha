@@ -191,6 +191,7 @@ def _chart_history(event: dict) -> dict:
                 "low": float(row.low),
                 "close": float(row.close),
                 "volume": int(row.volume) if row.volume == row.volume else 0,
+                "extendedHours": bool(row.extended_hours),
             }
             for row in intraday.itertuples()
         ]

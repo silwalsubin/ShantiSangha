@@ -94,9 +94,11 @@ def get_earnings_dates(ticker: str) -> list:
 
 
 def get_intraday_history(ticker: str) -> pd.DataFrame:
-    """Returns 5-minute intraday bars for the most recent trading day. The
-    DataFrame includes a `timestamp` column (timezone-aware datetime in
-    UTC) — daily-only callers should not use this; it's chart-only.
+    """Returns 5-minute intraday bars for the most recent trading day,
+    including pre-market (4:00–9:30 ET) and after-hours (16:00–20:00 ET).
+    The DataFrame includes a `timestamp` column (tz-aware UTC) and an
+    `extended_hours` bool flag — chart-only; daily callers should not use
+    this.
     """
     try:
         import yfinance as yf
@@ -105,10 +107,11 @@ def get_intraday_history(ticker: str) -> pd.DataFrame:
 
     try:
         t = yf.Ticker(ticker)
-        # Pull the last 5 trading days at 5-min resolution then filter to the
-        # most recent date — handles weekends/holidays gracefully (returns the
-        # last actual session instead of an empty result).
-        df = t.history(period="5d", interval="5m", prepost=False, raise_errors=False)
+        # Pull the last 5 trading days at 5-min resolution incl. pre/post,
+        # then filter to the most recent ET session — handles
+        # weekends/holidays gracefully (returns the last actual session
+        # instead of an empty result).
+        df = t.history(period="5d", interval="5m", prepost=True, raise_errors=False)
     except Exception as e:
         raise YFinanceUnavailable(f"yfinance intraday error for {ticker}: {e}") from e
 
@@ -127,8 +130,18 @@ def get_intraday_history(ticker: str) -> pd.DataFrame:
         "Volume": "volume",
     })
 
-    # Filter to the most recent session present in the result.
-    last_date = df["timestamp"].dt.date.max()
-    df = df[df["timestamp"].dt.date == last_date]
-    df = df[["timestamp", "open", "high", "low", "close", "volume"]].sort_values("timestamp").reset_index(drop=True)
+    # Filter by ET calendar date — after-hours bars (e.g. 6pm ET) cross UTC
+    # midnight in summer, so filtering by UTC date can drop the tail end of
+    # the most recent session.
+    local = df["timestamp"].dt.tz_convert("America/New_York")
+    last_date = local.dt.date.max()
+    keep = local.dt.date == last_date
+    df = df.loc[keep].copy()
+    local = local.loc[keep]
+
+    # Mark anything outside 9:30–16:00 ET as extended hours.
+    minutes_et = local.dt.hour * 60 + local.dt.minute
+    df["extended_hours"] = (minutes_et < 570) | (minutes_et >= 960)
+
+    df = df[["timestamp", "open", "high", "low", "close", "volume", "extended_hours"]].sort_values("timestamp").reset_index(drop=True)
     return df
