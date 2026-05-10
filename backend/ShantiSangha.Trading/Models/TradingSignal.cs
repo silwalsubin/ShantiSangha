@@ -2,9 +2,10 @@ namespace ShantiSangha.Trading.Models;
 
 /// <summary>
 /// One row per (user, ticker, date). Carries three verdicts side by side —
-/// 1W / 1M / 1Y — plus the legacy single-horizon columns (Action, Conviction,
-/// CompositeScore, TechnicalScore) which mirror the 1M values for back-compat
-/// with consumers that haven't migrated to the per-horizon API.
+/// 1W / 1M / 1Y. The wire DTO still surfaces a top-level (Action, Conviction,
+/// TechnicalScore, CompositeScore) view that mirrors the 1M horizon for
+/// consumers (iOS) that haven't migrated to the per-horizon API, but those
+/// fields are now computed in the DTO mapper rather than persisted.
 /// </summary>
 public class TradingSignal
 {
@@ -20,12 +21,6 @@ public class TradingSignal
     /// On weekends / holidays this lags `Date` by 1–3 days.
     /// </summary>
     public DateOnly LastBarDate { get; set; }
-
-    // Legacy single-horizon columns — kept in lockstep with the 1M values.
-    public TradingAction Action { get; set; }
-    public double Conviction { get; set; }
-    public double TechnicalScore { get; set; }
-    public double CompositeScore { get; set; }
 
     // Per-horizon verdicts.
     public TradingAction Action1W { get; set; }

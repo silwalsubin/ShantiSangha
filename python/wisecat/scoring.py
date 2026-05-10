@@ -1,25 +1,19 @@
-"""Compose per-ticker scores from individual strategies.
+"""Compose per-ticker scores from the per-horizon GBM classifiers.
 
-Two scoring paths live side by side:
+Loads a per-horizon LightGBM classifier from `wisecat/models/gbm_<horizon>.joblib`,
+computes the same feature row used at training time, and returns a probability
+triple (Buy/Hold/Sell) plus an expected-return estimate. Per-feature
+contributions come from LightGBM's built-in `pred_contrib` so the iOS detail
+view can render a per-feature breakdown of the verdict.
 
-- **Legacy**: weighted sum of registered strategies, fanned out to per-horizon
-  weights from `STRATEGY_WEIGHTS_BY_HORIZON`. The composite is the long-running
-  scoring engine that ships today. Always emits the new `pBuy/pHold/pSell/
-  expectedReturn` fields with neutral defaults (`p_hold = 1.0`) so the wire
-  format is uniform across both paths.
-
-- **GBM**: Phase 1 of SCORING_ROADMAP.md. Loads a per-horizon LightGBM
-  classifier from `wisecat/models/gbm_<horizon>.joblib`, computes the same
-  feature row used at training time, returns probability triples + an
-  expected-return estimate. Activated only when `WISECAT_GBM_ENABLED=1` AND
-  every requested horizon has a model artifact on disk; otherwise falls back
-  to legacy. Lets us A/B against the legacy path before retiring it.
+If a horizon's artifact is missing or feature compute fails, that horizon
+emits a neutral verdict (`pHold = 1.0`, `score = 0`, no signals) — the wire
+shape stays uniform across success and degraded paths.
 """
 
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 from threading import Lock
 
@@ -28,7 +22,7 @@ import pandas as pd
 
 from .features import FeatureContext, compute_all_features
 from .models import HorizonScore, StrategyContribution, TickerScore
-from .strategies import ALL_STRATEGIES, HORIZONS, STRATEGY_WEIGHTS_BY_HORIZON
+from .strategies import HORIZONS
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +34,6 @@ logger = logging.getLogger(__name__)
 _MODELS_DIR = Path(__file__).resolve().parent / "models"
 _GBM_CACHE: dict[str, dict | None] = {}
 _GBM_CACHE_LOCK = Lock()
-
-
-def _gbm_enabled() -> bool:
-    return os.environ.get("WISECAT_GBM_ENABLED", "").strip() in ("1", "true", "True", "yes")
 
 
 def _gbm_artifact_path(horizon: str) -> Path:
@@ -70,10 +60,6 @@ def _load_gbm_artifact(horizon: str) -> dict | None:
         return artifact
 
 
-def _has_model(horizon: str) -> bool:
-    return _load_gbm_artifact(horizon) is not None
-
-
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
@@ -85,98 +71,40 @@ def score_ticker(
     price: float | None,
     context: FeatureContext | None = None,
 ) -> TickerScore:
-    """Score a ticker across all horizons.
+    """Score a ticker across all horizons via the per-horizon GBM models.
 
-    Per-horizon routing: a horizon uses the GBM path iff `WISECAT_GBM_ENABLED`
-    is set AND that horizon's artifact exists on disk. Other horizons fall
-    back to the legacy weighted-sum path. Lets us roll out one horizon at a
-    time without all-or-nothing gating.
-
-    Both paths return the same wire shape — pBuy / pHold / pSell /
-    expectedReturn populated everywhere, with neutral defaults
-    (`pHold = 1.0`) on the legacy path.
+    Per-horizon: load artifact, compute features once, run GBM. If the
+    artifact is missing OR feature compute / pred_contrib raises, that
+    horizon falls back to a neutral verdict so a single bad horizon never
+    500's the whole response.
     """
     if df.empty:
         return TickerScore(
             ticker=ticker,
             price=price,
-            horizons={h: _neutral_horizon([]) for h in HORIZONS},
+            horizons={h: _neutral_horizon() for h in HORIZONS},
             error="no historical data",
         )
 
-    gbm_on = _gbm_enabled()
-
-    # Compute legacy first (cheap, runs on the same DataFrame). Per-horizon
-    # GBM scoring overwrites individual horizons that have artifacts.
-    base = _score_legacy(ticker, df, price)
-    if not gbm_on:
-        return base
-
     ctx = context or FeatureContext()
     feats: dict[str, float] | None = None
-    horizons = dict(base.horizons)
+    horizons: dict[str, HorizonScore] = {}
     for horizon in HORIZONS:
-        if not _has_model(horizon):
+        artifact = _load_gbm_artifact(horizon)
+        if artifact is None:
+            horizons[horizon] = _neutral_horizon()
             continue
         try:
             if feats is None:
                 feats = compute_all_features(ticker, df, ctx)
-            artifact = _load_gbm_artifact(horizon)
-            if artifact is None:
-                continue
             horizons[horizon] = _score_one_horizon_gbm(artifact, feats)
         except Exception as e:
-            # Per-horizon GBM failure falls back to that horizon's legacy
-            # entry rather than 500'ing the Lambda. The other horizons are
-            # unaffected.
             logger.warning(
-                "GBM scoring failed for %s @ %s, falling back to legacy: %s",
+                "GBM scoring failed for %s @ %s, emitting neutral: %s",
                 ticker, horizon, e,
             )
+            horizons[horizon] = _neutral_horizon()
 
-    return TickerScore(ticker=ticker, price=price, horizons=horizons, error=base.error)
-
-
-# ---------------------------------------------------------------------------
-# Legacy weighted-sum path
-# ---------------------------------------------------------------------------
-
-
-def _score_legacy(ticker: str, df: pd.DataFrame, price: float | None) -> TickerScore:
-    """Compute every strategy's (raw, value) once, fan out to per-horizon
-    weights. Fills probabilistic fields with neutral defaults so the wire
-    format matches the GBM path."""
-    strategy_results: dict[str, tuple[float, float]] = {}
-    for name, strategy_fn in ALL_STRATEGIES:
-        try:
-            raw, value = strategy_fn(df)
-        except Exception as e:
-            logger.warning("strategy %s failed for %s: %s", name, ticker, e)
-            continue
-        strategy_results[name] = (raw, value)
-
-    horizons: dict[str, HorizonScore] = {}
-    for horizon in HORIZONS:
-        weights = STRATEGY_WEIGHTS_BY_HORIZON[horizon]
-        contributions: list[StrategyContribution] = []
-        total = 0.0
-        for name, (raw, value) in strategy_results.items():
-            weight = weights.get(name, 0.0)
-            contributions.append(
-                StrategyContribution(
-                    name=name,
-                    value=raw,
-                    contribution=value * weight,
-                    weight=weight,
-                )
-            )
-            total += value * weight
-        horizons[horizon] = HorizonScore(
-            score=total,
-            signals=contributions,
-            # p_buy / p_hold / p_sell / expected_return default to the
-            # neutral verdict — see HorizonScore field defaults.
-        )
     return TickerScore(ticker=ticker, price=price, horizons=horizons)
 
 
@@ -190,8 +118,7 @@ def _score_one_horizon_gbm(artifact: dict, feats: dict[str, float]) -> HorizonSc
 
     Returns a HorizonScore with `signals` populated from LightGBM's
     `pred_contrib` so the iOS detail view can render a per-feature
-    breakdown of the verdict (matching what the legacy weighted-sum path
-    already provides).
+    breakdown of the verdict.
     """
     feature_names: list[str] = artifact["features"]
     booster = artifact["model"]
@@ -247,8 +174,7 @@ def _score_one_horizon_gbm(artifact: dict, feats: dict[str, float]) -> HorizonSc
     # negative => toward Sell. We then keep the top-K by |directional| and
     # report `weight = |directional| / sum_top_K(|directional|)` so weights
     # within the displayed slice sum to 1.0. Note: this weight is a per-row
-    # display weight, NOT a static feature importance like the legacy path's
-    # STRATEGY_WEIGHTS_BY_HORIZON entry.
+    # display weight, NOT a static feature importance.
     # ------------------------------------------------------------------
     contributions: list[StrategyContribution] = []
     try:
@@ -297,5 +223,5 @@ def _score_one_horizon_gbm(artifact: dict, feats: dict[str, float]) -> HorizonSc
 # ---------------------------------------------------------------------------
 
 
-def _neutral_horizon(signals: list[StrategyContribution]) -> HorizonScore:
-    return HorizonScore(score=0.0, signals=signals)
+def _neutral_horizon() -> HorizonScore:
+    return HorizonScore(score=0.0, signals=[])

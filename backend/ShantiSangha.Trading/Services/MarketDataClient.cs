@@ -126,14 +126,11 @@ public class MarketDataClient(
 
     private static HorizonTechnicalScore ToHorizonScore(TickerScoreDto dto, string horizon)
     {
-        // Lambda returns horizons keyed "1W"/"1M"/"1Y". If a key is missing
-        // (e.g. older Lambda revision still in flight), fall back to the
-        // legacy top-level signals so the consumer doesn't see all-zeros.
-        //
-        // The GBM classifier fields (pBuy/pHold/pSell/expectedReturn) may
-        // also be absent on older Lambda revisions — when missing we default
-        // pHold=1 (fully Hold) and the rest to 0 so the verdict reads
-        // unambiguously instead of as a 0/0/0 probability triple.
+        // Lambda always emits per-horizon scores keyed "1W"/"1M"/"1Y" plus the
+        // GBM classifier triple (pBuy/pHold/pSell + expectedReturn) per horizon.
+        // If a key is missing (Lambda outage / partial response), return a
+        // neutral fully-Hold verdict so downstream consumers stay sane instead
+        // of reading an all-zero probability triple as a confident call.
         if (dto.Horizons is { } horizons && horizons.TryGetValue(horizon, out var h) && h is not null)
         {
             var contribs = (h.Signals ?? new())
@@ -145,20 +142,6 @@ public class MarketDataClient(
                 h.PHold ?? 1.0,
                 h.PSell ?? 0.0,
                 h.ExpectedReturn ?? 0.0,
-                contribs);
-        }
-        // Fallback: legacy shape — apply only for 1M (the legacy default horizon).
-        if (horizon == "1M")
-        {
-            var contribs = (dto.Signals ?? new())
-                .Select(c => new TechnicalSignalContribution(c.Name, c.Value, c.Contribution, c.Weight))
-                .ToList();
-            return new HorizonTechnicalScore(
-                dto.TechnicalScore,
-                PBuy: 0.0,
-                PHold: 1.0,
-                PSell: 0.0,
-                ExpectedReturn: 0.0,
                 contribs);
         }
         return new HorizonTechnicalScore(
@@ -233,8 +216,6 @@ public class MarketDataClient(
     private record TickerScoreDto(
         string Ticker,
         decimal? Price,
-        [property: JsonPropertyName("technicalScore")] double TechnicalScore,
-        List<SignalContributionDto>? Signals,
         Dictionary<string, HorizonScoreDto>? Horizons);
 
     // PBuy / PHold / PSell / ExpectedReturn arrive once the Python Lambda is

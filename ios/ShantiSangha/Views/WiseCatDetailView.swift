@@ -188,10 +188,9 @@ struct WiseCatDetailView: View {
         LuxCard {
             VStack(alignment: .leading, spacing: SacredSpacing.l) {
                 horizonHero(read: read)
-                // Drivers table renders for both paths: legacy = per-strategy
-                // weight + signed contribution; GBM = top-8 feature
-                // attributions (weight = share of explanation magnitude,
-                // score = signed push toward Buy/Sell). Same wire shape.
+                // Drivers table = top-8 GBM feature attributions
+                // (weight = share of explanation magnitude, score = signed
+                // push toward Buy/Sell).
                 Divider()
                     .background(Color.sacredMuted.opacity(0.2))
                 technicalBlock(read: read)
@@ -201,20 +200,10 @@ struct WiseCatDetailView: View {
         }
     }
 
-    @ViewBuilder
+    /// Verdict label + a three-segment probability bar that visualizes the
+    /// GBM's actual uncertainty (pBuy / pHold / pSell carries strictly more
+    /// information than a single conviction scalar).
     private func horizonHero(read: HorizonRead) -> some View {
-        if read.hasProbabilisticVerdict {
-            probabilisticHero(read: read)
-        } else {
-            convictionHero(read: read)
-        }
-    }
-
-    /// GBM-served horizons: the verdict label + a three-segment probability
-    /// bar that visualizes the model's actual uncertainty. Replaces the arc
-    /// gauge because pBuy / pHold / pSell carries strictly more information
-    /// than a single conviction scalar.
-    private func probabilisticHero(read: HorizonRead) -> some View {
         let action = WiseCatAction.from(read.action)
         return VStack(spacing: SacredSpacing.s) {
             Text(read.action)
@@ -232,27 +221,6 @@ struct WiseCatDetailView: View {
                     .font(.sacredSmall)
                     .foregroundColor(.sacredMuted)
             }
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    /// Legacy weighted-sum horizons: the original conviction arc + composite
-    /// caption. Kept as-is so non-GBM horizons read identically to today.
-    private func convictionHero(read: HorizonRead) -> some View {
-        let action = WiseCatAction.from(read.action)
-        return VStack(spacing: SacredSpacing.s) {
-            ConvictionMeter(
-                conviction: read.conviction,
-                color: actionColor(action),
-                label: read.action,
-                diameter: 120,
-                lineWidth: 7,
-                labelFont: .sacredHeading,
-                labelPosition: .diameterLine
-            )
-            Text(String(format: "Composite %+.2f", read.compositeScore))
-                .font(.sacredSmall)
-                .foregroundColor(.sacredMuted)
         }
         .frame(maxWidth: .infinity)
     }
@@ -348,24 +316,11 @@ struct WiseCatDetailView: View {
     }
 
     private func prettyStrategyName(_ raw: String) -> String {
-        // Two name spaces share this lookup:
-        //  - Legacy weighted-sum strategies (first six cases below) — the
-        //    oscillator entries are still mapped in case a basket tune
-        //    re-enables them; they're filtered out today via weight > 0.
-        //  - GBM features emitted by `compute_all_features` (everything
-        //    after). Each base strategy contributes both `_raw`
-        //    (unsaturated gap) and `_value` (saturated [-1,+1] score); we
-        //    label them with a parenthetical so the user can tell which
-        //    flavor drove the row when both surface.
+        // GBM features emitted by `compute_all_features`. Each base strategy
+        // contributes both `_raw` (unsaturated gap) and `_value` (saturated
+        // [-1,+1] score); we label them with a parenthetical so the user can
+        // tell which flavor drove the row when both surface.
         switch raw {
-        // Legacy strategies
-        case "trend_50_200":      return "Trend (50/200 EMA)"
-        case "ts_momentum_12_1":  return "Time-series momentum (12-1)"
-        case "fast_trend_5_20":   return "Fast trend (5/20 EMA)"
-        case "rsi_14":            return "Momentum (RSI-14)"
-        case "bollinger_pctb":    return "Mean reversion (Bollinger)"
-        case "volume_confirm":    return "Volume confirmation"
-
         // GBM base technicals (raw + saturated)
         case "trend_50_200_raw":       return "Trend gap (50/200 EMA)"
         case "trend_50_200_value":     return "Trend score (50/200 EMA)"

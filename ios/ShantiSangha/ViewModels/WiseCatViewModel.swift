@@ -85,22 +85,8 @@ final class WiseCatViewModel: ObservableObject {
     }()
 
     private func isStale(_ signal: TradingSignal) -> Bool {
-        // Calendar-day check applies to every row — yesterday's signal is
-        // always stale regardless of which scoring path produced it.
-        if signal.date != Self.utcDateFormatter.string(from: Date()) { return true }
-
-        // The "empty technicalSignals" heuristic was added to catch hollow
-        // legacy rows persisted after an upstream Lambda failure (Finnhub
-        // 403 incident). It only signals failure for legacy weighted-sum
-        // rows — GBM-served horizons return `signals = []` by design
-        // (per-feature SHAP is a Phase 4 follow-up). Skip the heuristic
-        // when the 1M horizon already carries a real probabilistic
-        // verdict.
-        if !signal.horizon1M.hasProbabilisticVerdict
-            && signal.technicalSignals.isEmpty {
-            return true
-        }
-        return false
+        // Calendar-day check — yesterday's signal is always stale.
+        signal.date != Self.utcDateFormatter.string(from: Date())
     }
 
     func add(_ ticker: String) async {

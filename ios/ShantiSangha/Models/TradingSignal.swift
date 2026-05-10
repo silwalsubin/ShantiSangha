@@ -39,12 +39,7 @@ struct TradingSignal: Codable, Identifiable, Hashable {
 }
 
 /// One horizon's read of (ticker, date) — Buy/Hold/Sell, composite, conviction,
-/// and the per-strategy contributions for that horizon's weight vector.
-///
-/// `pBuy / pHold / pSell / expectedReturn` are populated by the post-GBM
-/// scoring pipeline. Pre-GBM rows ship with `pHold = 1.0, pBuy = pSell = 0`
-/// (or omit the keys entirely on legacy responses) — use
-/// `hasProbabilisticVerdict` to gate UI that depends on real distributions.
+/// and the per-feature GBM attributions for that horizon.
 struct HorizonRead: Codable, Hashable {
     let action: String                // "Buy" | "Sell" | "Hold"
     let conviction: Double
@@ -67,14 +62,6 @@ struct HorizonRead: Codable, Hashable {
         pHold = try c.decodeIfPresent(Double.self, forKey: .pHold)
         pSell = try c.decodeIfPresent(Double.self, forKey: .pSell)
         expectedReturn = try c.decodeIfPresent(Double.self, forKey: .expectedReturn)
-    }
-
-    /// True when the model returned real probabilities (post-GBM signals).
-    /// Pre-GBM rows have pHold=1.0 and pBuy=pSell=0 — sum is still 1 but
-    /// the distribution is degenerate; treat as "no probabilistic data".
-    var hasProbabilisticVerdict: Bool {
-        guard let pBuy, let pSell else { return false }
-        return pBuy > 0.0 || pSell > 0.0
     }
 }
 

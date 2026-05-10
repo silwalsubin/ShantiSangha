@@ -35,7 +35,6 @@ public class TradingDbContext(DbContextOptions<TradingDbContext> options) : DbCo
             e.HasIndex(s => new { s.UserId, s.Date });
             e.HasIndex(s => new { s.UserId, s.Ticker, s.Date }).IsUnique();
             e.Property(s => s.Ticker).HasMaxLength(16).IsRequired();
-            e.Property(s => s.Action).HasConversion<string>().HasMaxLength(8);
             e.Property(s => s.Action1W).HasConversion<string>().HasMaxLength(8);
             e.Property(s => s.Action1M).HasConversion<string>().HasMaxLength(8);
             e.Property(s => s.Action1Y).HasConversion<string>().HasMaxLength(8);

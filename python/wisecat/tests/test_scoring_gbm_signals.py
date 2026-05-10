@@ -1,10 +1,10 @@
 """Regression test for GBM per-feature contribution signals.
 
-When `WISECAT_GBM_ENABLED=1` and a horizon's artifact is on disk, the
-scoring path must populate `HorizonScore.signals` with the top-8
-per-feature contributions from LightGBM's built-in `pred_contrib`. This
-is what the iOS detail view reads to show "why" behind the verdict —
-without it the per-feature breakdown is hidden.
+For each horizon with a model artifact on disk, the scoring path must
+populate `HorizonScore.signals` with the top-8 per-feature contributions
+from LightGBM's built-in `pred_contrib`. This is what the iOS detail view
+reads to show "why" behind the verdict — without it the per-feature
+breakdown is hidden.
 """
 
 from __future__ import annotations
@@ -38,12 +38,9 @@ def _make_bars(n: int = 400) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def test_gbm_signals_populated(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_gbm_signals_populated() -> None:
     """For each horizon with an artifact on disk, every HorizonScore
     must carry a non-empty, sensibly-shaped `signals` list."""
-    monkeypatch.setenv("WISECAT_GBM_ENABLED", "1")
-
-    # Import lazily so the env var is read after.
     from wisecat.features import FeatureContext
     from wisecat.scoring import score_ticker
 
@@ -64,7 +61,7 @@ def test_gbm_signals_populated(monkeypatch: pytest.MonkeyPatch) -> None:
             artifacts[h] = joblib.load(path)
 
     # If no artifacts are present (unlikely — they're committed), nothing
-    # to assert. The other horizons fall back to legacy.
+    # to assert. Horizons without artifacts emit a neutral verdict.
     if not artifacts:
         pytest.skip("no GBM artifacts on disk; nothing to assert")
 

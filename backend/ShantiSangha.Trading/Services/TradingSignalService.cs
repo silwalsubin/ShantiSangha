@@ -138,12 +138,6 @@ public class TradingSignalService(
         existing.PSell1Y = tech1Y.PSell;
         existing.ExpectedReturn1Y = tech1Y.ExpectedReturn;
 
-        // Legacy single-horizon columns mirror the 1M values.
-        existing.Action = action1M;
-        existing.Conviction = Math.Abs(composite1M);
-        existing.TechnicalScore = tech1M.Score;
-        existing.CompositeScore = composite1M;
-
         existing.ReasoningJson = reasoningJson;
         existing.PriceAtSignal = price;
         existing.LastBarDate = bars.Count > 0 ? bars[^1].Date : date;

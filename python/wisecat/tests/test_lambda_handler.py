@@ -4,8 +4,8 @@ The Lambda is invoked by the .NET task with bars serialized over JSON, so the
 `date` column arrives as strings. Several feature modules (earnings,
 cross_sectional, vix_regime) compare those values to `datetime.date`
 instances loaded from the parquet `FeatureContext`. Without an explicit
-normalize step the comparison raises TypeError, the GBM path catches it,
-and every horizon falls back to the legacy verdict (pHold=1.0). That looks
+normalize step the comparison raises TypeError, scoring catches it, and
+every horizon falls back to the neutral verdict (pHold=1.0). That looks
 like "no probability bar" on the iOS detail view.
 
 This test guards the normalize step in `_score` so the regression doesn't
@@ -14,7 +14,6 @@ recur.
 
 from __future__ import annotations
 
-import os
 from datetime import date, timedelta
 
 import numpy as np
@@ -42,12 +41,9 @@ def _make_bars(n: int = 400) -> list[dict]:
     return bars
 
 
-def test_score_handles_iso_string_dates(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_score_handles_iso_string_dates() -> None:
     """JSON bars -> _score must normalize date strings to datetime.date so
     feature modules don't blow up on cross-type comparisons."""
-    monkeypatch.setenv("WISECAT_GBM_ENABLED", "1")
-
-    # Import lazily so the env var is set before scoring caches kick in.
     from wisecat.lambda_handler import _score
 
     bars = _make_bars()
@@ -68,6 +64,6 @@ def test_score_handles_iso_string_dates(monkeypatch: pytest.MonkeyPatch) -> None
         assert 0.99 <= total <= 1.01, f"{h} probabilities don't sum to 1: {score}"
         non_degenerate = score["pBuy"] > 0 or score["pSell"] > 0
         assert non_degenerate, (
-            f"{h} fell back to the legacy degenerate verdict — string-date "
+            f"{h} fell back to the neutral degenerate verdict — string-date "
             f"normalization regressed in _score: {score}"
         )
