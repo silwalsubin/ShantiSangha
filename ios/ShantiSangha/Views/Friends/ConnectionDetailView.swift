@@ -15,9 +15,10 @@ struct ConnectionDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var profile: ProfileService
 
-    // Connection overlay drafts
-    @State private var nicknameDraft: String = ""
-    @State private var notesDraft: String = ""
+    // Connection overlay edit state. Nickname and Notes use the same
+    // sheet pattern the personal account flow uses on Home; circlesDraft
+    // remains because the circles editor is still inline today.
+    @State private var activeOverlayEdit: ConnectionOverlayEdit?
     @State private var circlesDraft: [String] = []
     @State private var showCirclesPicker = false
 
@@ -29,8 +30,6 @@ struct ConnectionDetailView: View {
     @State private var stateDraft: String = ""
     @State private var countryDraft: String = ""
 
-    @State private var savingNickname = false
-    @State private var savingNotes = false
     @State private var savingRelation = false
     @State private var savingPerson = false
     @State private var saveError: String?
@@ -108,7 +107,44 @@ struct ConnectionDetailView: View {
                     : nil)
         }
         .sheet(isPresented: $showAvatarPickerSheet) {
-            privateAvatarPickerSheet
+            if let c = connection {
+                SacredFormSheet(
+                    title: "Profile picture",
+                    detent: .height(560),
+                    onCancel: { showAvatarPickerSheet = false }
+                ) {
+                    privateAvatarPickerBody(c)
+                }
+            }
+        }
+        .sheet(item: $activeOverlayEdit) { edit in
+            if let c = connection {
+                SacredFormSheet(
+                    title: edit.title,
+                    detent: edit.detent,
+                    onCancel: { activeOverlayEdit = nil }
+                ) {
+                    overlayEditBody(edit, connection: c)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func overlayEditBody(_ edit: ConnectionOverlayEdit, connection c: Connection) -> some View {
+        switch edit {
+        case .nickname:
+            ConnectionNicknameEditBody(
+                vm: vm,
+                connectionId: c.id,
+                initialValue: c.nickname ?? "",
+                onSaved: { activeOverlayEdit = nil })
+        case .notes:
+            ConnectionNotesEditBody(
+                vm: vm,
+                connectionId: c.id,
+                initialValue: c.privateNotes ?? "",
+                onSaved: { activeOverlayEdit = nil })
         }
     }
 
@@ -123,45 +159,24 @@ struct ConnectionDetailView: View {
             : "Only you will see this. They'll keep showing as their normal photo."
     }
 
-    @ViewBuilder
-    private var privateAvatarPickerSheet: some View {
-        if let c = connection {
-            // Match the personal profile-picture sheet chrome on Home:
-            // NavigationStack + Cancel toolbar + inline title + 560pt
-            // detent. AvatarPickerBody is the shared crop/upload body.
-            NavigationStack {
-                ScrollView {
-                    AvatarPickerBody(
-                        initialAvatarUrl: c.ownerVisibleAvatarUrl,
-                        submitLabel: "Save",
-                        upload: { data in
-                            try await vm.uploadPrivateAvatar(
-                                connectionId: c.id,
-                                jpegData: data)
-                        },
-                        onSaved: { showAvatarPickerSheet = false },
-                        footnote: AnyView(PrivateFootnote(privateAvatarFootnoteText)),
-                        removeLabel: c.privateAvatarUrl == nil ? nil : "Remove picture",
-                        removeAction: c.privateAvatarUrl == nil ? nil : {
-                            try? await vm.clearPrivateAvatar(connectionId: c.id)
-                        }
-                    )
-                    .padding(.horizontal, SacredSpacing.l)
-                    .padding(.top, SacredSpacing.l)
-                }
-                .frame(maxHeight: .infinity, alignment: .top)
-                .sacredBackground()
-                .navigationTitle("Profile picture")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { showAvatarPickerSheet = false }
-                            .foregroundColor(.sacredMuted)
-                    }
-                }
+    /// Body for the private-avatar sheet. The shell chrome (title,
+    /// Cancel, detent, sacred background) lives in `SacredFormSheet`.
+    private func privateAvatarPickerBody(_ c: Connection) -> some View {
+        AvatarPickerBody(
+            initialAvatarUrl: c.ownerVisibleAvatarUrl,
+            submitLabel: "Save",
+            upload: { data in
+                try await vm.uploadPrivateAvatar(
+                    connectionId: c.id,
+                    jpegData: data)
+            },
+            onSaved: { showAvatarPickerSheet = false },
+            footnote: AnyView(PrivateFootnote(privateAvatarFootnoteText)),
+            removeLabel: c.privateAvatarUrl == nil ? nil : "Remove picture",
+            removeAction: c.privateAvatarUrl == nil ? nil : {
+                try? await vm.clearPrivateAvatar(connectionId: c.id)
             }
-            .presentationDetents([.height(560)])
-        }
+        )
     }
 
     // MARK: - Sections
@@ -475,30 +490,17 @@ struct ConnectionDetailView: View {
 
     private var nicknameSection: some View {
         VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-            sectionLabel("NICKNAME")
-
-            SacredListCard {
-                HStack(spacing: 10) {
-                    TextField("Add a nickname", text: $nicknameDraft)
-                        .font(.sacredText)
-                        .foregroundColor(.sacredText)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
-                        .submitLabel(.done)
-                        .onSubmit { Task { await saveNickname() } }
-
-                    if savingNickname {
-                        ProgressView()
-                            .controlSize(.small)
-                            .tint(.sacredGold)
-                            .padding(.trailing, 14)
-                    }
+            Button {
+                activeOverlayEdit = .nickname
+            } label: {
+                SacredListCard {
+                    SacredMenuRow(
+                        icon: "person.text.rectangle",
+                        title: "Nickname",
+                        subtitle: nicknameSubtitle)
                 }
             }
-
-            if nicknameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                sectionScaffold("Replaces their name everywhere on your end.")
-            }
+            .buttonStyle(.plain)
 
             PrivateFootnote()
         }
@@ -506,35 +508,43 @@ struct ConnectionDetailView: View {
 
     private var notesSection: some View {
         VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-            sectionLabel("NOTES")
-
-            SacredListCard {
-                ZStack(alignment: .topLeading) {
-                    if notesDraft.isEmpty {
-                        Text("What you notice about them.")
-                            .font(.sacredText)
-                            .foregroundColor(.sacredMutedLight)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 18)
-                    }
-                    TextEditor(text: $notesDraft)
-                        .font(.sacredText)
-                        .foregroundColor(.sacredText)
-                        .scrollContentBackground(.hidden)
-                        .background(Color.clear)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .frame(minHeight: 120)
-                        .onChange(of: notesDraft) { _, _ in scheduleNotesSave() }
-                }
-
-                if savingNotes {
-                    savingFooter
+            Button {
+                activeOverlayEdit = .notes
+            } label: {
+                SacredListCard {
+                    SacredMenuRow(
+                        icon: "square.and.pencil",
+                        title: "Notes",
+                        subtitle: notesSubtitle)
                 }
             }
+            .buttonStyle(.plain)
 
             PrivateFootnote()
         }
+    }
+
+    /// Compact preview of the current nickname for the menu-row subtitle.
+    /// Falls back to a soft prompt when nothing is set so the row still
+    /// telegraphs what tapping it does.
+    private var nicknameSubtitle: String {
+        let value = (connection?.nickname ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty
+            ? "Replaces their name on your end."
+            : value
+    }
+
+    /// Single-line preview for notes — shows the first non-empty line,
+    /// truncated; soft prompt when empty.
+    private var notesSubtitle: String {
+        let raw = (connection?.privateNotes ?? "")
+        let firstLine = raw
+            .split(whereSeparator: \.isNewline)
+            .first
+            .map(String.init)?
+            .trimmingCharacters(in: .whitespaces) ?? ""
+        if firstLine.isEmpty { return "What you notice about them." }
+        return firstLine.count <= 60 ? firstLine : String(firstLine.prefix(60)) + "…"
     }
 
     /// Tile-row that pushes to a dedicated full-screen page for media + files.
@@ -698,8 +708,6 @@ struct ConnectionDetailView: View {
     private func seedDrafts(force: Bool = false) {
         guard let c = connection else { return }
         guard !didSeed || force else { return }
-        nicknameDraft = c.nickname ?? ""
-        notesDraft = c.privateNotes ?? ""
         circlesDraft = c.circles
         displayNameDraft = c.person.displayName
         phoneDraft = c.person.phoneNumber ?? ""
@@ -708,54 +716,6 @@ struct ConnectionDetailView: View {
         stateDraft = c.person.state ?? ""
         countryDraft = c.person.country ?? ""
         didSeed = true
-    }
-
-    private func saveNickname() async {
-        guard let c = connection else { return }
-        let trimmed = nicknameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        let original = c.nickname ?? ""
-        if trimmed == original { return }
-
-        savingNickname = true
-        defer { savingNickname = false }
-        do {
-            if trimmed.isEmpty {
-                _ = try await vm.updateOverlay(connectionId: c.id, clearNickname: true)
-            } else {
-                _ = try await vm.updateOverlay(connectionId: c.id, nickname: trimmed)
-            }
-            saveError = nil
-        } catch {
-            saveError = "Couldn't save. Try again."
-        }
-    }
-
-    private func scheduleNotesSave() {
-        let snapshot = notesDraft
-        Task {
-            try? await Task.sleep(nanoseconds: 600_000_000)
-            if snapshot == notesDraft {
-                await saveNotes()
-            }
-        }
-    }
-
-    private func saveNotes() async {
-        guard let c = connection else { return }
-        let original = c.privateNotes ?? ""
-        if notesDraft == original { return }
-        savingNotes = true
-        defer { savingNotes = false }
-        do {
-            if notesDraft.isEmpty {
-                _ = try await vm.updateOverlay(connectionId: c.id, clearPrivateNotes: true)
-            } else {
-                _ = try await vm.updateOverlay(connectionId: c.id, privateNotes: notesDraft)
-            }
-            saveError = nil
-        } catch {
-            saveError = "Couldn't save. Try again."
-        }
     }
 
     private func saveCircles() async {
@@ -947,6 +907,31 @@ private struct AvatarBackdrop: View {
                 return
             }
             image = await AvatarImageCache.shared.image(for: url)
+        }
+    }
+}
+
+/// Identifies which Connection-overlay editor is currently presented.
+/// Mirrors the `AccountEdit` enum on Home so the per-Connection sheets
+/// follow the same shape (title + presentation detent) the personal
+/// account-edit flow uses.
+enum ConnectionOverlayEdit: String, Identifiable {
+    case nickname
+    case notes
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .nickname: return "Nickname"
+        case .notes:    return "Notes"
+        }
+    }
+
+    var detent: PresentationDetent {
+        switch self {
+        case .nickname: return .height(380)
+        case .notes:    return .large
         }
     }
 }

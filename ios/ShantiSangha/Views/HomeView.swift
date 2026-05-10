@@ -613,24 +613,13 @@ struct ProfileMenuSheet: View {
                 Button("Cancel", role: .cancel) {}
             }
             .sheet(item: $activeAccountEdit) { edit in
-                NavigationStack {
+                SacredFormSheet(
+                    title: edit.title,
+                    detent: edit.detent,
+                    onCancel: { activeAccountEdit = nil }
+                ) {
                     accountEditSheet(edit)
-                        .padding(.horizontal, SacredSpacing.l)
-                        .padding(.top, SacredSpacing.l)
-                        .frame(maxHeight: .infinity, alignment: .top)
-                        .sacredBackground()
-                        .navigationTitle(edit.title)
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .cancellationAction) {
-                                Button("Cancel") {
-                                    activeAccountEdit = nil
-                                }
-                                .foregroundColor(.sacredMuted)
-                            }
-                        }
                 }
-                .presentationDetents([edit.detent])
             }
         }
     }
