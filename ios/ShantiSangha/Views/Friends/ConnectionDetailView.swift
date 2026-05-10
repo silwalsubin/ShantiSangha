@@ -38,11 +38,11 @@ struct ConnectionDetailView: View {
     @State private var removing = false
     @State private var didSeed = false
 
-    // Owner-private avatar editor — confirmation dialog opens on tap,
-    // then routes into the shared `AvatarPickerBody` sheet.
-    @State private var showAvatarActionSheet = false
+    // Owner-private avatar editor — pencil tap opens the same sheet
+    // chrome the personal profile picture uses; AvatarPickerBody owns
+    // the picker + crop + Save, plus an optional Remove button when
+    // the connection already has a private avatar.
     @State private var showAvatarPickerSheet = false
-    @State private var clearingPrivateAvatar = false
 
     // nil = sheet closed; .new = adding; .edit(id) = editing existing
     @State private var dateEditTarget: ConnectionDateEditTarget?
@@ -106,30 +106,16 @@ struct ConnectionDetailView: View {
                     ? { await deleteDate(target: target) }
                     : nil)
         }
-        .confirmationDialog(
-            "Private picture",
-            isPresented: $showAvatarActionSheet,
-            titleVisibility: .visible
-        ) {
-            Button("Change picture") { showAvatarPickerSheet = true }
-            if connection?.privateAvatarUrl != nil {
-                Button("Remove picture", role: .destructive) {
-                    Task { await removePrivateAvatar() }
-                }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text(privateAvatarDialogMessage)
-        }
         .sheet(isPresented: $showAvatarPickerSheet) {
             privateAvatarPickerSheet
         }
     }
 
-    /// Phrasing for the confirmation dialog under the avatar — slightly
-    /// different copy for in-app vs. local connections so the user
-    /// understands what "private" means in each case.
-    private var privateAvatarDialogMessage: String {
+    /// Phrasing for the privacy footnote inside the picker — mirrors
+    /// the wording used elsewhere for owner-private surfaces, but
+    /// adds an extra reassurance for in-app linked Persons that they
+    /// won't see this picture from their side.
+    private var privateAvatarFootnoteText: String {
         guard let c = connection else { return "Only you can see this." }
         return c.person.userId == nil
             ? "Only you can see this."
@@ -139,43 +125,41 @@ struct ConnectionDetailView: View {
     @ViewBuilder
     private var privateAvatarPickerSheet: some View {
         if let c = connection {
+            // Match the personal profile-picture sheet chrome on Home:
+            // NavigationStack + Cancel toolbar + inline title + 560pt
+            // detent. AvatarPickerBody is the shared crop/upload body.
             NavigationStack {
                 ScrollView {
                     AvatarPickerBody(
                         initialAvatarUrl: c.ownerVisibleAvatarUrl,
-                        submitLabel: "Save private picture",
+                        submitLabel: "Save",
                         upload: { data in
                             try await vm.uploadPrivateAvatar(
                                 connectionId: c.id,
                                 jpegData: data)
                         },
                         onSaved: { showAvatarPickerSheet = false },
-                        footnote: AnyView(PrivateFootnote(privateAvatarDialogMessage))
+                        footnote: AnyView(PrivateFootnote(privateAvatarFootnoteText)),
+                        removeLabel: c.privateAvatarUrl == nil ? nil : "Remove picture",
+                        removeAction: c.privateAvatarUrl == nil ? nil : {
+                            try? await vm.clearPrivateAvatar(connectionId: c.id)
+                        }
                     )
-                    .padding(.horizontal, SacredSpacing.m)
-                    .padding(.vertical, SacredSpacing.l)
+                    .padding(.horizontal, SacredSpacing.l)
+                    .padding(.top, SacredSpacing.l)
                 }
-                .background(SacredBackground().ignoresSafeArea())
-                .navigationTitle("Private picture")
+                .frame(maxHeight: .infinity, alignment: .top)
+                .sacredBackground()
+                .navigationTitle("Profile picture")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
+                    ToolbarItem(placement: .cancellationAction) {
                         Button("Cancel") { showAvatarPickerSheet = false }
+                            .foregroundColor(.sacredMuted)
                     }
                 }
             }
-        }
-    }
-
-    private func removePrivateAvatar() async {
-        guard let c = connection, !clearingPrivateAvatar else { return }
-        clearingPrivateAvatar = true
-        defer { clearingPrivateAvatar = false }
-        do {
-            try await vm.clearPrivateAvatar(connectionId: c.id)
-        } catch {
-            saveError = (error as? LocalizedError)?.errorDescription
-                ?? "We couldn't remove the picture. Try again."
+            .presentationDetents([.height(560)])
         }
     }
 
@@ -183,31 +167,38 @@ struct ConnectionDetailView: View {
 
     private func header(_ c: Connection) -> some View {
         VStack(spacing: SacredSpacing.s) {
-            // Tap-to-edit the owner-private avatar. The actual edit UI
-            // is a confirmation-dialog → sheet flow declared on the
-            // root view body so it doesn't replay header rebuilds.
+            // Pencil overlay matches the personal profile flow on Home.
+            // Tap anywhere on the avatar/pencil opens the picker sheet
+            // directly (no intermediate dialog). The atom mark for in-app
+            // linked Persons moves to the top-trailing corner so the
+            // pencil can sit in its conventional bottom-trailing spot.
             Button {
-                showAvatarActionSheet = true
+                showAvatarPickerSheet = true
             } label: {
                 ZStack(alignment: .bottomTrailing) {
                     SacredAvatar(
                         displayName: c.person.displayName,
                         avatarUrl: c.ownerVisibleAvatarUrl,
                         size: 120)
+                        .overlay(alignment: .topTrailing) {
+                            if c.person.userId != nil {
+                                Image(systemName: "atom")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(.sacredGold)
+                                    .frame(width: 26, height: 26)
+                                    .background(Circle().fill(Color.sacredBg))
+                                    .overlay(Circle().stroke(Color.sacredGold.opacity(0.5), lineWidth: 1.5))
+                                    .offset(x: 2, y: -2)
+                            }
+                        }
 
-                    // Small gold atom overlay marks linked Persons (those with
-                    // an actual ShantiSangha account, distinct from local
-                    // contacts the user added by hand). Replaces the now-gone
-                    // ABOUT THEM section's "they control this" disclosure.
-                    if c.person.userId != nil {
-                        Image(systemName: "atom")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(.sacredGold)
-                            .frame(width: 28, height: 28)
-                            .background(Circle().fill(Color.sacredBg))
-                            .overlay(Circle().stroke(Color.sacredGold.opacity(0.5), lineWidth: 1.5))
-                            .offset(x: -4, y: -4)
-                    }
+                    Image(systemName: "pencil")
+                        .font(.system(size: 13, weight: .bold, design: .serif))
+                        .foregroundColor(.white)
+                        .frame(width: 28, height: 28)
+                        .background(Circle().fill(Color.sacredGold))
+                        .overlay(Circle().stroke(Color.sacredBg, lineWidth: 2))
+                        .offset(x: 2, y: 2)
                 }
             }
             .buttonStyle(.plain)

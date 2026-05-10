@@ -23,6 +23,8 @@ struct AvatarPickerBody: View {
     let upload: (Data) async throws -> Void
     let onSaved: (() -> Void)?
     let footnote: AnyView?
+    let removeLabel: String?
+    let removeAction: (() async -> Void)?
 
     @State private var pickerItem: PhotosPickerItem?
     @State private var sourceImage: UIImage?
@@ -33,6 +35,7 @@ struct AvatarPickerBody: View {
     @State private var loadedAvatarUrl: String?
     @State private var showingCamera = false
     @State private var saving = false
+    @State private var removing = false
     @State private var errorMessage: String?
 
     private let maxDimension: CGFloat = 512
@@ -44,13 +47,17 @@ struct AvatarPickerBody: View {
         submitLabel: String,
         upload: @escaping (Data) async throws -> Void,
         onSaved: (() -> Void)? = nil,
-        footnote: AnyView? = nil
+        footnote: AnyView? = nil,
+        removeLabel: String? = nil,
+        removeAction: (() async -> Void)? = nil
     ) {
         self.initialAvatarUrl = initialAvatarUrl
         self.submitLabel = submitLabel
         self.upload = upload
         self.onSaved = onSaved
         self.footnote = footnote
+        self.removeLabel = removeLabel
+        self.removeAction = removeAction
     }
 
     var body: some View {
@@ -82,6 +89,24 @@ struct AvatarPickerBody: View {
                 isLoading: saving
             ) {
                 Task { await submit() }
+            }
+
+            if let removeAction, let removeLabel {
+                Button {
+                    Task { await runRemove(removeAction) }
+                } label: {
+                    if removing {
+                        ProgressView().tint(.sacredRed)
+                            .frame(maxWidth: .infinity, minHeight: 36)
+                    } else {
+                        Text(removeLabel)
+                            .font(.sacredSmallSemibold)
+                            .foregroundColor(.sacredRed)
+                            .frame(maxWidth: .infinity, minHeight: 36)
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(saving || removing)
             }
         }
         .onChange(of: pickerItem) { _, newItem in
@@ -319,6 +344,14 @@ struct AvatarPickerBody: View {
     }
 
     // MARK: - Submit
+
+    private func runRemove(_ action: () async -> Void) async {
+        guard !removing && !saving else { return }
+        removing = true
+        defer { removing = false }
+        await action()
+        onSaved?()
+    }
 
     private func submit() async {
         guard let sourceImage, !saving else { return }
