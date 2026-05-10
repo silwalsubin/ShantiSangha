@@ -58,6 +58,34 @@ public class FriendMessagesService(
         return await MaterializeAsync(rows);
     }
 
+    public async Task<List<FriendMessageResponse>?> ListMediaMessagesAsync(
+        Guid userId, Guid friendshipId, DateTime? before, int limit, CancellationToken ct = default)
+    {
+        var f = await GetFriendshipAsync(friendshipId, userId, ct);
+        if (f is null) return null;
+
+        var pageSize = Math.Clamp(limit <= 0 ? DefaultPageSize : limit, 1, MaxPageSize);
+        // Image + Voice only — text is filtered out at the SQL level so a
+        // chatty friendship doesn't pay the cost of paging through walls
+        // of text to surface a handful of media. Soft-deleted rows are
+        // also dropped so the archive doesn't show ghost entries.
+        var query = db.Messages.Where(m =>
+            m.FriendshipId == f.Id
+            && m.DeletedAt == null
+            && (m.Kind == FriendMessageKind.Image || m.Kind == FriendMessageKind.Voice));
+        if (before.HasValue)
+            query = query.Where(m => m.SentAt < before.Value);
+
+        var rows = await query
+            .OrderByDescending(m => m.SentAt)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        // Newest-first list — the archive renders most-recent at the top
+        // (Apple Photos style), unlike the chat which renders oldest-first.
+        return await MaterializeAsync(rows);
+    }
+
     public async Task<FriendMessageResponse?> SendTextAsync(
         Guid userId, Guid friendshipId, string body, Guid? replyToMessageId = null, CancellationToken ct = default)
     {

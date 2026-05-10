@@ -7,6 +7,15 @@ public interface IFriendMessagesService
     Task<List<FriendMessageResponse>?> ListMessagesAsync(
         Guid userId, Guid friendshipId, DateTime? before, int limit, CancellationToken ct = default);
 
+    /// Lists ONLY media messages (Image + Voice) for the friendship,
+    /// newest first, paginated by `before` cursor on `SentAt`. Used by
+    /// the per-Connection "Chat Media & Files" archive screen.
+    /// Skips soft-deleted rows so they don't crowd the archive UI.
+    /// Returns null when the friendship is missing or the caller isn't
+    /// a member.
+    Task<List<FriendMessageResponse>?> ListMediaMessagesAsync(
+        Guid userId, Guid friendshipId, DateTime? before, int limit, CancellationToken ct = default);
+
     Task<FriendMessageResponse?> SendTextAsync(
         Guid userId, Guid friendshipId, string body, Guid? replyToMessageId = null, CancellationToken ct = default);
 

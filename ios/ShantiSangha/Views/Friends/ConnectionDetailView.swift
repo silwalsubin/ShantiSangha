@@ -61,6 +61,7 @@ struct ConnectionDetailView: View {
             if let connection {
                 VStack(spacing: SacredSpacing.l) {
                     header(connection)
+                    chatMediaFilesRow(connection)
                     mediaFilesRow(connection)
                     relationSection
                     datesSection(connection)
@@ -549,6 +550,28 @@ struct ConnectionDetailView: View {
             .buttonStyle(.plain)
 
             PrivateFootnote()
+        }
+    }
+
+    /// Shared chat archive — every photo and voice note exchanged in
+    /// the chat. Only renders when the connection is paired with an
+    /// in-app friendship; for local Persons there's no chat to mine.
+    @ViewBuilder
+    private func chatMediaFilesRow(_ c: Connection) -> some View {
+        if let friendshipId = c.friendshipId {
+            VStack(alignment: .leading, spacing: SacredSpacing.xs) {
+                NavigationLink(destination: ChatMediaFilesScreen(
+                    friendshipId: friendshipId,
+                    connectionDisplayName: c.displayLabel)
+                ) {
+                    SacredListCard {
+                        SacredMenuRow(icon: "bubble.left.and.bubble.right", title: "Chat Media & Files")
+                    }
+                }
+                .buttonStyle(.plain)
+
+                SharedFootnote("Both of you can see this.")
+            }
         }
     }
 

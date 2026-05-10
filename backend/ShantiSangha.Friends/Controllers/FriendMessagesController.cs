@@ -27,6 +27,22 @@ public class FriendMessagesController(
         return result is null ? NotFound() : Ok(result);
     }
 
+    /// Image + voice messages only, newest first. Backs the per-Connection
+    /// "Chat Media & Files" archive without paging through walls of text.
+    [HttpGet("media")]
+    public async Task<IActionResult> ListMedia(
+        Guid friendshipId,
+        [FromQuery] DateTime? before = null,
+        [FromQuery] int limit = 100,
+        CancellationToken ct = default)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+
+        var result = await service.ListMediaMessagesAsync(user.Id, friendshipId, before, limit, ct);
+        return result is null ? NotFound() : Ok(result);
+    }
+
     [HttpPost]
     public async Task<IActionResult> SendText(
         Guid friendshipId,

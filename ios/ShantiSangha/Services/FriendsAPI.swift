@@ -56,6 +56,21 @@ enum FriendsAPI {
         return try await ApiService.shared.get(path)
     }
 
+    /// Image + voice messages only, newest first. Backs the per-Connection
+    /// "Chat Media & Files" archive — same payload shape as `listMessages`,
+    /// but the backend filters out text + soft-deleted rows so the client
+    /// doesn't page through walls of text to surface a few photos.
+    static func listChatMedia(friendshipId: UUID, before: Date? = nil, limit: Int = 100) async throws -> [FriendMessage] {
+        var path = "/friends/\(friendshipId.uuidString.lowercased())/messages/media?limit=\(limit)"
+        if let before = before {
+            let f = ISO8601DateFormatter()
+            f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            let beforeStr = f.string(from: before).addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+            path += "&before=\(beforeStr)"
+        }
+        return try await ApiService.shared.get(path)
+    }
+
     struct SendTextBody: Encodable {
         let body: String
         let replyToMessageId: UUID?
