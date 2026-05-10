@@ -146,6 +146,22 @@ _PERIOD_DAYS = {
 }
 
 
+def _safe_float(x) -> float | None:
+    """NaN/inf guard for JSON serialization. Python's json.dumps emits the
+    literal token `NaN` for math.nan, which violates RFC 8259 and crashes
+    strict decoders (iOS JSONDecoder reports "isn't in the correct format").
+    Returns None for missing values so the wire carries a valid `null`.
+    """
+    import math
+    try:
+        f = float(x)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(f) or math.isinf(f):
+        return None
+    return f
+
+
 def _chart_history(event: dict) -> dict:
     """Returns chart-display bars for the requested period plus an `aggregates`
     block computed off the FULL available history (so 52w / all-time stats are
@@ -179,39 +195,52 @@ def _chart_history(event: dict) -> dict:
             raise RuntimeError(f"yfinance intraday unavailable: {e}") from e
         logger.warning("intraday unavailable for %s, falling back to daily close: %s", ticker, e)
 
-    # Aggregates from full history.
+    # Aggregates from full history. yfinance occasionally serves bars with
+    # NaN OHLC right around session boundaries (no trades printed yet), so
+    # every numeric field is funneled through `_safe_float` to keep the
+    # response valid JSON.
     today = _date.today()
     last52 = df[df["date"] >= (today - timedelta(days=365))]
-    current_price = (
-        float(intraday["close"].iloc[-1])
+    current_price_src = (
+        intraday["close"].iloc[-1]
         if intraday is not None and not intraday.empty
-        else float(df["close"].iloc[-1])
+        else df["close"].iloc[-1]
     )
     aggregates = {
-        "currentPrice": current_price,
-        "previousClose": float(df["close"].iloc[-2]) if len(df) >= 2 else None,
-        "weekHigh52": float(last52["close"].max()) if not last52.empty else None,
-        "weekLow52": float(last52["close"].min()) if not last52.empty else None,
-        "allTimeHigh": float(df["close"].max()),
-        "allTimeLow": float(df["close"].min()),
+        "currentPrice": _safe_float(current_price_src),
+        "previousClose": _safe_float(df["close"].iloc[-2]) if len(df) >= 2 else None,
+        "weekHigh52": _safe_float(last52["close"].max()) if not last52.empty else None,
+        "weekLow52": _safe_float(last52["close"].min()) if not last52.empty else None,
+        "allTimeHigh": _safe_float(df["close"].max()),
+        "allTimeLow": _safe_float(df["close"].min()),
         "firstDate": df["date"].iloc[0].isoformat(),
         "latestDate": df["date"].iloc[-1].isoformat(),
     }
 
-    # 1D path: serve the intraday bars we already fetched.
+    # 1D path: serve the intraday bars we already fetched. Drop bars where any
+    # OHLC value is NaN — pre-market bars with no prints can sneak in and
+    # would otherwise serialize as the literal `NaN` token, breaking the
+    # response for the iOS decoder.
     if period == "1d":
-        bars = [
-            {
+        bars = []
+        for row in intraday.itertuples():
+            o, h, l, c = (
+                _safe_float(row.open),
+                _safe_float(row.high),
+                _safe_float(row.low),
+                _safe_float(row.close),
+            )
+            if None in (o, h, l, c):
+                continue
+            bars.append({
                 "date": row.timestamp.isoformat(),  # full ISO incl. timezone
-                "open": float(row.open),
-                "high": float(row.high),
-                "low": float(row.low),
-                "close": float(row.close),
+                "open": o,
+                "high": h,
+                "low": l,
+                "close": c,
                 "volume": int(row.volume) if row.volume == row.volume else 0,
                 "extendedHours": bool(row.extended_hours),
-            }
-            for row in intraday.itertuples()
-        ]
+            })
         return {"ticker": ticker, "period": period, "bars": bars, "aggregates": aggregates}
 
     # Daily-resolution paths.
@@ -225,17 +254,24 @@ def _chart_history(event: dict) -> dict:
         cutoff = today - timedelta(days=_PERIOD_DAYS[period])
         bars_df = df[df["date"] >= cutoff]
 
-    bars = [
-        {
+    bars = []
+    for row in bars_df.itertuples():
+        o, h, l, c = (
+            _safe_float(row.open),
+            _safe_float(row.high),
+            _safe_float(row.low),
+            _safe_float(row.close),
+        )
+        if None in (o, h, l, c):
+            continue
+        bars.append({
             "date": row.date.isoformat(),
-            "open": float(row.open),
-            "high": float(row.high),
-            "low": float(row.low),
-            "close": float(row.close),
-            "volume": int(row.volume) if row.volume == row.volume else 0,  # NaN guard
-        }
-        for row in bars_df.itertuples()
-    ]
+            "open": o,
+            "high": h,
+            "low": l,
+            "close": c,
+            "volume": int(row.volume) if row.volume == row.volume else 0,
+        })
     return {"ticker": ticker, "period": period, "bars": bars, "aggregates": aggregates}
 
 
