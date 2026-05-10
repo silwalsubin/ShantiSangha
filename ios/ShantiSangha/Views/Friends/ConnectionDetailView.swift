@@ -198,13 +198,22 @@ struct ConnectionDetailView: View {
                         size: 120)
                         .overlay(alignment: .bottomLeading) {
                             if c.person.userId != nil {
+                                // Push the badge so its center sits on the
+                                // avatar circle's bottom-leading edge —
+                                // half the chip overlaps the photo, half
+                                // hangs outside. Geometry: avatar is 120pt
+                                // (r=60), badge is 26pt; the 45° edge point
+                                // is ≈(17.5, 102.5) in the frame and the
+                                // badge's natural bottom-leading center is
+                                // (13, 107), so (+5, -5) lands the chip's
+                                // center on the curve.
                                 Image(systemName: "atom")
                                     .font(.system(size: 12, weight: .bold))
                                     .foregroundColor(.sacredGold)
                                     .frame(width: 26, height: 26)
                                     .background(Circle().fill(Color.sacredBg))
                                     .overlay(Circle().stroke(Color.sacredGold.opacity(0.5), lineWidth: 1.5))
-                                    .offset(x: -2, y: 2)
+                                    .offset(x: 5, y: -5)
                             }
                         }
 
