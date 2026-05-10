@@ -85,6 +85,13 @@ def _score(event: dict) -> dict:
             ))
             continue
         df = pd.DataFrame(bars).sort_values("date").reset_index(drop=True)
+        # Bars arrive over JSON with ISO-string dates; the FeatureContext's
+        # SPY/VIX/earnings frames carry `datetime.date` objects. Without
+        # normalizing here, any feature that compares the two types (e.g.
+        # earnings.compute's `d <= today`) raises TypeError, the GBM path
+        # catches it, and EVERY horizon falls back to legacy — producing
+        # the degenerate pHold=1 verdict that hides the probability bar.
+        df["date"] = pd.to_datetime(df["date"]).dt.date
         scores.append(_serialize_score(score_ticker(ticker, df, price, context=ctx)))
 
     return {"asOf": as_of, "scores": scores}
