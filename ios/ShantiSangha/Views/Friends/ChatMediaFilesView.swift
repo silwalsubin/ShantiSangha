@@ -11,8 +11,10 @@ import SwiftUI
 /// - Loads the latest 100 image+voice messages from the dedicated
 ///   `/messages/media` endpoint (text + soft-deleted are filtered
 ///   server-side so the page stays small).
-/// - Tapping a media tile opens the same `ChatImageViewer` the chat
-///   bubbles use — pinch zoom, drag to dismiss, share.
+/// - Tapping a media tile opens the shared `MediaViewer` — same
+///   chrome (timestamp pill, share, chevron back) the keepsake
+///   archive uses, with the actions that don't apply (caption,
+///   offline save, delete) hidden via nil callbacks.
 /// - No edits / deletes from this surface; the source of truth is
 ///   the chat itself, and message-level mutations live there.
 struct ChatMediaFilesView: View {
@@ -23,7 +25,7 @@ struct ChatMediaFilesView: View {
     @State private var loading = false
     @State private var didLoadOnce = false
     @State private var errorMessage: String?
-    @State private var imagePreview: ChatImagePreviewItem?
+    @State private var viewerInitialId: UUID?
 
     @EnvironmentObject private var profile: ProfileService
 
@@ -62,9 +64,32 @@ struct ChatMediaFilesView: View {
         .task(id: friendshipId) {
             await load()
         }
-        .fullScreenCover(item: $imagePreview) { item in
-            ChatImageViewer(url: item.url, messageId: item.messageId)
+        .fullScreenCover(item: viewerBinding) { startItem in
+            // Same MediaViewer the keepsake archive uses, but the
+            // chat surface hides actions that don't apply here:
+            // captions (chat images don't have them), offline save
+            // (the chat cache auto-warms), and delete (message-level
+            // mutations live in the chat itself). Share is kept
+            // because users do save photos out of an archive.
+            let imageItems = imageMessages
+            MediaViewer(
+                items: imageItems.map(toMediaViewerItem),
+                initialId: startItem.id,
+                localUrlResolver: { item in
+                    guard let remote = URL(string: item.remoteUrl) else { return nil }
+                    return await ChatMediaCache.shared.cachedURL(
+                        messageId: item.id, remoteUrl: remote)
+                })
         }
+    }
+
+    /// Binding adapter so `.fullScreenCover(item:)` works with our
+    /// `viewerInitialId` — wrapping the UUID in an `IdentifiableUUID`
+    /// shim keeps the cover's identity tied to which photo opened it.
+    private var viewerBinding: Binding<IdentifiableUUID?> {
+        Binding(
+            get: { viewerInitialId.map(IdentifiableUUID.init) },
+            set: { viewerInitialId = $0?.id })
     }
 
     // MARK: - Sections
@@ -141,8 +166,28 @@ struct ChatMediaFilesView: View {
     // MARK: - Actions
 
     private func openImagePreview(_ msg: FriendMessage) {
-        guard let urlStr = msg.mediaUrl, let url = URL(string: urlStr) else { return }
-        imagePreview = ChatImagePreviewItem(url: url, messageId: msg.id)
+        guard msg.mediaUrl != nil else { return }
+        viewerInitialId = msg.id
+    }
+
+    /// Adapter to the shared `MediaViewer` shape. Chat images are
+    /// always JPEG; we hard-code the content type because the wire
+    /// model doesn't carry it.
+    private func toMediaViewerItem(_ msg: FriendMessage) -> MediaViewerItem {
+        MediaViewerItem(
+            id: msg.id,
+            contentType: "image/jpeg",
+            remoteUrl: msg.mediaUrl ?? "",
+            caption: nil,
+            createdAt: parseISODate(msg.sentAt))
+    }
+
+    private func parseISODate(_ s: String) -> Date {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = f.date(from: s) { return d }
+        f.formatOptions = [.withInternetDateTime]
+        return f.date(from: s) ?? Date()
     }
 
     private func load() async {
@@ -158,12 +203,11 @@ struct ChatMediaFilesView: View {
     }
 }
 
-/// `.fullScreenCover(item:)`-friendly wrapper so the same sheet
-/// lifecycle the chat uses applies here.
-private struct ChatImagePreviewItem: Identifiable {
-    let url: URL
-    let messageId: UUID?
-    var id: String { url.absoluteString }
+/// `.fullScreenCover(item:)` requires an `Identifiable` value; this
+/// thin wrapper lets us use a bare `UUID` (the message id of the
+/// tapped photo) without inventing a richer state object.
+struct IdentifiableUUID: Identifiable, Equatable {
+    let id: UUID
 }
 
 /// Square thumbnail tile for chat image messages — local-first via

@@ -136,8 +136,39 @@ struct FriendChatView: View {
             }
         }
         .fullScreenCover(item: $imagePreview) { item in
-            ChatImageViewer(url: item.url, messageId: item.messageId)
+            // Same MediaViewer as the keepsake + chat-archive surfaces.
+            // Single-item array — the chat bubble tap doesn't paginate
+            // (matches iMessage), but the chrome and gestures stay
+            // identical so users see one viewer everywhere.
+            let viewerItemId = item.messageId ?? UUID()
+            MediaViewer(
+                items: [
+                    MediaViewerItem(
+                        id: viewerItemId,
+                        contentType: "image/jpeg",
+                        remoteUrl: item.url.absoluteString,
+                        caption: nil,
+                        createdAt: messageSentAt(item.messageId) ?? Date())
+                ],
+                initialId: viewerItemId,
+                localUrlResolver: { _ in
+                    guard let messageId = item.messageId else { return nil }
+                    return await ChatMediaCache.shared.cachedURL(
+                        messageId: messageId, remoteUrl: item.url)
+                })
         }
+    }
+
+    /// Look up the SentAt for a message id so the viewer's timestamp
+    /// pill reads "Today / 3:09 PM" — same chrome the keepsake viewer
+    /// uses. Falls back to nil for synthetic/unknown ids.
+    private func messageSentAt(_ id: UUID?) -> Date? {
+        guard let id, let m = vm.messages.first(where: { $0.id == id }) else { return nil }
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = f.date(from: m.sentAt) { return d }
+        f.formatOptions = [.withInternetDateTime]
+        return f.date(from: m.sentAt)
     }
 
     /// Stable sentinel id pinned to the very end of the LazyVStack —

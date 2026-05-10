@@ -1,6 +1,5 @@
 import SwiftUI
 import PhotosUI
-import AVKit
 import UniformTypeIdentifiers
 import QuickLook
 
@@ -128,13 +127,41 @@ struct ConnectionAttachmentsView: View {
                 onSave: { caption in await saveCaption(target: target, caption: caption) })
         }
         .fullScreenCover(item: $mediaViewerTarget) { target in
-            AttachmentMediaViewer(
-                items: mediaItems,
+            // Adapt the keepsake `[ConnectionAttachment]` list into the
+            // shared `MediaViewer` shape. The lookup map keeps the
+            // local-URL resolver O(1) per page hop without leaking
+            // attachment-specific types into the viewer itself.
+            let attMap = Dictionary(uniqueKeysWithValues: mediaItems.map { ($0.id, $0) })
+            MediaViewer(
+                items: mediaItems.map(toMediaViewerItem),
                 initialId: target.id,
-                onCaption: { item in captionTarget = item; mediaViewerTarget = nil },
-                onDelete: { item in deleteTarget = item; mediaViewerTarget = nil },
-                onSaveOffline: { item in Task { await saveOffline(item) } },
-                onRemoveOffline: { item in cache.removeOffline(item) })
+                localUrlResolver: { item in
+                    guard let att = attMap[item.id] else { return nil }
+                    return AttachmentCache.shared.offlineFileURL(for: att)
+                },
+                isOffline: { item in cache.isOffline(item.id) },
+                onCaption: { item in
+                    if let att = attMap[item.id] {
+                        captionTarget = att
+                        mediaViewerTarget = nil
+                    }
+                },
+                onDelete: { item in
+                    if let att = attMap[item.id] {
+                        deleteTarget = att
+                        mediaViewerTarget = nil
+                    }
+                },
+                onSaveOffline: { item in
+                    if let att = attMap[item.id] {
+                        Task { await saveOffline(att) }
+                    }
+                },
+                onRemoveOffline: { item in
+                    if let att = attMap[item.id] {
+                        cache.removeOffline(att)
+                    }
+                })
         }
         .quickLookPreview($fileQuickLookURL)
         .confirmationDialog(
@@ -301,6 +328,27 @@ struct ConnectionAttachmentsView: View {
 
     private var pendingFileItems: [PendingAttachment] {
         pendingItems.filter { $0.kind == .file }
+    }
+
+    /// Adapter from the keepsake `ConnectionAttachment` to the shared
+    /// `MediaViewerItem`. The viewer doesn't need to know about
+    /// attachments specifically — it just needs id, contentType,
+    /// remote URL, optional caption, and createdAt.
+    private func toMediaViewerItem(_ a: ConnectionAttachment) -> MediaViewerItem {
+        MediaViewerItem(
+            id: a.id,
+            contentType: a.contentType,
+            remoteUrl: a.downloadUrl,
+            caption: a.caption,
+            createdAt: parseISODate(a.createdAt))
+    }
+
+    private func parseISODate(_ s: String) -> Date {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = f.date(from: s) { return d }
+        f.formatOptions = [.withInternetDateTime]
+        return f.date(from: s) ?? Date()
     }
 
     private var deleteConfirmBinding: Binding<Bool> {
@@ -891,346 +939,5 @@ private struct AttachmentCaptionSheet: View {
         .onAppear {
             captionDraft = attachment.caption ?? ""
         }
-    }
-}
-
-// MARK: - Media viewer
-
-private struct AttachmentMediaViewer: View {
-    let items: [ConnectionAttachment]
-    let onCaption: (ConnectionAttachment) -> Void
-    let onDelete: (ConnectionAttachment) -> Void
-    let onSaveOffline: (ConnectionAttachment) -> Void
-    let onRemoveOffline: (ConnectionAttachment) -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @StateObject private var cache = AttachmentCache.shared
-    @State private var currentId: UUID
-    @State private var showShareSheet = false
-
-    init(
-        items: [ConnectionAttachment],
-        initialId: UUID,
-        onCaption: @escaping (ConnectionAttachment) -> Void,
-        onDelete: @escaping (ConnectionAttachment) -> Void,
-        onSaveOffline: @escaping (ConnectionAttachment) -> Void,
-        onRemoveOffline: @escaping (ConnectionAttachment) -> Void
-    ) {
-        self.items = items
-        self.onCaption = onCaption
-        self.onDelete = onDelete
-        self.onSaveOffline = onSaveOffline
-        self.onRemoveOffline = onRemoveOffline
-        _currentId = State(initialValue: initialId)
-    }
-
-    /// Active page. Falls back to the first item if currentId can't be
-    /// matched (shouldn't happen — the parent dismisses the viewer
-    /// before mutating items — but the fallback keeps the chrome alive).
-    private var current: ConnectionAttachment {
-        items.first(where: { $0.id == currentId }) ?? items[0]
-    }
-
-    /// Local file URL when the active page is saved offline, else the
-    /// presigned remote URL. Used by the share sheet so it operates on
-    /// whichever attachment the user is currently viewing.
-    private var sourceURL: URL? {
-        if let local = AttachmentCache.shared.offlineFileURL(for: current) {
-            return local
-        }
-        return URL(string: current.downloadUrl)
-    }
-
-    var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            // .page TabView gives the Apple-Photos horizontal swipe
-            // between attachments. Per-page zoom/pan state lives on
-            // AttachmentPage so swiping reliably resets it (state is
-            // tied to the page identity).
-            TabView(selection: $currentId) {
-                ForEach(items) { item in
-                    AttachmentPage(attachment: item)
-                        .tag(item.id)
-                }
-            }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .ignoresSafeArea()
-            VStack {
-                topBar
-                Spacer()
-                bottomBar
-            }
-        }
-        .statusBar(hidden: true)
-        .sheet(isPresented: $showShareSheet) {
-            if let url = sourceURL {
-                ShareSheet(items: [url])
-            }
-        }
-    }
-
-    /// Apple-Photos-style top bar: chevron back + center timestamp pill +
-    /// trailing more menu. Pills sit on a black-glass background that reads
-    /// against any image underneath.
-    private var topBar: some View {
-        HStack {
-            chromeButton(systemName: "chevron.backward") { dismiss() }
-            Spacer()
-            timestampPill
-            Spacer()
-            chromeMenu
-        }
-        .padding(.horizontal, SacredSpacing.m)
-        .padding(.top, SacredSpacing.m)
-    }
-
-    private func chromeButton(systemName: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(.white)
-                .frame(width: 36, height: 36)
-                .background(Circle().fill(Color.black.opacity(0.45)))
-        }
-    }
-
-    private var timestampPill: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 5) {
-                // Same offline badge the grid uses, scaled to the pill.
-                // Only renders when the cache actually has the file —
-                // otherwise this is a quiet timestamp.
-                if cache.isOffline(current.id) {
-                    Image(systemName: "arrow.down.circle.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.sacredGoldShine)
-                }
-                Text(timestampDay)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
-            }
-            Text(timestampTime)
-                .font(.system(size: 11))
-                .foregroundColor(.white.opacity(0.7))
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 6)
-        .background(Capsule().fill(Color.black.opacity(0.45)))
-    }
-
-    private var chromeMenu: some View {
-        Menu {
-            Button {
-                onCaption(current)
-            } label: {
-                Label(current.caption?.isEmpty == false ? "Edit caption" : "Add caption",
-                      systemImage: "text.bubble")
-            }
-            if cache.isOffline(current.id) {
-                Button {
-                    onRemoveOffline(current)
-                } label: {
-                    Label("Remove from offline", systemImage: "icloud.slash")
-                }
-            } else {
-                Button {
-                    onSaveOffline(current)
-                } label: {
-                    Label("Save for offline", systemImage: "arrow.down.circle")
-                }
-            }
-            Button(role: .destructive) {
-                onDelete(current)
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-        } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(.white)
-                .frame(width: 36, height: 36)
-                .background(Circle().fill(Color.black.opacity(0.45)))
-        }
-    }
-
-    /// Bottom action bar. Caption (if any) sits above the action row so
-    /// it stays visible while the actions are tappable.
-    private var bottomBar: some View {
-        VStack(spacing: SacredSpacing.s) {
-            if let caption = current.caption, !caption.isEmpty {
-                Text(caption)
-                    .font(.sacredText)
-                    .foregroundColor(.white)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, SacredSpacing.l)
-                    .padding(.vertical, SacredSpacing.s)
-                    .background(Capsule().fill(Color.black.opacity(0.45)))
-                    .padding(.horizontal, SacredSpacing.l)
-            }
-            HStack {
-                actionButton(systemName: "square.and.arrow.up") { showShareSheet = true }
-                Spacer()
-                actionButton(systemName: "text.bubble") { onCaption(current) }
-                Spacer()
-                actionButton(systemName: "trash", tint: .sacredRed) { onDelete(current) }
-            }
-            .padding(.horizontal, 48)
-            .padding(.bottom, SacredSpacing.l)
-        }
-    }
-
-    private func actionButton(systemName: String, tint: Color = .white, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 18, weight: .regular))
-                .foregroundColor(tint)
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
-        }
-    }
-
-    private var timestampDate: Date {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = f.date(from: current.createdAt) { return d }
-        f.formatOptions = [.withInternetDateTime]
-        return f.date(from: current.createdAt) ?? Date()
-    }
-
-    private var timestampDay: String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale.current
-        if Calendar.current.isDateInToday(timestampDate) { return "Today" }
-        if Calendar.current.isDateInYesterday(timestampDate) { return "Yesterday" }
-        formatter.dateFormat = "MMM d, yyyy"
-        return formatter.string(from: timestampDate)
-    }
-
-    private var timestampTime: String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale.current
-        formatter.dateFormat = "h:mm a"
-        return formatter.string(from: timestampDate)
-    }
-}
-
-/// One swipeable page in the AttachmentMediaViewer carousel. Owns its own
-/// zoom/pan state so swiping to a new page resets back to fit-to-screen.
-/// The pan gesture is only attached when zoomed in — otherwise it would
-/// swallow the horizontal drag the parent TabView needs to flip pages.
-private struct AttachmentPage: View {
-    let attachment: ConnectionAttachment
-
-    @State private var imageZoom: CGFloat = 1.0
-    @State private var imageZoomBase: CGFloat = 1.0
-    @State private var imageOffset: CGSize = .zero
-    @State private var imageOffsetBase: CGSize = .zero
-
-    private var sourceURL: URL? {
-        if let local = AttachmentCache.shared.offlineFileURL(for: attachment) {
-            return local
-        }
-        return URL(string: attachment.downloadUrl)
-    }
-
-    var body: some View {
-        if attachment.contentType.hasPrefix("video/"), let url = sourceURL {
-            // Lift the AVPlayer out so SwiftUI rebuilds (e.g. dismissal
-            // animation) don't restart playback.
-            VideoPlayerHost(url: url)
-                .ignoresSafeArea()
-        } else if let url = sourceURL {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    zoomable(image)
-                case .failure:
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 36))
-                        .foregroundColor(.white.opacity(0.6))
-                default:
-                    ProgressView().tint(.white)
-                }
-            }
-        } else {
-            Color.black
-        }
-    }
-
-    @ViewBuilder
-    private func zoomable(_ image: Image) -> some View {
-        let base = image
-            .resizable()
-            .scaledToFit()
-            .scaleEffect(imageZoom)
-            .offset(imageOffset)
-            .gesture(magnificationGesture)
-            .onTapGesture(count: 2) { handleDoubleTap() }
-
-        if imageZoom > 1.0 {
-            base.simultaneousGesture(panGesture)
-        } else {
-            base
-        }
-    }
-
-    private var magnificationGesture: some Gesture {
-        MagnificationGesture()
-            .onChanged { value in
-                imageZoom = max(1.0, min(4.0, imageZoomBase * value))
-            }
-            .onEnded { _ in
-                imageZoomBase = imageZoom
-                if imageZoom <= 1.0 {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        imageOffset = .zero
-                        imageOffsetBase = .zero
-                    }
-                }
-            }
-    }
-
-    private var panGesture: some Gesture {
-        DragGesture()
-            .onChanged { value in
-                imageOffset = CGSize(
-                    width: imageOffsetBase.width + value.translation.width,
-                    height: imageOffsetBase.height + value.translation.height)
-            }
-            .onEnded { _ in
-                imageOffsetBase = imageOffset
-            }
-    }
-
-    private func handleDoubleTap() {
-        withAnimation(.easeInOut(duration: 0.25)) {
-            if imageZoom > 1.0 {
-                imageZoom = 1.0
-                imageZoomBase = 1.0
-                imageOffset = .zero
-                imageOffsetBase = .zero
-            } else {
-                imageZoom = 2.5
-                imageZoomBase = 2.5
-            }
-        }
-    }
-}
-
-
-private struct VideoPlayerHost: View {
-    let url: URL
-    @State private var player: AVPlayer?
-
-    var body: some View {
-        VideoPlayer(player: player)
-            .onAppear {
-                if player == nil { player = AVPlayer(url: url) }
-                player?.play()
-            }
-            .onDisappear {
-                player?.pause()
-            }
     }
 }

@@ -183,11 +183,11 @@ struct ConnectionDetailView: View {
 
     private func header(_ c: Connection) -> some View {
         VStack(spacing: SacredSpacing.s) {
-            // Pencil overlay matches the personal profile flow on Home.
-            // Tap anywhere on the avatar/pencil opens the picker sheet
-            // directly (no intermediate dialog). The atom mark for in-app
-            // linked Persons moves to the top-trailing corner so the
-            // pencil can sit in its conventional bottom-trailing spot.
+            // Pencil affordance matches the personal profile flow on Home —
+            // bottom-trailing is the iOS convention for "edit picture." The
+            // atom mark for in-app linked Persons sits at bottom-leading,
+            // mirroring the pencil across the avatar's vertical axis so
+            // both badges share the same baseline without crowding.
             Button {
                 showAvatarPickerSheet = true
             } label: {
@@ -196,7 +196,7 @@ struct ConnectionDetailView: View {
                         displayName: c.person.displayName,
                         avatarUrl: c.ownerVisibleAvatarUrl,
                         size: 120)
-                        .overlay(alignment: .topTrailing) {
+                        .overlay(alignment: .bottomLeading) {
                             if c.person.userId != nil {
                                 Image(systemName: "atom")
                                     .font(.system(size: 12, weight: .bold))
@@ -204,7 +204,7 @@ struct ConnectionDetailView: View {
                                     .frame(width: 26, height: 26)
                                     .background(Circle().fill(Color.sacredBg))
                                     .overlay(Circle().stroke(Color.sacredGold.opacity(0.5), lineWidth: 1.5))
-                                    .offset(x: 2, y: -2)
+                                    .offset(x: -2, y: 2)
                             }
                         }
 
