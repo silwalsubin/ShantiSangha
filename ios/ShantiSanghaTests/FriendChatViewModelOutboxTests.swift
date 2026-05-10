@@ -7,6 +7,9 @@ import XCTest
 ///    server-issued FriendMessage in `messages`.
 /// 2. A realtime echo of the same message id (which fires after every
 ///    successful send via `onMessageReceived`) does not duplicate the bubble.
+/// 2b. A realtime echo that arrives BEFORE the HTTP response returns
+///     (the common case in practice) clears the matching outbox pending,
+///     so the bubble doesn't render twice during the in-flight window.
 /// 3. A `flushOutbox` triggered while a send is in flight (e.g. on
 ///    network reconnect) does NOT trigger a second POST for the same
 ///    pending — the `inFlightSendIds` guard regression-protects d7c6a03.
@@ -75,6 +78,51 @@ final class FriendChatViewModelOutboxTests: XCTestCase {
 
         XCTAssertEqual(vm.messages.count, 1, "Realtime echo of the same id must not produce a duplicate row")
         XCTAssertEqual(vm.messages.first?.id, serverMessageId)
+    }
+
+    // MARK: - 2b. Realtime echo arriving before HTTP response does not duplicate
+
+    /// On a real network, the server's realtime broadcast usually wins
+    /// the race against its own HTTP response — so by the time the POST
+    /// returns, the echo (with the server-assigned id) has already been
+    /// upserted into `messages`. The pending in `outbox` has a local
+    /// UUID that doesn't match the server id, so `outbox.removeAll` by
+    /// id can't drop it. Without dedup-by-body in `upsertMessage`, the
+    /// chat shows the bubble twice (delivered + "Sending…") for the
+    /// duration of the HTTP roundtrip.
+    func test_realtimeEchoBeforeHttpResponse_clearsPendingAndShowsOneBubble() async {
+        let friendshipId = UUID()
+        let myUserId = UUID()
+        let serverMessageId = UUID()
+
+        let api = FakeFriendsMessagingClient()
+        api.blockSendText = true
+
+        let vm = makeVM(friendshipId: friendshipId, api: api)
+
+        let sendTask = Task { await vm.sendText("hello") }
+        await api.waitForSendTextStarted()
+
+        // Pending is in the outbox, HTTP is parked. Now fire the
+        // realtime echo (this is what `onMessageReceived` does in
+        // `startRealtime`).
+        XCTAssertEqual(vm.outbox.count, 1, "Pending should be in the outbox while HTTP is in flight")
+        let echo = FriendMessage.makeStub(
+            id: serverMessageId,
+            friendshipId: friendshipId,
+            senderUserId: myUserId,
+            body: "hello")
+        vm.upsertMessage(echo)
+
+        XCTAssertEqual(vm.messages.count, 1, "Echo should land in messages")
+        XCTAssertTrue(vm.outbox.isEmpty, "Echo of our own send must clear the matching pending so the bubble doesn't render twice")
+
+        // Drain the HTTP — final state should still be one bubble.
+        api.releaseBlockedSendText(with: .success(echo))
+        await sendTask.value
+
+        XCTAssertEqual(vm.messages.count, 1)
+        XCTAssertTrue(vm.outbox.isEmpty)
     }
 
     // MARK: - 3. Concurrent flush during in-flight send does not double-POST

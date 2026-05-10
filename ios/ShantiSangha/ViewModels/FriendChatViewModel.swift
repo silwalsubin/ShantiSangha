@@ -645,6 +645,20 @@ final class FriendChatViewModel: ObservableObject {
             // (history fetch racing the broadcast) lands in the right spot.
             messages.append(msg)
             messages.sort { ($0.sentAt) < ($1.sentAt) }
+            // If this is one of our own text sends landing for the first
+            // time, clear any outbox entry whose body matches. The
+            // server assigns its own id so the outbox can't be matched
+            // by id; without this, the realtime broadcast usually wins
+            // the race against the HTTP response and the user sees the
+            // bubble twice (once delivered, once still "Sending…")
+            // until the HTTP path catches up and removes the pending.
+            if !isFromFriend(msg), msg.kind == .text, !outbox.isEmpty,
+               let body = msg.body,
+               let i = outbox.firstIndex(where: {
+                   $0.body == body && $0.replyToMessageId == msg.replyToMessageId
+               }) {
+                outbox.remove(at: i)
+            }
         }
         // Clean up cached media if a refresh or realtime edit reveals
         // the message was deleted on another device — `applyDeleted`

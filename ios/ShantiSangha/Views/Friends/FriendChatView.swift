@@ -229,8 +229,15 @@ struct FriendChatView: View {
                 // alone. `pinnedScrollID` reflects whatever the system
                 // last wrote (visible bottom row or our sentinel).
                 guard isAtBottom else { return }
+                // Drive the scroll imperatively via the proxy. Writing
+                // `pinnedScrollID = Self.bottomAnchorId` is a no-op when
+                // the binding is already the sentinel (the common case
+                // — the seed and every re-pin park it there), so the
+                // new bubble would otherwise stay hidden behind the
+                // keyboard until the user scrolled. Same workaround as
+                // the focus handler below.
                 withAnimation(.easeOut(duration: 0.2)) {
-                    pinnedScrollID = Self.bottomAnchorId
+                    proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
                 }
             }
             .onChange(of: vm.outbox.last?.id) { _, newId in
@@ -238,7 +245,7 @@ struct FriendChatView: View {
                 // own sends to the bottom, even if scrolled up.
                 guard newId != nil else { return }
                 withAnimation(.easeOut(duration: 0.2)) {
-                    pinnedScrollID = Self.bottomAnchorId
+                    proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
                 }
             }
             .onChange(of: jumpToMessageId) { _, target in
