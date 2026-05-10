@@ -188,10 +188,10 @@ def _score_legacy(ticker: str, df: pd.DataFrame, price: float | None) -> TickerS
 def _score_one_horizon_gbm(artifact: dict, feats: dict[str, float]) -> HorizonScore:
     """Apply one horizon's GBM model to the feature row.
 
-    Returns a HorizonScore with `signals = []` for now — feature-importance
-    breakdowns (SHAP) are a Phase 4 concern. The legacy `score` field is
-    populated with `expected_return` so any consumer still reading it gets
-    a sensible continuous value.
+    Returns a HorizonScore with `signals` populated from LightGBM's
+    `pred_contrib` so the iOS detail view can render a per-feature
+    breakdown of the verdict (matching what the legacy weighted-sum path
+    already provides).
     """
     feature_names: list[str] = artifact["features"]
     booster = artifact["model"]
@@ -233,13 +233,62 @@ def _score_one_horizon_gbm(artifact: dict, feats: dict[str, float]) -> HorizonSc
     # `score` gets a directionally-correct continuous value.
     composite = max(-1.0, min(1.0, p_buy - p_sell))
 
+    # ------------------------------------------------------------------
+    # Per-feature contributions via LightGBM's built-in pred_contrib.
+    #
+    # pred_contrib is in LOGIT-space, not probability space, and for
+    # multiclass returns a flat row of shape (1, n_classes * (n_features + 1)).
+    # The layout is class-major: indices [i*(nf+1) : i*(nf+1)+nf] are
+    # class i's per-feature contributions, and [i*(nf+1)+nf] is class i's
+    # bias term (which we drop).
+    #
+    # The directional signal we surface = Buy_logit_contrib - Sell_logit_contrib.
+    # Positive => the feature pushed the verdict toward Buy at this row;
+    # negative => toward Sell. We then keep the top-K by |directional| and
+    # report `weight = |directional| / sum_top_K(|directional|)` so weights
+    # within the displayed slice sum to 1.0. Note: this weight is a per-row
+    # display weight, NOT a static feature importance like the legacy path's
+    # STRATEGY_WEIGHTS_BY_HORIZON entry.
+    # ------------------------------------------------------------------
+    contributions: list[StrategyContribution] = []
+    try:
+        contribs = booster.predict(row, pred_contrib=True)
+        contribs_row = np.asarray(contribs)[0]
+        nf = len(feature_names)
+        stride = nf + 1  # +1 for per-class bias
+        if contribs_row.size >= stride * (max(buy_idx, sell_idx) + 1):
+            buy_contribs = contribs_row[buy_idx * stride : buy_idx * stride + nf]
+            sell_contribs = contribs_row[sell_idx * stride : sell_idx * stride + nf]
+            directional = buy_contribs - sell_contribs
+            # Top-K by absolute directional contribution.
+            top_k = min(8, nf)
+            order = np.argsort(np.abs(directional))[::-1][:top_k]
+            denom = float(np.sum(np.abs(directional[order])))
+            for j in order:
+                d = float(directional[j])
+                w = (abs(d) / denom) if denom > 0 else 0.0
+                contributions.append(
+                    StrategyContribution(
+                        name=feature_names[j],
+                        value=float(feats.get(feature_names[j], 0.0)),
+                        contribution=d,
+                        weight=w,
+                    )
+                )
+    except Exception as e:
+        # If pred_contrib fails for any reason, fall back to no signals
+        # rather than failing the whole horizon. Probabilities are still
+        # the load-bearing output; signals are an explanation layer.
+        logger.warning("pred_contrib failed (signals will be empty): %s", e)
+        contributions = []
+
     return HorizonScore(
         score=composite,
         p_buy=p_buy,
         p_hold=p_hold,
         p_sell=p_sell,
         expected_return=expected_return,
-        signals=[],
+        signals=contributions,
     )
 
 

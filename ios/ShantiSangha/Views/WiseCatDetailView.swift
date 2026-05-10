@@ -188,16 +188,13 @@ struct WiseCatDetailView: View {
         LuxCard {
             VStack(alignment: .leading, spacing: SacredSpacing.l) {
                 horizonHero(read: read)
-                // The technical-contribution table is the legacy weighted-sum
-                // breakdown (per-strategy weight + signed contribution). GBM
-                // horizons don't expose per-feature SHAP yet (Phase 4), so
-                // hide the block on probabilistic rows rather than render an
-                // empty "No strategies fired today" panel.
-                if !read.hasProbabilisticVerdict {
-                    Divider()
-                        .background(Color.sacredMuted.opacity(0.2))
-                    technicalBlock(read: read)
-                }
+                // Drivers table renders for both paths: legacy = per-strategy
+                // weight + signed contribution; GBM = top-8 feature
+                // attributions (weight = share of explanation magnitude,
+                // score = signed push toward Buy/Sell). Same wire shape.
+                Divider()
+                    .background(Color.sacredMuted.opacity(0.2))
+                technicalBlock(read: read)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(SacredSpacing.lux)
@@ -273,7 +270,7 @@ struct WiseCatDetailView: View {
 
         return VStack(alignment: .leading, spacing: SacredSpacing.s) {
             sectionHeader(
-                title: "Technical",
+                title: "Drivers",
                 score: read.technicalScore
             )
 
@@ -351,17 +348,60 @@ struct WiseCatDetailView: View {
     }
 
     private func prettyStrategyName(_ raw: String) -> String {
-        // Active ensemble = trend_50_200 + ts_momentum_12_1. The legacy
-        // oscillator names are kept as a fallback in case they're re-enabled
-        // by a future basket tune; they're filtered out of the UI today via
-        // the weight > 0 check above.
+        // Two name spaces share this lookup:
+        //  - Legacy weighted-sum strategies (first six cases below) — the
+        //    oscillator entries are still mapped in case a basket tune
+        //    re-enables them; they're filtered out today via weight > 0.
+        //  - GBM features emitted by `compute_all_features` (everything
+        //    after). Each base strategy contributes both `_raw`
+        //    (unsaturated gap) and `_value` (saturated [-1,+1] score); we
+        //    label them with a parenthetical so the user can tell which
+        //    flavor drove the row when both surface.
         switch raw {
+        // Legacy strategies
         case "trend_50_200":      return "Trend (50/200 EMA)"
         case "ts_momentum_12_1":  return "Time-series momentum (12-1)"
         case "fast_trend_5_20":   return "Fast trend (5/20 EMA)"
         case "rsi_14":            return "Momentum (RSI-14)"
         case "bollinger_pctb":    return "Mean reversion (Bollinger)"
         case "volume_confirm":    return "Volume confirmation"
+
+        // GBM base technicals (raw + saturated)
+        case "trend_50_200_raw":       return "Trend gap (50/200 EMA)"
+        case "trend_50_200_value":     return "Trend score (50/200 EMA)"
+        case "ts_momentum_12_1_raw":   return "12-1 momentum return"
+        case "ts_momentum_12_1_value": return "12-1 momentum score"
+        case "fast_trend_5_20_raw":    return "Fast trend gap (5/20)"
+        case "fast_trend_5_20_value":  return "Fast trend score (5/20)"
+
+        // GBM cross-sectional return spreads vs SPY
+        case "xs_return_spread_3m_vs_spy": return "3-month return vs SPY"
+        case "xs_return_spread_6m_vs_spy": return "6-month return vs SPY"
+        case "xs_return_spread_1y_vs_spy": return "1-year return vs SPY"
+
+        // GBM earnings window
+        case "days_since_earnings":        return "Days since earnings"
+        case "days_to_earnings":           return "Days to earnings"
+        case "post_earnings_drift_signal": return "Post-earnings drift"
+
+        // GBM calendar
+        case "month_of_year":         return "Month of year"
+        case "day_of_week":            return "Day of week"
+        case "january_effect_flag":    return "January effect"
+        case "quarter_end_proximity":  return "Days to quarter end"
+
+        // GBM range / candle shape
+        case "range_position_today":   return "Close within day's range"
+        case "range_position_5d_avg":  return "Close within range (5d avg)"
+        case "body_to_atr_ratio":      return "Body size vs ATR"
+        case "upper_wick_pct":         return "Upper wick share"
+        case "lower_wick_pct":         return "Lower wick share"
+
+        // GBM VIX regime
+        case "vix_level":         return "VIX level"
+        case "vix_change_21d":    return "VIX 21-day change"
+        case "vix_zscore_252d":   return "VIX vs 1-year average"
+
         default: return raw.replacingOccurrences(of: "_", with: " ").capitalized
         }
     }
