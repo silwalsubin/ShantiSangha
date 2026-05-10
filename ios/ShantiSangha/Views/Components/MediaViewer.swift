@@ -70,13 +70,16 @@ struct MediaViewer: View {
                 }
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-            .ignoresSafeArea()
-            VStack {
-                topBar
-                Spacer()
-                bottomBar
-            }
         }
+        // Register the chrome as safe-area insets so the TabView's photo
+        // is always bounded *inside* the top/bottom bars regardless of
+        // the photo's aspect ratio. Without this, screenshots whose
+        // aspect matches the device fill the screen and the chrome ends
+        // up overlapping photo content (and vice versa). Apple Photos'
+        // floating chrome relies on the photo letterboxing — that's not
+        // a guarantee for arbitrary chat-attached screenshots.
+        .safeAreaInset(edge: .top, spacing: 0) { topBar }
+        .safeAreaInset(edge: .bottom, spacing: 0) { bottomBar }
         .statusBar(hidden: true)
         .sheet(isPresented: $showShareSheet) {
             if let url = sharedURL {
@@ -292,9 +295,10 @@ struct MediaViewerPage: View {
             } else if let url = resolvedURL {
                 if item.contentType.hasPrefix("video/") {
                     // Lift the AVPlayer out so SwiftUI rebuilds (e.g.
-                    // dismissal animation) don't restart playback.
+                    // dismissal animation) don't restart playback. Stays
+                    // inside the parent's safe area so the chrome bars
+                    // don't overlap the video frame (matches photos).
                     MediaViewerVideoHost(url: url)
-                        .ignoresSafeArea()
                 } else {
                     AsyncImage(url: url) { phase in
                         switch phase {
