@@ -4,6 +4,9 @@ import SwiftUI
 struct WiseCatView: View {
     @StateObject private var vm = WiseCatViewModel()
     @State private var showWatchlistEdit = false
+    /// Horizon that drives every row's action label + probability bar.
+    /// 1M is the canonical default (matches what the home card highlights).
+    @State private var selectedHorizon: WiseCatHorizon = .oneMonth
 
     var body: some View {
         ZStack {
@@ -20,6 +23,7 @@ struct WiseCatView: View {
                     } else if vm.watchlist.isEmpty {
                         emptyWatchlist
                     } else {
+                        horizonSelector
                         watchlistList
                     }
 
@@ -62,6 +66,34 @@ struct WiseCatView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private var horizonSelector: some View {
+        HStack(spacing: SacredSpacing.xxs) {
+            ForEach(WiseCatHorizon.allCases) { horizon in
+                Button {
+                    selectedHorizon = horizon
+                } label: {
+                    Text(horizon.label)
+                        .font(.sacredTextMedium)
+                        .foregroundColor(horizon == selectedHorizon ? .sacredGold : .sacredMuted)
+                        .frame(maxWidth: .infinity, minHeight: 36)
+                        .background(
+                            RoundedRectangle(cornerRadius: SacredRadius.pill)
+                                .fill(horizon == selectedHorizon ? Color.sacredGold.opacity(0.12) : Color.clear)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: SacredRadius.pill)
+                                .stroke(
+                                    horizon == selectedHorizon ? Color.sacredGold.opacity(0.45)
+                                                               : Color.sacredMutedLight.opacity(0.25),
+                                    lineWidth: 1
+                                )
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
     private var watchlistList: some View {
         VStack(spacing: 0) {
             ForEach(Array(vm.watchlist.enumerated()), id: \.element.id) { index, entry in
@@ -73,6 +105,7 @@ struct WiseCatView: View {
                 WiseCatRow(
                     entry: entry,
                     signal: vm.signal(for: entry.ticker),
+                    horizon: selectedHorizon,
                     generating: vm.generatingTickers.contains(entry.ticker)
                 )
             }
@@ -107,6 +140,7 @@ struct WiseCatView: View {
 private struct WiseCatRow: View {
     let entry: WatchlistEntry
     let signal: TradingSignal?
+    let horizon: WiseCatHorizon
     let generating: Bool
 
     var body: some View {
@@ -134,15 +168,20 @@ private struct WiseCatRow: View {
                 Spacer()
 
                 if let signal {
-                    ConvictionMeter(
-                        conviction: signal.conviction,
-                        color: meterColor(signal),
-                        label: signal.action,
-                        diameter: 72,
-                        lineWidth: 5,
-                        labelFont: .sacredButtonLabel,
-                        labelPosition: .diameterLine
-                    )
+                    let read = signal.read(for: horizon)
+                    VStack(alignment: .trailing, spacing: SacredSpacing.xxs) {
+                        Text(read.action)
+                            .font(.sacredButtonLabel)
+                            .foregroundColor(actionColor(read.action))
+                        ProbabilityBar(
+                            pBuy: read.pBuy ?? 0,
+                            pHold: read.pHold ?? 1,
+                            pSell: read.pSell ?? 0,
+                            height: 8,
+                            showLabels: false
+                        )
+                        .frame(width: 120)
+                    }
                 } else if generating {
                     ProgressView()
                         .scaleEffect(0.8)
@@ -156,8 +195,8 @@ private struct WiseCatRow: View {
         .buttonStyle(.plain)
     }
 
-    private func meterColor(_ s: TradingSignal) -> Color {
-        switch WiseCatAction.from(s.action) {
+    private func actionColor(_ action: String) -> Color {
+        switch WiseCatAction.from(action) {
         case .buy: return .sacredGreen
         case .sell: return .sacredRed
         case .hold: return .sacredText

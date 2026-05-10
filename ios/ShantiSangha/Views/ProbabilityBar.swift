@@ -2,10 +2,7 @@ import SwiftUI
 
 /// Single horizontal capsule split into three width-proportional segments —
 /// Buy (green), Hold (muted), Sell (red) — visualizing the model's
-/// {pBuy, pHold, pSell} verdict distribution.
-///
-/// Eventual replacement for the arc-style `ConvictionMeter` once probabilistic
-/// signals are wired into the detail view. Inputs are normalized before
+/// {pBuy, pHold, pSell} verdict distribution. Inputs are normalized before
 /// rendering so callers can pass raw probabilities even if rounding pushes
 /// the sum slightly off 1.0.
 struct ProbabilityBar: View {
