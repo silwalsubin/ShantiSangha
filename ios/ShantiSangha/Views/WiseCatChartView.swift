@@ -12,6 +12,10 @@ struct WiseCatChartView: View {
     @State private var charts: [ChartRange: ChartHistory] = [:]
     @State private var loadingRanges: Set<ChartRange> = []
     @State private var errors: [ChartRange: String] = [:]
+    /// Ranges the network has refreshed in this view session. Disk-hydrated
+    /// entries land in `charts` without entering this set, so prefetch still
+    /// fires for them.
+    @State private var revalidatedRanges: Set<ChartRange> = []
     @State private var range: ChartRange = .intraday
     @State private var selectedDate: Date?
     @State private var statsExpanded = false
@@ -35,7 +39,20 @@ struct WiseCatChartView: View {
             statsCard
                 .padding(.horizontal, SacredSpacing.m)
         }
-        .task { await prefetchAll() }
+        .task {
+            hydrateFromCache()
+            await prefetchAll()
+        }
+    }
+
+    /// Synchronously paint the last cached snapshot before the network refresh
+    /// runs. Lets the chart appear instantly on reopen; `prefetchAll()` then
+    /// revalidates and overwrites cached values as fresh data lands.
+    private func hydrateFromCache() {
+        guard let cached = WiseCatCache.loadCharts(ticker: ticker) else { return }
+        for (r, h) in cached.charts where charts[r] == nil {
+            charts[r] = h
+        }
     }
 
     /// Renders one of: chart, loading spinner, or empty/error message — but
@@ -398,7 +415,10 @@ struct WiseCatChartView: View {
     }
 
     private func load(_ r: ChartRange) async {
-        if charts[r] != nil { return }
+        // Skip the network fetch only when we already have a *fresh* result —
+        // cache-hydrated entries still need to revalidate. Track that via a
+        // separate set so `prefetchAll()` doesn't short-circuit on stale data.
+        if revalidatedRanges.contains(r) { return }
         if loadingRanges.contains(r) { return }
         loadingRanges.insert(r)
         defer { loadingRanges.remove(r) }
@@ -406,6 +426,8 @@ struct WiseCatChartView: View {
             let result = try await WiseCatAPI.getChart(ticker, range: r)
             charts[r] = result
             errors[r] = nil
+            revalidatedRanges.insert(r)
+            WiseCatCache.saveCharts(ticker: ticker, charts: charts, refreshedAt: Date())
         } catch {
             if error.isCancellation { return }
             errors[r] = error.localizedDescription

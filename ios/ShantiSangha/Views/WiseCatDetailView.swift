@@ -7,6 +7,10 @@ struct WiseCatDetailView: View {
     @State private var loading = true
     @State private var error: String?
     @State private var selectedHorizon: WiseCatHorizon = .oneWeek
+    /// Wall-clock of the most recent successful signal load (cache hydrate or
+    /// network refresh). Drives the "refreshed N min ago" suffix on the as-of
+    /// caption so the user can spot stale data while revalidation runs.
+    @State private var refreshedAt: Date?
 
     var body: some View {
         ZStack {
@@ -22,13 +26,13 @@ struct WiseCatDetailView: View {
 
                     // Non-chart content stays at the standard inset.
                     VStack(alignment: .leading, spacing: SacredSpacing.l) {
-                        if loading {
-                            ProgressView()
-                                .frame(maxWidth: .infinity, minHeight: 200)
-                        } else if let signal {
+                        if let signal {
                             asOfCaption(signal)
                             horizonSelector(signal)
                             horizonCard(read: signal.read(for: selectedHorizon))
+                        } else if loading {
+                            ProgressView()
+                                .frame(maxWidth: .infinity, minHeight: 200)
                         } else if let error {
                             Text(error)
                                 .font(.sacredText)
@@ -44,15 +48,34 @@ struct WiseCatDetailView: View {
         }
         .navigationTitle(ticker)
         .navigationBarTitleDisplayMode(.inline)
-        .task { await load() }
+        .task {
+            hydrateFromCache()
+            await load()
+        }
+    }
+
+    /// Paints the cached signal synchronously so the page doesn't show a
+    /// spinner on reopen. The network refresh runs right after via `load()`,
+    /// stale-while-revalidate.
+    private func hydrateFromCache() {
+        guard let cached = WiseCatCache.loadSignal(ticker: ticker) else { return }
+        signal = cached.signal
+        refreshedAt = cached.refreshedAt
+        loading = false
     }
 
     private func load() async {
-        loading = true
+        // Don't flip `loading` back to true if we already have cached data —
+        // that would trigger the spinner branch and hide the content. Only
+        // first-load (no cache) keeps the spinner.
+        if signal == nil { loading = true }
         defer { loading = false }
         do {
-            self.signal = try await WiseCatAPI.getSignal(ticker)
+            let fresh = try await WiseCatAPI.getSignal(ticker)
+            self.signal = fresh
+            self.refreshedAt = Date()
             self.error = nil
+            WiseCatCache.saveSignal(ticker: ticker, signal: fresh, refreshedAt: Date())
         } catch {
             self.error = error.localizedDescription
         }
@@ -64,13 +87,37 @@ struct WiseCatDetailView: View {
     /// close — explains the disconnect between the live chart above and a
     /// gauge that doesn't tick intraday. Falls back to the signal's
     /// calendar date for legacy responses that predate `lastBarDate`.
+    /// Suffixes a "refreshed …" relative time so the user can tell when the
+    /// view is showing cached data vs. a just-completed network revalidation.
     private func asOfCaption(_ s: TradingSignal) -> some View {
         let raw = s.lastBarDate ?? s.date
-        return Text("Scores as of \(formatAsOf(raw))")
-            .font(.sacredCaption)
-            .foregroundColor(.sacredMuted)
-            .frame(maxWidth: .infinity, alignment: .center)
+        let body = "Scores as of \(formatAsOf(raw))"
+        // TimelineView re-renders this Text every minute so the relative time
+        // ticks forward without any manual Timer plumbing. When `refreshedAt`
+        // is nil (first-load before the cache or network resolved) the suffix
+        // is suppressed.
+        return TimelineView(.periodic(from: .now, by: 60)) { context in
+            let suffix = refreshedAt.map {
+                " · refreshed \(formatRefreshed($0, now: context.date))"
+            } ?? ""
+            Text(body + suffix)
+                .font(.sacredCaption)
+                .foregroundColor(.sacredMuted)
+                .frame(maxWidth: .infinity, alignment: .center)
+        }
     }
+
+    private func formatRefreshed(_ date: Date, now: Date) -> String {
+        let elapsed = now.timeIntervalSince(date)
+        if elapsed < 60 { return "just now" }
+        return Self.relativeFormatter.localizedString(for: date, relativeTo: now)
+    }
+
+    private static let relativeFormatter: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .short
+        return f
+    }()
 
     private func formatAsOf(_ ymd: String) -> String {
         guard let date = Self.ymdParser.date(from: ymd) else { return ymd }
