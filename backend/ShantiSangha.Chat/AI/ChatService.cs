@@ -18,7 +18,7 @@ public class ChatService(
     ChatDbContext db,
     Kernel kernel,
     ISafetyService safety,
-    IGoalQueryService goalQuery,
+    IPracticeQueryService practiceQuery,
     IReflectionQueryService reflectionQuery,
     IProfileQueryService profileQuery,
     IEventBus eventBus,
@@ -142,18 +142,18 @@ public class ChatService(
         // failure doesn't kill the entire conversation.
         string? displayName = null;
         string? todaysReflection = null;
-        IReadOnlyList<GoalSummaryDto> goalDtos = [];
+        IReadOnlyList<PracticeSummaryDto> practiceDtos = [];
 
         try
         {
             var displayNameTask = profileQuery.GetDisplayNameAsync(userId, cancellationToken);
-            var goalsTask = goalQuery.GetActiveGoalsForContextAsync(userId, ct: cancellationToken);
+            var practicesTask = practiceQuery.GetActivePracticesForContextAsync(userId, ct: cancellationToken);
             var reflectionTask = reflectionQuery.GetRecentReflectionAsync(userId, cancellationToken);
 
-            await Task.WhenAll(displayNameTask, goalsTask, reflectionTask);
+            await Task.WhenAll(displayNameTask, practicesTask, reflectionTask);
 
             displayName = displayNameTask.Result;
-            goalDtos = goalsTask.Result;
+            practiceDtos = practicesTask.Result;
             todaysReflection = reflectionTask.Result;
         }
         catch (Exception ex)
@@ -161,20 +161,17 @@ public class ChatService(
             logger.LogWarning(ex, "Failed to load some context for conversation {ConversationId} — continuing with partial context", conversationId);
         }
 
-        var goalContexts = goalDtos.Select(g => new GoalContext(
-            Title: g.Title,
-            Type: g.Type,
-            CurrentStreak: g.CurrentStreak,
-            LongestStreak: g.LongestStreak,
-            CheckedInToday: g.CheckedInToday,
-            DaysRemaining: g.DaysRemaining,
-            IsCompleted: g.IsCompleted,
-            DeeperWhy: g.DeeperWhy)).ToList();
+        var practiceContexts = practiceDtos.Select(p => new PracticeContext(
+            Title: p.Title,
+            CurrentStreak: p.CurrentStreak,
+            LongestStreak: p.LongestStreak,
+            CheckedInToday: p.CheckedInToday,
+            DeeperWhy: p.DeeperWhy)).ToList();
 
         var systemPrompt = SystemPrompt.WithContext(
             displayName: displayName,
             todaysReflection: todaysReflection,
-            goals: goalContexts);
+            practices: practiceContexts);
 
         var history = new ChatHistory(systemPrompt);
 

@@ -15,9 +15,10 @@ using ShantiSangha.Chat.AI;
 using ShantiSangha.Friends;
 using ShantiSangha.Friends.Realtime;
 using ShantiSangha.Identity;
-using ShantiSangha.Goals;
+using ShantiSangha.Practices;
 using ShantiSangha.Journal;
 using ShantiSangha.Notifications;
+using ShantiSangha.Reminders;
 using ShantiSangha.Shared;
 using ShantiSangha.Trading;
 using ShantiSangha.Shared.Interfaces;
@@ -95,7 +96,8 @@ try
     // user-shared identity content with the same trust class. Identity owns
     // the avatar key + lifecycle on its own AvatarStorage S3 client.
     builder.Services.AddIdentityModule(connStr, appConfig.FriendsMediaBucketName);
-    builder.Services.AddGoalsModule(connStr);
+    builder.Services.AddPracticesModule(connStr);
+    builder.Services.AddRemindersModule(connStr);
     builder.Services.AddChatModule(vectorDataSource);
     builder.Services.AddJournalModule(vectorDataSource);
     builder.Services.AddWellnessModule(connStr, appConfig.VoiceBucketName);
@@ -114,7 +116,8 @@ try
     // ── Controller discovery from domain assemblies ─────────────────────
     builder.Services.AddControllers()
         .AddApplicationPart(typeof(ShantiSangha.Identity.DependencyInjection).Assembly)
-        .AddApplicationPart(typeof(ShantiSangha.Goals.DependencyInjection).Assembly)
+        .AddApplicationPart(typeof(ShantiSangha.Practices.DependencyInjection).Assembly)
+        .AddApplicationPart(typeof(ShantiSangha.Reminders.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Chat.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Journal.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Wellness.DependencyInjection).Assembly)
@@ -246,7 +249,8 @@ try
     {
         var sp = scope.ServiceProvider;
         await sp.GetRequiredService<ShantiSangha.Identity.Data.IdentityDbContext>().Database.MigrateAsync();
-        await sp.GetRequiredService<ShantiSangha.Goals.Data.GoalsDbContext>().Database.MigrateAsync();
+        await sp.GetRequiredService<ShantiSangha.Practices.Data.PracticesDbContext>().Database.MigrateAsync();
+        await sp.GetRequiredService<ShantiSangha.Reminders.Data.RemindersDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Chat.Data.ChatDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Journal.Data.JournalDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Wellness.Data.WellnessDbContext>().Database.MigrateAsync();

@@ -151,14 +151,14 @@ actor SyncService {
         }
     }
 
-    /// Send a single queue item. Returns decoded AppTask for POST creates.
-    private func sendItem(_ item: SyncQueueItem) async throws -> AppTask? {
+    /// Send a single queue item. Returns decoded Practice for POST creates.
+    private func sendItem(_ item: SyncQueueItem) async throws -> Practice? {
         switch item.method {
         case "POST":
             if let body = item.body {
                 if item.tempId != nil {
                     // Create operation — decode the response to get real ID
-                    let created: AppTask = try await api.postRaw(item.path, body: body)
+                    let created: Practice = try await api.postRaw(item.path, body: body)
                     return created
                 } else {
                     let _: EmptyResponse = try await api.postRaw(item.path, body: body)
@@ -177,10 +177,10 @@ actor SyncService {
     }
 
     /// Replace temp ID with real server ID in local DB and remaining queue items
-    private func replaceTempId(_ tempId: String, with created: AppTask, in context: ModelContext) async {
-        // Update local CachedTask: delete temp, insert real
+    private func replaceTempId(_ tempId: String, with created: Practice, in context: ModelContext) async {
+        // Update local CachedPractice: delete temp, insert real
         await MainActor.run {
-            let repo = TaskRepository.shared
+            let repo = PracticeRepository.shared
             repo.replaceTempWithReal(tempId: tempId, real: created)
         }
 
@@ -195,13 +195,13 @@ actor SyncService {
 
     /// Mark the resource as synced in the local DB
     private func markResourceSynced(from path: String) async {
-        // Extract resource ID from paths like /goals/{id}/checkin or /goals/{id}
+        // Extract resource ID from paths like /practices/{id}/checkin or /practices/{id}
         let parts = path.split(separator: "/")
         guard parts.count >= 2 else { return }
-        let resourceId = String(parts[1]) // /goals/{id}...
+        let resourceId = String(parts[1])
 
         await MainActor.run {
-            TaskRepository.shared.markSynced(id: resourceId)
+            PracticeRepository.shared.markSynced(id: resourceId)
         }
     }
 

@@ -28,16 +28,16 @@ enum WidgetData {
         set { defaults?.set(newValue, forKey: "widget.practicesTotal") }
     }
 
-    // MARK: - Goals
+    // MARK: - Reminders
 
-    static var goalsOverdue: Int {
-        get { defaults?.integer(forKey: "widget.goalsOverdue") ?? 0 }
-        set { defaults?.set(newValue, forKey: "widget.goalsOverdue") }
+    static var remindersOverdue: Int {
+        get { defaults?.integer(forKey: "widget.remindersOverdue") ?? 0 }
+        set { defaults?.set(newValue, forKey: "widget.remindersOverdue") }
     }
 
-    static var goalsDueToday: Int {
-        get { defaults?.integer(forKey: "widget.goalsDueToday") ?? 0 }
-        set { defaults?.set(newValue, forKey: "widget.goalsDueToday") }
+    static var remindersDueToday: Int {
+        get { defaults?.integer(forKey: "widget.remindersDueToday") ?? 0 }
+        set { defaults?.set(newValue, forKey: "widget.remindersDueToday") }
     }
 
     // MARK: - User
@@ -59,15 +59,15 @@ enum WidgetData {
         reflection: String?,
         practicesDone: Int,
         practicesTotal: Int,
-        goalsOverdue: Int,
-        goalsDueToday: Int,
+        remindersOverdue: Int,
+        remindersDueToday: Int,
         userName: String?
     ) {
         self.reflection = reflection
         self.practicesDone = practicesDone
         self.practicesTotal = practicesTotal
-        self.goalsOverdue = goalsOverdue
-        self.goalsDueToday = goalsDueToday
+        self.remindersOverdue = remindersOverdue
+        self.remindersDueToday = remindersDueToday
         self.userName = userName
         self.lastUpdated = Date()
     }

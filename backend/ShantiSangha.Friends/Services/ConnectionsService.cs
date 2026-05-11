@@ -66,17 +66,6 @@ public class ConnectionsService(
                 .ToListAsync(ct))
                 .ToDictionary(x => x.FriendshipId, x => x.Count);
 
-        // Bulk-load important dates for all connections in one round trip
-        // so the per-row projection doesn't N+1. Sorted ascending so the
-        // iOS list reads in chronological order without re-sorting.
-        var connIds = rows.Select(x => x.Conn.Id).ToList();
-        var datesByConn = (await db.ConnectionDates
-                .Where(d => connIds.Contains(d.ConnectionId))
-                .OrderBy(d => d.Date)
-                .ToListAsync(ct))
-            .GroupBy(d => d.ConnectionId)
-            .ToDictionary(g => g.Key, g => (IReadOnlyList<ConnectionDate>)g.ToList());
-
         var result = new List<ConnectionResponse>(rows.Count);
         foreach (var x in rows)
         {
@@ -90,8 +79,7 @@ public class ConnectionsService(
                 }
                 unreadByFs.TryGetValue(fsId, out unread);
             }
-            var dates = datesByConn.TryGetValue(x.Conn.Id, out var d) ? d : [];
-            result.Add(await ProjectAsync(x.Conn, x.Person, dates, preview, sentAt, unread, ct));
+            result.Add(await ProjectAsync(x.Conn, x.Person, preview, sentAt, unread, ct));
         }
         return result;
     }
@@ -117,8 +105,7 @@ public class ConnectionsService(
             unread = await db.Messages.CountAsync(
                 m => m.FriendshipId == fsId && m.SenderUserId != userId && m.ReadAt == null, ct);
         }
-        var dates = await LoadDatesAsync(hit.Conn.Id, ct);
-        return await ProjectAsync(hit.Conn, hit.Person, dates, preview, sentAt, unread, ct);
+        return await ProjectAsync(hit.Conn, hit.Person, preview, sentAt, unread, ct);
     }
 
     public async Task<ConnectionResponse> CreateLocalAsync(
@@ -161,7 +148,7 @@ public class ConnectionsService(
         db.Connections.Add(conn);
         await db.SaveChangesAsync(ct);
 
-        return await ProjectAsync(conn, person, [], null, null, 0, ct);
+        return await ProjectAsync(conn, person, null, null, 0, ct);
     }
 
     public async Task<ConnectionResponse?> UpdateAsync(
@@ -336,115 +323,17 @@ public class ConnectionsService(
         return true;
     }
 
-    public async Task<ConnectionDateResponse?> AddDateAsync(
-        Guid userId,
-        Guid connectionId,
-        AddConnectionDateRequest req,
-        CancellationToken ct = default)
-    {
-        var conn = await db.Connections
-            .FirstOrDefaultAsync(c => c.Id == connectionId && c.OwnerUserId == userId, ct);
-        if (conn is null) return null;
-
-        var label = NormalizeDateLabel(req.Label)
-            ?? throw new FriendsServiceException("label_required", "A label is required.");
-
-        // Soft cap so a single connection can't accumulate hundreds of
-        // dates — the iOS list isn't designed for that and there's no
-        // product reason to allow it.
-        const int MaxDates = 32;
-        var current = await db.ConnectionDates.CountAsync(d => d.ConnectionId == connectionId, ct);
-        if (current >= MaxDates)
-            throw new FriendsServiceException("too_many_dates",
-                $"You can keep up to {MaxDates} dates per person.");
-
-        var now = DateTime.UtcNow;
-        var entry = new ConnectionDate
-        {
-            Id = Guid.NewGuid(),
-            ConnectionId = connectionId,
-            Label = label,
-            Date = req.Date,
-            Recurrence = req.Recurrence,
-            CreatedAt = now,
-            UpdatedAt = now
-        };
-        db.ConnectionDates.Add(entry);
-
-        // Bump Connection.UpdatedAt so the list view re-orders to surface
-        // the freshly-edited row at the top.
-        conn.UpdatedAt = now;
-        await db.SaveChangesAsync(ct);
-
-        return new ConnectionDateResponse(entry.Id, entry.Label, entry.Date, entry.Recurrence);
-    }
-
-    public async Task<ConnectionDateResponse?> UpdateDateAsync(
-        Guid userId,
-        Guid connectionId,
-        Guid dateId,
-        UpdateConnectionDateRequest req,
-        CancellationToken ct = default)
-    {
-        var hit = await db.ConnectionDates
-            .Where(d => d.Id == dateId && d.ConnectionId == connectionId)
-            .Join(db.Connections,
-                  d => d.ConnectionId,
-                  c => c.Id,
-                  (d, c) => new { Date = d, Conn = c })
-            .FirstOrDefaultAsync(d => d.Conn.OwnerUserId == userId, ct);
-        if (hit is null) return null;
-
-        var label = NormalizeDateLabel(req.Label)
-            ?? throw new FriendsServiceException("label_required", "A label is required.");
-
-        var now = DateTime.UtcNow;
-        hit.Date.Label = label;
-        hit.Date.Date = req.Date;
-        hit.Date.Recurrence = req.Recurrence;
-        hit.Date.UpdatedAt = now;
-        hit.Conn.UpdatedAt = now;
-        await db.SaveChangesAsync(ct);
-
-        return new ConnectionDateResponse(hit.Date.Id, hit.Date.Label, hit.Date.Date, hit.Date.Recurrence);
-    }
-
-    public async Task<bool> DeleteDateAsync(
-        Guid userId,
-        Guid connectionId,
-        Guid dateId,
-        CancellationToken ct = default)
-    {
-        var hit = await db.ConnectionDates
-            .Where(d => d.Id == dateId && d.ConnectionId == connectionId)
-            .Join(db.Connections,
-                  d => d.ConnectionId,
-                  c => c.Id,
-                  (d, c) => new { Date = d, Conn = c })
-            .FirstOrDefaultAsync(d => d.Conn.OwnerUserId == userId, ct);
-        if (hit is null) return false;
-
-        db.ConnectionDates.Remove(hit.Date);
-        hit.Conn.UpdatedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
-        return true;
-    }
-
     // ── Helpers ─────────────────────────────────────────────────────
 
     private async Task<ConnectionResponse> ProjectAsync(
         Connection conn,
         Person person,
-        IReadOnlyList<ConnectionDate> dates,
         string? preview,
         DateTime? sentAt,
         int unread,
         CancellationToken ct)
     {
         var personDto = await BuildPersonResponseAsync(person, ct);
-        var dateDtos = dates
-            .Select(d => new ConnectionDateResponse(d.Id, d.Label, d.Date, d.Recurrence))
-            .ToList();
 
         // Fresh presigned GET URL on every read; never persist the URL
         // because S3 expires it. Failures are non-fatal — the iOS layer
@@ -479,7 +368,6 @@ public class ConnectionsService(
             conn.CreatedAt,
             conn.UpdatedAt,
             personDto,
-            dateDtos,
             preview,
             sentAt,
             unread,
@@ -535,14 +423,6 @@ public class ConnectionsService(
             "image/webp" => ".webp",
             _ => string.Empty
         };
-
-    private async Task<IReadOnlyList<ConnectionDate>> LoadDatesAsync(
-        Guid connectionId,
-        CancellationToken ct) =>
-        await db.ConnectionDates
-            .Where(d => d.ConnectionId == connectionId)
-            .OrderBy(d => d.Date)
-            .ToListAsync(ct);
 
     /// For a linked Person we read display name + biographical data
     /// directly from `Identity.Profile` so the row stays in sync with
@@ -613,18 +493,6 @@ public class ConnectionsService(
         }
 
         return result.ToArray();
-    }
-
-    /// Trim, collapse to null when empty, cap at 64 chars — the same
-    /// label budget Circles use. Returns null when the input is unusable
-    /// so callers can throw a clean validation error.
-    private static string? NormalizeDateLabel(string? raw)
-    {
-        if (raw is null) return null;
-        var trimmed = raw.Trim();
-        if (trimmed.Length == 0) return null;
-        if (trimmed.Length > 64) trimmed = trimmed[..64];
-        return trimmed;
     }
 
     private static string? NullIfEmpty(string? s) =>

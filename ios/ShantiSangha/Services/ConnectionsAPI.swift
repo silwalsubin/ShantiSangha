@@ -31,32 +31,6 @@ enum ConnectionsAPI {
         try await ApiService.shared.delete("/connections/\(connectionId.uuidString.lowercased())")
     }
 
-    // ── Important dates ─────────────────────────────────────────────
-
-    static func addDate(
-        _ connectionId: UUID,
-        request: AddConnectionDateRequest
-    ) async throws -> ConnectionDate {
-        try await ApiService.shared.post(
-            "/connections/\(connectionId.uuidString.lowercased())/dates",
-            body: request)
-    }
-
-    static func updateDate(
-        _ connectionId: UUID,
-        dateId: UUID,
-        request: UpdateConnectionDateRequest
-    ) async throws -> ConnectionDate {
-        try await ApiService.shared.put(
-            "/connections/\(connectionId.uuidString.lowercased())/dates/\(dateId.uuidString.lowercased())",
-            body: request)
-    }
-
-    static func deleteDate(_ connectionId: UUID, dateId: UUID) async throws {
-        try await ApiService.shared.delete(
-            "/connections/\(connectionId.uuidString.lowercased())/dates/\(dateId.uuidString.lowercased())")
-    }
-
     // ── Attachments (keepsakes) ─────────────────────────────────────
 
     static func listAttachments(_ connectionId: UUID) async throws -> [ConnectionAttachment] {

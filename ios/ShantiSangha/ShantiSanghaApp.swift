@@ -142,14 +142,15 @@ struct ShantiSanghaApp: App {
     @StateObject private var auth = AuthService.shared
     @StateObject private var profile = ProfileService.shared
     @StateObject private var network = NetworkMonitor.shared
-    @StateObject private var repo = TaskRepository.shared
+    @StateObject private var repo = PracticeRepository.shared
+    @StateObject private var reminderRepo = ReminderRepository.shared
     @StateObject private var notifications = NotificationService.shared
 
     let container: ModelContainer
 
     init() {
         do {
-            container = try ModelContainer(for: CachedTask.self, CachedConversation.self, SyncQueueItem.self)
+            container = try ModelContainer(for: CachedPractice.self, CachedConversation.self, SyncQueueItem.self)
         } catch {
             // Migration failed — delete old store and recreate
             // Data will be re-fetched from server on next refresh
@@ -160,7 +161,7 @@ struct ShantiSanghaApp: App {
             try? FileManager.default.removeItem(at: url.appendingPathExtension("wal"))
             try? FileManager.default.removeItem(at: url.appendingPathExtension("shm"))
             do {
-                container = try ModelContainer(for: CachedTask.self, CachedConversation.self, SyncQueueItem.self)
+                container = try ModelContainer(for: CachedPractice.self, CachedConversation.self, SyncQueueItem.self)
             } catch {
                 fatalError("Failed to create ModelContainer after reset: \(error)")
             }
@@ -221,8 +222,11 @@ struct ShantiSanghaApp: App {
                 // Notification permission is requested contextually from
                 // settings or reminder flows, not on first launch.
             }
-            .onChange(of: repo.tasks) {
-                notifications.reschedule(tasks: repo.tasks)
+            .onChange(of: repo.practices) {
+                notifications.reschedule(practices: repo.practices, reminders: reminderRepo.reminders)
+            }
+            .onChange(of: reminderRepo.reminders) {
+                notifications.reschedule(practices: repo.practices, reminders: reminderRepo.reminders)
             }
         }
         .modelContainer(container)

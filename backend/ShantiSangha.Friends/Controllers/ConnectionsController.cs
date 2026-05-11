@@ -104,65 +104,6 @@ public class ConnectionsController(
         return ok ? NoContent() : NotFound();
     }
 
-    // ── Important dates ─────────────────────────────────────────────
-    // Owner-private list (birthday, anniversary, day-we-met). The list
-    // already ships embedded in `ConnectionResponse.Dates`; these
-    // endpoints just mutate it.
-
-    [HttpPost("{connectionId:guid}/dates")]
-    public async Task<IActionResult> AddDate(
-        Guid connectionId,
-        [FromBody] AddConnectionDateRequest body,
-        CancellationToken ct)
-    {
-        var user = await currentUser.GetAsync();
-        if (user is null) return Unauthorized();
-
-        try
-        {
-            var created = await service.AddDateAsync(user.Id, connectionId, body, ct);
-            return created is null ? NotFound() : Ok(created);
-        }
-        catch (FriendsServiceException ex)
-        {
-            return UnprocessableEntity(new { error = ex.Code, message = ex.Message });
-        }
-    }
-
-    [HttpPut("{connectionId:guid}/dates/{dateId:guid}")]
-    public async Task<IActionResult> UpdateDate(
-        Guid connectionId,
-        Guid dateId,
-        [FromBody] UpdateConnectionDateRequest body,
-        CancellationToken ct)
-    {
-        var user = await currentUser.GetAsync();
-        if (user is null) return Unauthorized();
-
-        try
-        {
-            var updated = await service.UpdateDateAsync(user.Id, connectionId, dateId, body, ct);
-            return updated is null ? NotFound() : Ok(updated);
-        }
-        catch (FriendsServiceException ex)
-        {
-            return UnprocessableEntity(new { error = ex.Code, message = ex.Message });
-        }
-    }
-
-    [HttpDelete("{connectionId:guid}/dates/{dateId:guid}")]
-    public async Task<IActionResult> DeleteDate(
-        Guid connectionId,
-        Guid dateId,
-        CancellationToken ct)
-    {
-        var user = await currentUser.GetAsync();
-        if (user is null) return Unauthorized();
-
-        var ok = await service.DeleteDateAsync(user.Id, connectionId, dateId, ct);
-        return ok ? NoContent() : NotFound();
-    }
-
     // ── Owner-private avatar ────────────────────────────────────────
     // Step 1 of the avatar upload — hand back a presigned PUT URL the
     // client uses to ship JPEG bytes directly to S3. Step 2 is the

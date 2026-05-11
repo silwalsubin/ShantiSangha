@@ -75,8 +75,8 @@ enum SilentPushHandler {
             break
         }
 
-        // Always refresh goals/practices since they're in the widget
-        await refreshGoalsAndPractices(api: api, dateStr: dateStr)
+        // Always refresh reminders/practices since they're in the widget
+        await refreshRemindersAndPractices(api: api, dateStr: dateStr)
 
         // Force UserDefaults to flush to disk before telling WidgetKit to reload —
         // the widget runs in a separate process and needs to see the updated values
@@ -109,26 +109,24 @@ enum SilentPushHandler {
         }
     }
 
-    private static func refreshGoalsAndPractices(api: ApiService, dateStr: String) async {
-        // Fetch goals
+    private static func refreshRemindersAndPractices(api: ApiService, dateStr: String) async {
+        // Fetch reminders
         do {
-            let goals: [AppTask] = try await api.get("/goals?date=\(dateStr)")
-            let milestones = goals.filter { $0.type == .oneTime }
-            let pending = milestones.filter { $0.completedAt == nil }
-            WidgetData.goalsOverdue = pending.filter { ($0.daysRemaining ?? 1) < 0 }.count
-            WidgetData.goalsDueToday = pending.filter { $0.daysRemaining == 0 }.count
+            let reminders: [Reminder] = try await api.get("/reminders")
+            let pending = reminders.filter { $0.completedAt == nil }
+            WidgetData.remindersOverdue = pending.filter { $0.daysRemaining < 0 }.count
+            WidgetData.remindersDueToday = pending.filter { $0.daysRemaining == 0 }.count
         } catch {
             if !error.isCancellation {
-                await AppLogger.shared.error("Push", "Failed to refresh goals: \(error.localizedDescription)")
+                await AppLogger.shared.error("Push", "Failed to refresh reminders: \(error.localizedDescription)")
             }
         }
 
         // Fetch practices
         do {
-            let tasks: [AppTask] = try await api.get("/goals/today?date=\(dateStr)")
-            let recurring = tasks.filter { $0.type == .recurring }
-            WidgetData.practicesDone = recurring.filter { $0.checkedIn }.count
-            WidgetData.practicesTotal = recurring.count
+            let items: [Practice] = try await api.get("/practices/today?date=\(dateStr)")
+            WidgetData.practicesDone = items.filter { $0.checkedIn }.count
+            WidgetData.practicesTotal = items.count
         } catch {
             if !error.isCancellation {
                 await AppLogger.shared.error("Push", "Failed to refresh practices: \(error.localizedDescription)")

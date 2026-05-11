@@ -19,7 +19,7 @@ namespace ShantiSangha.Wellness.Jobs;
 public class GeneratePortraitJob(
     WellnessDbContext db,
     Kernel kernel,
-    IGoalQueryService goalQuery,
+    IPracticeQueryService practiceQuery,
     IProfileQueryService profileQuery,
     ILogger<GeneratePortraitJob> logger)
 {
@@ -29,7 +29,7 @@ public class GeneratePortraitJob(
         {
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             var displayName = await profileQuery.GetDisplayNameAsync(userId);
-            var goals = await goalQuery.GetActiveGoalsForContextAsync(userId, today);
+            var practices = await practiceQuery.GetActivePracticesForContextAsync(userId, today);
 
             var recentReflections = await db.DailyReflections
                 .Where(r => r.UserId == userId)
@@ -48,15 +48,15 @@ public class GeneratePortraitJob(
 
             contextParts.Add($"They have been using the app for {totalReflections} days.");
 
-            if (goals.Count > 0)
+            if (practices.Count > 0)
             {
-                var goalLines = goals.Select(g =>
+                var practiceLines = practices.Select(p =>
                 {
-                    var streak = g.CurrentStreak > 0 ? $" (streak: {g.CurrentStreak} days, longest: {g.LongestStreak})" : " (no active streak)";
-                    var why = !string.IsNullOrWhiteSpace(g.DeeperWhy) ? $" Why: \"{g.DeeperWhy}\"" : "";
-                    return $"  - {g.Type}: {g.Title}{streak}{why}";
+                    var streak = p.CurrentStreak > 0 ? $" (streak: {p.CurrentStreak} days, longest: {p.LongestStreak})" : " (no active streak)";
+                    var why = !string.IsNullOrWhiteSpace(p.DeeperWhy) ? $" Why: \"{p.DeeperWhy}\"" : "";
+                    return $"  - {p.Title}{streak}{why}";
                 });
-                contextParts.Add($"Active practices and goals:\n{string.Join("\n", goalLines)}");
+                contextParts.Add($"Active practices:\n{string.Join("\n", practiceLines)}");
             }
 
             if (recentReflections.Count > 0)

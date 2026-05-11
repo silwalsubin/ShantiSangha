@@ -2,79 +2,88 @@ import Foundation
 import Combine
 
 /// ViewModel for the Home screen — "What needs your attention today?"
-/// Delegates to TaskRepository for offline-first data management.
-enum CommitmentFilter: String, CaseIterable {
-    case today = "Due today"
-    case week = "Due this week"
-    case month = "Due this month"
-    case all = "All"
-
-    var maxDays: Int? {
-        switch self {
-        case .today: return 0
-        case .week: return 7
-        case .month: return 30
-        case .all: return nil
-        }
-    }
-}
-
+/// Practices delegate to `PracticeRepository` for offline-first data;
+/// reminders go through `ReminderRepository` (online, no streaks).
 @MainActor
 class HomeViewModel: ObservableObject {
     @Published var loading = true
-    @Published var commitmentFilter: CommitmentFilter = .today
     @Published var activeSwipeId: String?
-    private let repo = TaskRepository.shared
+
+    private let practiceRepo = PracticeRepository.shared
+    private let reminderRepo = ReminderRepository.shared
     private var cancellables = Set<AnyCancellable>()
 
-    var tasks: [AppTask] { repo.tasks }
-    var hasTasks: Bool { !tasks.isEmpty }
+    // MARK: - Practices
 
-    /// Pending recurring tasks
-    var pendingRecurring: [AppTask] {
-        tasks.filter { !$0.checkedIn && $0.type == .recurring }
+    var practices: [Practice] { practiceRepo.practices }
+    var hasPractices: Bool { !practices.isEmpty }
+
+    /// Pending recurring practices (not checked in today)
+    var pendingPractices: [Practice] {
+        practices.filter { !$0.checkedIn }
     }
 
-    /// Filtered commitments (pending only), sorted by urgency
-    var filteredCommitments: [AppTask] {
-        let maxDays = commitmentFilter.maxDays
-        return tasks.filter {
-            guard $0.type == .oneTime && $0.completedAt == nil else { return false }
-            if let max = maxDays {
-                return ($0.daysRemaining ?? 999) <= max
+    /// All practices — pending first, then completed
+    var allPractices: [Practice] {
+        practices.sorted { !$0.checkedIn && $1.checkedIn }
+    }
+
+    var totalPractices: Int { practices.count }
+    var donePractices: Int { practices.filter { $0.checkedIn }.count }
+    var allPracticesDone: Bool { totalPractices > 0 && donePractices == totalPractices }
+
+    var completedPractices: [Practice] {
+        practices.filter { $0.checkedIn && $0.completedToday == true }
+    }
+    var skippedPractices: [Practice] {
+        practices.filter { $0.checkedIn && $0.completedToday == false }
+    }
+
+    // MARK: - Reminders
+
+    var reminders: [Reminder] { reminderRepo.reminders }
+
+    /// Pending reminders — not completed, sorted by urgency (overdue first).
+    var pendingReminders: [Reminder] {
+        reminders.filter { $0.completedAt == nil }
+            .sorted { $0.daysRemaining < $1.daysRemaining }
+    }
+
+    var completedReminders: [Reminder] {
+        reminders.filter { $0.completedAt != nil }
+    }
+
+    var overdueRemindersCount: Int {
+        pendingReminders.filter { $0.daysRemaining < 0 }.count
+    }
+    var dueTodayRemindersCount: Int {
+        pendingReminders.filter { $0.daysRemaining == 0 }.count
+    }
+    var upcomingRemindersCount: Int {
+        pendingReminders.filter { $0.daysRemaining > 0 }.count
+    }
+
+    /// Total reminders in scope for the Home ring (overdue + today + upcoming-this-week).
+    var totalRemindersForToday: Int {
+        pendingReminders.filter { $0.daysRemaining <= 7 }.count
+    }
+    var doneRemindersForToday: Int {
+        // Reminders completed within the last 7 days
+        completedReminders.filter { completedWithinDays($0.completedAt, 7) }.count
+    }
+    var remindersOverdue: Bool { overdueRemindersCount > 0 }
+
+    var remindersSummaryDetail: String {
+        var parts: [String] = []
+        if overdueRemindersCount > 0 { parts.append("\(overdueRemindersCount) carried over") }
+        if dueTodayRemindersCount > 0 { parts.append("\(dueTodayRemindersCount) due today") }
+        if parts.isEmpty {
+            if upcomingRemindersCount > 0 {
+                return "\(upcomingRemindersCount) upcoming"
             }
-            return true
-        }.sorted { ($0.daysRemaining ?? 0) < ($1.daysRemaining ?? 0) }
-    }
-
-    /// All milestones (for summary view)
-    var allMilestones: [AppTask] {
-        tasks.filter { $0.type == .oneTime }
-    }
-    var pendingMilestones: [AppTask] {
-        allMilestones.filter { $0.completedAt == nil }
-            .sorted { ($0.daysRemaining ?? 999) < ($1.daysRemaining ?? 999) }
-    }
-    var completedMilestones: [AppTask] {
-        allMilestones.filter { $0.completedAt != nil }
-    }
-    var overdueMilestones: Int {
-        pendingMilestones.filter { ($0.daysRemaining ?? 1) <= 0 }.count
-    }
-    var totalMilestones: Int { allMilestones.count }
-    var doneMilestones: Int { completedMilestones.count }
-
-    // Filter-aware counts for progress ring
-    private func milestonesInWindow(_ filter: CommitmentFilter) -> [AppTask] {
-        allMilestones.filter { task in
-            guard let max = filter.maxDays else { return true }
-            if task.completedAt != nil {
-                // Completed: include if completed within the last N days
-                return completedWithinDays(task.completedAt, max)
-            }
-            // Pending: include if due within N days (or overdue)
-            return (task.daysRemaining ?? 999) <= max
+            return "\(pendingReminders.count) active"
         }
+        return parts.joined(separator: "\n")
     }
 
     private func completedWithinDays(_ dateStr: String?, _ days: Int) -> Bool {
@@ -88,88 +97,97 @@ class HomeViewModel: ObservableObject {
         return daysAgo <= days
     }
 
-    var filteredTotal: Int { milestonesInWindow(commitmentFilter).count }
-    var filteredDone: Int { milestonesInWindow(commitmentFilter).filter { $0.completedAt != nil }.count }
-    var filteredOverdue: Bool { milestonesInWindow(commitmentFilter).contains { $0.completedAt == nil && ($0.daysRemaining ?? 1) <= 0 } }
-
-    var pendingTasks: [AppTask] { pendingRecurring + filteredCommitments }
-
-    /// All recurring tasks — pending first, then completed
-    var allRecurring: [AppTask] {
-        tasks.filter { $0.type == .recurring }
-            .sorted { !$0.checkedIn && $1.checkedIn }
-    }
-
-    var allPracticesDone: Bool { totalRecurring > 0 && doneRecurring == totalRecurring }
-
-    /// Urgent goals for Home — overdue + due today + due this week, max 5
-    var urgentGoals: [AppTask] {
-        tasks.filter { $0.type == .oneTime && $0.completedAt == nil }
-            .sorted { ($0.daysRemaining ?? 0) < ($1.daysRemaining ?? 0) }
-            .prefix(5)
-            .map { $0 }
-    }
-
-    var pendingGoalCount: Int {
-        tasks.filter { $0.type == .oneTime && $0.completedAt == nil }.count
-    }
-
-    var goalsSummaryDetail: String {
-        let pending = tasks.filter { $0.type == .oneTime && $0.completedAt == nil }
-        let overdue = pending.filter { ($0.daysRemaining ?? 1) < 0 }.count
-        let dueToday = pending.filter { $0.daysRemaining == 0 }.count
-
-        var parts: [String] = []
-        if overdue > 0 { parts.append("\(overdue) carried over") }
-        if dueToday > 0 { parts.append("\(dueToday) due today") }
-        if parts.isEmpty { return "\(pending.count) active" }
-        return parts.joined(separator: "\n")
-    }
-
-    var completedTasks: [AppTask] { tasks.filter { $0.checkedIn && $0.completedToday == true } }
-    var skippedTasks: [AppTask] { tasks.filter { $0.checkedIn && $0.completedToday == false } }
-
-    // Daily progress — recurring tasks only
-    var totalRecurring: Int { tasks.filter { $0.type == .recurring }.count }
-    var doneRecurring: Int { tasks.filter { $0.type == .recurring && $0.checkedIn }.count }
-
     init() {
         // Forward repo changes to trigger view updates
-        repo.$tasks
+        practiceRepo.$practices
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
 
-        repo.$loading
+        reminderRepo.$reminders
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+
+        practiceRepo.$loading
             .receive(on: DispatchQueue.main)
             .assign(to: &$loading)
     }
 
     func load() async {
-        await repo.refreshFromServer()
+        async let p: () = practiceRepo.refreshFromServer()
+        async let r: () = reminderRepo.refresh()
+        _ = await (p, r)
     }
 
+    // MARK: - Practice operations
+
     func checkIn(id: String, completed: Bool) async {
-        await repo.checkIn(id: id, completed: completed)
+        await practiceRepo.checkIn(id: id, completed: completed)
     }
 
     func undoCheckIn(id: String) async {
-        await repo.undoCheckIn(id: id)
+        await practiceRepo.undoCheckIn(id: id)
     }
 
-    func updateProgress(id: String, value: Int) async {
-        await repo.updateProgress(id: id, value: value)
+    func deletePractice(id: String) async {
+        await practiceRepo.deletePractice(id: id)
     }
 
-    func deleteTask(id: String) async {
-        await repo.deleteTask(id: id)
+    func createPractice(title: String, deeperWhy: String? = nil) async {
+        await practiceRepo.createPractice(title: title, deeperWhy: deeperWhy)
     }
 
-    func updateDueDate(id: String, date: String) async {
-        await repo.updateDueDate(id: id, date: date)
+    // MARK: - Reminder operations
+
+    func createReminder(label: String,
+                        date: String,
+                        recurrence: ReminderRecurrence = .none,
+                        remindersEnabled: Bool = true,
+                        connectionId: UUID? = nil) async {
+        do {
+            _ = try await reminderRepo.create(
+                label: label,
+                date: date,
+                recurrence: recurrence,
+                remindersEnabled: remindersEnabled,
+                connectionId: connectionId)
+        } catch {
+            if !error.isCancellation {
+                AppLogger.shared.error("Home", "Failed to create reminder: \(error)")
+            }
+        }
     }
 
-    func createTask(title: String, type: TaskType, targetDate: String? = nil, deeperWhy: String? = nil) async {
-        await repo.createTask(title: title, type: type, targetDate: targetDate, deeperWhy: deeperWhy)
+    func updateReminder(id: UUID,
+                        label: String? = nil,
+                        date: String? = nil,
+                        recurrence: ReminderRecurrence? = nil,
+                        remindersEnabled: Bool? = nil,
+                        completed: Bool? = nil) async {
+        do {
+            _ = try await reminderRepo.update(
+                id: id, label: label, date: date,
+                recurrence: recurrence, remindersEnabled: remindersEnabled,
+                completed: completed)
+        } catch {
+            if !error.isCancellation {
+                AppLogger.shared.error("Home", "Failed to update reminder: \(error)")
+            }
+        }
+    }
+
+    func completeReminder(id: UUID) async {
+        await updateReminder(id: id, completed: true)
+    }
+
+    func deleteReminder(id: UUID) async {
+        do {
+            try await reminderRepo.delete(id: id)
+        } catch {
+            if !error.isCancellation {
+                AppLogger.shared.error("Home", "Failed to delete reminder: \(error)")
+            }
+        }
     }
 }

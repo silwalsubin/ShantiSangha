@@ -18,7 +18,7 @@ public class JournalPromptController(
     WellnessDbContext db,
     ICurrentUser currentUser,
     Kernel kernel,
-    IGoalQueryService goalQuery,
+    IPracticeQueryService practiceQuery,
     IReflectionQueryService reflectionQuery,
     ILogger<JournalPromptController> logger) : ControllerBase
 {
@@ -45,18 +45,18 @@ public class JournalPromptController(
         if (cached is not null)
             return Ok(new { Prompt = cached });
 
-        var goals = await goalQuery.GetActiveGoalsForContextAsync(user.Id, today, ct);
+        var practices = await practiceQuery.GetActivePracticesForContextAsync(user.Id, today, ct);
         var todaysReflection = await reflectionQuery.GetRecentReflectionAsync(user.Id, ct);
 
         // If the user has no context at all, return null — client falls back.
-        var hasContext = goals.Count > 0
+        var hasContext = practices.Count > 0
             || !string.IsNullOrWhiteSpace(todaysReflection);
         if (!hasContext)
             return Ok(new { Prompt = (string?)null });
 
         var contextParts = new List<string>();
 
-        foreach (var g in goals)
+        foreach (var g in practices)
         {
             var streak = g.CurrentStreak > 0 ? $" ({g.CurrentStreak}-day streak)" : "";
             var why = !string.IsNullOrWhiteSpace(g.DeeperWhy) ? $" Why: \"{g.DeeperWhy}\"" : "";
@@ -79,7 +79,7 @@ public class JournalPromptController(
                 Rules:
                 - ONE sentence. Under 20 words. A question or invitation.
                 - Be SPECIFIC to their context — reference their actual streaks,
-                  goals, or today's reflection. Generic prompts are worthless.
+                  practices, or today's reflection. Generic prompts are worthless.
                 - Never give advice. Never mention what they haven't done.
                 - Never use exclamation marks. No emojis.
                 - Tone: warm, curious, unhurried. Like a friend asking the right

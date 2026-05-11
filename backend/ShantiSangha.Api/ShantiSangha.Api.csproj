@@ -29,7 +29,8 @@
   <ItemGroup>
     <ProjectReference Include="..\ShantiSangha.Shared\ShantiSangha.Shared.csproj" />
     <ProjectReference Include="..\ShantiSangha.Identity\ShantiSangha.Identity.csproj" />
-    <ProjectReference Include="..\ShantiSangha.Goals\ShantiSangha.Goals.csproj" />
+    <ProjectReference Include="..\ShantiSangha.Practices\ShantiSangha.Practices.csproj" />
+    <ProjectReference Include="..\ShantiSangha.Reminders\ShantiSangha.Reminders.csproj" />
     <ProjectReference Include="..\ShantiSangha.Chat\ShantiSangha.Chat.csproj" />
     <ProjectReference Include="..\ShantiSangha.Journal\ShantiSangha.Journal.csproj" />
     <ProjectReference Include="..\ShantiSangha.Wellness\ShantiSangha.Wellness.csproj" />

@@ -141,9 +141,9 @@ public record PersonResponse(
 /// embedded `Person` carries identity. `Messageable` is true iff
 /// `Person.UserId` is set AND `FriendshipId` is set; the iOS layer
 /// uses it to gate the chat affordance. `Circles` is the free-form
-/// tag set the owner has applied (empty array allowed). `Dates` is
-/// the owner-private "important dates" list (birthday, anniversary,
-/// day-we-met) sorted by Date ascending.
+/// tag set the owner has applied (empty array allowed). Important
+/// dates for the connection now live in the Reminders module —
+/// clients fetch them via `GET /api/reminders?connectionId={id}`.
 public record ConnectionResponse(
     Guid Id,
     Guid OwnerUserId,
@@ -156,7 +156,6 @@ public record ConnectionResponse(
     DateTime CreatedAt,
     DateTime UpdatedAt,
     PersonResponse Person,
-    IReadOnlyList<ConnectionDateResponse> Dates,
     string? LastMessagePreview,
     DateTime? LastMessageAt,
     int UnreadCount,
@@ -164,31 +163,6 @@ public record ConnectionResponse(
     // every read. Null when the owner hasn't set one — clients fall back
     // to `Person.AvatarUrl` (in-app users) or initials (local persons).
     string? PrivateAvatarUrl);
-
-/// Single owner-private "important date" attached to a Connection.
-/// Order in the parent list is Date ascending. `Recurrence` tells the
-/// client whether the date repeats annually (birthday, anniversary)
-/// or pins to its absolute calendar slot (moved cities, started job).
-public record ConnectionDateResponse(
-    Guid Id,
-    string Label,
-    DateOnly Date,
-    ConnectionDateRecurrence Recurrence);
-
-/// Add a new date to a Connection. Label is trimmed; date required.
-/// `Recurrence` defaults to `Yearly` — the most common case is
-/// birthdays/anniversaries that roll forward each year.
-public record AddConnectionDateRequest(
-    string Label,
-    DateOnly Date,
-    ConnectionDateRecurrence Recurrence = ConnectionDateRecurrence.Yearly);
-
-/// Update an existing date on a Connection. All fields required —
-/// the iOS edit sheet always submits the full row.
-public record UpdateConnectionDateRequest(
-    string Label,
-    DateOnly Date,
-    ConnectionDateRecurrence Recurrence = ConnectionDateRecurrence.Yearly);
 
 // ── Connection attachments (keepsakes: media + files) ───────────────
 

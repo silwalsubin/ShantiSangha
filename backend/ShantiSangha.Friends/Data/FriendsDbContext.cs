@@ -19,7 +19,6 @@ public class FriendsDbContext(DbContextOptions<FriendsDbContext> options) : DbCo
     public DbSet<FriendshipAnnotation> FriendshipAnnotations => Set<FriendshipAnnotation>();
     public DbSet<Person> Persons => Set<Person>();
     public DbSet<Connection> Connections => Set<Connection>();
-    public DbSet<ConnectionDate> ConnectionDates => Set<ConnectionDate>();
     public DbSet<ConnectionAttachment> ConnectionAttachments => Set<ConnectionAttachment>();
 
     protected override void OnModelCreating(ModelBuilder mb)
@@ -103,18 +102,6 @@ public class FriendsDbContext(DbContextOptions<FriendsDbContext> options) : DbCo
                 .WithMany()
                 .HasForeignKey(c => c.PersonId)
                 .OnDelete(DeleteBehavior.Cascade);
-        });
-
-        mb.Entity<ConnectionDate>(e =>
-        {
-            e.ToTable("ConnectionDates");
-            // FK + per-connection list query. Cascade delete from Connections
-            // is declared in the migration SQL so removing a connection
-            // takes its dates with it.
-            e.HasIndex(d => d.ConnectionId);
-            // Store as text for forward compatibility with future
-            // recurrence kinds (monthly, custom) without DB schema churn.
-            e.Property(d => d.Recurrence).HasConversion<string>();
         });
 
         mb.Entity<ConnectionAttachment>(e =>

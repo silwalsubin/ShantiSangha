@@ -6,34 +6,25 @@
  * but anything shared should be defined and exported from this file.
  */
 
-// --- Tasks & Goals ---
+// --- Practices (recurring) ---
 
-export interface Task {
+export interface PracticeTask {
   id: string
   title: string
-  type: 'Recurring' | 'OneTime'
   checkedIn: boolean
   completedToday: boolean | null
-  daysRemaining: number | null
-  progress: number
   feedbackMessage: string | null
   saving: boolean
 }
 
-export interface Goal {
+export interface Practice {
   id: string
   title: string
-  type: 'Recurring' | 'OneTime'
   deeperWhy: string | null
   currentStreak: number
   longestStreak: number
   frequency: string | null
   frequencyTarget: number | null
-  targetDate: string | null
-  completedAt: string | null
-  daysRemaining: number | null
-  progress: number
-  noteCount: number
   createdAt: string
 }
 
@@ -43,6 +34,32 @@ export interface CheckIn {
   completed: boolean
   note: string | null
   createdAt: string
+}
+
+// --- Reminders (date-based, one-time or yearly) ---
+
+export type ReminderRecurrence = 'none' | 'yearly'
+
+export interface Reminder {
+  id: string
+  label: string
+  date: string
+  recurrence: ReminderRecurrence
+  remindersEnabled: boolean
+  connectionId: string | null
+  completedAt: string | null
+  createdAt: string
+  daysRemaining: number
+}
+
+export interface ReminderTask {
+  id: string
+  label: string
+  date: string
+  recurrence: ReminderRecurrence
+  daysRemaining: number
+  completed: boolean
+  saving: boolean
 }
 
 // --- Conversations & Chat ---

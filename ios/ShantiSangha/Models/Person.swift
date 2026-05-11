@@ -34,25 +34,6 @@ struct Person: Codable, Identifiable, Equatable, Hashable {
 /// chat affordance — true iff `person.userId != nil` AND
 /// `friendshipId != nil`. `circles` is the free-form tag set the owner
 /// has applied (empty array allowed — no labels yet).
-/// Whether a `ConnectionDate` repeats. `yearly` rolls forward each
-/// year (birthday, anniversary, day-we-met). `once` pins to its
-/// absolute calendar slot (moved cities, started a job).
-enum ConnectionDateRecurrence: String, Codable {
-    case yearly = "Yearly"
-    case once = "Once"
-}
-
-/// Mirror of the backend `ConnectionDateResponse`. A single owner-
-/// private "important date" attached to a connection — birthday,
-/// anniversary, day-we-met, etc. The date string arrives as ISO
-/// 'yyyy-MM-dd' from the backend's `DateOnly`.
-struct ConnectionDate: Codable, Identifiable, Equatable, Hashable {
-    let id: UUID
-    let label: String
-    let date: String
-    let recurrence: ConnectionDateRecurrence
-}
-
 struct Connection: Codable, Identifiable, Equatable, Hashable {
     let id: UUID
     let ownerUserId: UUID
@@ -65,7 +46,6 @@ struct Connection: Codable, Identifiable, Equatable, Hashable {
     let createdAt: String
     let updatedAt: String
     let person: Person
-    let dates: [ConnectionDate]
     let lastMessagePreview: String?
     let lastMessageAt: String?
     let unreadCount: Int
@@ -136,18 +116,6 @@ struct CreateConnectionAvatarUploadResponse: Decodable {
     let objectKey: String
     let uploadUrl: String
     let uploadUrlExpiresAt: String
-}
-
-struct AddConnectionDateRequest: Encodable {
-    let label: String
-    let date: String   // ISO 'yyyy-MM-dd'
-    let recurrence: ConnectionDateRecurrence
-}
-
-struct UpdateConnectionDateRequest: Encodable {
-    let label: String
-    let date: String
-    let recurrence: ConnectionDateRecurrence
 }
 
 struct UpdatePersonRequest: Encodable {

@@ -8,8 +8,8 @@ struct ShantiSanghaEntry: TimelineEntry {
     let reflection: String?
     let practicesDone: Int
     let practicesTotal: Int
-    let goalsOverdue: Int
-    let goalsDueToday: Int
+    let remindersOverdue: Int
+    let remindersDueToday: Int
     let userName: String?
 }
 
@@ -22,7 +22,7 @@ struct ShantiSanghaProvider: TimelineProvider {
             date: Date(),
             reflection: "Your practice has a rhythm now. The days you show up are the ones you shape.",
             practicesDone: 2, practicesTotal: 4,
-            goalsOverdue: 0, goalsDueToday: 1,
+            remindersOverdue: 0, remindersDueToday: 1,
             userName: nil
         )
     }
@@ -46,8 +46,8 @@ struct ShantiSanghaProvider: TimelineProvider {
             reflection: WidgetData.reflection,
             practicesDone: WidgetData.practicesDone,
             practicesTotal: WidgetData.practicesTotal,
-            goalsOverdue: WidgetData.goalsOverdue,
-            goalsDueToday: WidgetData.goalsDueToday,
+            remindersOverdue: WidgetData.remindersOverdue,
+            remindersDueToday: WidgetData.remindersDueToday,
             userName: WidgetData.userName
         )
     }
@@ -220,17 +220,17 @@ struct DashboardWidgetView: View {
 
             Spacer()
 
-            // Goals summary at bottom
-            if entry.goalsOverdue > 0 || entry.goalsDueToday > 0 {
+            // Reminders summary at bottom
+            if entry.remindersOverdue > 0 || entry.remindersDueToday > 0 {
                 HStack(spacing: 4) {
                     Image(systemName: "calendar.badge.clock")
                         .font(.system(size: 10))
-                    if entry.goalsOverdue > 0 {
-                        Text("\(entry.goalsOverdue) carried over")
+                    if entry.remindersOverdue > 0 {
+                        Text("\(entry.remindersOverdue) carried over")
                     }
-                    if entry.goalsDueToday > 0 {
-                        if entry.goalsOverdue > 0 { Text("·") }
-                        Text("\(entry.goalsDueToday) today")
+                    if entry.remindersDueToday > 0 {
+                        if entry.remindersOverdue > 0 { Text("·") }
+                        Text("\(entry.remindersDueToday) today")
                     }
                 }
                 .font(.system(size: 10, design: .serif))

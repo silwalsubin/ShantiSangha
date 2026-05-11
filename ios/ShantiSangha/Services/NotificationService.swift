@@ -60,9 +60,9 @@ class NotificationService: ObservableObject {
         return settings.authorizationStatus == .authorized
     }
 
-    // MARK: - Schedule all notifications based on current tasks
+    // MARK: - Schedule all notifications based on current state
 
-    func reschedule(tasks: [AppTask]) {
+    func reschedule(practices: [Practice], reminders: [Reminder]) {
         guard isEnabled else {
             center.removeAllPendingNotificationRequests()
             return
@@ -73,24 +73,23 @@ class NotificationService: ObservableObject {
         let calendar = Calendar.current
         let now = Date()
 
-        for task in tasks {
-            if task.type == .recurring {
-                scheduleStreakProtection(task: task, calendar: calendar, now: now)
-            } else if task.type == .oneTime && task.completedAt == nil {
-                scheduleCommitmentReminders(task: task, calendar: calendar, now: now)
-            }
+        for practice in practices {
+            scheduleStreakProtection(practice: practice, calendar: calendar, now: now)
+        }
+        for reminder in reminders where reminder.completedAt == nil && reminder.remindersEnabled {
+            scheduleReminderNudge(reminder: reminder, calendar: calendar, now: now)
         }
     }
 
     // MARK: - Streak protection
 
-    /// Notify in the evening if a recurring task hasn't been completed today
+    /// Notify in the evening if a recurring practice hasn't been completed today
     /// and the user has an active streak worth protecting.
-    private func scheduleStreakProtection(task: AppTask, calendar: Calendar, now: Date) {
+    private func scheduleStreakProtection(practice: Practice, calendar: Calendar, now: Date) {
         // Only protect streaks of 2+ days
-        guard task.currentStreak >= 2 && !task.checkedIn else { return }
+        guard practice.currentStreak >= 2 && !practice.checkedIn else { return }
 
-        let body = "Your \(task.currentStreak)-day \(task.title) streak is still alive. One check-in keeps it going."
+        let body = "Your \(practice.currentStreak)-day \(practice.title) streak is still alive. One check-in keeps it going."
 
         var dateComponents = DateComponents()
         dateComponents.hour = reminderHour
@@ -100,22 +99,22 @@ class NotificationService: ObservableObject {
         if let reminderToday = calendar.date(bySettingHour: reminderHour, minute: reminderMinute, second: 0, of: now),
            reminderToday > now {
             scheduleNotification(
-                id: "streak-\(task.id)",
-                title: task.title,
+                id: "streak-\(practice.id)",
+                title: practice.title,
                 body: body,
                 dateComponents: dateComponents
             )
         }
     }
 
-    // MARK: - Commitment due reminders
+    // MARK: - Reminder nudges
 
-    /// Notify when a commitment is due tomorrow (evening before) and due today (morning of).
-    private func scheduleCommitmentReminders(task: AppTask, calendar: Calendar, now: Date) {
-        guard let daysRemaining = task.daysRemaining else { return }
+    /// Notify when a reminder is due tomorrow (evening before) and due today (morning of).
+    private func scheduleReminderNudge(reminder: Reminder, calendar: Calendar, now: Date) {
+        let daysRemaining = reminder.daysRemaining
+        let id = reminder.id.uuidString
 
         if daysRemaining == 1 {
-            // Due tomorrow — remind this evening
             var dateComponents = DateComponents()
             dateComponents.hour = reminderHour
             dateComponents.minute = reminderMinute
@@ -123,14 +122,13 @@ class NotificationService: ObservableObject {
             if let reminderToday = calendar.date(bySettingHour: reminderHour, minute: reminderMinute, second: 0, of: now),
                reminderToday > now {
                 scheduleNotification(
-                    id: "due-tomorrow-\(task.id)",
-                    title: task.title,
-                    body: "\(task.title) is due tomorrow.",
+                    id: "due-tomorrow-\(id)",
+                    title: reminder.label,
+                    body: "\(reminder.label) is tomorrow.",
                     dateComponents: dateComponents
                 )
             }
         } else if daysRemaining == 0 {
-            // Due today — remind in the morning (9 AM)
             var dateComponents = DateComponents()
             dateComponents.hour = 9
             dateComponents.minute = 0
@@ -138,14 +136,13 @@ class NotificationService: ObservableObject {
             if let morningToday = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: now),
                morningToday > now {
                 scheduleNotification(
-                    id: "due-today-\(task.id)",
-                    title: task.title,
-                    body: "\(task.title) is due today.",
+                    id: "due-today-\(id)",
+                    title: reminder.label,
+                    body: "\(reminder.label) is today.",
                     dateComponents: dateComponents
                 )
             }
 
-            // Also remind in the evening if still not done
             var eveningComponents = DateComponents()
             eveningComponents.hour = reminderHour
             eveningComponents.minute = reminderMinute
@@ -153,14 +150,13 @@ class NotificationService: ObservableObject {
             if let eveningToday = calendar.date(bySettingHour: reminderHour, minute: reminderMinute, second: 0, of: now),
                eveningToday > now {
                 scheduleNotification(
-                    id: "due-today-evening-\(task.id)",
-                    title: task.title,
-                    body: "\(task.title) is due today. You still have time.",
+                    id: "due-today-evening-\(id)",
+                    title: reminder.label,
+                    body: "\(reminder.label) is today. You still have time.",
                     dateComponents: eveningComponents
                 )
             }
         } else if daysRemaining < 0 && daysRemaining >= -3 {
-            // Carried over (up to 3 days) — gentle morning reminder
             var dateComponents = DateComponents()
             dateComponents.hour = 9
             dateComponents.minute = 0
@@ -169,9 +165,9 @@ class NotificationService: ObservableObject {
             if let morningToday = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: now),
                morningToday > now {
                 scheduleNotification(
-                    id: "overdue-\(task.id)",
-                    title: task.title,
-                    body: "\(task.title) has been waiting for \(overdueDays) day\(overdueDays == 1 ? "" : "s").",
+                    id: "overdue-\(id)",
+                    title: reminder.label,
+                    body: "\(reminder.label) has been waiting for \(overdueDays) day\(overdueDays == 1 ? "" : "s").",
                     dateComponents: dateComponents
                 )
             }

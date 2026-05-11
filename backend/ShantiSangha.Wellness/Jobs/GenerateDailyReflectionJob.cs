@@ -12,7 +12,7 @@ namespace ShantiSangha.Wellness.Jobs;
 public class GenerateDailyReflectionJob(
     WellnessDbContext db,
     Kernel kernel,
-    IGoalQueryService goalQuery,
+    IPracticeQueryService practiceQuery,
     IProfileQueryService profileQuery,
     IPushNotificationService pushService,
     ILogger<GenerateDailyReflectionJob> logger)
@@ -27,7 +27,7 @@ public class GenerateDailyReflectionJob(
         try
         {
             var displayName = await profileQuery.GetDisplayNameAsync(userId);
-            var goals = await goalQuery.GetActiveGoalsForContextAsync(userId, today);
+            var practices = await practiceQuery.GetActivePracticesForContextAsync(userId, today);
 
             // Get previous reflections — now used for CONTINUITY, not just deduplication
             var previousReflections = await db.DailyReflections
@@ -49,21 +49,16 @@ public class GenerateDailyReflectionJob(
             // Goals with pattern data
             var milestoneThresholds = new HashSet<int> { 7, 14, 30, 60, 100, 365 };
             var milestonesHitToday = new List<string>();
-            foreach (var g in goals)
+            foreach (var p in practices)
             {
-                var streak = g.CurrentStreak > 0 ? $" (current streak: {g.CurrentStreak} days, longest: {g.LongestStreak})" : " (no active streak)";
-                var why = !string.IsNullOrWhiteSpace(g.DeeperWhy) ? $" Their deeper why: \"{g.DeeperWhy}\"" : "";
-                var checkedIn = g.CheckedInToday switch
-                {
-                    true => " — completed today",
-                    false => " — not yet done today",
-                    _ => ""
-                };
-                contextParts.Add($"- {g.Type} goal: {g.Title}{streak}{checkedIn}{why}");
+                var streak = p.CurrentStreak > 0 ? $" (current streak: {p.CurrentStreak} days, longest: {p.LongestStreak})" : " (no active streak)";
+                var why = !string.IsNullOrWhiteSpace(p.DeeperWhy) ? $" Their deeper why: \"{p.DeeperWhy}\"" : "";
+                var checkedIn = p.CheckedInToday ? " — completed today" : " — not yet done today";
+                contextParts.Add($"- practice: {p.Title}{streak}{checkedIn}{why}");
 
-                if (g.CheckedInToday == true && milestoneThresholds.Contains(g.CurrentStreak))
+                if (p.CheckedInToday && milestoneThresholds.Contains(p.CurrentStreak))
                 {
-                    milestonesHitToday.Add($"{g.Title} reached {g.CurrentStreak} days today");
+                    milestonesHitToday.Add($"{p.Title} reached {p.CurrentStreak} days today");
                 }
             }
 
@@ -242,8 +237,8 @@ public class GenerateDailyReflectionJob(
               themes, their patterns. A reflection that could apply to anyone is
               worthless.
             - ONLY speak to what they HAVE done, never what they haven't.
-              Do not mention incomplete goals, dormant commitments, or missed
-              days. If a goal has no activity, ignore it completely.
+              Do not mention incomplete practices, dormant commitments, or missed
+              days. If a practice has no activity, ignore it completely.
             - Never give advice or instructions. No "try to..." or "consider..."
             - Never use exclamation marks. Never be peppy.
             - Never judge, evaluate, or imply they should do more.

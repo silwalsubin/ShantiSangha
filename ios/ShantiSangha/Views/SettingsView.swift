@@ -58,10 +58,12 @@ struct SettingsView: View {
                                     let result = await notifications.requestPermission()
                                     if !result { notifications.isEnabled = false }
                                 }
-                                notifications.reschedule(tasks: TaskRepository.shared.tasks)
+                                notifications.reschedule(
+                                    practices: PracticeRepository.shared.practices,
+                                    reminders: ReminderRepository.shared.reminders)
                             }
                         } else {
-                            notifications.reschedule(tasks: [])
+                            notifications.reschedule(practices: [], reminders: [])
                         }
                     }
 
@@ -299,7 +301,9 @@ struct SettingsView: View {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Done") {
                             showTimePicker = false
-                            notifications.reschedule(tasks: TaskRepository.shared.tasks)
+                            notifications.reschedule(
+                                practices: PracticeRepository.shared.practices,
+                                reminders: ReminderRepository.shared.reminders)
                         }
                         .foregroundColor(.sacredGold)
                     }

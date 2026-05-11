@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import SacredIcons from '@/components/icons/SacredIcons.vue'
-import type { Task } from '@/types'
+import type { PracticeTask } from '@/types'
 
 const props = defineProps<{
-  task: Task
+  task: PracticeTask
 }>()
 
 const emit = defineEmits<{
@@ -13,30 +13,14 @@ const emit = defineEmits<{
   undo: [id: string]
   delete: [id: string]
   navigate: [id: string]
-  progress: [id: string, value: number]
 }>()
 
 const showMenu = ref(false)
-const showProgress = ref(false)
 const confirmDelete = ref(false)
-const progressValue = ref(props.task.progress)
-
-const isOverdue = props.task.type === 'OneTime' && props.task.daysRemaining != null && props.task.daysRemaining <= 0
 
 function onDone() { showMenu.value = false; emit('done', props.task.id) }
 function onSkip() { showMenu.value = false; emit('skip', props.task.id) }
 function onUndo() { showMenu.value = false; emit('undo', props.task.id) }
-
-function openProgress() {
-  showMenu.value = false
-  progressValue.value = props.task.progress
-  showProgress.value = true
-}
-
-function saveProgress() {
-  showProgress.value = false
-  emit('progress', props.task.id, progressValue.value)
-}
 </script>
 
 <template>
@@ -45,15 +29,13 @@ function saveProgress() {
     :class="
       task.checkedIn
         ? 'border-sacred-green-border bg-sacred-green-bg'
-        : isOverdue
-          ? 'border-sacred-red-border bg-sacred-red-bg'
-          : 'border-sacred-border-subtle bg-sacred-bg-card-inner'
+        : 'border-sacred-border-subtle bg-sacred-bg-card-inner'
     "
   >
     <div class="flex items-center gap-3">
       <!-- Type icon -->
       <div class="flex h-6 w-6 shrink-0 items-center justify-center">
-        <SacredIcons :name="task.type === 'Recurring' ? 'recurring' : 'target'" :size="14" :class="task.type === 'Recurring' ? 'text-sacred-muted-light' : 'text-sacred-gold'" />
+        <SacredIcons name="recurring" :size="14" class="text-sacred-muted-light" />
       </div>
 
       <!-- Title -->
@@ -63,11 +45,6 @@ function saveProgress() {
         :aria-label="`View details for ${task.title}`"
         @click="emit('navigate', task.id)"
       >{{ task.title }}</button>
-
-      <!-- Milestone info -->
-      <span v-if="task.type === 'OneTime' && task.daysRemaining != null" class="shrink-0 font-serif text-xs" :class="task.daysRemaining <= 0 ? 'font-bold text-sacred-red' : 'text-sacred-gold'">
-        {{ task.daysRemaining > 0 ? `${task.daysRemaining}d` : task.daysRemaining === 0 ? 'Today' : `${Math.abs(task.daysRemaining)}d over` }}
-      </span>
 
       <!-- Three-dot menu -->
       <button
@@ -81,30 +58,6 @@ function saveProgress() {
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
       </button>
-    </div>
-
-    <!-- Progress bar for milestones -->
-    <div v-if="task.type === 'OneTime' && !showProgress" class="mt-2 ml-9">
-      <div class="h-1.5 w-full rounded-full bg-sacred-border-subtle">
-        <div class="h-1.5 rounded-full bg-gradient-to-r from-sacred-gold to-sacred-gold-dark transition-all duration-300" :style="{ width: `${task.progress}%` }" />
-      </div>
-      <p class="mt-1 text-[10px] text-sacred-muted">{{ task.progress }}% complete</p>
-    </div>
-
-    <!-- Progress slider (inline edit) -->
-    <div v-if="showProgress" class="mt-3 ml-9">
-      <input
-        v-model.number="progressValue"
-        type="range" min="0" max="100" step="5"
-        class="w-full accent-sacred-gold"
-      />
-      <div class="mt-1 flex items-center justify-between">
-        <span class="text-xs font-medium text-sacred-gold">{{ progressValue }}%</span>
-        <div class="flex gap-2">
-          <button @click="showProgress = false" class="text-xs text-sacred-muted hover:text-sacred-text-secondary">Cancel</button>
-          <button @click="saveProgress" class="text-xs font-semibold text-sacred-gold hover:text-sacred-gold-dark">Save</button>
-        </div>
-      </div>
     </div>
 
     <!-- Dropdown menu -->
@@ -123,16 +76,6 @@ function saveProgress() {
       >
         <SacredIcons name="check" :size="14" class="text-sacred-green" />
         Mark complete
-      </button>
-
-      <button
-        v-if="task.type === 'OneTime' && !task.checkedIn"
-        @click="openProgress"
-        role="menuitem"
-        class="flex w-full items-center gap-2.5 px-4 py-2.5 text-left text-sm text-sacred-text transition duration-200 hover:bg-sacred-bg-hover"
-      >
-        <SacredIcons name="dharma" :size="14" class="text-sacred-gold" />
-        Update progress
       </button>
 
       <button
@@ -166,7 +109,7 @@ function saveProgress() {
         Delete
       </button>
       <div v-if="confirmDelete" class="px-4 py-2.5">
-        <p class="text-xs text-sacred-text-secondary">This will delete the task and all its history.</p>
+        <p class="text-xs text-sacred-text-secondary">This will delete the practice and all its history.</p>
         <div class="mt-2 flex gap-2">
           <button
             @click="confirmDelete = false; showMenu = false; emit('delete', task.id)"

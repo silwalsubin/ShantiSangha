@@ -44,8 +44,13 @@ struct ConnectionDetailView: View {
     @State private var showAvatarPickerSheet = false
 
     // nil = sheet closed; .new = adding; .edit(id) = editing existing
-    @State private var dateEditTarget: ConnectionDateEditTarget?
+    @State private var dateEditTarget: ReminderEditTarget?
     @State private var datesExpanded = false
+
+    /// Connection-scoped reminders fetched via `/api/reminders?connectionId=…`.
+    /// Loaded on first appear and refreshed after each create/update/delete.
+    @State private var dates: [Reminder] = []
+    @State private var datesLoading = false
 
     private var connection: Connection? {
         vm.connections.first(where: { $0.id == connectionId })
@@ -93,7 +98,7 @@ struct ConnectionDetailView: View {
         .onAppear { seedDrafts() }
         .onChange(of: connection?.id) { _, _ in seedDrafts(force: true) }
         .sheet(item: $dateEditTarget) { target in
-            ConnectionDateEditSheet(
+            ReminderEditSheet(
                 target: target,
                 onSave: { label, date, recurrence in
                     await saveDate(
@@ -106,6 +111,7 @@ struct ConnectionDetailView: View {
                     ? { await deleteDate(target: target) }
                     : nil)
         }
+        .task(id: connectionId) { await loadDates() }
         .sheet(isPresented: $showAvatarPickerSheet) {
             if let c = connection {
                 SacredFormSheet(
@@ -364,16 +370,12 @@ struct ConnectionDetailView: View {
     private func datesSection(_ c: Connection) -> some View {
         VStack(alignment: .leading, spacing: SacredSpacing.xs) {
             sectionLabel("IMPORTANT DATES")
-            if c.dates.isEmpty {
+            if dates.isEmpty {
                 emptyDatesPresets
             } else {
                 SacredListCard {
                     VStack(spacing: 0) {
-                        // Always show the first date so the section
-                        // never reads as empty; "+ N more" lets the
-                        // rest live one tap away when the user has
-                        // accumulated several.
-                        let visible = datesExpanded ? c.dates : Array(c.dates.prefix(1))
+                        let visible = datesExpanded ? dates : Array(dates.prefix(1))
                         ForEach(Array(visible.enumerated()), id: \.element.id) { index, entry in
                             SacredDateRow(
                                 date: parseISODate(entry.date) ?? Date(),
@@ -383,9 +385,9 @@ struct ConnectionDetailView: View {
                                 Divider().padding(.leading, 64)
                             }
                         }
-                        if c.dates.count > 1 {
+                        if dates.count > 1 {
                             Divider().padding(.leading, 16)
-                            datesToggleRow(remaining: c.dates.count - 1)
+                            datesToggleRow(remaining: dates.count - 1)
                         }
                         Divider().padding(.leading, 16)
                         addDateButton(label: "Add another")
@@ -451,7 +453,7 @@ struct ConnectionDetailView: View {
 
     private func datePresetRow(label: String?, subtitle: String) -> some View {
         Button {
-            dateEditTarget = .new(initialLabel: label)
+            dateEditTarget = .new(initialLabel: label, connectionId: connectionId)
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: label == nil ? "plus.circle" : "calendar")
@@ -480,7 +482,7 @@ struct ConnectionDetailView: View {
 
     private func addDateButton(label: String) -> some View {
         Button {
-            dateEditTarget = .new()
+            dateEditTarget = .new(initialLabel: nil, connectionId: connectionId)
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "plus")
@@ -793,43 +795,58 @@ struct ConnectionDetailView: View {
     }
 
     private func saveDate(
-        target: ConnectionDateEditTarget,
+        target: ReminderEditTarget,
         label: String,
         date: String,
-        recurrence: ConnectionDateRecurrence
+        recurrence: ReminderRecurrence
     ) async {
         guard let c = connection else { return }
         do {
             switch target {
             case .new:
-                _ = try await vm.addDate(
-                    connectionId: c.id,
+                _ = try await ReminderRepository.shared.create(
                     label: label,
                     date: date,
-                    recurrence: recurrence)
+                    recurrence: recurrence,
+                    remindersEnabled: true,
+                    connectionId: c.id)
             case .edit(let entry):
-                _ = try await vm.updateDate(
-                    connectionId: c.id,
-                    dateId: entry.id,
+                _ = try await ReminderRepository.shared.update(
+                    id: entry.id,
                     label: label,
                     date: date,
                     recurrence: recurrence)
             }
             saveError = nil
             dateEditTarget = nil
+            await loadDates()
         } catch {
             saveError = "Couldn't save. Try again."
         }
     }
 
-    private func deleteDate(target: ConnectionDateEditTarget) async {
-        guard let c = connection, case .edit(let entry) = target else { return }
+    private func deleteDate(target: ReminderEditTarget) async {
+        guard case .edit(let entry) = target else { return }
         do {
-            try await vm.deleteDate(connectionId: c.id, dateId: entry.id)
+            try await ReminderRepository.shared.delete(id: entry.id)
             saveError = nil
             dateEditTarget = nil
+            await loadDates()
         } catch {
             saveError = "Couldn't delete. Try again."
+        }
+    }
+
+    /// Fetch this connection's important dates from the new reminders endpoint.
+    private func loadDates() async {
+        datesLoading = true
+        defer { datesLoading = false }
+        do {
+            dates = try await ReminderRepository.shared.list(connectionId: connectionId)
+        } catch {
+            if !error.isCancellation {
+                AppLogger.shared.error("Connection", "Failed to load dates: \(error)")
+            }
         }
     }
 
@@ -843,32 +860,6 @@ struct ConnectionDetailView: View {
     }
 }
 
-/// Sheet identity for the add/edit-date flow. `.new()` opens an empty
-/// form; `.new(initialLabel:)` pre-fills the label so the empty-state
-/// preset rows can hand the user a one-tap "Birthday" / "Anniversary"
-/// / "Day we met" path; `.edit(entry)` pre-fills the whole row and
-/// offers a destructive "Delete" action.
-enum ConnectionDateEditTarget: Identifiable {
-    case new(initialLabel: String? = nil)
-    case edit(ConnectionDate)
-
-    var id: String {
-        switch self {
-        case .new: return "new"
-        case .edit(let entry): return entry.id.uuidString
-        }
-    }
-
-    var isEditing: Bool {
-        if case .edit = self { return true }
-        return false
-    }
-
-    var initialLabel: String? {
-        if case .new(let label) = self { return label }
-        return nil
-    }
-}
 
 private extension String {
     var trimmed: String {

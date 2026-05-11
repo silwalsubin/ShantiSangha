@@ -2,57 +2,81 @@
 /**
  * Home page — "What needs your attention today?"
  *
- * Shows all active tasks grouped by type (Recurring Tasks, Milestones).
- * Completed and skipped tasks collapse into expandable summaries.
- * Inline form for creating new tasks.
- *
- * Uses: useGoals composable for all data and actions.
+ * Shows pending practices (recurring) and reminders (date-based)
+ * grouped by section. Completed and skipped items collapse into
+ * expandable summaries. Inline form for creating new items.
  */
 
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useGoals } from '@/composables/useGoals'
+import { usePractices } from '@/composables/usePractices'
+import { useReminders } from '@/composables/useReminders'
+import { useLocalDate } from '@/composables/useLocalDate'
 import SacredIcons from '@/components/icons/SacredIcons.vue'
 import TaskItem from '@/components/TaskItem.vue'
+import ReminderItem from '@/components/ReminderItem.vue'
 
 const router = useRouter()
+const { today } = useLocalDate()
+
 const {
-  loading, hasTasks,
-  recurringTasks, milestoneTasks, completedTasks, skippedTasks,
-  load, checkIn, undoCheckIn, updateProgress, deleteGoal, createGoal,
-} = useGoals()
+  loading: practicesLoading,
+  hasPractices,
+  pendingPractices, completedPractices, skippedPractices,
+  loadPractices, checkIn, undoCheckIn, deletePractice, createPractice,
+} = usePractices()
+
+const {
+  loading: remindersLoading,
+  activeReminders, completedReminders,
+  loadReminders, createReminder, completeReminder, deleteReminder,
+} = useReminders()
+
+const loading = computed(() => practicesLoading.value || remindersLoading.value)
+const hasAnything = computed(() => hasPractices.value || activeReminders.value.length > 0 || completedReminders.value.length > 0)
 
 // Collapsed groups
 const showCompleted = ref(false)
 const showSkipped = ref(false)
 
-// New task form
-const showNewGoalForm = ref(false)
-const newGoalTitle = ref('')
-const newGoalType = ref<'Recurring' | 'OneTime'>('Recurring')
-const newGoalTargetDate = ref('')
-const newGoalSaving = ref(false)
+// New item form
+const showNewForm = ref(false)
+const newKind = ref<'practice' | 'reminder'>('practice')
+const newTitle = ref('')
+const newDate = ref('')
+const newSaving = ref(false)
 
-async function onCreateGoal() {
-  if (!newGoalTitle.value.trim()) return
-  if (newGoalType.value === 'OneTime' && !newGoalTargetDate.value) return
-  newGoalSaving.value = true
+async function onCreate() {
+  const title = newTitle.value.trim()
+  if (!title) return
+  if (newKind.value === 'reminder' && !newDate.value) return
+  newSaving.value = true
   try {
-    await createGoal(newGoalTitle.value.trim(), newGoalType.value, newGoalTargetDate.value || undefined)
-    newGoalTitle.value = ''
-    newGoalType.value = 'Recurring'
-    newGoalTargetDate.value = ''
-    showNewGoalForm.value = false
+    if (newKind.value === 'practice') {
+      await createPractice(title)
+    } else {
+      await createReminder({ label: title, date: newDate.value })
+    }
+    newTitle.value = ''
+    newDate.value = ''
+    newKind.value = 'practice'
+    showNewForm.value = false
   } catch {} finally {
-    newGoalSaving.value = false
+    newSaving.value = false
   }
 }
 
-function onNavigate(id: string) {
-  router.push(`/app/journey/goals/${id}`)
+function onCompleteReminder(id: string) { completeReminder(id, true) }
+function onUncompleteReminder(id: string) { completeReminder(id, false) }
+
+function onNavigatePractice(id: string) {
+  router.push(`/app/journey/practices/${id}`)
 }
 
-onMounted(() => load())
+onMounted(async () => {
+  await Promise.all([loadPractices(), loadReminders()])
+  void today
+})
 </script>
 
 <template>
@@ -65,112 +89,118 @@ onMounted(() => load())
       <div v-for="i in 2" :key="i" class="h-14 animate-pulse rounded-2xl bg-sacred-bg-pulse" />
     </div>
 
-    <!-- No tasks -->
-    <div v-else-if="!hasTasks && !showNewGoalForm" class="mt-6 text-center">
-      <p class="text-sm text-sacred-text-secondary">You haven't set any tasks yet.</p>
+    <!-- Empty state -->
+    <div v-else-if="!hasAnything && !showNewForm" class="mt-6 text-center">
+      <p class="text-sm text-sacred-text-secondary">You haven't set anything yet.</p>
       <button
-        @click="showNewGoalForm = true"
+        @click="showNewForm = true"
         class="mt-4 min-h-[44px] rounded-full bg-gradient-to-r from-sacred-gold to-sacred-gold-dark px-6 py-3 text-sm font-semibold text-white shadow-sacred-button transition duration-200 active:scale-[0.97]"
       >
-        Set your first task
+        Set your first practice
       </button>
     </div>
 
-    <!-- New task form -->
-    <div v-if="showNewGoalForm" class="mt-6">
+    <!-- New item form -->
+    <div v-if="showNewForm" class="mt-6">
       <div class="mb-3 flex justify-center gap-2">
-        <button @click="newGoalType = 'Recurring'" class="flex min-h-[44px] items-center gap-1.5 rounded-2xl border px-4 py-2.5 text-xs font-semibold transition duration-200 active:scale-[0.97]" :class="newGoalType === 'Recurring' ? 'border-sacred-gold text-sacred-gold bg-sacred-gold-light' : 'border-sacred-border text-sacred-text-secondary'">
+        <button @click="newKind = 'practice'" class="flex min-h-[44px] items-center gap-1.5 rounded-2xl border px-4 py-2.5 text-xs font-semibold transition duration-200 active:scale-[0.97]" :class="newKind === 'practice' ? 'border-sacred-gold text-sacred-gold bg-sacred-gold-light' : 'border-sacred-border text-sacred-text-secondary'">
           <SacredIcons name="flame" :size="14" /> Daily practice
         </button>
-        <button @click="newGoalType = 'OneTime'" class="flex min-h-[44px] items-center gap-1.5 rounded-2xl border px-4 py-2.5 text-xs font-semibold transition duration-200 active:scale-[0.97]" :class="newGoalType === 'OneTime' ? 'border-sacred-gold text-sacred-gold bg-sacred-gold-light' : 'border-sacred-border text-sacred-text-secondary'">
-          <SacredIcons name="target" :size="14" /> Reach a milestone
+        <button @click="newKind = 'reminder'" class="flex min-h-[44px] items-center gap-1.5 rounded-2xl border px-4 py-2.5 text-xs font-semibold transition duration-200 active:scale-[0.97]" :class="newKind === 'reminder' ? 'border-sacred-gold text-sacred-gold bg-sacred-gold-light' : 'border-sacred-border text-sacred-text-secondary'">
+          <SacredIcons name="target" :size="14" /> Reminder
         </button>
       </div>
-      <input v-model="newGoalTitle" type="text" :placeholder="newGoalType === 'Recurring' ? 'I want to practice...' : 'I want to achieve...'" class="w-full rounded-2xl border border-sacred-border bg-sacred-bg-warm px-4 py-3 text-sm text-sacred-text placeholder-sacred-muted-light outline-none transition duration-200 focus:border-sacred-gold focus:ring-1 focus:ring-sacred-gold" @keyup.enter="newGoalType === 'Recurring' ? onCreateGoal() : undefined" />
-      <input v-if="newGoalType === 'OneTime'" v-model="newGoalTargetDate" type="date" class="mt-2 w-full rounded-2xl border border-sacred-border bg-sacred-bg-warm px-4 py-3 text-sm text-sacred-text outline-none transition duration-200 focus:border-sacred-gold focus:ring-1 focus:ring-sacred-gold" />
+      <input v-model="newTitle" type="text" :placeholder="newKind === 'practice' ? 'I want to practice...' : 'Remind me to...'" class="w-full rounded-2xl border border-sacred-border bg-sacred-bg-warm px-4 py-3 text-sm text-sacred-text placeholder-sacred-muted-light outline-none transition duration-200 focus:border-sacred-gold focus:ring-1 focus:ring-sacred-gold" @keyup.enter="newKind === 'practice' ? onCreate() : undefined" />
+      <input v-if="newKind === 'reminder'" v-model="newDate" type="date" class="mt-2 w-full rounded-2xl border border-sacred-border bg-sacred-bg-warm px-4 py-3 text-sm text-sacred-text outline-none transition duration-200 focus:border-sacred-gold focus:ring-1 focus:ring-sacred-gold" />
       <div class="mt-3 flex justify-center gap-2">
-        <button @click="onCreateGoal" :disabled="newGoalSaving || !newGoalTitle.trim() || (newGoalType === 'OneTime' && !newGoalTargetDate)" class="min-h-[44px] rounded-full bg-gradient-to-r from-sacred-gold to-sacred-gold-dark px-6 py-2.5 text-sm font-semibold text-white shadow-sacred-button transition duration-200 active:scale-[0.97] disabled:opacity-60">
-          {{ newGoalSaving ? 'Saving...' : 'Save' }}
+        <button @click="onCreate" :disabled="newSaving || !newTitle.trim() || (newKind === 'reminder' && !newDate)" class="min-h-[44px] rounded-full bg-gradient-to-r from-sacred-gold to-sacred-gold-dark px-6 py-2.5 text-sm font-semibold text-white shadow-sacred-button transition duration-200 active:scale-[0.97] disabled:opacity-60">
+          {{ newSaving ? 'Saving...' : 'Save' }}
         </button>
-        <button @click="showNewGoalForm = false; newGoalType = 'Recurring'; newGoalTargetDate = ''" class="min-h-[44px] rounded-full border border-sacred-border-strong px-5 py-2.5 text-sm font-medium text-sacred-text-secondary transition duration-200 active:scale-[0.97]">
+        <button @click="showNewForm = false; newKind = 'practice'; newDate = ''" class="min-h-[44px] rounded-full border border-sacred-border-strong px-5 py-2.5 text-sm font-medium text-sacred-text-secondary transition duration-200 active:scale-[0.97]">
           Cancel
         </button>
       </div>
     </div>
 
-    <!-- Recurring Tasks -->
-    <div v-if="recurringTasks.length > 0" class="mt-6">
+    <!-- Practices -->
+    <div v-if="pendingPractices.length > 0" class="mt-6">
       <div class="flex items-center gap-1.5 mb-3">
         <SacredIcons name="recurring" :size="14" class="text-sacred-label" />
-        <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-sacred-label">Recurring Tasks</p>
+        <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-sacred-label">Practices</p>
       </div>
       <ul class="space-y-3">
         <TaskItem
-          v-for="task in recurringTasks" :key="task.id" :task="task"
+          v-for="task in pendingPractices" :key="task.id" :task="task"
           @done="checkIn($event, true)" @skip="checkIn($event, false)"
-          @undo="undoCheckIn" @navigate="onNavigate"
-          @progress="updateProgress" @delete="deleteGoal"
+          @undo="undoCheckIn" @navigate="onNavigatePractice"
+          @delete="deletePractice"
         />
       </ul>
     </div>
 
-    <!-- Milestones -->
-    <div v-if="milestoneTasks.length > 0" class="mt-6">
+    <!-- Reminders -->
+    <div v-if="activeReminders.length > 0" class="mt-6">
       <div class="flex items-center gap-1.5 mb-3">
         <SacredIcons name="target" :size="14" class="text-sacred-label" />
-        <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-sacred-label">Milestones</p>
+        <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-sacred-label">Reminders</p>
       </div>
       <ul class="space-y-3">
-        <TaskItem
-          v-for="task in milestoneTasks" :key="task.id" :task="task"
-          @done="checkIn($event, true)" @skip="checkIn($event, false)"
-          @undo="undoCheckIn" @navigate="onNavigate"
-          @progress="updateProgress" @delete="deleteGoal"
+        <ReminderItem
+          v-for="r in activeReminders" :key="r.id" :reminder="r"
+          @complete="onCompleteReminder"
+          @uncomplete="onUncompleteReminder"
+          @delete="deleteReminder"
         />
       </ul>
     </div>
 
     <!-- Completed -->
-    <div v-if="completedTasks.length > 0" class="mt-4">
+    <div v-if="completedPractices.length > 0 || completedReminders.length > 0" class="mt-4">
       <button @click="showCompleted = !showCompleted" class="flex min-h-[44px] items-center gap-1.5 text-xs font-medium text-sacred-green transition duration-200 hover:text-sacred-green-dark">
         <SacredIcons name="check" :size="12" />
-        {{ completedTasks.length }} completed
+        {{ completedPractices.length + completedReminders.length }} completed
         <span class="text-[10px]">{{ showCompleted ? '&#9650;' : '&#9660;' }}</span>
       </button>
       <ul v-if="showCompleted" class="mt-2 space-y-3">
         <TaskItem
-          v-for="task in completedTasks" :key="task.id" :task="task"
+          v-for="task in completedPractices" :key="task.id" :task="task"
           @done="checkIn($event, true)" @skip="checkIn($event, false)"
-          @undo="undoCheckIn" @navigate="onNavigate"
-          @progress="updateProgress" @delete="deleteGoal"
+          @undo="undoCheckIn" @navigate="onNavigatePractice"
+          @delete="deletePractice"
+        />
+        <ReminderItem
+          v-for="r in completedReminders" :key="r.id" :reminder="r"
+          @complete="onCompleteReminder"
+          @uncomplete="onUncompleteReminder"
+          @delete="deleteReminder"
         />
       </ul>
     </div>
 
-    <!-- Skipped -->
-    <div v-if="skippedTasks.length > 0" class="mt-2">
+    <!-- Skipped practices -->
+    <div v-if="skippedPractices.length > 0" class="mt-2">
       <button @click="showSkipped = !showSkipped" class="flex min-h-[44px] items-center gap-1.5 text-xs font-medium text-sacred-muted transition duration-200 hover:text-sacred-text-secondary">
         <SacredIcons name="skip" :size="12" />
-        {{ skippedTasks.length }} skipped
+        {{ skippedPractices.length }} skipped
         <span class="text-[10px]">{{ showSkipped ? '&#9650;' : '&#9660;' }}</span>
       </button>
       <ul v-if="showSkipped" class="mt-2 space-y-3">
         <TaskItem
-          v-for="task in skippedTasks" :key="task.id" :task="task"
+          v-for="task in skippedPractices" :key="task.id" :task="task"
           @done="checkIn($event, true)" @skip="checkIn($event, false)"
-          @undo="undoCheckIn" @navigate="onNavigate"
-          @progress="updateProgress" @delete="deleteGoal"
+          @undo="undoCheckIn" @navigate="onNavigatePractice"
+          @delete="deletePractice"
         />
       </ul>
     </div>
 
-    <!-- Add task button -->
+    <!-- Add button -->
     <button
-      v-if="hasTasks && !showNewGoalForm"
-      @click="showNewGoalForm = true"
+      v-if="hasAnything && !showNewForm"
+      @click="showNewForm = true"
       class="mt-4 flex min-h-[44px] items-center justify-center gap-1.5 text-xs font-medium text-sacred-gold transition duration-200 hover:text-sacred-gold-dark active:scale-[0.97]"
     >
-      + Add task
+      + Add
     </button>
   </div>
 </template>

@@ -116,52 +116,6 @@ final class CircleViewModel: ObservableObject {
         connections.removeAll { $0.id == connectionId }
     }
 
-    /// Append a new "important date". Re-fetches the parent connection
-    /// so the embedded `dates` list reflects server-side ordering.
-    @discardableResult
-    func addDate(
-        connectionId: UUID,
-        label: String,
-        date: String,
-        recurrence: ConnectionDateRecurrence
-    ) async throws -> ConnectionDate {
-        let created = try await ConnectionsAPI.addDate(
-            connectionId,
-            request: AddConnectionDateRequest(
-                label: label,
-                date: date,
-                recurrence: recurrence))
-        let refreshed = try await ConnectionsAPI.get(connectionId)
-        replaceInPlace(refreshed)
-        return created
-    }
-
-    @discardableResult
-    func updateDate(
-        connectionId: UUID,
-        dateId: UUID,
-        label: String,
-        date: String,
-        recurrence: ConnectionDateRecurrence
-    ) async throws -> ConnectionDate {
-        let updated = try await ConnectionsAPI.updateDate(
-            connectionId,
-            dateId: dateId,
-            request: UpdateConnectionDateRequest(
-                label: label,
-                date: date,
-                recurrence: recurrence))
-        let refreshed = try await ConnectionsAPI.get(connectionId)
-        replaceInPlace(refreshed)
-        return updated
-    }
-
-    func deleteDate(connectionId: UUID, dateId: UUID) async throws {
-        try await ConnectionsAPI.deleteDate(connectionId, dateId: dateId)
-        let refreshed = try await ConnectionsAPI.get(connectionId)
-        replaceInPlace(refreshed)
-    }
-
     /// Owner-private avatar for this connection. The upload returns the
     /// refreshed `Connection` carrying a fresh presigned download URL,
     /// so we splice it in place rather than re-fetching.

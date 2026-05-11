@@ -76,11 +76,6 @@ struct JourneyView: View {
                                 .foregroundColor(.sacredText)
                         }
 
-                        if journey.summary.commitmentsFinished > 0 {
-                            Text("\(journey.summary.commitmentsFinished) commitment\(journey.summary.commitmentsFinished == 1 ? "" : "s") fulfilled")
-                                .font(.sacredSmall)
-                                .foregroundColor(.sacredGreen)
-                        }
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.bottom, 28)
@@ -153,10 +148,10 @@ struct JourneyView: View {
                         VStack(spacing: 0) {
                             ForEach(Array(journey.practices.enumerated()), id: \.element.id) { index, practice in
                                 NavigationLink {
-                                    GoalCalendarView(
-                                        goalId: practice.id,
-                                        goalTitle: practice.title,
-                                        goalCreatedAt: practice.days.first?.date ?? journey.from
+                                    PracticeCalendarView(
+                                        practiceId: practice.id,
+                                        practiceTitle: practice.title,
+                                        practiceCreatedAt: practice.days.first?.date ?? journey.from
                                     )
                                 } label: {
                                     HStack(spacing: 14) {
@@ -193,39 +188,6 @@ struct JourneyView: View {
                         .padding(.bottom, 28)
                     }
 
-                    // Fulfilled commitments
-                    if !journey.completedCommitments.isEmpty {
-                        Rectangle()
-                            .fill(Color.sacredMuted.opacity(0.12))
-                            .frame(height: 1)
-                            .padding(.bottom, 20)
-
-                        VStack(alignment: .leading, spacing: 0) {
-                            Text("FULFILLED")
-                                .font(.sacredSectionLabel)
-                                .tracking(3)
-                                .foregroundColor(.sacredLabel)
-                                .padding(.bottom, 12)
-
-                            ForEach(Array(journey.completedCommitments.enumerated()), id: \.element.id) { index, c in
-                                HStack(spacing: 12) {
-                                    Image(systemName: "leaf.fill")
-                                        .font(.sacredSmall)
-                                        .foregroundColor(.sacredGreen)
-                                    Text(c.title)
-                                        .font(.sacredTextMedium)
-                                        .foregroundColor(.sacredText)
-                                }
-                                .padding(.vertical, 10)
-
-                                if index < journey.completedCommitments.count - 1 {
-                                    Divider()
-                                        .padding(.leading, 36)
-                                }
-                            }
-                        }
-                    }
-
                 } else {
                     VStack(spacing: 14) {
                         Text("Start your practices to see your journey unfold.")
@@ -248,8 +210,8 @@ struct JourneyView: View {
         .navigationTitle("Journey")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(isPresented: $showNewTask) {
-            NewTaskView { title, type, targetDate, deeperWhy in
-                await taskVM.createTask(title: title, type: type, targetDate: targetDate, deeperWhy: deeperWhy)
+            NewPracticeView { title, deeperWhy in
+                await taskVM.createPractice(title: title, deeperWhy: deeperWhy)
                 await loadAll()
             }
         }
@@ -277,7 +239,7 @@ struct JourneyView: View {
         let (from, to) = selectedPeriod.dateRange
 
         do {
-            journey = try await api.get("/goals/journey?from=\(from)&to=\(to)")
+            journey = try await api.get("/practices/journey?from=\(from)&to=\(to)")
         } catch {
             if !error.isCancellation {
                 AppLogger.shared.error("Journey", "Failed to load journey: \(error)")
@@ -291,7 +253,7 @@ struct JourneyView: View {
 
     private func loadReflectionData(from: String, to: String) async {
         do {
-            let result: ReflectionResponse = try await api.get("/goals/journey/reflection?from=\(from)&to=\(to)")
+            let result: ReflectionResponse = try await api.get("/practices/journey/reflection?from=\(from)&to=\(to)")
             withAnimation(.easeIn(duration: 0.3)) { reflection = result.reflection }
         } catch {
             if !error.isCancellation {
@@ -378,7 +340,6 @@ struct JourneyData: Codable {
     let to: String
     let totalDays: Int
     let practices: [JourneyPractice]
-    let completedCommitments: [JourneyCommitment]
     let summary: JourneySummary
 }
 
@@ -401,13 +362,6 @@ struct JourneySummary: Codable {
     let practicesCompleted: Int
     let practicesPossible: Int
     let completionRate: Int
-    let commitmentsFinished: Int
-}
-
-struct JourneyCommitment: Codable, Identifiable {
-    let id: String
-    let title: String
-    let completedAt: String?
 }
 
 struct ReflectionResponse: Codable {

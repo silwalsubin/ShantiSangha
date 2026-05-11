@@ -258,11 +258,14 @@ struct ChatView: View {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
         do {
-            let tasks: [AppTask] = try await api.get("/goals/today?date=\(f.string(from: Date()))")
-            if let practice = tasks.first(where: { !$0.checkedIn && $0.type == .recurring }) {
+            let practices: [Practice] = try await api.get("/practices/today?date=\(f.string(from: Date()))")
+            if let practice = practices.first(where: { !$0.checkedIn }) {
                 openingPrompt = "You are carrying \(practice.title) today. What feels alive around it?"
-            } else if let commitment = tasks.first(where: { $0.type == .oneTime && $0.completedAt == nil }) {
-                openingPrompt = "\(commitment.title) is in your field today. What would help you meet it clearly?"
+                return
+            }
+            let reminders: [Reminder] = try await api.get("/reminders")
+            if let upcoming = reminders.first(where: { $0.completedAt == nil && $0.daysRemaining <= 7 }) {
+                openingPrompt = "\(upcoming.label) is in your field. What would help you meet it clearly?"
             }
         } catch {
             if !error.isCancellation {

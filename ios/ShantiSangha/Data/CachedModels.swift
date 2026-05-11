@@ -5,57 +5,48 @@ import SwiftData
 /// These mirror the API types but are persisted in SwiftData.
 
 @Model
-class CachedTask {
+class CachedPractice {
     @Attribute(.unique) var id: String
     var title: String
-    var type: String  // "Recurring" or "OneTime"
     var currentStreak: Int
     var longestStreak: Int
-    var daysRemaining: Int?
-    var progress: Int
     var checkedIn: Bool
     var completedToday: Bool?
     var lastSyncedAt: Date
     var hasPendingChanges: Bool
 
-    init(id: String, title: String, type: String, currentStreak: Int = 0,
-         longestStreak: Int = 0, daysRemaining: Int? = nil, progress: Int = 0,
+    init(id: String, title: String, currentStreak: Int = 0,
+         longestStreak: Int = 0,
          checkedIn: Bool = false, completedToday: Bool? = nil,
          hasPendingChanges: Bool = false) {
         self.id = id
         self.title = title
-        self.type = type
         self.currentStreak = currentStreak
         self.longestStreak = longestStreak
-        self.daysRemaining = daysRemaining
-        self.progress = progress
         self.checkedIn = checkedIn
         self.completedToday = completedToday
         self.lastSyncedAt = Date()
         self.hasPendingChanges = hasPendingChanges
     }
 
-    /// Convert to the view-layer AppTask type
-    func toAppTask() -> AppTask {
-        var task = AppTask.local(
-            id: id, title: title, type: type,
+    /// Convert to the view-layer Practice type
+    func toPractice() -> Practice {
+        var practice = Practice.local(
+            id: id, title: title,
             currentStreak: currentStreak, longestStreak: longestStreak,
-            daysRemaining: daysRemaining, progress: progress,
             checkedIn: checkedIn, completedToday: completedToday
         )
-        task.hasPendingChanges = hasPendingChanges
-        return task
+        practice.hasPendingChanges = hasPendingChanges
+        return practice
     }
 
     /// Update from an API response
-    func update(from task: AppTask) {
-        title = task.title
-        currentStreak = task.currentStreak
-        longestStreak = task.longestStreak
-        daysRemaining = task.daysRemaining
-        progress = task.progress
-        checkedIn = task.checkedIn
-        completedToday = task.completedToday
+    func update(from practice: Practice) {
+        title = practice.title
+        currentStreak = practice.currentStreak
+        longestStreak = practice.longestStreak
+        checkedIn = practice.checkedIn
+        completedToday = practice.completedToday
         lastSyncedAt = Date()
         hasPendingChanges = false
     }

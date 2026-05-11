@@ -1,34 +1,41 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useApi } from '@/composables/useApi'
+import { useLocalDate } from '@/composables/useLocalDate'
 import SacredIcons from '@/components/icons/SacredIcons.vue'
 
 const api = useApi()
+const { formatShortDate } = useLocalDate()
 
-// --- Goals state ---
-interface Goal {
+// --- Practices state ---
+interface Practice {
   id: string
   title: string
-  type: 'Recurring' | 'OneTime'
   currentStreak: number
   longestStreak: number
-  targetDate: string | null
-  completedAt: string | null
-  checkInCount: number
 }
 
-interface GoalHistory {
-  goalId: string
+interface PracticeHistory {
+  practiceId: string
   days: { date: string; completed: boolean }[]
 }
 
-const goals = ref<Goal[]>([])
-const goalsLoading = ref(true)
-const weekHistory = ref<Record<string, GoalHistory>>({})
+const practices = ref<Practice[]>([])
+const practicesLoading = ref(true)
+const weekHistory = ref<Record<string, PracticeHistory>>({})
 const weekHistoryLoading = ref(true)
 
-const recurringGoals = computed(() => goals.value.filter(g => g.type === 'Recurring'))
-const oneTimeGoals = computed(() => goals.value.filter(g => g.type === 'OneTime'))
+// --- Reminders state ---
+interface ReminderItem {
+  id: string
+  label: string
+  date: string
+  completed: boolean
+  daysRemaining: number
+}
+
+const reminders = ref<ReminderItem[]>([])
+const remindersLoading = ref(true)
 
 const conversationCount = ref(0)
 const journalCount = ref(0)
@@ -36,45 +43,38 @@ const voiceCount = ref(0)
 const statsLoading = ref(true)
 
 // --- Data loaders ---
-async function loadGoals() {
-  goalsLoading.value = true
+async function loadPractices() {
+  practicesLoading.value = true
   try {
-    const data = await api.get<any>('/goals')
-    const items = Array.isArray(data) ? data : (data?.goals || data?.items || [])
-    goals.value = items
-      .filter((g: any) => !g.archivedAt && !g.archived_at)
-      .map((g: any) => ({
-        id: g.id,
-        title: g.title,
-        type: g.type ?? 'Recurring',
-        currentStreak: g.currentStreak ?? g.current_streak ?? 0,
-        longestStreak: g.longestStreak ?? g.longest_streak ?? 0,
-        targetDate: g.targetDate ?? g.target_date ?? null,
-        completedAt: g.completedAt ?? g.completed_at ?? null,
-        checkInCount: g.checkInCount ?? g.check_in_count ?? g.progressNoteCount ?? g.progress_note_count ?? 0,
-      }))
+    const data = await api.get<any>('/practices')
+    const items = Array.isArray(data) ? data : (data?.practices || data?.items || [])
+    practices.value = items.map((p: any) => ({
+      id: p.id,
+      title: p.title,
+      currentStreak: p.currentStreak ?? 0,
+      longestStreak: p.longestStreak ?? 0,
+    }))
   } catch {
-    goals.value = []
+    practices.value = []
   } finally {
-    goalsLoading.value = false
+    practicesLoading.value = false
   }
 }
 
 async function loadWeekHistory() {
   weekHistoryLoading.value = true
   try {
-    // Load history for each goal for the last 7 days
-    const histories: Record<string, GoalHistory> = {}
-    for (const goal of recurringGoals.value) {
+    const histories: Record<string, PracticeHistory> = {}
+    for (const p of practices.value) {
       try {
-        const data = await api.get<any>(`/goals/${goal.id}/history?days=7`)
+        const data = await api.get<any>(`/practices/${p.id}/history?days=7`)
         const items = Array.isArray(data) ? data : (data?.checkins || data?.checkIns || data?.items || [])
-        histories[goal.id] = {
-          goalId: goal.id,
+        histories[p.id] = {
+          practiceId: p.id,
           days: buildWeekDays(items),
         }
       } catch {
-        histories[goal.id] = { goalId: goal.id, days: buildWeekDays([]) }
+        histories[p.id] = { practiceId: p.id, days: buildWeekDays([]) }
       }
     }
     weekHistory.value = histories
@@ -107,6 +107,27 @@ function dayLabel(dateStr: string): string {
   return d.toLocaleDateString('en-US', { weekday: 'narrow' })
 }
 
+async function loadReminders() {
+  remindersLoading.value = true
+  try {
+    const data = await api.get<any>('/reminders')
+    const items = Array.isArray(data) ? data : (data?.reminders || data?.items || [])
+    reminders.value = items
+      .filter((r: any) => !r.connectionId)
+      .map((r: any): ReminderItem => ({
+        id: r.id,
+        label: r.label,
+        date: typeof r.date === 'string' ? r.date : String(r.date),
+        completed: r.completedAt != null,
+        daysRemaining: r.daysRemaining ?? 0,
+      }))
+  } catch {
+    reminders.value = []
+  } finally {
+    remindersLoading.value = false
+  }
+}
+
 async function loadStats() {
   statsLoading.value = true
   try {
@@ -128,25 +149,17 @@ async function loadStats() {
   }
 }
 
-// --- Helpers ---
-function daysRemaining(dateStr: string | null): number | null {
-  if (!dateStr) return null
-  const target = new Date(dateStr + 'T00:00:00')
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const diff = Math.ceil((target.getTime() - today.getTime()) / 86400000)
-  return diff
-}
-
-function formatTargetDate(dateStr: string | null): string {
-  if (!dateStr) return ''
-  const d = new Date(dateStr + 'T12:00:00')
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
+const upcomingReminders = computed(() =>
+  [...reminders.value].sort((a, b) => {
+    if (a.completed !== b.completed) return a.completed ? 1 : -1
+    return a.daysRemaining - b.daysRemaining
+  })
+)
 
 onMounted(async () => {
-  await loadGoals()
+  await loadPractices()
   loadWeekHistory()
+  loadReminders()
   loadStats()
 })
 </script>
@@ -156,67 +169,68 @@ onMounted(async () => {
     <!-- Header -->
     <p class="text-[13px] sm:text-sm text-sacred-text-secondary">See how you're growing over time.</p>
 
-    <!-- Your Dharma (Recurring Goals) -->
+    <!-- Your Dharma (Practices) -->
     <div class="rounded-2xl border border-sacred-border bg-sacred-bg-card p-4 shadow-sacred backdrop-blur-[20px] sm:p-6">
       <div class="flex items-center gap-1.5">
         <SacredIcons name="flame" :size="14" class="text-sacred-gold" />
         <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-sacred-label">Your Dharma</p>
       </div>
 
-      <div v-if="goalsLoading" class="mt-4 space-y-3">
+      <div v-if="practicesLoading" class="mt-4 space-y-3">
         <div v-for="i in 2" :key="i" class="h-16 animate-pulse rounded-2xl bg-sacred-bg-hover" />
       </div>
 
-      <div v-else-if="recurringGoals.length === 0" class="mt-4 text-sm text-sacred-text-secondary">
-        No tasks yet. Set one from the Sacred Scrolls.
+      <div v-else-if="practices.length === 0" class="mt-4 text-sm text-sacred-text-secondary">
+        No practices yet. Set one from the home screen.
       </div>
 
       <ul v-else class="mt-4 space-y-2">
         <li
-          v-for="goal in recurringGoals"
-          :key="goal.id"
-          class="rounded-2xl border border-sacred-border-subtle bg-sacred-bg-card-inner px-4 py-3"
+          v-for="p in practices"
+          :key="p.id"
+          class="cursor-pointer rounded-2xl border border-sacred-border-subtle bg-sacred-bg-card-inner px-4 py-3 transition duration-200 active:scale-[0.99]"
+          @click="$router.push(`/app/journey/practices/${p.id}`)"
         >
           <div class="flex items-center justify-between">
-            <p class="text-sm font-medium text-sacred-text">{{ goal.title }}</p>
+            <p class="text-sm font-medium text-sacred-text">{{ p.title }}</p>
             <div class="flex items-center gap-3 shrink-0">
               <div class="flex items-center gap-1">
                 <SacredIcons name="flame" :size="14" class="text-sacred-gold" />
-                <span class="font-serif font-bold text-sacred-gold text-sm">{{ goal.currentStreak }}</span>
+                <span class="font-serif font-bold text-sacred-gold text-sm">{{ p.currentStreak }}</span>
                 <span class="text-[10px] text-sacred-muted">days</span>
               </div>
             </div>
           </div>
           <div class="mt-1 flex items-center gap-3">
             <span class="text-[10px] uppercase tracking-[0.15em] text-sacred-label">
-              Longest: {{ goal.longestStreak }} days
+              Longest: {{ p.longestStreak }} days
             </span>
           </div>
         </li>
       </ul>
     </div>
 
-    <!-- Dharma This Week (Recurring only) -->
+    <!-- Dharma This Week (Practices only) -->
     <div class="rounded-2xl border border-sacred-border bg-sacred-bg-card p-4 shadow-sacred backdrop-blur-[20px] sm:p-6">
       <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-sacred-label">Dharma This Week</p>
 
-      <div v-if="goalsLoading || weekHistoryLoading" class="mt-4 space-y-3">
+      <div v-if="practicesLoading || weekHistoryLoading" class="mt-4 space-y-3">
         <div v-for="i in 2" :key="i" class="h-12 animate-pulse rounded-2xl bg-sacred-bg-hover" />
       </div>
 
-      <div v-else-if="recurringGoals.length === 0" class="mt-4 text-sm text-sacred-text-secondary">
-        Set your tasks to see your weekly progress here.
+      <div v-else-if="practices.length === 0" class="mt-4 text-sm text-sacred-text-secondary">
+        Set your practices to see your weekly progress here.
       </div>
 
       <div v-else class="mt-4 space-y-4">
         <div
-          v-for="goal in recurringGoals"
-          :key="goal.id"
+          v-for="p in practices"
+          :key="p.id"
         >
-          <p class="text-xs font-medium text-sacred-text mb-2">{{ goal.title }}</p>
+          <p class="text-xs font-medium text-sacred-text mb-2">{{ p.title }}</p>
           <div class="flex items-center gap-2">
             <div
-              v-for="(day, idx) in (weekHistory[goal.id]?.days || [])"
+              v-for="(day, idx) in (weekHistory[p.id]?.days || [])"
               :key="idx"
               class="flex flex-col items-center gap-1"
             >
@@ -235,51 +249,47 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Milestones (OneTime Goals) -->
+    <!-- Reminders -->
     <div class="rounded-2xl border border-sacred-border bg-sacred-bg-card p-4 shadow-sacred backdrop-blur-[20px] sm:p-6">
       <div class="flex items-center gap-1.5">
         <SacredIcons name="target" :size="14" class="text-sacred-gold" />
-        <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-sacred-label">Milestones</p>
+        <p class="text-[9px] font-bold uppercase tracking-[0.2em] text-sacred-label">Reminders</p>
       </div>
 
-      <div v-if="goalsLoading" class="mt-4 space-y-3">
+      <div v-if="remindersLoading" class="mt-4 space-y-3">
         <div v-for="i in 2" :key="i" class="h-16 animate-pulse rounded-2xl bg-sacred-bg-hover" />
       </div>
 
-      <div v-else-if="oneTimeGoals.length === 0" class="mt-4 text-sm text-sacred-text-secondary">
-        No milestones yet. Set one from the Sacred Scrolls.
+      <div v-else-if="upcomingReminders.length === 0" class="mt-4 text-sm text-sacred-text-secondary">
+        No reminders yet. Add one from the home screen.
       </div>
 
       <ul v-else class="mt-4 space-y-2">
         <li
-          v-for="goal in oneTimeGoals"
-          :key="goal.id"
-          class="cursor-pointer rounded-2xl border border-sacred-border-subtle bg-sacred-bg-card-inner px-4 py-3 transition duration-200 active:scale-[0.99]"
-          @click="$router.push(`/app/journey/goals/${goal.id}`)"
+          v-for="r in upcomingReminders"
+          :key="r.id"
+          class="rounded-2xl border border-sacred-border-subtle bg-sacred-bg-card-inner px-4 py-3"
         >
           <div class="flex items-center justify-between">
-            <p class="text-sm font-medium text-sacred-text">{{ goal.title }}</p>
-            <div v-if="goal.completedAt" class="shrink-0 rounded-full bg-gradient-to-r from-sacred-gold to-sacred-gold-dark px-2.5 py-0.5">
+            <p class="text-sm font-medium text-sacred-text">{{ r.label }}</p>
+            <div v-if="r.completed" class="shrink-0 rounded-full bg-gradient-to-r from-sacred-gold to-sacred-gold-dark px-2.5 py-0.5">
               <span class="text-[10px] font-semibold text-white">Completed</span>
             </div>
           </div>
           <div class="mt-1.5 flex items-center gap-3">
-            <span v-if="goal.targetDate" class="font-serif text-xs text-sacred-gold">
-              {{ formatTargetDate(goal.targetDate) }}
-              <template v-if="!goal.completedAt && daysRemaining(goal.targetDate) !== null">
-                <template v-if="(daysRemaining(goal.targetDate) ?? 0) > 0">
-                  — {{ daysRemaining(goal.targetDate) }} days left
+            <span class="font-serif text-xs text-sacred-gold">
+              {{ formatShortDate(r.date) }}
+              <template v-if="!r.completed">
+                <template v-if="r.daysRemaining > 0">
+                  — {{ r.daysRemaining }} days left
                 </template>
-                <template v-else-if="(daysRemaining(goal.targetDate) ?? 0) === 0">
+                <template v-else-if="r.daysRemaining === 0">
                   — Due today
                 </template>
                 <template v-else>
-                  — {{ Math.abs(daysRemaining(goal.targetDate) ?? 0) }} days overdue
+                  — {{ Math.abs(r.daysRemaining) }} days overdue
                 </template>
               </template>
-            </span>
-            <span v-if="goal.checkInCount > 0" class="text-[10px] uppercase tracking-[0.15em] text-sacred-label">
-              {{ goal.checkInCount }} {{ goal.checkInCount === 1 ? 'note' : 'notes' }}
             </span>
           </div>
         </li>

@@ -83,10 +83,10 @@ public static class SystemPrompt
     public static string WithContext(
         string? displayName,
         string? todaysReflection,
-        IEnumerable<GoalContext>? goals = null)
+        IEnumerable<PracticeContext>? practices = null)
     {
         // Stablest content first so OpenAI's automatic prompt caching can match
-        // the prefix across turns: Base → name → reflection → goals.
+        // the prefix across turns: Base → name → reflection → practices.
         var parts = new List<string> { Base };
 
         if (displayName is not null)
@@ -109,52 +109,34 @@ public static class SystemPrompt
                 If they don't bring it up, don't force it in.
                 """);
 
-        var goalList = goals?.ToList();
-        if (goalList is { Count: > 0 })
+        var practiceList = practices?.ToList();
+        if (practiceList is { Count: > 0 })
         {
-            var goalLines = goalList.Select(g =>
+            var practiceLines = practiceList.Select(p =>
             {
-                if (g.Type == "Recurring")
-                {
-                    var streakInfo = g.CurrentStreak > 0
-                        ? $" (current streak: {g.CurrentStreak} days, longest: {g.LongestStreak} days)"
-                        : " (no active streak)";
-                    var todayStatus = g.CheckedInToday switch
-                    {
-                        true => " — checked in today",
-                        false => " — not yet checked in today",
-                        _ => ""
-                    };
-                    var whyInfo = !string.IsNullOrWhiteSpace(g.DeeperWhy)
-                        ? $"\n  Why it matters to them: \"{g.DeeperWhy}\""
-                        : "";
-                    return $"- [Daily practice] {g.Title}{streakInfo}{todayStatus}{whyInfo}";
-                }
-                else
-                {
-                    var deadlineInfo = g.DaysRemaining.HasValue
-                        ? g.DaysRemaining.Value > 0
-                            ? $" ({g.DaysRemaining} days remaining)"
-                            : " (deadline passed)"
-                        : "";
-                    var completedInfo = g.IsCompleted ? " — COMPLETED" : "";
-                    var whyInfo = !string.IsNullOrWhiteSpace(g.DeeperWhy)
-                        ? $"\n  Why it matters to them: \"{g.DeeperWhy}\""
-                        : "";
-                    return $"- [Milestone] {g.Title}{deadlineInfo}{completedInfo}{whyInfo}";
-                }
+                var streakInfo = p.CurrentStreak > 0
+                    ? $" (current streak: {p.CurrentStreak} days, longest: {p.LongestStreak} days)"
+                    : " (no active streak)";
+                var todayStatus = p.CheckedInToday
+                    ? " — checked in today"
+                    : " — not yet checked in today";
+                var whyInfo = !string.IsNullOrWhiteSpace(p.DeeperWhy)
+                    ? $"\n  Why it matters to them: \"{p.DeeperWhy}\""
+                    : "";
+                return $"- [Daily practice] {p.Title}{streakInfo}{todayStatus}{whyInfo}";
             });
 
             parts.Add($"""
-                ## Their goals and intentions
-                These are the goals this person is actively working toward. Use this to understand
-                what matters to them right now. Weave goal awareness into conversation naturally —
-                celebrate streaks, gently check in on goals that seem stalled, and help them see
-                the spiritual dimension of their commitments. Do not list their goals back to them
-                unless they ask. Instead, let this knowledge inform how you respond — like a friend
-                who remembers what you're working on.
+                ## Their daily practices
+                These are the recurring practices this person is actively keeping. Use this to
+                understand what matters to them right now. Weave practice awareness into
+                conversation naturally — celebrate streaks, gently check in on practices that
+                seem stalled, and help them see the spiritual dimension of their commitments.
+                Do not list their practices back to them unless they ask. Instead, let this
+                knowledge inform how you respond — like a friend who remembers what they're
+                working on.
 
-                {string.Join("\n", goalLines)}
+                {string.Join("\n", practiceLines)}
                 """);
         }
 
@@ -162,12 +144,9 @@ public static class SystemPrompt
     }
 }
 
-public record GoalContext(
+public record PracticeContext(
     string Title,
-    string Type,
     int CurrentStreak,
     int LongestStreak,
-    bool? CheckedInToday,
-    int? DaysRemaining,
-    bool IsCompleted,
+    bool CheckedInToday,
     string? DeeperWhy);

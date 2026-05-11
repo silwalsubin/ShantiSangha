@@ -9,9 +9,9 @@ struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
     @StateObject private var health = HealthKitService.shared
     @StateObject private var weather = WeatherService.shared
-    @State private var showNewTask = false
+    @State private var showNewPractice = false
     @State private var showRecurringSummary = false
-    @State private var showMilestoneSummary = false
+    @State private var showRemindersList = false
     @State private var reflection: String?
     @State private var reflectionDate: String?
     /// True when `reflection` is a prior day's reflection shown while today's
@@ -65,7 +65,7 @@ struct HomeView: View {
                     if vm.loading {
                         ProgressView()
                             .frame(maxWidth: .infinity, minHeight: 200)
-                    } else if !vm.hasTasks {
+                    } else if !vm.hasPractices && vm.reminders.isEmpty {
                         emptyState
                     } else {
                         dailyRhythmCard
@@ -74,16 +74,16 @@ struct HomeView: View {
                             .padding(.bottom, 20)
 
                         // Inline practice list — swipe to check in without leaving Home
-                        if !vm.pendingRecurring.isEmpty {
+                        if !vm.pendingPractices.isEmpty {
                             inlinePractices
                                 .padding(.top, SacredSpacing.xs)
                         }
 
-                        SacredGhostRow(icon: "plus", label: "Add task") {
-                            showNewTask = true
+                        SacredGhostRow(icon: "plus", label: "Add practice") {
+                            showNewPractice = true
                         }
                         .padding(.horizontal, SacredSpacing.m)
-                        .padding(.top, vm.pendingRecurring.isEmpty ? SacredSpacing.xs : SacredSpacing.lux)
+                        .padding(.top, vm.pendingPractices.isEmpty ? SacredSpacing.xs : SacredSpacing.lux)
 
                         if practicesCompleted {
                             Text("All practices complete. You showed up today.")
@@ -148,8 +148,9 @@ struct HomeView: View {
                 await refreshWholeDayContext()
                 await notifications.refreshUnreadCount()
             }
-            .onChange(of: vm.doneRecurring) { updateWidgetData() }
-            .onChange(of: vm.doneMilestones) { updateWidgetData() }
+            .onChange(of: vm.donePractices) { updateWidgetData() }
+            .onChange(of: vm.overdueRemindersCount) { updateWidgetData() }
+            .onChange(of: vm.dueTodayRemindersCount) { updateWidgetData() }
             // Foreground refresh — pull truth from server when the app
             // returns from background. The `.task` modifier above only
             // fires when HomeView is mounted; foregrounding doesn't
@@ -187,16 +188,16 @@ struct HomeView: View {
                 }
             }
         }
-        .navigationDestination(isPresented: $showNewTask) {
-            NewTaskView { title, type, targetDate, deeperWhy in
-                await vm.createTask(title: title, type: type, targetDate: targetDate, deeperWhy: deeperWhy)
+        .navigationDestination(isPresented: $showNewPractice) {
+            NewPracticeView { title, deeperWhy in
+                await vm.createPractice(title: title, deeperWhy: deeperWhy)
             }
         }
         .navigationDestination(isPresented: $showRecurringSummary) {
             RecurringSummaryView(vm: vm)
         }
-        .navigationDestination(isPresented: $showMilestoneSummary) {
-            MilestoneSummaryView(vm: vm)
+        .navigationDestination(isPresented: $showRemindersList) {
+            RemindersView(vm: vm)
         }
     }
 
@@ -214,19 +215,18 @@ struct HomeView: View {
 
     private var inlinePractices: some View {
         VStack(spacing: 0) {
-            ForEach(Array(vm.pendingRecurring.enumerated()), id: \.element.id) { index, task in
-                TaskRow(
-                    task: task,
+            ForEach(Array(vm.pendingPractices.enumerated()), id: \.element.id) { index, practice in
+                PracticeRow(
+                    practice: practice,
                     onDone: {
                         Task {
                             UINotificationFeedbackGenerator().notificationOccurred(.success)
-                            await vm.checkIn(id: task.id, completed: true)
+                            await vm.checkIn(id: practice.id, completed: true)
                         }
                     },
-                    onSkip: { Task { await vm.checkIn(id: task.id, completed: false) } },
-                    onUndo: { Task { await vm.undoCheckIn(id: task.id) } },
-                    onDelete: { Task { await vm.deleteTask(id: task.id) } },
-                    onProgressUpdate: { _ in },
+                    onSkip: { Task { await vm.checkIn(id: practice.id, completed: false) } },
+                    onUndo: { Task { await vm.undoCheckIn(id: practice.id) } },
+                    onDelete: { Task { await vm.deletePractice(id: practice.id) } },
                     activeSwipeId: Binding(
                         get: { vm.activeSwipeId },
                         set: { vm.activeSwipeId = $0 }
@@ -234,13 +234,13 @@ struct HomeView: View {
                 )
                 .transition(.opacity.combined(with: .move(edge: .trailing)))
 
-                if index < vm.pendingRecurring.count - 1 {
+                if index < vm.pendingPractices.count - 1 {
                     Divider()
                         .padding(.leading, 52)
                 }
             }
         }
-        .animation(.easeOut(duration: 0.3), value: vm.pendingRecurring.map(\.id))
+        .animation(.easeOut(duration: 0.3), value: vm.pendingPractices.map(\.id))
     }
 
     // MARK: - Empty state
@@ -251,8 +251,8 @@ struct HomeView: View {
                 .font(.sacredText)
                 .foregroundColor(.sacredTextSecondary)
 
-            SacredPrimaryButton("Set your first task") {
-                showNewTask = true
+            SacredPrimaryButton("Set your first practice") {
+                showNewPractice = true
             }
         }
         .frame(maxWidth: .infinity)
@@ -278,7 +278,7 @@ struct HomeView: View {
                 }
 
                 HStack(spacing: 0) {
-                    if vm.totalRecurring > 0 {
+                    if vm.totalPractices > 0 {
                         Button {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             showRecurringSummary = true
@@ -286,11 +286,11 @@ struct HomeView: View {
                             SacredProgressRing(
                                 label: "Practices",
                                 icon: "arrow.triangle.2.circlepath",
-                                done: vm.doneRecurring,
-                                total: vm.totalRecurring,
+                                done: vm.donePractices,
+                                total: vm.totalPractices,
                                 color: .sacredGold,
                                 isComplete: vm.allPracticesDone,
-                                almostDone: vm.totalRecurring > 1 && vm.doneRecurring == vm.totalRecurring - 1,
+                                almostDone: vm.totalPractices > 1 && vm.donePractices == vm.totalPractices - 1,
                                 ringPulse: ringPulse
                             )
                         }
@@ -298,18 +298,18 @@ struct HomeView: View {
                         .frame(maxWidth: .infinity)
                     }
 
-                    if vm.filteredTotal > 0 {
+                    if vm.totalRemindersForToday > 0 {
                         Button {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            showMilestoneSummary = true
+                            showRemindersList = true
                         } label: {
                             SacredProgressRing(
-                                label: "Goals",
+                                label: "Reminders",
                                 icon: "calendar.badge.clock",
-                                done: vm.filteredDone,
-                                total: vm.filteredTotal,
+                                done: vm.doneRemindersForToday,
+                                total: vm.totalRemindersForToday,
                                 color: .sacredGoldDark,
-                                detail: vm.goalsSummaryDetail
+                                detail: vm.remindersSummaryDetail
                             )
                         }
                         .buttonStyle(.plain)
@@ -323,12 +323,12 @@ struct HomeView: View {
 
     private var rhythmSubtitle: String {
         if vm.allPracticesDone { return "The circle is complete." }
-        if vm.totalRecurring > 0 {
-            let remaining = max(vm.totalRecurring - vm.doneRecurring, 0)
+        if vm.totalPractices > 0 {
+            let remaining = max(vm.totalPractices - vm.donePractices, 0)
             if remaining == 1 { return "One quiet step remains." }
             if remaining > 1 { return "\(remaining) practices are waiting." }
         }
-        if vm.filteredTotal > 0 { return "Your commitments are in view." }
+        if vm.totalRemindersForToday > 0 { return "Your reminders are in view." }
         return "A clear day."
     }
 
@@ -348,19 +348,18 @@ struct HomeView: View {
 
     private var shouldShowNudge: Bool {
         let hour = Calendar.current.component(.hour, from: Date())
-        return hour >= 18 && !vm.loading && vm.totalRecurring > 0 && vm.doneRecurring == 0
+        return hour >= 18 && !vm.loading && vm.totalPractices > 0 && vm.donePractices == 0
     }
 
     // MARK: - Widget data sync
 
     private func updateWidgetData() {
-        let pending = vm.tasks.filter { $0.type == .oneTime && $0.completedAt == nil }
         WidgetData.update(
             reflection: reflection,
-            practicesDone: vm.doneRecurring,
-            practicesTotal: vm.totalRecurring,
-            goalsOverdue: pending.filter { ($0.daysRemaining ?? 1) < 0 }.count,
-            goalsDueToday: pending.filter { $0.daysRemaining == 0 }.count,
+            practicesDone: vm.donePractices,
+            practicesTotal: vm.totalPractices,
+            remindersOverdue: vm.overdueRemindersCount,
+            remindersDueToday: vm.dueTodayRemindersCount,
             userName: preferredFirstName
         )
         WidgetCenter.shared.reloadTimelines(ofKind: "ShantiSanghaReflection")

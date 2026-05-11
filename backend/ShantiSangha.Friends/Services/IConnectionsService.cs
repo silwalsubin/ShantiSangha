@@ -40,30 +40,6 @@ public interface IConnectionsService
     /// Connection too via the same path).
     Task<bool> DeleteAsync(Guid userId, Guid connectionId, CancellationToken ct = default);
 
-    /// Append a new "important date" to the Connection. Returns null
-    /// when the connection isn't owned by `userId`.
-    Task<ConnectionDateResponse?> AddDateAsync(
-        Guid userId,
-        Guid connectionId,
-        AddConnectionDateRequest req,
-        CancellationToken ct = default);
-
-    /// Replace label/date on an existing entry. Returns null when the
-    /// row doesn't exist or isn't owned by `userId`.
-    Task<ConnectionDateResponse?> UpdateDateAsync(
-        Guid userId,
-        Guid connectionId,
-        Guid dateId,
-        UpdateConnectionDateRequest req,
-        CancellationToken ct = default);
-
-    /// Drop a single entry. False when not found / not owned.
-    Task<bool> DeleteDateAsync(
-        Guid userId,
-        Guid connectionId,
-        Guid dateId,
-        CancellationToken ct = default);
-
     /// Step 1 of the owner-private avatar upload — hand back a
     /// presigned PUT URL the client uses to ship JPEG bytes directly
     /// to S3, plus the object key the client round-trips back via
