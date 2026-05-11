@@ -64,7 +64,7 @@ struct ReminderRow: View {
 
             Spacer()
 
-            if !hideDateBadge {
+            if !hideDateBadge && !showDateStamp {
                 Text(dueDateLabel)
                     .font(reminder.daysRemaining <= 0 ? .sacredSmallSemibold : .sacredSmall)
                     .foregroundColor(
