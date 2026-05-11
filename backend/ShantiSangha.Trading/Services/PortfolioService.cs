@@ -153,6 +153,27 @@ public class PortfolioService(
             });
         }
 
+        // Mirror held tickers into the watchlist so the daily-signal cron
+        // keeps generating reads for them — the Stocks UI no longer shows
+        // the watchlist directly, but the Home card and TradingSignal
+        // pipeline still depend on it.
+        var heldTickers = clean.Select(c => c.Ticker).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var alreadyWatched = await db.WatchlistItems
+            .Where(w => w.UserId == userId && heldTickers.Contains(w.Ticker))
+            .Select(w => w.Ticker)
+            .ToListAsync(ct);
+        var alreadyWatchedSet = new HashSet<string>(alreadyWatched, StringComparer.OrdinalIgnoreCase);
+        foreach (var ticker in heldTickers)
+        {
+            if (alreadyWatchedSet.Contains(ticker)) continue;
+            db.WatchlistItems.Add(new WatchlistItem
+            {
+                UserId = userId,
+                Ticker = ticker,
+                AddedAt = now,
+            });
+        }
+
         await db.SaveChangesAsync(ct);
         return await ListAsync(userId, ct);
     }
