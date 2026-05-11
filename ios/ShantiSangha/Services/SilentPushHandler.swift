@@ -58,7 +58,10 @@ enum SilentPushHandler {
                 NotificationCenter.default.post(name: .friendsUpdated, object: nil)
             }
         case "trading_signal":
-            // Strong-conviction Wise Cat call. WiseCatViewModel listens and refreshes.
+            // Strong-conviction Wise Cat call. Posts a local notification
+            // any view can observe; currently unwired on the receiver
+            // side since WiseCatViewModel was retired, but the post is
+            // cheap and future-friendly.
             let ticker = userInfo["ticker"] as? String ?? ""
             let action = userInfo["action"] as? String ?? ""
             await MainActor.run {
@@ -144,4 +147,11 @@ enum SilentPushHandler {
 
 private struct DailyReflectionResponse: Decodable {
     let content: String?
+}
+
+extension Notification.Name {
+    /// Fired by the silent-push handler when a "trading_signal" push
+    /// arrives (high-conviction Wise Cat call on a held ticker). Any
+    /// view that wants to refresh in response can observe this name.
+    static let tradingSignalReceived = Notification.Name("tradingSignalReceived")
 }
