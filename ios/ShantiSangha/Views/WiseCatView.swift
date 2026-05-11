@@ -7,7 +7,8 @@ import SwiftUI
 /// keeps firing for them.
 struct WiseCatView: View {
     @StateObject private var vm = PortfolioViewModel()
-    @State private var showPortfolioInput = false
+    @State private var showAddPosition = false
+    @State private var pendingDelete: String?
 
     var body: some View {
         ZStack {
@@ -47,19 +48,42 @@ struct WiseCatView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    showPortfolioInput = true
+                    showAddPosition = true
                 } label: {
-                    Image(systemName: "briefcase")
+                    Image(systemName: "plus")
                         .foregroundColor(.sacredGold)
                 }
-                .accessibilityLabel("Edit portfolio")
+                .accessibilityLabel("Add a stock")
             }
         }
-        .sheet(isPresented: $showPortfolioInput, onDismiss: {
-            // Pick up any changes the user made in the input sheet.
-            Task { await vm.generatePlan() }
-        }) {
-            PortfolioInputView()
+        .sheet(isPresented: $showAddPosition) {
+            AddPositionView(
+                excludedTickers: Set(vm.positions.map { $0.ticker.uppercased() })
+            ) {
+                // Refresh after a successful add. The add VM already
+                // updated its own `positions`, but this VM (the Stocks
+                // tab's) needs the position list + plan re-fetched.
+                Task {
+                    await vm.loadPortfolio()
+                    await vm.generatePlan()
+                }
+            }
+        }
+        .confirmationDialog("Remove this position?",
+                            isPresented: Binding(
+                                get: { pendingDelete != nil },
+                                set: { if !$0 { pendingDelete = nil } }
+                            ),
+                            titleVisibility: .visible) {
+            Button("Remove \(pendingDelete ?? "")", role: .destructive) {
+                if let t = pendingDelete {
+                    Task { await vm.removePosition(t) }
+                }
+                pendingDelete = nil
+            }
+            Button("Cancel", role: .cancel) { pendingDelete = nil }
+        } message: {
+            Text("Your shares and cost basis will be deleted. The position can be re-added later.")
         }
         .task {
             await vm.loadPortfolio()
@@ -120,7 +144,11 @@ struct WiseCatView: View {
                             .fill(Color.sacredMuted.opacity(0.18))
                             .frame(height: 1)
                     }
-                    HoldingRow(holding: holding, action: action(for: holding.ticker, in: plan))
+                    HoldingRow(
+                        holding: holding,
+                        action: action(for: holding.ticker, in: plan),
+                        onRequestDelete: { pendingDelete = holding.ticker }
+                    )
                 }
             }
         }
@@ -206,6 +234,7 @@ struct WiseCatView: View {
 private struct HoldingRow: View {
     let holding: PortfolioHolding
     let action: PortfolioAction?
+    var onRequestDelete: () -> Void
 
     var body: some View {
         NavigationLink(destination: WiseCatDetailView(ticker: holding.ticker)) {
@@ -250,6 +279,16 @@ private struct HoldingRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive, action: onRequestDelete) {
+                Label("Remove", systemImage: "trash")
+            }
+        }
+        .contextMenu {
+            Button(role: .destructive, action: onRequestDelete) {
+                Label("Remove position", systemImage: "trash")
+            }
+        }
     }
 
     private var metaLine: String {

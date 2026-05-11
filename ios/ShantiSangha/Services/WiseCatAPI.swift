@@ -49,4 +49,12 @@ enum WiseCatAPI {
         }
         return try await ApiService.shared.get("/wisecat/portfolio/plan")
     }
+
+    static func addPortfolioPosition(_ position: SavePortfolioPosition) async throws -> PortfolioPosition {
+        try await ApiService.shared.post("/wisecat/portfolio/position", body: position)
+    }
+
+    static func removePortfolioPosition(_ ticker: String) async throws {
+        try await ApiService.shared.delete("/wisecat/portfolio/position/\(ticker)")
+    }
 }

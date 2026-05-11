@@ -17,6 +17,24 @@ public interface IPortfolioService
         CancellationToken ct = default);
 
     /// <summary>
+    /// Add a single position. Throws InvalidOperationException if the user
+    /// already holds the ticker — callers should remove first to re-enter.
+    /// </summary>
+    Task<PortfolioPositionDto> AddAsync(
+        Guid userId,
+        SavePortfolioPosition position,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Remove a single position by ticker. Returns false if the user didn't
+    /// hold the ticker.
+    /// </summary>
+    Task<bool> RemoveAsync(
+        Guid userId,
+        string ticker,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Score the user's current portfolio against the 10 ratified rules and
     /// produce an action plan. `cashBalance` is treated as un-invested cash
     /// for percent-of-portfolio math but not persisted.

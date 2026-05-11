@@ -178,6 +178,68 @@ public class PortfolioService(
         return await ListAsync(userId, ct);
     }
 
+    public async Task<PortfolioPositionDto> AddAsync(
+        Guid userId,
+        SavePortfolioPosition position,
+        CancellationToken ct = default)
+    {
+        var ticker = (position.Ticker ?? string.Empty).Trim().ToUpperInvariant();
+        if (string.IsNullOrEmpty(ticker) || ticker.Length > 16)
+            throw new InvalidOperationException($"ticker must be 1-16 characters: '{position.Ticker}'");
+        if (position.Shares <= 0)
+            throw new InvalidOperationException($"shares must be > 0 for {ticker}");
+        if (position.CostBasis <= 0)
+            throw new InvalidOperationException($"costBasis must be > 0 for {ticker}");
+
+        var existing = await db.UserPortfolioPositions
+            .FirstOrDefaultAsync(p => p.UserId == userId && p.Ticker == ticker, ct);
+        if (existing is not null)
+            throw new InvalidOperationException(
+                $"You already hold {ticker}. Remove the existing position first to re-enter.");
+
+        var now = DateTime.UtcNow;
+        var row = new UserPortfolioPosition
+        {
+            UserId = userId,
+            Ticker = ticker,
+            Shares = position.Shares,
+            CostBasis = position.CostBasis,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+        db.UserPortfolioPositions.Add(row);
+
+        // Mirror into watchlist so the daily-signal cron picks it up.
+        var alreadyWatched = await db.WatchlistItems
+            .AnyAsync(w => w.UserId == userId && w.Ticker == ticker, ct);
+        if (!alreadyWatched)
+        {
+            db.WatchlistItems.Add(new WatchlistItem
+            {
+                UserId = userId,
+                Ticker = ticker,
+                AddedAt = now,
+            });
+        }
+
+        await db.SaveChangesAsync(ct);
+        return new PortfolioPositionDto(row.Ticker, row.Shares, row.CostBasis, row.UpdatedAt);
+    }
+
+    public async Task<bool> RemoveAsync(
+        Guid userId,
+        string ticker,
+        CancellationToken ct = default)
+    {
+        ticker = (ticker ?? string.Empty).Trim().ToUpperInvariant();
+        var row = await db.UserPortfolioPositions
+            .FirstOrDefaultAsync(p => p.UserId == userId && p.Ticker == ticker, ct);
+        if (row is null) return false;
+        db.UserPortfolioPositions.Remove(row);
+        await db.SaveChangesAsync(ct);
+        return true;
+    }
+
     // ---------- Plan generation --------------------------------------------
 
     public async Task<PortfolioPlanDto> GeneratePlanAsync(

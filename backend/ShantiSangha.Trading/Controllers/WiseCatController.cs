@@ -144,4 +144,29 @@ public class WiseCatController(
         var plan = await portfolio.GeneratePlanAsync(user.Id, cash, ct);
         return Ok(plan);
     }
+
+    [HttpPost("portfolio/position")]
+    public async Task<IActionResult> AddPortfolioPosition([FromBody] SavePortfolioPosition body, CancellationToken ct = default)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+        try
+        {
+            var added = await portfolio.AddAsync(user.Id, body, ct);
+            return Ok(added);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpDelete("portfolio/position/{ticker}")]
+    public async Task<IActionResult> RemovePortfolioPosition(string ticker, CancellationToken ct = default)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+        var removed = await portfolio.RemoveAsync(user.Id, ticker, ct);
+        return removed ? NoContent() : NotFound();
+    }
 }
