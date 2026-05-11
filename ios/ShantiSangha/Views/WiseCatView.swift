@@ -20,10 +20,33 @@ struct WiseCatView: View {
     @State private var searching = false
     @State private var searchTaskID = UUID()
     @State private var selectedSectors: Set<String> = []
-    /// When true, sort filtered results by p_buy descending (nulls last).
-    /// Default off — search rank follows Finnhub relevance, which is the
-    /// "I typed this name, find it" behavior, not a leaderboard.
-    @State private var sortByPBuy: Bool = false
+    @State private var selectedPBuyBuckets: Set<PBuyBucket> = []
+
+    /// Buckets that match how p_buy actually distributes in our model
+    /// output. When any bucket is active, results are filtered to the
+    /// union of selected ranges AND auto-sorted by p_buy descending so
+    /// the strongest candidate within the selection floats up.
+    enum PBuyBucket: String, CaseIterable, Hashable {
+        case lt50, fifty, sixty, seventy
+
+        var label: String {
+            switch self {
+            case .lt50:    return "< 50"
+            case .fifty:   return "50–60"
+            case .sixty:   return "60–70"
+            case .seventy: return "70+"
+            }
+        }
+        func contains(_ pBuy: Double) -> Bool {
+            let pct = pBuy * 100
+            switch self {
+            case .lt50:    return pct < 50
+            case .fifty:   return pct >= 50 && pct < 60
+            case .sixty:   return pct >= 60 && pct < 70
+            case .seventy: return pct >= 70
+            }
+        }
+    }
 
 
     /// GICS-11 sector universe. Static (rather than derived from results)
@@ -39,37 +62,44 @@ struct WiseCatView: View {
             SacredBackground()
                 .ignoresSafeArea()
 
-            if !query.trimmingCharacters(in: .whitespaces).isEmpty {
-                searchResultsView
-            } else {
-                ScrollView {
-                    VStack(spacing: SacredSpacing.l) {
-                        if let plan = vm.plan, plan.positionCount > 0 {
-                            summary(plan)
-                            holdingsSection(plan)
-                        } else if vm.generatingPlan || vm.loading {
-                            ProgressView()
-                                .tint(.sacredGold)
-                                .frame(maxWidth: .infinity, minHeight: 200)
-                        } else {
-                            emptyState
-                        }
+            // Switch between portfolio and search-results panel based on
+            // both the typed query AND the search bar's focus. Reading
+            // `\.isSearching` requires being a descendant of the
+            // `.searchable()` modifier, hence the SearchActiveAware shim.
+            SearchActiveAware { isSearching in
+                let typing = !query.trimmingCharacters(in: .whitespaces).isEmpty
+                if isSearching || typing {
+                    searchResultsView
+                } else {
+                    ScrollView {
+                        VStack(spacing: SacredSpacing.l) {
+                            if let plan = vm.plan, plan.positionCount > 0 {
+                                summary(plan)
+                                holdingsSection(plan)
+                            } else if vm.generatingPlan || vm.loading {
+                                ProgressView()
+                                    .tint(.sacredGold)
+                                    .frame(maxWidth: .infinity, minHeight: 200)
+                            } else {
+                                emptyState
+                            }
 
-                        if let err = vm.error {
-                            Text(err)
-                                .font(.sacredCaption)
-                                .foregroundColor(.sacredRed)
-                                .padding(.horizontal, SacredSpacing.m)
+                            if let err = vm.error {
+                                Text(err)
+                                    .font(.sacredCaption)
+                                    .foregroundColor(.sacredRed)
+                                    .padding(.horizontal, SacredSpacing.m)
+                            }
                         }
+                        .padding(.horizontal, SacredSpacing.m)
+                        .padding(.top, SacredSpacing.l)
+                        .padding(.bottom, SacredSpacing.tabBarSafe)
                     }
-                    .padding(.horizontal, SacredSpacing.m)
-                    .padding(.top, SacredSpacing.l)
-                    .padding(.bottom, SacredSpacing.tabBarSafe)
-                }
-                .refreshable {
-                    // User-driven refresh — bypass throttle entirely.
-                    lastFetchAt = Date()
-                    await vm.generatePlan()
+                    .refreshable {
+                        // User-driven refresh — bypass throttle entirely.
+                        lastFetchAt = Date()
+                        await vm.generatePlan()
+                    }
                 }
             }
         }
@@ -158,12 +188,13 @@ struct WiseCatView: View {
         let heldSet = Set(vm.positions.map { $0.ticker.uppercased() })
         let filtered = filteredResults(heldSet: heldSet)
         let manualSymbol = SymbolMatch(symbol: trimmed, description: "", type: "")
+        let filtersActive = !selectedSectors.isEmpty || !selectedPBuyBuckets.isEmpty
         let suggestManual = !trimmed.isEmpty
-            && selectedSectors.isEmpty
+            && !filtersActive
             && !searchResults.contains(where: { $0.symbol.uppercased() == trimmed })
 
         VStack(spacing: 0) {
-            sortRow
+            pBuyBucketRow
             sectorFilterRow
 
             ScrollView {
@@ -186,12 +217,12 @@ struct WiseCatView: View {
                     }
 
                     if !searching && filtered.isEmpty && !suggestManual {
-                        Text(selectedSectors.isEmpty
-                             ? "No matches"
-                             : "No matches in the selected sector(s)")
+                        Text(emptyResultsCopy(trimmed: trimmed, filtersActive: filtersActive))
                             .font(.sacredCaption)
                             .foregroundColor(.sacredMuted)
+                            .multilineTextAlignment(.center)
                             .frame(maxWidth: .infinity)
+                            .padding(.horizontal, SacredSpacing.m)
                             .padding(.top, SacredSpacing.l)
                     }
                 }
@@ -200,36 +231,70 @@ struct WiseCatView: View {
                 .padding(.bottom, SacredSpacing.tabBarSafe)
             }
         }
+        .onAppear {
+            // First-touch of the search panel — fire a browse fetch so
+            // the filter chips have something to narrow when the user
+            // hasn't typed yet. Idempotent thanks to scheduleSearch's
+            // ID-based cancellation; subsequent appearances re-fetch
+            // only if we don't already have results loaded.
+            if searchResults.isEmpty {
+                scheduleSearch(for: query)
+            }
+        }
     }
 
-    /// Compact sort toggle. Off = Finnhub relevance order (typing a name
-    /// finds it). On = p_buy descending, nulls last. The on-state is a
-    /// deliberate user choice — we never default to it, because that
-    /// would re-create the "highest-buy-rating" leaderboard.
-    private var sortRow: some View {
-        HStack(spacing: SacredSpacing.xs) {
-            Spacer()
-            Button {
-                sortByPBuy.toggle()
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: sortByPBuy ? "arrow.down.right.circle.fill" : "arrow.down.right.circle")
-                        .font(.system(size: 12))
-                    Text(sortByPBuy ? "Sorted by buy rating" : "Sort by buy rating")
-                        .font(.sacredCaption)
+    /// Buy-rating bucket chips. Tap one or more to filter; OR semantics
+    /// within the bucket row, AND against the sector chip row. When any
+    /// bucket is active, results are auto-sorted by p_buy descending
+    /// inside the filtered set so the strongest candidate floats up.
+    /// Unscored rows (no cached bars) are hidden whenever any bucket is
+    /// active — they have no rating, no honest place to land.
+    private var pBuyBucketRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: SacredSpacing.xs) {
+                Text("BUY RATING")
+                    .font(.sacredSectionLabel)
+                    .foregroundColor(.sacredMuted)
+                ForEach(PBuyBucket.allCases, id: \.self) { bucket in
+                    pBuyBucketChip(bucket)
                 }
-                .foregroundColor(sortByPBuy ? .sacredGold : .sacredTextSecondary)
+            }
+            .padding(.horizontal, SacredSpacing.m)
+            .padding(.vertical, SacredSpacing.xs)
+        }
+    }
+
+    private func pBuyBucketChip(_ bucket: PBuyBucket) -> some View {
+        let active = selectedPBuyBuckets.contains(bucket)
+        // Mirror the result-row chip tint so the bucket choice has the
+        // same visual language as the per-row p_buy chip.
+        let tint: Color = {
+            switch bucket {
+            case .lt50:    return .sacredMuted
+            case .fifty:   return .sacredGold
+            case .sixty:   return .sacredGreen
+            case .seventy: return .sacredGreen
+            }
+        }()
+        return Button {
+            if active { selectedPBuyBuckets.remove(bucket) }
+            else { selectedPBuyBuckets.insert(bucket) }
+        } label: {
+            Text(bucket.label)
+                .font(.sacredSmallSemibold)
+                .foregroundColor(active ? .white : tint)
                 .padding(.horizontal, SacredSpacing.s)
                 .padding(.vertical, 6)
                 .background(
                     Capsule()
-                        .fill(sortByPBuy ? Color.sacredGold.opacity(0.12) : Color.clear)
+                        .fill(active ? tint : Color.sacredBgCard.opacity(0.6))
                 )
-            }
-            .buttonStyle(.plain)
+                .overlay(
+                    Capsule()
+                        .stroke(active ? Color.clear : tint.opacity(0.3), lineWidth: 1)
+                )
         }
-        .padding(.horizontal, SacredSpacing.m)
-        .padding(.top, SacredSpacing.xs)
+        .buttonStyle(.plain)
     }
 
     /// Horizontal chips along the top of search mode. Tapping a chip
@@ -272,17 +337,39 @@ struct WiseCatView: View {
         .buttonStyle(.plain)
     }
 
+    /// Empty-state copy. Browse mode (empty query) loads the held +
+    /// basket universe on appear, so "nothing showing" almost always
+    /// means the filter chips narrowed the set to zero.
+    private func emptyResultsCopy(trimmed: String, filtersActive: Bool) -> String {
+        filtersActive
+            ? "No matches with the active filters"
+            : "No matches"
+    }
+
     private func filteredResults(heldSet: Set<String>) -> [SymbolMatch] {
-        let filtered: [SymbolMatch] = {
+        // Sector filter — hide unscored rows when active.
+        let bySector: [SymbolMatch] = {
             if selectedSectors.isEmpty { return searchResults }
             return searchResults.filter { match in
                 guard let s = match.sector else { return false }
                 return selectedSectors.contains(s)
             }
         }()
-        if !sortByPBuy { return filtered }
-        return filtered.sorted { lhs, rhs in
-            // nulls last; otherwise higher p_buy first.
+
+        // p_buy bucket filter — hide unscored rows when active.
+        let byBucket: [SymbolMatch] = {
+            if selectedPBuyBuckets.isEmpty { return bySector }
+            return bySector.filter { match in
+                guard let pBuy = match.pBuy else { return false }
+                return selectedPBuyBuckets.contains(where: { $0.contains(pBuy) })
+            }
+        }()
+
+        // When the user has narrowed by bucket, sort strongest-first
+        // within the selection — that's the implicit ask. Otherwise
+        // preserve Finnhub relevance order so "I typed AAPL" finds AAPL.
+        if selectedPBuyBuckets.isEmpty { return byBucket }
+        return byBucket.sorted { lhs, rhs in
             switch (lhs.pBuy, rhs.pBuy) {
             case let (l?, r?): return l > r
             case (_?, nil):    return true
@@ -375,14 +462,11 @@ struct WiseCatView: View {
     /// Cancellable, lightly-debounced search. Each keystroke spawns a
     /// task that waits 250ms before hitting the symbol-search endpoint;
     /// the previous task is cancelled by bumping `searchTaskID` so only
-    /// the latest query wins.
+    /// the latest query wins. An empty query is NOT a no-op — the
+    /// backend's browse mode kicks in and returns the held + sector-
+    /// basket universe so the filter chips can stand alone.
     private func scheduleSearch(for raw: String) {
         let trimmed = raw.trimmingCharacters(in: .whitespaces)
-        if trimmed.isEmpty {
-            searchResults = []
-            searching = false
-            return
-        }
         let id = UUID()
         searchTaskID = id
         searching = true
@@ -390,7 +474,10 @@ struct WiseCatView: View {
             try? await Task.sleep(nanoseconds: 250_000_000)
             guard searchTaskID == id else { return }
             do {
-                let hits = try await WiseCatAPI.searchSymbolsEnriched(trimmed, limit: 12)
+                // Browse mode wants a wider cap; typed-query mode stays
+                // narrow so Finnhub relevance order remains useful.
+                let limit = trimmed.isEmpty ? 30 : 12
+                let hits = try await WiseCatAPI.searchSymbolsEnriched(trimmed, limit: limit)
                 guard searchTaskID == id else { return }
                 await MainActor.run {
                     self.searchResults = hits
@@ -510,6 +597,16 @@ struct WiseCatView: View {
 }
 
 // MARK: - Rows
+
+/// Reads `\.isSearching` from the environment and surfaces it to a
+/// closure. SwiftUI only propagates that value to descendants of the
+/// `.searchable()` modifier, so the parent view can't read it directly
+/// — this view does.
+private struct SearchActiveAware<Content: View>: View {
+    @Environment(\.isSearching) private var isSearching
+    @ViewBuilder let content: (Bool) -> Content
+    var body: some View { content(isSearching) }
+}
 
 private struct HoldingRow: View {
     let holding: PortfolioHolding

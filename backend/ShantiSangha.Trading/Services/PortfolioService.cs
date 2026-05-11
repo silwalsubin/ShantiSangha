@@ -611,17 +611,42 @@ public class PortfolioService(
         Guid userId, string query, int limit, CancellationToken ct = default)
     {
         var trimmed = (query ?? string.Empty).Trim();
-        if (trimmed.Length < 1) return Array.Empty<EnrichedSymbolMatchDto>();
 
         IReadOnlyList<SymbolMatch> hits;
-        try
+        if (trimmed.Length < 1)
         {
-            hits = await marketData.SearchSymbolsAsync(trimmed, Math.Clamp(limit, 1, 25), ct);
+            // Browse mode — no typed query. Universe is the user's held
+            // tickers plus the curated mega-cap basket (one rep per
+            // sector). Both have cached bars and resolved sectors, so
+            // the enrichment loop below stays under a couple of seconds.
+            // Scoring more than ~25 tickers per keystroke would dominate
+            // the Lambda budget; we cap deliberately at a small universe
+            // and rely on Finnhub for the long tail when the user types.
+            var holdings = await db.UserPortfolioPositions
+                .Where(p => p.UserId == userId)
+                .Select(p => p.Ticker)
+                .ToListAsync(ct);
+            var universe = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var h in holdings) universe.Add(h.ToUpperInvariant());
+            foreach (var t in SectorBasket.Values) universe.Add(t.ToUpperInvariant());
+
+            hits = universe
+                .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
+                .Select(s => new SymbolMatch(s, string.Empty, "Common Stock"))
+                .Take(Math.Clamp(limit, 1, 30))
+                .ToList();
         }
-        catch (Exception e)
+        else
         {
-            logger.LogWarning(e, "Symbol search failed for query {Query}", trimmed);
-            return Array.Empty<EnrichedSymbolMatchDto>();
+            try
+            {
+                hits = await marketData.SearchSymbolsAsync(trimmed, Math.Clamp(limit, 1, 25), ct);
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(e, "Symbol search failed for query {Query}", trimmed);
+                return Array.Empty<EnrichedSymbolMatchDto>();
+            }
         }
         if (hits.Count == 0) return Array.Empty<EnrichedSymbolMatchDto>();
 
