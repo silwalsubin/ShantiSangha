@@ -20,6 +20,10 @@ struct WiseCatView: View {
     @State private var searching = false
     @State private var searchTaskID = UUID()
     @State private var selectedSectors: Set<String> = []
+    /// When true, sort filtered results by p_buy descending (nulls last).
+    /// Default off — search rank follows Finnhub relevance, which is the
+    /// "I typed this name, find it" behavior, not a leaderboard.
+    @State private var sortByPBuy: Bool = false
 
     /// GICS-11 sector universe. Static (rather than derived from results)
     /// so the filter chips don't reflow on every keystroke.
@@ -42,7 +46,6 @@ struct WiseCatView: View {
                         if let plan = vm.plan, plan.positionCount > 0 {
                             summary(plan)
                             holdingsSection(plan)
-                            buysSection(plan)
                         } else if vm.generatingPlan || vm.loading {
                             ProgressView()
                                 .tint(.sacredGold)
@@ -159,6 +162,7 @@ struct WiseCatView: View {
             && !searchResults.contains(where: { $0.symbol.uppercased() == trimmed })
 
         VStack(spacing: 0) {
+            sortRow
             sectorFilterRow
 
             ScrollView {
@@ -195,6 +199,36 @@ struct WiseCatView: View {
                 .padding(.bottom, SacredSpacing.tabBarSafe)
             }
         }
+    }
+
+    /// Compact sort toggle. Off = Finnhub relevance order (typing a name
+    /// finds it). On = p_buy descending, nulls last. The on-state is a
+    /// deliberate user choice — we never default to it, because that
+    /// would re-create the "highest-buy-rating" leaderboard.
+    private var sortRow: some View {
+        HStack(spacing: SacredSpacing.xs) {
+            Spacer()
+            Button {
+                sortByPBuy.toggle()
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: sortByPBuy ? "arrow.down.right.circle.fill" : "arrow.down.right.circle")
+                        .font(.system(size: 12))
+                    Text(sortByPBuy ? "Sorted by buy rating" : "Sort by buy rating")
+                        .font(.sacredCaption)
+                }
+                .foregroundColor(sortByPBuy ? .sacredGold : .sacredTextSecondary)
+                .padding(.horizontal, SacredSpacing.s)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(sortByPBuy ? Color.sacredGold.opacity(0.12) : Color.clear)
+                )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, SacredSpacing.m)
+        .padding(.top, SacredSpacing.xs)
     }
 
     /// Horizontal chips along the top of search mode. Tapping a chip
@@ -238,10 +272,22 @@ struct WiseCatView: View {
     }
 
     private func filteredResults(heldSet: Set<String>) -> [SymbolMatch] {
-        if selectedSectors.isEmpty { return searchResults }
-        return searchResults.filter { match in
-            guard let s = match.sector else { return false }   // hide unscored when filtering
-            return selectedSectors.contains(s)
+        let filtered: [SymbolMatch] = {
+            if selectedSectors.isEmpty { return searchResults }
+            return searchResults.filter { match in
+                guard let s = match.sector else { return false }
+                return selectedSectors.contains(s)
+            }
+        }()
+        if !sortByPBuy { return filtered }
+        return filtered.sorted { lhs, rhs in
+            // nulls last; otherwise higher p_buy first.
+            switch (lhs.pBuy, rhs.pBuy) {
+            case let (l?, r?): return l > r
+            case (_?, nil):    return true
+            case (nil, _?):    return false
+            case (nil, nil):   return false
+            }
         }
     }
 
@@ -362,8 +408,11 @@ struct WiseCatView: View {
     // MARK: - Sections
 
     private func summary(_ plan: PortfolioPlan) -> some View {
-        LuxCard {
-            VStack(alignment: .leading, spacing: SacredSpacing.xs) {
+        let missingPicks = plan.actions
+            .filter { $0.kind == .buy && $0.bracket != nil && plan.missingSectors.contains($0.sector) }
+
+        return LuxCard {
+            VStack(alignment: .leading, spacing: SacredSpacing.s) {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Portfolio")
@@ -379,8 +428,48 @@ struct WiseCatView: View {
                 Text("\(plan.positionCount) positions · \(money(plan.cashBalance)) cash")
                     .font(.sacredSmall)
                     .foregroundColor(.sacredTextSecondary)
+
+                if !missingPicks.isEmpty {
+                    missingSectorChips(picks: missingPicks)
+                }
             }
             .padding(SacredSpacing.lux)
+        }
+    }
+
+    /// Quiet replacement for the old Recommended Buys section. Each chip
+    /// is the sector name (NOT the ticker, to avoid leaderboard feel);
+    /// tap navigates to the basket-ticker's detail view where the user
+    /// reviews chart + signals + decides. One chip per missing sector
+    /// keeps Rule 1 (8+ sectors) visible without scrolling a list.
+    @ViewBuilder
+    private func missingSectorChips(picks: [PortfolioAction]) -> some View {
+        VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
+            Text("Missing sectors")
+                .font(.sacredCaption)
+                .foregroundColor(.sacredMuted)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: SacredSpacing.xs) {
+                    ForEach(picks) { pick in
+                        NavigationLink(destination: WiseCatDetailView(ticker: pick.ticker)) {
+                            Text(pick.sector)
+                                .font(.sacredSmallSemibold)
+                                .foregroundColor(.sacredText)
+                                .padding(.horizontal, SacredSpacing.s)
+                                .padding(.vertical, 6)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.sacredBgCard.opacity(0.6))
+                                )
+                                .overlay(
+                                    Capsule()
+                                        .stroke(Color.sacredMuted.opacity(0.25), lineWidth: 1)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
         }
     }
 
@@ -417,29 +506,6 @@ struct WiseCatView: View {
                         action: action(for: holding.ticker, in: plan),
                         onRequestDelete: { pendingDelete = holding.ticker }
                     )
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func buysSection(_ plan: PortfolioPlan) -> some View {
-        let buys = plan.actions.filter { $0.kind == .buy }
-        if !buys.isEmpty {
-            VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-                Text("Recommended buys")
-                    .font(.sacredSubheading)
-                    .foregroundColor(.sacredText)
-
-                VStack(spacing: 0) {
-                    ForEach(Array(buys.enumerated()), id: \.element.id) { index, action in
-                        if index > 0 {
-                            Rectangle()
-                                .fill(Color.sacredMuted.opacity(0.18))
-                                .frame(height: 1)
-                        }
-                        BuyRow(action: action)
-                    }
                 }
             }
         }
@@ -591,108 +657,5 @@ private struct HoldingRow: View {
         case .hold, .buy:
             return nil
         }
-    }
-}
-
-private struct BuyRow: View {
-    let action: PortfolioAction
-
-    var body: some View {
-        NavigationLink(destination: WiseCatDetailView(ticker: action.ticker)) {
-            VStack(alignment: .leading, spacing: SacredSpacing.s) {
-                HStack(alignment: .center, spacing: SacredSpacing.m) {
-                    VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
-                        Text(action.ticker)
-                            .font(.sacredHeading)
-                            .foregroundColor(.sacredText)
-                        Text(action.sector)
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredTextSecondary)
-                        if let price = action.price, price > 0 {
-                            Text(String(format: "$%.2f", price))
-                                .font(.sacredCaption)
-                                .foregroundColor(.sacredMuted)
-                        }
-                    }
-
-                    Spacer()
-
-                    VStack(alignment: .trailing, spacing: SacredSpacing.xxs) {
-                        Text("BUY")
-                            .font(.sacredButtonLabel)
-                            .foregroundColor(.sacredGreen)
-                        if let amount = action.amount, amount > 0 {
-                            Text(target(amount))
-                                .font(.sacredCaption)
-                                .foregroundColor(.sacredTextSecondary)
-                        }
-                        Text(shortReason)
-                            .font(.sacredCaption)
-                            .foregroundColor(.sacredMuted)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.trailing)
-                    }
-                }
-
-                if let bracket = action.bracket {
-                    bracketChips(bracket)
-                }
-            }
-            .padding(.vertical, SacredSpacing.m)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    /// Three compact chips — entry / stop / target — plus an R-multiple
-    /// caption so the user can see the trade's reward-to-risk shape
-    /// before placing the bracket at their broker.
-    @ViewBuilder
-    private func bracketChips(_ b: BracketOrder) -> some View {
-        VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
-            HStack(spacing: SacredSpacing.xs) {
-                bracketChip(label: "Entry", value: String(format: "$%.2f", b.entryPrice),
-                            tint: .sacredText)
-                bracketChip(label: "Stop", value: String(format: "$%.2f", b.stopPrice),
-                            tint: .sacredRed)
-                bracketChip(label: "Target", value: String(format: "$%.2f", b.targetPrice),
-                            tint: .sacredGreen)
-            }
-            Text(String(format: "Risk $%.0f per share, $%.0f total · %.1fR",
-                        b.riskPerShare, b.totalRiskDollars, b.rMultiple))
-                .font(.sacredCaption)
-                .foregroundColor(.sacredMuted)
-        }
-    }
-
-    private func bracketChip(label: String, value: String, tint: Color) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(label.uppercased())
-                .font(.sacredCaption)
-                .foregroundColor(.sacredMuted)
-            Text(value)
-                .font(.sacredSmallSemibold)
-                .foregroundColor(tint)
-        }
-        .padding(.horizontal, SacredSpacing.xs)
-        .padding(.vertical, SacredSpacing.xxs)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.sacredBgCard.opacity(0.6))
-        )
-    }
-
-    private func target(_ v: Double) -> String {
-        if v >= 1000 { return String(format: "~$%.1fk", v / 1000) }
-        return String(format: "~$%.0f", v)
-    }
-
-    /// Distill the server reason into 1-2 line hint.
-    private var shortReason: String {
-        let r = action.reason.lowercased()
-        if r.contains("high-confidence") { return "High conf · missing sector" }
-        if r.contains("missing sector") { return "Missing sector · low conf" }
-        return action.reason
     }
 }
