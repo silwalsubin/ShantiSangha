@@ -2,13 +2,6 @@ using ShantiSangha.Trading.Models;
 
 namespace ShantiSangha.Trading.Contracts;
 
-public record AddWatchlistRequest(string Ticker);
-
-public record WatchlistItemDto(
-    string Ticker,
-    DateTime AddedAt
-);
-
 public record StrategyContributionDto(string Name, double Value, double Contribution, double Weight);
 
 /// <summary>

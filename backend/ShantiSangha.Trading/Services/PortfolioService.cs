@@ -16,88 +16,21 @@ public class PortfolioService(
     // (All thresholds now come from UserStrategySettings; constants kept
     // only as fallback for older callers.)
 
-    // Hardcoded sector overrides for common large-caps. Falls back to "Unknown"
-    // for anything not listed — the iOS side surfaces those so user can
-    // manually classify or accept the warning.
-    private static readonly Dictionary<string, string> SectorOverrides = new(StringComparer.OrdinalIgnoreCase)
-    {
-        // Information Technology
-        ["AAPL"] = "Information Technology",  ["MSFT"] = "Information Technology",
-        ["NVDA"] = "Information Technology",  ["AMD"] = "Information Technology",
-        ["INTC"] = "Information Technology",  ["AVGO"] = "Information Technology",
-        ["CRM"] = "Information Technology",   ["ORCL"] = "Information Technology",
-        ["ADBE"] = "Information Technology",  ["CSCO"] = "Information Technology",
-        ["ACN"] = "Information Technology",   ["IBM"] = "Information Technology",
-        ["QCOM"] = "Information Technology",  ["TXN"] = "Information Technology",
-        ["NOW"] = "Information Technology",   ["PANW"] = "Information Technology",
-        ["PLTR"] = "Information Technology",  ["SMCI"] = "Information Technology",
-        // Health Care
-        ["JNJ"] = "Health Care",  ["UNH"] = "Health Care",  ["PFE"] = "Health Care",
-        ["LLY"] = "Health Care",  ["ABBV"] = "Health Care", ["MRK"] = "Health Care",
-        ["TMO"] = "Health Care",  ["ABT"] = "Health Care",  ["DHR"] = "Health Care",
-        ["BMY"] = "Health Care",  ["AMGN"] = "Health Care", ["CVS"] = "Health Care",
-        ["ISRG"] = "Health Care",
-        // Financials
-        ["JPM"] = "Financials", ["BAC"] = "Financials", ["WFC"] = "Financials",
-        ["GS"] = "Financials",  ["MS"] = "Financials",  ["C"] = "Financials",
-        ["BLK"] = "Financials", ["BRK-A"] = "Financials", ["BRK-B"] = "Financials",
-        ["BRK.A"] = "Financials", ["BRK.B"] = "Financials",
-        ["V"] = "Financials",   ["MA"] = "Financials",  ["AXP"] = "Financials",
-        ["SCHW"] = "Financials", ["COF"] = "Financials", ["USB"] = "Financials",
-        // Consumer Discretionary
-        ["HD"] = "Consumer Discretionary",   ["AMZN"] = "Consumer Discretionary",
-        ["TSLA"] = "Consumer Discretionary", ["NKE"] = "Consumer Discretionary",
-        ["MCD"] = "Consumer Discretionary",  ["SBUX"] = "Consumer Discretionary",
-        ["LOW"] = "Consumer Discretionary",  ["BKNG"] = "Consumer Discretionary",
-        ["ORLY"] = "Consumer Discretionary", ["TJX"] = "Consumer Discretionary",
-        ["F"] = "Consumer Discretionary",    ["GM"] = "Consumer Discretionary",
-        // Consumer Staples
-        ["PG"] = "Consumer Staples",   ["KO"] = "Consumer Staples",
-        ["PEP"] = "Consumer Staples",  ["WMT"] = "Consumer Staples",
-        ["COST"] = "Consumer Staples", ["MO"] = "Consumer Staples",
-        ["PM"] = "Consumer Staples",   ["CL"] = "Consumer Staples",
-        ["MDLZ"] = "Consumer Staples", ["TGT"] = "Consumer Staples",
-        // Communication Services
-        ["VZ"] = "Communication Services",   ["T"] = "Communication Services",
-        ["GOOGL"] = "Communication Services", ["GOOG"] = "Communication Services",
-        ["META"] = "Communication Services", ["DIS"] = "Communication Services",
-        ["NFLX"] = "Communication Services", ["CMCSA"] = "Communication Services",
-        ["TMUS"] = "Communication Services",
-        // Industrials
-        ["CAT"] = "Industrials", ["BA"] = "Industrials", ["GE"] = "Industrials",
-        ["HON"] = "Industrials", ["UPS"] = "Industrials", ["RTX"] = "Industrials",
-        ["LMT"] = "Industrials", ["MMM"] = "Industrials", ["DE"] = "Industrials",
-        ["UNP"] = "Industrials", ["FDX"] = "Industrials", ["NOC"] = "Industrials",
-        // Energy
-        ["XOM"] = "Energy", ["CVX"] = "Energy", ["COP"] = "Energy",
-        ["EOG"] = "Energy", ["SLB"] = "Energy", ["OXY"] = "Energy",
-        ["MPC"] = "Energy", ["PSX"] = "Energy",
-        // Utilities
-        ["NEE"] = "Utilities", ["DUK"] = "Utilities", ["SO"] = "Utilities",
-        ["AEP"] = "Utilities", ["D"] = "Utilities",   ["EXC"] = "Utilities",
-        // Materials
-        ["APD"] = "Materials", ["LIN"] = "Materials", ["SHW"] = "Materials",
-        ["ECL"] = "Materials", ["NEM"] = "Materials", ["FCX"] = "Materials",
-        ["DD"] = "Materials",
-        // Real Estate
-        ["PLD"] = "Real Estate", ["AMT"] = "Real Estate", ["EQIX"] = "Real Estate",
-        ["CCI"] = "Real Estate", ["O"] = "Real Estate",   ["SPG"] = "Real Estate",
-    };
+    // Curated ticker universe + sector mappings now live in TickerCatalog
+    // so the daily jobs can reference them without depending on this
+    // service. Bring them in via aliases for readability.
+    private static IReadOnlyDictionary<string, string> SectorOverrides => TickerCatalog.SectorOverrides;
+    private static IReadOnlyDictionary<string, string> SectorBasket => TickerCatalog.SectorBasket;
 
-    // The 10-sector mega-cap basket — sector → preferred ticker.
-    private static readonly Dictionary<string, string> SectorBasket = new()
-    {
-        ["Information Technology"] = "AAPL",
-        ["Health Care"]            = "JNJ",
-        ["Financials"]             = "JPM",
-        ["Consumer Discretionary"] = "HD",
-        ["Consumer Staples"]       = "PG",
-        ["Communication Services"] = "VZ",
-        ["Industrials"]            = "CAT",
-        ["Energy"]                 = "XOM",
-        ["Utilities"]              = "NEE",
-        ["Materials"]              = "APD",
-    };
+    /// <summary>
+    /// Process-local per-day score cache. Keyed by ticker; the date is
+    /// part of the value so a stale entry self-invalidates by comparing
+    /// against today. Concurrent because multiple search requests can hit
+    /// in parallel. No eviction policy is needed — total entries are
+    /// bounded by SectorOverrides + held tickers across all users (~100s).
+    /// </summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, (DateOnly Date, TechnicalScore Score)>
+        ScoreCacheByDate = new(StringComparer.OrdinalIgnoreCase);
 
     // ---------- CRUD --------------------------------------------------------
 
@@ -151,27 +84,6 @@ public class PortfolioService(
             });
         }
 
-        // Mirror held tickers into the watchlist so the daily-signal cron
-        // keeps generating reads for them — the Stocks UI no longer shows
-        // the watchlist directly, but the Home card and TradingSignal
-        // pipeline still depend on it.
-        var heldTickers = clean.Select(c => c.Ticker).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var alreadyWatched = await db.WatchlistItems
-            .Where(w => w.UserId == userId && heldTickers.Contains(w.Ticker))
-            .Select(w => w.Ticker)
-            .ToListAsync(ct);
-        var alreadyWatchedSet = new HashSet<string>(alreadyWatched, StringComparer.OrdinalIgnoreCase);
-        foreach (var ticker in heldTickers)
-        {
-            if (alreadyWatchedSet.Contains(ticker)) continue;
-            db.WatchlistItems.Add(new WatchlistItem
-            {
-                UserId = userId,
-                Ticker = ticker,
-                AddedAt = now,
-            });
-        }
-
         await db.SaveChangesAsync(ct);
         return await ListAsync(userId, ct);
     }
@@ -206,19 +118,6 @@ public class PortfolioService(
             UpdatedAt = now,
         };
         db.UserPortfolioPositions.Add(row);
-
-        // Mirror into watchlist so the daily-signal cron picks it up.
-        var alreadyWatched = await db.WatchlistItems
-            .AnyAsync(w => w.UserId == userId && w.Ticker == ticker, ct);
-        if (!alreadyWatched)
-        {
-            db.WatchlistItems.Add(new WatchlistItem
-            {
-                UserId = userId,
-                Ticker = ticker,
-                AddedAt = now,
-            });
-        }
 
         await db.SaveChangesAsync(ct);
         return new PortfolioPositionDto(row.Ticker, row.Shares, row.CostBasis, row.UpdatedAt);
@@ -615,32 +514,23 @@ public class PortfolioService(
         IReadOnlyList<SymbolMatch> hits;
         if (trimmed.Length < 1)
         {
-            // Browse mode — no typed query. Universe is the user's held
-            // tickers ∪ watchlist ∪ the curated mega-cap basket (one rep
-            // per sector). Held auto-mirror into the watchlist so the
-            // union is mostly watchlist + basket in practice. Both have
-            // cached bars and resolved sectors, so the enrichment loop
-            // below stays fast. Scoring more than ~30 tickers per
-            // keystroke would dominate the Lambda budget; we cap
-            // deliberately at a small universe and rely on Finnhub for
-            // the long tail when the user types.
+            // Browse mode — no typed query. Universe is everything the
+            // app "knows about": user's held tickers ∪ the full curated
+            // mega-cap dictionary (SectorOverrides). All have hardcoded
+            // sectors. Bars + scores are pulled from cache where
+            // available so the first hit per day eats the Lambda cost
+            // and subsequent hits are instant (see ScoreCacheByDate).
             var holdings = await db.UserPortfolioPositions
                 .Where(p => p.UserId == userId)
                 .Select(p => p.Ticker)
                 .ToListAsync(ct);
-            var watchlist = await db.WatchlistItems
-                .Where(w => w.UserId == userId)
-                .Select(w => w.Ticker)
-                .ToListAsync(ct);
             var universe = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var h in holdings) universe.Add(h.ToUpperInvariant());
-            foreach (var w in watchlist) universe.Add(w.ToUpperInvariant());
-            foreach (var t in SectorBasket.Values) universe.Add(t.ToUpperInvariant());
+            foreach (var t in SectorOverrides.Keys) universe.Add(t.ToUpperInvariant());
 
             hits = universe
                 .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
                 .Select(s => new SymbolMatch(s, string.Empty, "Common Stock"))
-                .Take(Math.Clamp(limit, 1, 30))
                 .ToList();
         }
         else
@@ -660,41 +550,11 @@ public class PortfolioService(
         return await EnrichHitsAsync(userId, hits, ct);
     }
 
-    public async Task<IReadOnlyList<EnrichedSymbolMatchDto>> ListWatchlistEnrichedAsync(
-        Guid userId, CancellationToken ct = default)
-    {
-        // Pure-interest watchlist surface — held tickers are excluded so
-        // the "Watching" section only shows what the user is tracking
-        // outside of their portfolio.
-        var heldSet = await db.UserPortfolioPositions
-            .Where(p => p.UserId == userId)
-            .Select(p => p.Ticker.ToUpper())
-            .ToListAsync(ct);
-        var held = new HashSet<string>(heldSet, StringComparer.OrdinalIgnoreCase);
-
-        var watchlist = await db.WatchlistItems
-            .Where(w => w.UserId == userId)
-            .OrderBy(w => w.Ticker)
-            .Select(w => w.Ticker)
-            .ToListAsync(ct);
-
-        var pureWatch = watchlist
-            .Where(t => !held.Contains(t.ToUpperInvariant()))
-            .ToList();
-
-        if (pureWatch.Count == 0) return Array.Empty<EnrichedSymbolMatchDto>();
-
-        var hits = pureWatch
-            .Select(t => new SymbolMatch(t.ToUpperInvariant(), string.Empty, "Common Stock"))
-            .ToList();
-        return await EnrichHitsAsync(userId, hits, ct);
-    }
-
     /// <summary>
     /// Shared enrichment loop — sector resolution (cache-only) + batch
     /// scoring from cached bars (skips tickers with &lt; 100 bars).
-    /// Used by both SearchEnrichedAsync and ListWatchlistEnrichedAsync
-    /// so the wire shape stays identical for the iOS rendering layer.
+    /// Used by SearchEnrichedAsync so the wire shape stays identical
+    /// for the iOS rendering layer.
     /// </summary>
     private async Task<IReadOnlyList<EnrichedSymbolMatchDto>> EnrichHitsAsync(
         Guid userId, IReadOnlyList<SymbolMatch> hits, CancellationToken ct)
@@ -729,12 +589,27 @@ public class PortfolioService(
         // Score only tickers that already have ≥100 cached bars. Backfill
         // would dominate the request time and we're optimizing for keystroke
         // latency, not coverage. The detail view backfills on tap-in.
+        //
+        // Per-day in-memory score cache (ScoreCacheByDate) prevents
+        // re-scoring the full catalog on every browse-mode hit. First
+        // request per ticker per day pays the Lambda cost; subsequent
+        // requests are instant. Process-local — fine for a single-task
+        // ECS service; if we ever scale to N tasks each would re-score
+        // once per day, still cheap relative to no caching.
         const int MinBars = 100;
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var cutoff = today.AddDays(-450);
+
+        var scoreByTicker = new Dictionary<string, TechnicalScore>(StringComparer.OrdinalIgnoreCase);
         var scoreInputs = new List<ScoreInput>();
+
         foreach (var t in tickers)
         {
+            if (ScoreCacheByDate.TryGetValue(t, out var cached) && cached.Date == today)
+            {
+                scoreByTicker[t] = cached.Score;
+                continue;
+            }
             var bars = await db.TickerDailyCloses
                 .Where(b => b.Ticker == t && b.Date <= today && b.Date >= cutoff)
                 .OrderBy(b => b.Date)
@@ -746,13 +621,16 @@ public class PortfolioService(
             }
         }
 
-        var scoreByTicker = new Dictionary<string, TechnicalScore>(StringComparer.OrdinalIgnoreCase);
         if (scoreInputs.Count > 0)
         {
             try
             {
                 var scores = await marketData.ScoreAsync(scoreInputs, ct);
-                foreach (var s in scores) scoreByTicker[s.Ticker] = s;
+                foreach (var s in scores)
+                {
+                    scoreByTicker[s.Ticker] = s;
+                    ScoreCacheByDate[s.Ticker] = (today, s);
+                }
             }
             catch (Exception e)
             {

@@ -2,19 +2,6 @@ import Foundation
 
 /// Typed wrapper around `ApiService` for the Wise Cat (`/api/wisecat`) endpoints.
 enum WiseCatAPI {
-    static func listWatchlist() async throws -> [WatchlistEntry] {
-        try await ApiService.shared.get("/wisecat/watchlist")
-    }
-
-    struct AddBody: Encodable { let ticker: String }
-    static func addWatchlist(_ ticker: String) async throws -> WatchlistEntry {
-        try await ApiService.shared.post("/wisecat/watchlist", body: AddBody(ticker: ticker))
-    }
-
-    static func removeWatchlist(_ ticker: String) async throws {
-        try await ApiService.shared.delete("/wisecat/watchlist/\(ticker)")
-    }
-
     static func getSignals() async throws -> [TradingSignal] {
         try await ApiService.shared.get("/wisecat/signals")
     }
@@ -34,13 +21,6 @@ enum WiseCatAPI {
     static func searchSymbolsEnriched(_ query: String, limit: Int = 12) async throws -> [SymbolMatch] {
         let escaped = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
         return try await ApiService.shared.get("/wisecat/symbols/search/enriched?q=\(escaped)&limit=\(limit)")
-    }
-
-    /// Enriched watchlist — same shape as `searchSymbolsEnriched`,
-    /// pre-filtered to exclude held tickers. Powers the "Watching"
-    /// section on the Stocks home view.
-    static func listWatchlistEnriched() async throws -> [SymbolMatch] {
-        try await ApiService.shared.get("/wisecat/watchlist/enriched")
     }
 
     static func getChart(_ ticker: String, range: ChartRange) async throws -> ChartHistory {

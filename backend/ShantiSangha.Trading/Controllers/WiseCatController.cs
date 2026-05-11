@@ -10,7 +10,6 @@ namespace ShantiSangha.Trading.Controllers;
 [Authorize]
 [Route("api/wisecat")]
 public class WiseCatController(
-    IWatchlistService watchlist,
     ITradingSignalService signals,
     IMarketDataClient marketData,
     IPortfolioService portfolio,
@@ -18,40 +17,6 @@ public class WiseCatController(
     IStrategyBacktestService backtest,
     ICurrentUser currentUser) : ControllerBase
 {
-    [HttpGet("watchlist")]
-    public async Task<IActionResult> GetWatchlist(CancellationToken ct = default)
-    {
-        var user = await currentUser.GetAsync();
-        if (user is null) return Unauthorized();
-        var items = await watchlist.ListAsync(user.Id, ct);
-        return Ok(items);
-    }
-
-    [HttpPost("watchlist")]
-    public async Task<IActionResult> AddWatchlist([FromBody] AddWatchlistRequest body, CancellationToken ct = default)
-    {
-        var user = await currentUser.GetAsync();
-        if (user is null) return Unauthorized();
-        try
-        {
-            var item = await watchlist.AddAsync(user.Id, body.Ticker, ct);
-            return Ok(item);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-    }
-
-    [HttpDelete("watchlist/{ticker}")]
-    public async Task<IActionResult> RemoveWatchlist(string ticker, CancellationToken ct = default)
-    {
-        var user = await currentUser.GetAsync();
-        if (user is null) return Unauthorized();
-        var removed = await watchlist.RemoveAsync(user.Id, ticker, ct);
-        return removed ? NoContent() : NotFound();
-    }
-
     [HttpGet("signals")]
     public async Task<IActionResult> GetSignals(CancellationToken ct = default)
     {
@@ -99,20 +64,6 @@ public class WiseCatController(
         return Ok(rows);
     }
 
-    /// <summary>
-    /// Enriched watchlist — same shape as /symbols/search/enriched, but
-    /// pre-filtered to exclude held tickers. Powers the collapsible
-    /// "Watching" section on the Stocks home view.
-    /// </summary>
-    [HttpGet("watchlist/enriched")]
-    public async Task<IActionResult> WatchlistEnriched(CancellationToken ct = default)
-    {
-        var user = await currentUser.GetAsync();
-        if (user is null) return Unauthorized();
-
-        var rows = await portfolio.ListWatchlistEnrichedAsync(user.Id, ct);
-        return Ok(rows);
-    }
 
     [HttpGet("history/{ticker}")]
     public async Task<IActionResult> GetHistory(string ticker, int days = 90, CancellationToken ct = default)

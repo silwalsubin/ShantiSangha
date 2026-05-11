@@ -18,12 +18,6 @@ struct WiseCatDetailView: View {
     @State private var heldByUser: Bool?
     @State private var showAddSheet = false
 
-    /// Star toggle state. `nil` while loading, then true/false based on
-    /// the watchlist GET. Optimistic flip on tap, reconciled with the
-    /// server response.
-    @State private var watched: Bool?
-    @State private var watchToggling = false
-
     var body: some View {
         ZStack {
             SacredBackground()
@@ -60,16 +54,10 @@ struct WiseCatDetailView: View {
         }
         .navigationTitle(ticker)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                starButton
-            }
-        }
         .task {
             hydrateFromCache()
             await load()
             await loadHeldStatus()
-            await loadWatchStatus()
         }
         .safeAreaInset(edge: .bottom) {
             if heldByUser == false {
@@ -89,36 +77,6 @@ struct WiseCatDetailView: View {
                 // onDismiss above. Nothing extra to do here.
             }
         }
-    }
-
-    /// Star toggle. Optimistic state flip so the tap feels instant;
-    /// reconciles if the network call fails. Held tickers stay starred
-    /// (the backend auto-mirrors held into the watchlist), so unstarring
-    /// a held ticker is a no-op there too.
-    private var starButton: some View {
-        Button {
-            guard !watchToggling else { return }
-            let current = watched ?? false
-            watched = !current
-            watchToggling = true
-            Task {
-                defer { Task { @MainActor in watchToggling = false } }
-                do {
-                    if current {
-                        try await WiseCatAPI.removeWatchlist(ticker)
-                    } else {
-                        _ = try await WiseCatAPI.addWatchlist(ticker)
-                    }
-                } catch {
-                    await MainActor.run { self.watched = current }   // revert
-                }
-            }
-        } label: {
-            Image(systemName: (watched ?? false) ? "star.fill" : "star")
-                .foregroundColor(.sacredGold)
-        }
-        .disabled(watched == nil)
-        .accessibilityLabel((watched ?? false) ? "Remove from watchlist" : "Add to watchlist")
     }
 
     private var addToPortfolioCTA: some View {
@@ -159,18 +117,6 @@ struct WiseCatDetailView: View {
             // If we can't tell, hide the CTA rather than risk a duplicate-add
             // attempt that the backend would reject anyway.
             heldByUser = true
-        }
-    }
-
-    private func loadWatchStatus() async {
-        do {
-            let items = try await WiseCatAPI.listWatchlist()
-            let target = ticker.uppercased()
-            watched = items.contains(where: { $0.ticker.uppercased() == target })
-        } catch {
-            // If we can't tell, default to "not on the list" so the
-            // star reads as a fresh affordance rather than a stuck state.
-            watched = false
         }
     }
 

@@ -8,9 +8,9 @@ using ShantiSangha.Trading.Services;
 namespace ShantiSangha.Trading.Jobs;
 
 /// <summary>
-/// After RefreshMarketDataJob has populated the cache: for each user with a
-/// non-empty watchlist, generate today's signals (technical) and dispatch
-/// a push for any high-conviction call.
+/// After RefreshMarketDataJob has populated the cache: for each user with
+/// at least one held position, generate today's signals for their held
+/// tickers and dispatch a push for any high-conviction call.
 /// </summary>
 public class GenerateDailyTradingSignalsJob(
     TradingDbContext db,
@@ -24,9 +24,12 @@ public class GenerateDailyTradingSignalsJob(
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        var userTickers = await db.WatchlistItems
-            .GroupBy(w => w.UserId)
-            .Select(g => new { UserId = g.Key, Tickers = g.Select(w => w.Ticker).ToList() })
+        // Per-user signals are scoped to held tickers now — those are the
+        // positions the user has explicit risk on. Browse-mode scoring of
+        // the wider catalog happens on demand via SearchEnrichedAsync.
+        var userTickers = await db.UserPortfolioPositions
+            .GroupBy(p => p.UserId)
+            .Select(g => new { UserId = g.Key, Tickers = g.Select(p => p.Ticker).ToList() })
             .ToListAsync();
 
         var totalGenerated = 0;

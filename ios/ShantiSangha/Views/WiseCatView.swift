@@ -21,10 +21,6 @@ struct WiseCatView: View {
     @State private var searchTaskID = UUID()
     @State private var selectedSectors: Set<String> = []
     @State private var selectedPBuyBuckets: Set<PBuyBucket> = []
-    /// Watching section is collapsed by default; the user expands it
-    /// when they want to see what they're tracking. State lives on the
-    /// view because it's a pure UI preference.
-    @State private var watchlistExpanded: Bool = false
 
     /// Buckets that match how p_buy actually distributes in our model
     /// output. When any bucket is active, results are filtered to the
@@ -79,9 +75,6 @@ struct WiseCatView: View {
                         VStack(spacing: SacredSpacing.l) {
                             if let plan = vm.plan, plan.positionCount > 0 {
                                 summary(plan)
-                                if !vm.watchlist.isEmpty {
-                                    watchingSection
-                                }
                                 holdingsSection(plan)
                             } else if vm.generatingPlan || vm.loading {
                                 ProgressView()
@@ -180,7 +173,6 @@ struct WiseCatView: View {
         lastFetchAt = Date()
         await vm.loadPortfolio()
         await vm.generatePlan()
-        await vm.loadWatchlist()
     }
 
     // MARK: - Search
@@ -557,58 +549,6 @@ struct WiseCatView: View {
         }
     }
 
-    /// Collapsible "Watching" section between summary and holdings.
-    /// Default collapsed — header shows the count and a chevron. Tap
-    /// header to expand. Each row is a thin holding-style line (ticker,
-    /// sector, p_buy badge) and pushes to the detail view on tap.
-    @ViewBuilder
-    private var watchingSection: some View {
-        VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-            Button {
-                withAnimation(.easeOut(duration: 0.2)) {
-                    watchlistExpanded.toggle()
-                }
-            } label: {
-                HStack(spacing: SacredSpacing.xs) {
-                    Text("Watching \(vm.watchlist.count)")
-                        .font(.sacredSmallSemibold)
-                        .foregroundColor(.sacredTextSecondary)
-                    Spacer()
-                    Image(systemName: watchlistExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(.sacredMuted)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            if watchlistExpanded {
-                VStack(spacing: 0) {
-                    ForEach(Array(vm.watchlist.enumerated()), id: \.element.id) { index, match in
-                        if index > 0 {
-                            Rectangle()
-                                .fill(Color.sacredMuted.opacity(0.18))
-                                .frame(height: 1)
-                        }
-                        WatchRow(match: match) {
-                            await unwatch(match.symbol)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func unwatch(_ ticker: String) async {
-        do {
-            try await WiseCatAPI.removeWatchlist(ticker)
-            await vm.loadWatchlist()
-        } catch {
-            // Silent — surfacing a banner for a swipe-delete failure
-            // would feel noisy; the row reappears on next refresh.
-        }
-    }
-
     @ViewBuilder
     private func holdingsSection(_ plan: PortfolioPlan) -> some View {
         VStack(spacing: 0) {
@@ -666,60 +606,6 @@ private struct SearchActiveAware<Content: View>: View {
     @Environment(\.isSearching) private var isSearching
     @ViewBuilder let content: (Bool) -> Content
     var body: some View { content(isSearching) }
-}
-
-/// Single-row layout for the "Watching" section: ticker, sector, p_buy
-/// chip on the right. Tap = detail view. Swipe trailing or long-press
-/// gives an "Unwatch" action via the same callback.
-private struct WatchRow: View {
-    let match: SymbolMatch
-    var onUnwatch: () async -> Void
-
-    var body: some View {
-        NavigationLink(destination: WiseCatDetailView(ticker: match.symbol)) {
-            HStack(alignment: .center, spacing: SacredSpacing.m) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(match.symbol)
-                        .font(.sacredTextSemibold)
-                        .foregroundColor(.sacredText)
-                    if let sector = match.sector, !sector.isEmpty {
-                        Text(sector)
-                            .font(.sacredCaption)
-                            .foregroundColor(.sacredTextSecondary)
-                    }
-                }
-                Spacer()
-                if let pBuy = match.pBuy, let horizon = match.horizon {
-                    probabilityChip(pBuy: pBuy, horizon: horizon)
-                }
-            }
-            .padding(.vertical, SacredSpacing.s)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            Button(role: .destructive) {
-                Task { await onUnwatch() }
-            } label: { Label("Unwatch", systemImage: "star.slash") }
-        }
-        .contextMenu {
-            Button(role: .destructive) {
-                Task { await onUnwatch() }
-            } label: { Label("Unwatch", systemImage: "star.slash") }
-        }
-    }
-
-    private func probabilityChip(pBuy: Double, horizon: String) -> some View {
-        let tint: Color = {
-            if pBuy >= 0.60 { return .sacredGreen }
-            if pBuy >= 0.50 { return .sacredGold }
-            return .sacredMuted
-        }()
-        return Text(String(format: "p_buy %.2f · %@", pBuy, horizon as NSString))
-            .font(.sacredCaption)
-            .foregroundColor(tint)
-    }
 }
 
 private struct HoldingRow: View {

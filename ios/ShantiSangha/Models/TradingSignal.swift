@@ -101,13 +101,6 @@ struct StrategyContribution: Codable, Hashable {
     let weight: Double
 }
 
-struct WatchlistEntry: Codable, Identifiable, Hashable {
-    let ticker: String
-    let addedAt: String
-
-    var id: String { ticker }
-}
-
 struct SymbolMatch: Codable, Identifiable, Hashable {
     let symbol: String
     let description: String

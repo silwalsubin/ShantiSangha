@@ -7,9 +7,10 @@ using ShantiSangha.Trading.Services;
 namespace ShantiSangha.Trading.Jobs;
 
 /// <summary>
-/// Once per trading day after US market close: for each unique ticker across
-/// all users' watchlists, fetch only the missing bars from Finnhub (delta) and
-/// store them in TickerDailyClose. Keeps Finnhub calls O(unique tickers).
+/// Once per trading day after US market close: for each ticker in the
+/// curated catalog union held tickers across all users, fetch only the
+/// missing bars from Finnhub (delta) and store them in TickerDailyClose.
+/// Keeps Finnhub calls O(unique tickers).
 /// </summary>
 public class RefreshMarketDataJob(
     TradingDbContext db,
@@ -20,10 +21,18 @@ public class RefreshMarketDataJob(
 
     public async Task RunAsync()
     {
-        var tickers = await db.WatchlistItems
-            .Select(w => w.Ticker)
+        // Universe: curated catalog (the search browse universe) plus
+        // anything users currently hold. Held auto-extends the refresh
+        // set for tickers outside the catalog (e.g. small-caps the user
+        // owns but the app doesn't natively know about).
+        var held = await db.UserPortfolioPositions
+            .Select(p => p.Ticker)
             .Distinct()
             .ToListAsync();
+        var universe = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var t in TickerCatalog.SectorOverrides.Keys) universe.Add(t);
+        foreach (var t in held) universe.Add(t);
+        var tickers = universe.ToList();
 
         if (tickers.Count == 0)
         {

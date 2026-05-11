@@ -5,7 +5,6 @@ namespace ShantiSangha.Trading.Data;
 
 public class TradingDbContext(DbContextOptions<TradingDbContext> options) : DbContext(options)
 {
-    public DbSet<WatchlistItem> WatchlistItems => Set<WatchlistItem>();
     public DbSet<TickerDailyClose> TickerDailyCloses => Set<TickerDailyClose>();
     public DbSet<TradingSignal> TradingSignals => Set<TradingSignal>();
     public DbSet<UserPortfolioPosition> UserPortfolioPositions => Set<UserPortfolioPosition>();
@@ -15,14 +14,6 @@ public class TradingDbContext(DbContextOptions<TradingDbContext> options) : DbCo
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<WatchlistItem>(e =>
-        {
-            e.HasKey(w => w.Id);
-            e.HasIndex(w => w.UserId);
-            e.HasIndex(w => new { w.UserId, w.Ticker }).IsUnique();
-            e.Property(w => w.Ticker).HasMaxLength(16).IsRequired();
-        });
-
         modelBuilder.Entity<TickerDailyClose>(e =>
         {
             e.HasKey(b => new { b.Ticker, b.Date });

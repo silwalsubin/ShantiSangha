@@ -56,13 +56,4 @@ public interface IPortfolioService
         int limit,
         CancellationToken ct = default);
 
-    /// <summary>
-    /// Watchlist enriched with the same sector + p_buy/p_sell shape as
-    /// the search-enrichment path. Held tickers are excluded so the
-    /// "Watching" surface only shows pure interest items (no double
-    /// display with the holdings section).
-    /// </summary>
-    Task<IReadOnlyList<EnrichedSymbolMatchDto>> ListWatchlistEnrichedAsync(
-        Guid userId,
-        CancellationToken ct = default);
 }

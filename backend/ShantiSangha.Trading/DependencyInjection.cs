@@ -17,7 +17,6 @@ public static class DependencyInjection
         services.AddDbContext<TradingDbContext>(options =>
             options.UseNpgsql(connectionString));
 
-        services.AddScoped<IWatchlistService, WatchlistService>();
         services.AddScoped<ITradingSignalService, TradingSignalService>();
         services.AddScoped<IMarketDataClient, MarketDataClient>();
         services.AddScoped<IPortfolioService, PortfolioService>();
