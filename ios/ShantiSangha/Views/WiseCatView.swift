@@ -298,8 +298,15 @@ private struct HoldingRow: View {
     }
 
     private var unrealizedLine: String {
-        let sign = holding.unrealizedReturnPct >= 0 ? "+" : ""
-        return String(format: "%@%.1f%% from cost", sign, holding.unrealizedReturnPct * 100)
+        let cost = holding.shares * holding.costBasis
+        let dollarPnL = holding.marketValue - cost
+        let f = NumberFormatter()
+        f.numberStyle = .currency
+        f.currencyCode = "USD"
+        f.maximumFractionDigits = (abs(dollarPnL) >= 1000) ? 0 : 2
+        let formatted = f.string(from: NSNumber(value: abs(dollarPnL))) ?? "$\(abs(Int(dollarPnL)))"
+        let sign = dollarPnL >= 0 ? "+" : "-"
+        return "\(sign)\(formatted)"
     }
 
     private var actionBadge: String {
