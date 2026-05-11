@@ -196,6 +196,10 @@ public class PortfolioService(
         var basketTickers = SectorBasket.Values.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var allTickers = heldTickers.Union(basketTickers).ToList();
 
+        // Resolve sectors for any held tickers we don't have hardcoded.
+        // Three-layer chain: hardcoded → DB cache → Lambda → "Unknown".
+        var sectorByTicker = await ResolveSectorsAsync(heldTickers, ct);
+
         // Pull bars from the cache; backfill any ticker with < 200 bars.
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var cutoff = today.AddDays(-450);
@@ -263,7 +267,7 @@ public class PortfolioService(
             var marketValue = pos.Shares * price;
             invested += marketValue;
             var unrealizedPct = pos.CostBasis > 0 ? (double)((price / pos.CostBasis) - 1m) : 0.0;
-            var sector = ResolveSector(pos.Ticker);
+            var sector = sectorByTicker.TryGetValue(pos.Ticker, out var s) ? s : "Unknown";
             var (pBuy, pSell) = ReadProbabilities(scoreByTicker, pos.Ticker);
             holdings.Add(new PortfolioHoldingDto(
                 Ticker: pos.Ticker,
@@ -420,9 +424,89 @@ public class PortfolioService(
 
     // ---------- helpers -----------------------------------------------------
 
-    private static string ResolveSector(string ticker)
+    private static string? ResolveHardcodedSector(string ticker)
     {
-        return SectorOverrides.TryGetValue(ticker.ToUpperInvariant(), out var s) ? s : "Unknown";
+        return SectorOverrides.TryGetValue(ticker.ToUpperInvariant(), out var s) ? s : null;
+    }
+
+    /// <summary>
+    /// Resolve every ticker to a sector, three-tier:
+    ///   1. Hardcoded large-cap overrides — instant, no I/O.
+    ///   2. DB-cached prior lookup (TickerSectors row).
+    ///   3. Lambda yfinance .info call. Result is persisted to the cache
+    ///      (including "Unknown") so we don't re-hit yfinance next plan.
+    /// </summary>
+    private async Task<Dictionary<string, string>> ResolveSectorsAsync(
+        IEnumerable<string> tickers, CancellationToken ct)
+    {
+        var resolved = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var stillMissing = new List<string>();
+        foreach (var t in tickers.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var hard = ResolveHardcodedSector(t);
+            if (hard is not null)
+            {
+                resolved[t] = hard;
+                continue;
+            }
+            stillMissing.Add(t);
+        }
+
+        if (stillMissing.Count == 0) return resolved;
+
+        var cached = await db.TickerSectors
+            .Where(s => stillMissing.Contains(s.Ticker))
+            .ToListAsync(ct);
+        var cachedSet = new HashSet<string>(cached.Select(c => c.Ticker), StringComparer.OrdinalIgnoreCase);
+        foreach (var row in cached)
+        {
+            resolved[row.Ticker] = string.IsNullOrEmpty(row.Sector) ? "Unknown" : row.Sector;
+        }
+
+        var lambdaNeeded = stillMissing.Where(t => !cachedSet.Contains(t)).ToList();
+        if (lambdaNeeded.Count == 0) return resolved;
+
+        IReadOnlyList<TickerProfile> profiles;
+        try
+        {
+            profiles = await marketData.GetTickerProfilesAsync(lambdaNeeded, ct);
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(e, "Sector resolution via Lambda failed; defaulting to Unknown");
+            foreach (var t in lambdaNeeded) resolved[t] = "Unknown";
+            return resolved;
+        }
+
+        var byTicker = profiles.ToDictionary(p => p.Ticker, p => p, StringComparer.OrdinalIgnoreCase);
+        var now = DateTime.UtcNow;
+        foreach (var t in lambdaNeeded)
+        {
+            byTicker.TryGetValue(t, out var profile);
+            var sector = !string.IsNullOrWhiteSpace(profile?.Sector) ? profile!.Sector! : "Unknown";
+            resolved[t] = sector;
+
+            db.TickerSectors.Add(new TickerSector
+            {
+                Ticker = t.ToUpperInvariant(),
+                Sector = sector,
+                Name = profile?.Name,
+                FetchedAt = now,
+            });
+        }
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (Exception e)
+        {
+            // Don't fail the whole plan if the cache write fails — the
+            // in-memory `resolved` map is still valid for this request.
+            logger.LogWarning(e, "Persisting TickerSectors cache failed");
+        }
+
+        return resolved;
     }
 
     private static (double pBuy, double pSell) ReadProbabilities(

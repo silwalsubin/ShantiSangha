@@ -9,6 +9,7 @@ public class TradingDbContext(DbContextOptions<TradingDbContext> options) : DbCo
     public DbSet<TickerDailyClose> TickerDailyCloses => Set<TickerDailyClose>();
     public DbSet<TradingSignal> TradingSignals => Set<TradingSignal>();
     public DbSet<UserPortfolioPosition> UserPortfolioPositions => Set<UserPortfolioPosition>();
+    public DbSet<TickerSector> TickerSectors => Set<TickerSector>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -51,6 +52,14 @@ public class TradingDbContext(DbContextOptions<TradingDbContext> options) : DbCo
             e.Property(p => p.Ticker).HasMaxLength(16).IsRequired();
             e.Property(p => p.Shares).HasPrecision(18, 6);
             e.Property(p => p.CostBasis).HasPrecision(18, 4);
+        });
+
+        modelBuilder.Entity<TickerSector>(e =>
+        {
+            e.HasKey(t => t.Ticker);
+            e.Property(t => t.Ticker).HasMaxLength(16);
+            e.Property(t => t.Sector).HasMaxLength(64).IsRequired();
+            e.Property(t => t.Name).HasMaxLength(256);
         });
     }
 }

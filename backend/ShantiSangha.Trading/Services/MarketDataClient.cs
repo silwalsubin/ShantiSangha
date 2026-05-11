@@ -92,6 +92,20 @@ public class MarketDataClient(
         return resp.Results.Select(r => new SymbolMatch(r.Symbol, r.Description, r.Type)).ToList();
     }
 
+    public async Task<IReadOnlyList<TickerProfile>> GetTickerProfilesAsync(IReadOnlyList<string> tickers, CancellationToken ct = default)
+    {
+        if (tickers.Count == 0) return Array.Empty<TickerProfile>();
+        var resp = await InvokeAsync<TickerProfilesResponseDto>(new
+        {
+            action = "tickerProfiles",
+            tickers,
+        }, ct);
+        if (resp?.Profiles is null) return Array.Empty<TickerProfile>();
+        return resp.Profiles
+            .Select(p => new TickerProfile(p.Ticker, p.Sector, p.Name))
+            .ToList();
+    }
+
     public async Task<IReadOnlyList<TechnicalScore>> ScoreAsync(IReadOnlyList<ScoreInput> items, CancellationToken ct = default)
     {
         var payload = new
@@ -242,6 +256,9 @@ public class MarketDataClient(
         ChartAggregatesDto? Aggregates);
 
     private record ChartBarDto(string Date, decimal Open, decimal High, decimal Low, decimal Close, long Volume, bool? ExtendedHours);
+
+    private record TickerProfilesResponseDto(List<TickerProfileDto>? Profiles);
+    private record TickerProfileDto(string Ticker, string? Sector, string? Name);
 
     private record ChartAggregatesDto(
         [property: JsonPropertyName("currentPrice")] decimal CurrentPrice,

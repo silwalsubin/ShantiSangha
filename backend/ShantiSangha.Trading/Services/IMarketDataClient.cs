@@ -65,6 +65,13 @@ public record ChartAggregates(
 public record ChartHistoryResult(string Ticker, string Period, IReadOnlyList<ChartBar> Bars, ChartAggregates? Aggregates);
 
 /// <summary>
+/// Issuer profile — sector + name. Sector follows GICS labels
+/// ("Information Technology", "Health Care", "Consumer Discretionary",
+/// etc.). `Sector` is null when the upstream resolver couldn't find one.
+/// </summary>
+public record TickerProfile(string Ticker, string? Sector, string? Name);
+
+/// <summary>
 /// Wraps the Python wisecat service. The .NET side owns the durable bar cache;
 /// this client only uses Python for (a) computing technical scores from bars
 /// and (b) fetching missing bars / live quotes / symbol search from Finnhub.
@@ -85,4 +92,10 @@ public interface IMarketDataClient
 
     /// <summary>Long-range chart data + 52w / all-time aggregates. yfinance-backed (free, unlimited).</summary>
     Task<ChartHistoryResult?> GetChartHistoryAsync(string ticker, string period, CancellationToken ct = default);
+
+    /// <summary>
+    /// Resolve sector + name for a batch of tickers via yfinance .info.
+    /// Callers should cache results — yfinance is rate-limited and slow.
+    /// </summary>
+    Task<IReadOnlyList<TickerProfile>> GetTickerProfilesAsync(IReadOnlyList<string> tickers, CancellationToken ct = default);
 }

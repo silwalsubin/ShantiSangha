@@ -49,6 +49,8 @@ def handler(event: dict, context: Any) -> dict:
         return _symbol_search(event)
     if action == "chartHistory":
         return _chart_history(event)
+    if action == "tickerProfiles":
+        return _ticker_profiles(event)
 
     raise ValueError(f"unknown action: {action}")
 
@@ -56,6 +58,65 @@ def handler(event: dict, context: Any) -> dict:
 def _healthz() -> dict:
     status, detail = healthcheck()
     return {"status": status, "detail": detail}
+
+
+# yfinance returns sectors in its own taxonomy; map them to the GICS labels
+# the Mode B strategy uses so the cached value matches the hardcoded basket
+# keys (Information Technology, Health Care, etc.). Anything we can't map
+# is returned verbatim — the caller treats unmapped strings as "Unknown".
+_YFINANCE_TO_GICS_SECTOR: dict[str, str] = {
+    "Technology": "Information Technology",
+    "Healthcare": "Health Care",
+    "Financial Services": "Financials",
+    "Consumer Cyclical": "Consumer Discretionary",
+    "Consumer Defensive": "Consumer Staples",
+    "Communication Services": "Communication Services",
+    "Industrials": "Industrials",
+    "Energy": "Energy",
+    "Utilities": "Utilities",
+    "Basic Materials": "Materials",
+    "Real Estate": "Real Estate",
+}
+
+
+def _ticker_profiles(event: dict) -> dict:
+    """Resolve sector (and best-effort name) for one or more tickers via
+    yfinance .info. Pure-IO action — no parquet / model dependencies.
+
+    Returns:
+        {"profiles": [{"ticker": "...", "sector": "...", "name": "..."}]}
+    Tickers that fail to resolve return `sector=None` so the caller can
+    persist an "Unknown" placeholder and avoid hammering yfinance again.
+    """
+    raw = event.get("tickers")
+    if not isinstance(raw, list) or not raw:
+        raise ValueError("'tickers' must be a non-empty list")
+    tickers = [str(t).strip().upper() for t in raw if str(t).strip()]
+    if not tickers:
+        raise ValueError("no valid tickers")
+
+    profiles: list[dict] = []
+    try:
+        import yfinance as yf
+    except ImportError as e:
+        raise YFinanceUnavailable(f"yfinance not installed: {e}") from e
+
+    for ticker in tickers:
+        sector: str | None = None
+        name: str | None = None
+        try:
+            info = yf.Ticker(ticker).info or {}
+            raw_sector = info.get("sector")
+            if isinstance(raw_sector, str) and raw_sector:
+                sector = _YFINANCE_TO_GICS_SECTOR.get(raw_sector, raw_sector)
+            n = info.get("longName") or info.get("shortName")
+            if isinstance(n, str) and n:
+                name = n
+        except Exception as e:
+            logger.warning("ticker profile lookup failed for %s: %s", ticker, e)
+        profiles.append({"ticker": ticker, "sector": sector, "name": name})
+
+    return {"profiles": profiles}
 
 
 def _score(event: dict) -> dict:
