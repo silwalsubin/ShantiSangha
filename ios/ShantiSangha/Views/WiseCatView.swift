@@ -25,10 +25,6 @@ struct WiseCatView: View {
     /// "I typed this name, find it" behavior, not a leaderboard.
     @State private var sortByPBuy: Bool = false
 
-    /// Toggled by tapping the sector badge. Collapsed by default so the
-    /// gap between current and required sector coverage reads in a single
-    /// glance (the badge); expanded reveals the actionable chips.
-    @State private var sectorsExpanded: Bool = false
 
     /// GICS-11 sector universe. Static (rather than derived from results)
     /// so the filter chips don't reflow on every keystroke.
@@ -415,7 +411,6 @@ struct WiseCatView: View {
     private func summary(_ plan: PortfolioPlan) -> some View {
         let missingPicks = plan.actions
             .filter { $0.kind == .buy && $0.bracket != nil && plan.missingSectors.contains($0.sector) }
-        let hasGap = !missingPicks.isEmpty
 
         return VStack(alignment: .leading, spacing: SacredSpacing.s) {
             HStack(alignment: .firstTextBaseline) {
@@ -428,80 +423,42 @@ struct WiseCatView: View {
                         .foregroundColor(.sacredText)
                 }
                 Spacer()
-                sectorBadge(plan, tappable: hasGap)
+                sectorBadge(plan, missingPicks: missingPicks)
             }
             Text("\(plan.positionCount) positions · \(money(plan.cashBalance)) cash")
                 .font(.sacredSmall)
                 .foregroundColor(.sacredTextSecondary)
-
-            if hasGap && sectorsExpanded {
-                missingSectorChips(picks: missingPicks)
-            }
         }
     }
 
-    /// Revealed by tapping the sector badge when there's a gap. Each
-    /// chip is the sector name (NOT the ticker, to avoid leaderboard
-    /// feel); tap navigates to the basket-ticker's detail view where
-    /// the user reviews chart + signals + decides.
-    @ViewBuilder
-    private func missingSectorChips(picks: [PortfolioAction]) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: SacredSpacing.xs) {
-                ForEach(picks) { pick in
-                    NavigationLink(destination: WiseCatDetailView(ticker: pick.ticker)) {
-                        Text(pick.sector)
-                            .font(.sacredSmallSemibold)
-                            .foregroundColor(.sacredText)
-                            .padding(.horizontal, SacredSpacing.s)
-                            .padding(.vertical, 6)
-                            .background(
-                                Capsule()
-                                    .fill(Color.sacredBgCard.opacity(0.6))
-                            )
-                            .overlay(
-                                Capsule()
-                                    .stroke(Color.sacredMuted.opacity(0.25), lineWidth: 1)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func sectorBadge(_ plan: PortfolioPlan, tappable: Bool) -> some View {
+    private func sectorBadge(_ plan: PortfolioPlan,
+                             missingPicks: [PortfolioAction]) -> some View
+    {
         let ok = plan.sectorsCovered >= plan.minSectorsRequired
         let label = "\(plan.sectorsCovered)/\(plan.minSectorsRequired)+ sectors"
         let tint: Color = ok ? .sacredGreen : .sacredRed
+        let shortfall = max(0, plan.minSectorsRequired - plan.sectorsCovered)
+        let explanation = ok
+            ? "You're covering \(plan.sectorsCovered) sectors — diversification is intact."
+            : "Spread risk across at least \(plan.minSectorsRequired) sectors. You're holding \(plan.sectorsCovered) — \(shortfall) short. Diversification is what protects you when one sector takes a hit."
 
-        let pill = HStack(spacing: 4) {
-            Text(label)
-                .font(.sacredSmallSemibold)
-                .foregroundColor(tint)
-            if tappable {
-                Image(systemName: sectorsExpanded ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(tint)
-            }
-        }
-        .padding(.horizontal, SacredSpacing.s)
-        .padding(.vertical, SacredSpacing.xxs)
-        .background(
-            Capsule()
-                .fill(tint.opacity(0.12))
-        )
-
-        if tappable {
-            Button {
-                withAnimation(.easeOut(duration: 0.2)) {
-                    sectorsExpanded.toggle()
+        return SacredStatusBadge(label: label, tint: tint) {
+            VStack(alignment: .leading, spacing: SacredSpacing.xs) {
+                Text(explanation)
+                    .font(.sacredText)
+                    .foregroundColor(.sacredText)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !missingPicks.isEmpty {
+                    Text("MISSING")
+                        .font(.sacredSectionLabel)
+                        .foregroundColor(.sacredMuted)
+                        .padding(.top, SacredSpacing.xxs)
+                    Text(missingPicks.map { $0.sector }.joined(separator: ", "))
+                        .font(.sacredCaption)
+                        .foregroundColor(.sacredTextSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-            } label: { pill }
-            .buttonStyle(.plain)
-        } else {
-            pill
+            }
         }
     }
 
@@ -588,12 +545,10 @@ private struct HoldingRow: View {
                         showLabels: false
                     )
                     .frame(width: 120)
-                    if let reason = compactReason {
-                        Text(reason)
-                            .font(.sacredCaption)
-                            .foregroundColor(.sacredMuted)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.trailing)
+                    if let badge = compactReasonBadge {
+                        SacredStatusBadge(label: badge.label,
+                                          tint: badge.tint,
+                                          explanation: badge.explanation)
                     }
                 }
             }
@@ -655,17 +610,47 @@ private struct HoldingRow: View {
         }
     }
 
-    /// Short reason hint for SELL / TRIM rows.
-    private var compactReason: String? {
+    /// Status pill rendered under the action label on SELL / TRIM rows.
+    /// The label is the "what"; the explanation is shown when the pill
+    /// is tapped, surfaced through `SacredStatusBadge`. Reasons mirror
+    /// the rule constants the PortfolioService is actually enforcing
+    /// (Rule 3 stop, Rule 11 take-profit, Rule 2 concentration cap).
+    private var compactReasonBadge: (label: String, tint: Color, explanation: String)? {
         guard let action else { return nil }
         switch action.kind {
         case .sell:
-            if holding.unrealizedReturnPct >= 0.10 { return "Hit +10% target" }
-            if holding.unrealizedReturnPct <= -0.10 { return "Past -10% stop" }
-            if holding.pSell >= 0.55 { return "Model: exit signal" }
-            return "Rule violation"
+            if holding.unrealizedReturnPct >= 0.10 {
+                return (
+                    label: "Hit target",
+                    tint: .sacredGreen,
+                    explanation: "This position has reached your take-profit threshold (default +10% from cost). Cashing out locks in the win and frees the slot for the next signal."
+                )
+            }
+            if holding.unrealizedReturnPct <= -0.07 {
+                return (
+                    label: "Past stop",
+                    tint: .sacredRed,
+                    explanation: "This position is down past your stop-loss threshold (default -7% from cost). Exiting at the pre-committed stop is the discipline that prevents another large drawdown."
+                )
+            }
+            if holding.pSell >= 0.55 {
+                return (
+                    label: "Exit signal",
+                    tint: .sacredRed,
+                    explanation: "The WiseCat model's exit confidence crossed the advisory threshold (default 0.55). The momentum read has flipped bearish at your entry horizon."
+                )
+            }
+            return (
+                label: "Exit triggered",
+                tint: .sacredRed,
+                explanation: "One of your exit conditions fired against this position. Open the detail view to see which signal triggered it."
+            )
         case .trim:
-            return "Over 10% cap"
+            return (
+                label: "Over cap",
+                tint: .sacredGoldDark,
+                explanation: "Each position is capped at 10% of the portfolio. This holding has grown past the cap — trim back to the target to keep concentration risk bounded."
+            )
         case .hold, .buy:
             return nil
         }
