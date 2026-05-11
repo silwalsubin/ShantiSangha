@@ -95,11 +95,16 @@ struct HomeView: View {
                         }
                     }
 
-                    // Wise Cat — astro-aware trading signals. Quiet by default;
-                    // the card shows what's there only if the user is using it.
-                    WiseCatHomeCard()
-                        .padding(.horizontal, SacredSpacing.m)
-                        .padding(.top, SacredSpacing.l)
+                    // Wise Cat — astro-aware trading signals. Gated to a
+                    // single email while the feature is in private use;
+                    // every other user gets a clean home view without the
+                    // stocks surface. Flip the allow-list when we're ready
+                    // to roll it out more broadly.
+                    if isStocksAllowed(email: auth.user?.email) {
+                        WiseCatHomeCard()
+                            .padding(.horizontal, SacredSpacing.m)
+                            .padding(.top, SacredSpacing.l)
+                    }
                 }
                 .padding(.top, SacredSpacing.xl)
                 .padding(.bottom, SacredSpacing.tabBarSafe)
@@ -193,6 +198,16 @@ struct HomeView: View {
         .navigationDestination(isPresented: $showMilestoneSummary) {
             MilestoneSummaryView(vm: vm)
         }
+    }
+
+    // MARK: - Feature gating
+
+    /// Stocks (Wise Cat) is gated to a single email while in private
+    /// use. Returns true only for that account; everyone else gets a
+    /// clean home view without the stocks card.
+    private func isStocksAllowed(email: String?) -> Bool {
+        guard let email else { return false }
+        return email.lowercased() == "subinho09@gmail.com"
     }
 
     // MARK: - Inline practice list
