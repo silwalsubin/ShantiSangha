@@ -201,9 +201,9 @@ struct WiseCatView: View {
                     .font(.sacredText)
                     .foregroundColor(.sacredTextSecondary)
                 Button {
-                    showPortfolioInput = true
+                    showAddPosition = true
                 } label: {
-                    Text("Add positions")
+                    Text("Add a stock")
                         .font(.sacredButtonLabel)
                         .foregroundColor(.sacredGold)
                         .padding(.top, SacredSpacing.xs)

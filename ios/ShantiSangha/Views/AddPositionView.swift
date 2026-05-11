@@ -170,9 +170,9 @@ struct AddPositionView: View {
     }
 }
 
-/// Embedded version of the symbol search — no NavigationStack of its own,
-/// so it composes cleanly inside AddPositionView's stack. Mirrors
-/// TickerSearchSheet behavior otherwise.
+/// Symbol search — no NavigationStack of its own, so it composes cleanly
+/// inside AddPositionView's stack. Debounced and backed by
+/// `/api/wisecat/symbols/search`.
 private struct TickerSearchSheetEmbedded: View {
     var excluded: Set<String>
     var onSelect: (String) -> Void
