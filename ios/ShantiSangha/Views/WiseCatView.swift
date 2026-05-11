@@ -25,6 +25,11 @@ struct WiseCatView: View {
     /// "I typed this name, find it" behavior, not a leaderboard.
     @State private var sortByPBuy: Bool = false
 
+    /// Toggled by tapping the sector badge. Collapsed by default so the
+    /// gap between current and required sector coverage reads in a single
+    /// glance (the badge); expanded reveals the actionable chips.
+    @State private var sectorsExpanded: Bool = false
+
     /// GICS-11 sector universe. Static (rather than derived from results)
     /// so the filter chips don't reflow on every keystroke.
     private let sectorFilters: [String] = [
@@ -410,103 +415,110 @@ struct WiseCatView: View {
     private func summary(_ plan: PortfolioPlan) -> some View {
         let missingPicks = plan.actions
             .filter { $0.kind == .buy && $0.bracket != nil && plan.missingSectors.contains($0.sector) }
+        let hasGap = !missingPicks.isEmpty
 
-        return LuxCard {
-            VStack(alignment: .leading, spacing: SacredSpacing.s) {
-                HStack(alignment: .firstTextBaseline) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Portfolio")
-                            .font(.sacredSmallSemibold)
-                            .foregroundColor(.sacredMuted)
-                        Text(money(plan.totalValue))
-                            .font(.sacredTitle)
-                            .foregroundColor(.sacredText)
-                    }
-                    Spacer()
-                    sectorBadge(plan)
+        return VStack(alignment: .leading, spacing: SacredSpacing.s) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Portfolio")
+                        .font(.sacredSmallSemibold)
+                        .foregroundColor(.sacredMuted)
+                    Text(money(plan.totalValue))
+                        .font(.sacredTitle)
+                        .foregroundColor(.sacredText)
                 }
-                Text("\(plan.positionCount) positions · \(money(plan.cashBalance)) cash")
-                    .font(.sacredSmall)
-                    .foregroundColor(.sacredTextSecondary)
-
-                if !missingPicks.isEmpty {
-                    missingSectorChips(picks: missingPicks)
-                }
+                Spacer()
+                sectorBadge(plan, tappable: hasGap)
             }
-            .padding(SacredSpacing.lux)
+            Text("\(plan.positionCount) positions · \(money(plan.cashBalance)) cash")
+                .font(.sacredSmall)
+                .foregroundColor(.sacredTextSecondary)
+
+            if hasGap && sectorsExpanded {
+                missingSectorChips(picks: missingPicks)
+            }
         }
     }
 
-    /// Quiet replacement for the old Recommended Buys section. Each chip
-    /// is the sector name (NOT the ticker, to avoid leaderboard feel);
-    /// tap navigates to the basket-ticker's detail view where the user
-    /// reviews chart + signals + decides. One chip per missing sector
-    /// keeps Rule 1 (8+ sectors) visible without scrolling a list.
+    /// Revealed by tapping the sector badge when there's a gap. Each
+    /// chip is the sector name (NOT the ticker, to avoid leaderboard
+    /// feel); tap navigates to the basket-ticker's detail view where
+    /// the user reviews chart + signals + decides.
     @ViewBuilder
     private func missingSectorChips(picks: [PortfolioAction]) -> some View {
-        VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
-            Text("Missing sectors")
-                .font(.sacredCaption)
-                .foregroundColor(.sacredMuted)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: SacredSpacing.xs) {
-                    ForEach(picks) { pick in
-                        NavigationLink(destination: WiseCatDetailView(ticker: pick.ticker)) {
-                            Text(pick.sector)
-                                .font(.sacredSmallSemibold)
-                                .foregroundColor(.sacredText)
-                                .padding(.horizontal, SacredSpacing.s)
-                                .padding(.vertical, 6)
-                                .background(
-                                    Capsule()
-                                        .fill(Color.sacredBgCard.opacity(0.6))
-                                )
-                                .overlay(
-                                    Capsule()
-                                        .stroke(Color.sacredMuted.opacity(0.25), lineWidth: 1)
-                                )
-                        }
-                        .buttonStyle(.plain)
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: SacredSpacing.xs) {
+                ForEach(picks) { pick in
+                    NavigationLink(destination: WiseCatDetailView(ticker: pick.ticker)) {
+                        Text(pick.sector)
+                            .font(.sacredSmallSemibold)
+                            .foregroundColor(.sacredText)
+                            .padding(.horizontal, SacredSpacing.s)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule()
+                                    .fill(Color.sacredBgCard.opacity(0.6))
+                            )
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color.sacredMuted.opacity(0.25), lineWidth: 1)
+                            )
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }
     }
 
-    private func sectorBadge(_ plan: PortfolioPlan) -> some View {
+    @ViewBuilder
+    private func sectorBadge(_ plan: PortfolioPlan, tappable: Bool) -> some View {
         let ok = plan.sectorsCovered >= plan.minSectorsRequired
         let label = "\(plan.sectorsCovered)/\(plan.minSectorsRequired)+ sectors"
-        return Text(label)
-            .font(.sacredSmallSemibold)
-            .foregroundColor(ok ? .sacredGreen : .sacredRed)
-            .padding(.horizontal, SacredSpacing.s)
-            .padding(.vertical, SacredSpacing.xxs)
-            .background(
-                Capsule()
-                    .fill((ok ? Color.sacredGreen : Color.sacredRed).opacity(0.12))
-            )
+        let tint: Color = ok ? .sacredGreen : .sacredRed
+
+        let pill = HStack(spacing: 4) {
+            Text(label)
+                .font(.sacredSmallSemibold)
+                .foregroundColor(tint)
+            if tappable {
+                Image(systemName: sectorsExpanded ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(tint)
+            }
+        }
+        .padding(.horizontal, SacredSpacing.s)
+        .padding(.vertical, SacredSpacing.xxs)
+        .background(
+            Capsule()
+                .fill(tint.opacity(0.12))
+        )
+
+        if tappable {
+            Button {
+                withAnimation(.easeOut(duration: 0.2)) {
+                    sectorsExpanded.toggle()
+                }
+            } label: { pill }
+            .buttonStyle(.plain)
+        } else {
+            pill
+        }
     }
 
     @ViewBuilder
     private func holdingsSection(_ plan: PortfolioPlan) -> some View {
-        VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-            Text("Your holdings")
-                .font(.sacredSubheading)
-                .foregroundColor(.sacredText)
-
-            VStack(spacing: 0) {
-                ForEach(Array(plan.holdings.enumerated()), id: \.element.id) { index, holding in
-                    if index > 0 {
-                        Rectangle()
-                            .fill(Color.sacredMuted.opacity(0.18))
-                            .frame(height: 1)
-                    }
-                    HoldingRow(
-                        holding: holding,
-                        action: action(for: holding.ticker, in: plan),
-                        onRequestDelete: { pendingDelete = holding.ticker }
-                    )
+        VStack(spacing: 0) {
+            ForEach(Array(plan.holdings.enumerated()), id: \.element.id) { index, holding in
+                if index > 0 {
+                    Rectangle()
+                        .fill(Color.sacredMuted.opacity(0.18))
+                        .frame(height: 1)
                 }
+                HoldingRow(
+                    holding: holding,
+                    action: action(for: holding.ticker, in: plan),
+                    onRequestDelete: { pendingDelete = holding.ticker }
+                )
             }
         }
     }
