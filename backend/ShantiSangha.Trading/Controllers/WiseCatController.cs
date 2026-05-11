@@ -99,6 +99,21 @@ public class WiseCatController(
         return Ok(rows);
     }
 
+    /// <summary>
+    /// Enriched watchlist — same shape as /symbols/search/enriched, but
+    /// pre-filtered to exclude held tickers. Powers the collapsible
+    /// "Watching" section on the Stocks home view.
+    /// </summary>
+    [HttpGet("watchlist/enriched")]
+    public async Task<IActionResult> WatchlistEnriched(CancellationToken ct = default)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+
+        var rows = await portfolio.ListWatchlistEnrichedAsync(user.Id, ct);
+        return Ok(rows);
+    }
+
     [HttpGet("history/{ticker}")]
     public async Task<IActionResult> GetHistory(string ticker, int days = 90, CancellationToken ct = default)
     {

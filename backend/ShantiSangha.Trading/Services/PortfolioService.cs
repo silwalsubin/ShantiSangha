@@ -616,18 +616,25 @@ public class PortfolioService(
         if (trimmed.Length < 1)
         {
             // Browse mode — no typed query. Universe is the user's held
-            // tickers plus the curated mega-cap basket (one rep per
-            // sector). Both have cached bars and resolved sectors, so
-            // the enrichment loop below stays under a couple of seconds.
-            // Scoring more than ~25 tickers per keystroke would dominate
-            // the Lambda budget; we cap deliberately at a small universe
-            // and rely on Finnhub for the long tail when the user types.
+            // tickers ∪ watchlist ∪ the curated mega-cap basket (one rep
+            // per sector). Held auto-mirror into the watchlist so the
+            // union is mostly watchlist + basket in practice. Both have
+            // cached bars and resolved sectors, so the enrichment loop
+            // below stays fast. Scoring more than ~30 tickers per
+            // keystroke would dominate the Lambda budget; we cap
+            // deliberately at a small universe and rely on Finnhub for
+            // the long tail when the user types.
             var holdings = await db.UserPortfolioPositions
                 .Where(p => p.UserId == userId)
                 .Select(p => p.Ticker)
                 .ToListAsync(ct);
+            var watchlist = await db.WatchlistItems
+                .Where(w => w.UserId == userId)
+                .Select(w => w.Ticker)
+                .ToListAsync(ct);
             var universe = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var h in holdings) universe.Add(h.ToUpperInvariant());
+            foreach (var w in watchlist) universe.Add(w.ToUpperInvariant());
             foreach (var t in SectorBasket.Values) universe.Add(t.ToUpperInvariant());
 
             hits = universe
@@ -650,6 +657,48 @@ public class PortfolioService(
         }
         if (hits.Count == 0) return Array.Empty<EnrichedSymbolMatchDto>();
 
+        return await EnrichHitsAsync(userId, hits, ct);
+    }
+
+    public async Task<IReadOnlyList<EnrichedSymbolMatchDto>> ListWatchlistEnrichedAsync(
+        Guid userId, CancellationToken ct = default)
+    {
+        // Pure-interest watchlist surface — held tickers are excluded so
+        // the "Watching" section only shows what the user is tracking
+        // outside of their portfolio.
+        var heldSet = await db.UserPortfolioPositions
+            .Where(p => p.UserId == userId)
+            .Select(p => p.Ticker.ToUpper())
+            .ToListAsync(ct);
+        var held = new HashSet<string>(heldSet, StringComparer.OrdinalIgnoreCase);
+
+        var watchlist = await db.WatchlistItems
+            .Where(w => w.UserId == userId)
+            .OrderBy(w => w.Ticker)
+            .Select(w => w.Ticker)
+            .ToListAsync(ct);
+
+        var pureWatch = watchlist
+            .Where(t => !held.Contains(t.ToUpperInvariant()))
+            .ToList();
+
+        if (pureWatch.Count == 0) return Array.Empty<EnrichedSymbolMatchDto>();
+
+        var hits = pureWatch
+            .Select(t => new SymbolMatch(t.ToUpperInvariant(), string.Empty, "Common Stock"))
+            .ToList();
+        return await EnrichHitsAsync(userId, hits, ct);
+    }
+
+    /// <summary>
+    /// Shared enrichment loop — sector resolution (cache-only) + batch
+    /// scoring from cached bars (skips tickers with &lt; 100 bars).
+    /// Used by both SearchEnrichedAsync and ListWatchlistEnrichedAsync
+    /// so the wire shape stays identical for the iOS rendering layer.
+    /// </summary>
+    private async Task<IReadOnlyList<EnrichedSymbolMatchDto>> EnrichHitsAsync(
+        Guid userId, IReadOnlyList<SymbolMatch> hits, CancellationToken ct)
+    {
         var settings = await strategySettings.GetOrCreateAsync(userId, ct);
         var horizon = settings.EntryHorizon;
 

@@ -9,6 +9,12 @@ final class PortfolioViewModel: ObservableObject {
     @Published private(set) var generatingPlan = false
     @Published var error: String?
 
+    /// Watchlist entries already enriched (sector + p_buy / p_sell at
+    /// the user's entry horizon). Held tickers are filtered out on the
+    /// server, so this set is pure "stocks I want to track but don't
+    /// own yet."
+    @Published private(set) var watchlist: [SymbolMatch] = []
+
     func loadPortfolio() async {
         loading = true
         defer { loading = false }
@@ -39,6 +45,16 @@ final class PortfolioViewModel: ObservableObject {
             self.error = nil
         } catch {
             self.error = "Could not generate plan: \(error.localizedDescription)"
+        }
+    }
+
+    func loadWatchlist() async {
+        do {
+            self.watchlist = try await WiseCatAPI.listWatchlistEnriched()
+        } catch {
+            // Non-fatal — the watchlist is a side surface, the plan view
+            // is the main content. Silent fallback keeps the UI calm.
+            self.watchlist = []
         }
     }
 

@@ -36,6 +36,13 @@ enum WiseCatAPI {
         return try await ApiService.shared.get("/wisecat/symbols/search/enriched?q=\(escaped)&limit=\(limit)")
     }
 
+    /// Enriched watchlist — same shape as `searchSymbolsEnriched`,
+    /// pre-filtered to exclude held tickers. Powers the "Watching"
+    /// section on the Stocks home view.
+    static func listWatchlistEnriched() async throws -> [SymbolMatch] {
+        try await ApiService.shared.get("/wisecat/watchlist/enriched")
+    }
+
     static func getChart(_ ticker: String, range: ChartRange) async throws -> ChartHistory {
         try await ApiService.shared.get("/wisecat/chart/\(ticker)?period=\(range.rawValue)")
     }
