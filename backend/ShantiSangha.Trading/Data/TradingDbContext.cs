@@ -11,6 +11,8 @@ public class TradingDbContext(DbContextOptions<TradingDbContext> options) : DbCo
     public DbSet<UserPortfolioPosition> UserPortfolioPositions => Set<UserPortfolioPosition>();
     public DbSet<TickerSector> TickerSectors => Set<TickerSector>();
     public DbSet<UserStrategySettings> UserStrategySettings => Set<UserStrategySettings>();
+    public DbSet<StopOutLedger> StopOutLedgers => Set<StopOutLedger>();
+    public DbSet<TradeJournalEntry> TradeJournalEntries => Set<TradeJournalEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -70,7 +72,29 @@ public class TradingDbContext(DbContextOptions<TradingDbContext> options) : DbCo
             e.Property(s => s.TakeProfitPct).HasPrecision(6, 4);
             e.Property(s => s.EntryThresholdPBuy).HasPrecision(6, 4);
             e.Property(s => s.PositionCapPct).HasPrecision(6, 4);
+            e.Property(s => s.SellSignalPSell).HasPrecision(6, 4);
             e.Property(s => s.EntryHorizon).HasMaxLength(4).IsRequired();
+        });
+
+        modelBuilder.Entity<StopOutLedger>(e =>
+        {
+            e.HasKey(s => s.Id);
+            e.HasIndex(s => new { s.UserId, s.Ticker, s.StoppedAt });
+            e.Property(s => s.Ticker).HasMaxLength(16).IsRequired();
+            e.Property(s => s.ExitPrice).HasPrecision(18, 4);
+            e.Property(s => s.CostBasis).HasPrecision(18, 4);
+            e.Property(s => s.LossPct).HasPrecision(6, 4);
+        });
+
+        modelBuilder.Entity<TradeJournalEntry>(e =>
+        {
+            e.HasKey(j => j.Id);
+            e.HasIndex(j => new { j.UserId, j.CreatedAt });
+            e.Property(j => j.Ticker).HasMaxLength(16).IsRequired();
+            e.Property(j => j.Kind).HasConversion<string>().HasMaxLength(16).IsRequired();
+            e.Property(j => j.Price).HasPrecision(18, 4);
+            e.Property(j => j.Shares).HasPrecision(18, 6);
+            e.Property(j => j.Reason).HasMaxLength(500);
         });
     }
 }

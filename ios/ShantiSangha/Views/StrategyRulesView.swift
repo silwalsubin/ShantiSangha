@@ -18,7 +18,12 @@ struct StrategyRulesView: View {
     @State private var positionCapText = ""
     @State private var cooldownText = ""
     @State private var minSectorsText = ""
+    @State private var sellSignalText = ""
     @State private var horizon = "1W"
+
+    @State private var backtest: StrategyBacktestResult?
+    @State private var backtesting = false
+    @State private var backtestError: String?
 
     private let horizons = ["1W", "1M", "1Y"]
 
@@ -37,6 +42,7 @@ struct StrategyRulesView: View {
                             exitsCard
                             entryCard
                             sizingCard
+                            backtestCard
                             if let err = error {
                                 Text(err)
                                     .font(.sacredCaption)
@@ -93,13 +99,16 @@ struct StrategyRulesView: View {
     private var exitsCard: some View {
         LuxCard {
             VStack(alignment: .leading, spacing: SacredSpacing.m) {
-                sectionTitle("Exits", subtitle: "Rule 3 (stop) & Rule 11 (target)")
+                sectionTitle("Exits", subtitle: "Rule 3 (stop), Rule 11 (target), momentum reversal")
                 percentField(label: "Stop-loss (% from cost)",
                              help: "When a position is down this much, exit. Default -7%.",
                              text: $stopLossText)
                 percentField(label: "Take-profit (% from cost)",
                              help: "When a position is up this much, cash out. Default +10%.",
                              text: $takeProfitText)
+                probField(label: "Sell on p_sell ≥ (0.40–0.95)",
+                          help: "Exit when the model flips bearish at the entry horizon. Default 0.55. Lower = exit earlier on reversal.",
+                          text: $sellSignalText)
             }
             .padding(SacredSpacing.lux)
         }
@@ -131,6 +140,77 @@ struct StrategyRulesView: View {
                          text: $cooldownText)
             }
             .padding(SacredSpacing.lux)
+        }
+    }
+
+    private var backtestCard: some View {
+        LuxCard {
+            VStack(alignment: .leading, spacing: SacredSpacing.m) {
+                sectionTitle("Preview envelope", subtitle: "Coarse estimate from the 2026-05-10 basket backtest")
+                if let r = backtest {
+                    HStack(spacing: SacredSpacing.l) {
+                        statBlock(label: "Return / yr",
+                                  value: String(format: "%+.1f%%", r.annualizedReturnPct * 100),
+                                  tint: r.annualizedReturnPct >= 0 ? .sacredGreen : .sacredRed)
+                        statBlock(label: "Max DD",
+                                  value: String(format: "%+.1f%%", r.maxDrawdownPct * 100),
+                                  tint: .sacredRed)
+                        statBlock(label: "Win rate",
+                                  value: String(format: "%.0f%%", r.winRatePct * 100),
+                                  tint: .sacredText)
+                    }
+                    Text(r.notes)
+                        .font(.sacredCaption)
+                        .foregroundColor(.sacredMuted)
+                } else {
+                    Text("Tap to see a rough envelope. The honest backtest still runs offline in `python -m wisecat.strategy_sim` — this is a directional sanity check before saving.")
+                        .font(.sacredText)
+                        .foregroundColor(.sacredTextSecondary)
+                }
+                if let err = backtestError {
+                    Text(err)
+                        .font(.sacredCaption)
+                        .foregroundColor(.sacredRed)
+                }
+                Button {
+                    Task { await runBacktest() }
+                } label: {
+                    HStack {
+                        if backtesting { ProgressView().tint(.sacredGold) }
+                        Text(backtest == nil ? "Preview backtest envelope" : "Refresh")
+                            .font(.sacredButtonLabel)
+                            .foregroundColor(.sacredGold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, SacredSpacing.xs)
+                }
+                .disabled(backtesting)
+            }
+            .padding(SacredSpacing.lux)
+        }
+    }
+
+    private func statBlock(label: String, value: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label.uppercased())
+                .font(.sacredCaption)
+                .foregroundColor(.sacredMuted)
+            Text(value)
+                .font(.sacredSubheading)
+                .foregroundColor(tint)
+        }
+    }
+
+    private func runBacktest() async {
+        backtesting = true
+        defer { backtesting = false }
+        do {
+            // Save current edits first so the backend sees the live constants.
+            await save(dismissOnSuccess: false)
+            backtest = try await WiseCatAPI.runStrategyBacktest()
+            backtestError = nil
+        } catch {
+            backtestError = error.localizedDescription
         }
     }
 
@@ -226,6 +306,7 @@ struct StrategyRulesView: View {
             self.positionCapText = String(format: "%.0f", s.positionCapPct * 100)
             self.cooldownText = String(s.cooldownDays)
             self.minSectorsText = String(s.minSectors)
+            self.sellSignalText = String(format: "%.2f", s.sellSignalPSell)
             self.horizon = s.entryHorizon
             self.error = nil
         } catch {
@@ -233,7 +314,7 @@ struct StrategyRulesView: View {
         }
     }
 
-    private func save() async {
+    private func save(dismissOnSuccess: Bool = true) async {
         saving = true
         defer { saving = false }
         // Percent fields are entered as 0–100; the API expects 0.00–1.00.
@@ -243,6 +324,7 @@ struct StrategyRulesView: View {
         let threshold = Double(entryThresholdText)
         let cooldown = Int(cooldownText)
         let minSec = Int(minSectorsText)
+        let sellSignal = Double(sellSignalText)
 
         let req = UpdateStrategySettingsRequest(
             stopLossPct: stop,
@@ -251,13 +333,14 @@ struct StrategyRulesView: View {
             entryHorizon: horizon,
             cooldownDays: cooldown,
             positionCapPct: cap,
-            minSectors: minSec
+            minSectors: minSec,
+            sellSignalPSell: sellSignal
         )
 
         do {
             self.settings = try await WiseCatAPI.updateStrategySettings(req)
             self.error = nil
-            dismiss()
+            if dismissOnSuccess { dismiss() }
         } catch {
             self.error = "Save failed: \(error.localizedDescription)"
         }

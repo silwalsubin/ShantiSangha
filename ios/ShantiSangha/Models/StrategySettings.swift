@@ -11,6 +11,7 @@ struct StrategySettings: Codable, Hashable {
     let cooldownDays: Int
     let positionCapPct: Double
     let minSectors: Int
+    let sellSignalPSell: Double
     let updatedAt: String
 }
 
@@ -23,4 +24,5 @@ struct UpdateStrategySettingsRequest: Codable {
     let cooldownDays: Int?
     let positionCapPct: Double?
     let minSectors: Int?
+    let sellSignalPSell: Double?
 }

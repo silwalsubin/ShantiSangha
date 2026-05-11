@@ -73,6 +73,12 @@ public class StrategySettingsService(TradingDbContext db) : IStrategySettingsSer
                 throw new InvalidOperationException("minSectors must be between 1 and 11");
             row.MinSectors = min;
         }
+        if (req.SellSignalPSell is { } ps)
+        {
+            if (ps < 0.4m || ps > 0.95m)
+                throw new InvalidOperationException("sellSignalPSell must be between 0.40 and 0.95");
+            row.SellSignalPSell = ps;
+        }
 
         row.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);

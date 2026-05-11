@@ -44,6 +44,17 @@ enum PortfolioActionKind: String, Codable, Hashable {
     }
 }
 
+/// Concrete numbers for placing a bracket order at the broker. Populated
+/// on BUY actions only; null on Sell/Trim/Hold.
+struct BracketOrder: Codable, Hashable {
+    let entryPrice: Double
+    let stopPrice: Double
+    let targetPrice: Double
+    let riskPerShare: Double
+    let totalRiskDollars: Double
+    let rMultiple: Double
+}
+
 struct PortfolioAction: Codable, Identifiable, Hashable {
     let ticker: String
     let sector: String
@@ -52,6 +63,7 @@ struct PortfolioAction: Codable, Identifiable, Hashable {
     let price: Double?
     let amount: Double?
     let reason: String
+    let bracket: BracketOrder?
 
     var id: String { "\(kind.rawValue)-\(ticker)" }
 }

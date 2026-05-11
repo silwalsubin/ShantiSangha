@@ -66,6 +66,13 @@ class StrategyParams:
     entry_mode: str = "wisecat"           # "wisecat" (gate on p_buy) or "always" (always-in unless stopped or cooldown)
     cooldown_days: int = 0                # min calendar days after a stop before re-entry. 0 = immediate next signal.
     take_profit_pct: float | None = None  # exit when (close / entry) - 1 >= take_profit_pct. None disables.
+    # ---- Active-trader exits (off by default; toggle per-backtest) ------
+    trailing_stop_pct: float | None = None  # once a position trades through `trailing_arm_pct`, trail at -trailing_stop_pct from peak. None disables.
+    trailing_arm_pct: float = 0.05         # peak-from-entry threshold that arms the trailing stop. Default +5%.
+    scale_out_pct: float | None = None     # take partial profit at +scale_out_pct, ride the rest. None disables.
+    scale_out_fraction: float = 0.5        # what fraction of the position to take off at scale_out_pct. Default half.
+    time_decay_days: int = 0               # 0 disables. If >0 and held this long AND p_buy < time_decay_pbuy_floor at the entry horizon, force-exit.
+    time_decay_pbuy_floor: float = 0.50    # p_buy threshold for the time-decay exit. Only consulted when time_decay_days > 0.
 
 
 # -------- Per-window simulation -----------------------------------------------
@@ -81,7 +88,10 @@ class TradeRecord:
     vix_at_entry: float | None = None
     exit_date: date | None = None
     exit_price: float | None = None
-    exit_reason: str | None = None  # "stop", "window_end"
+    exit_reason: str | None = None  # "stop", "take_profit", "trailing", "scale_out", "time_decay", "window_end"
+    # ---- Active-trader exit state ----
+    peak_price: float | None = None        # max close seen since entry; drives trailing stop
+    scaled_out: bool = False               # set once a scale-out fill has fired
 
     @property
     def return_pct(self) -> float:
@@ -165,6 +175,44 @@ def _position_fraction(params: StrategyParams, vix: float | None) -> float:
     return 0.5
 
 
+_REASON_LABEL = {
+    "stop": "STOP  ",
+    "trailing": "TRAIL ",
+    "take_profit": "TARGET",
+    "time_decay": "DECAY ",
+    "window_end": "ENDWIN",
+}
+
+
+def _close_trade(
+    tr: "TradeRecord",
+    d: date,
+    close_today: float,
+    reason: str,
+    slot_balance: dict[str, float],
+    ticker: str,
+    all_trades: list,
+    open_trade: dict,
+    verbose: bool,
+) -> None:
+    """Realize the remaining deployed capital at today's close, mark the
+    trade with `reason`, free the slot. Used by every exit path so the
+    bookkeeping stays in one place."""
+    ret = close_today / tr.entry_price - 1.0
+    tr.exit_date = d
+    tr.exit_price = close_today
+    tr.exit_reason = reason
+    slot_balance[ticker] += tr.deployed * ret
+    all_trades.append(tr)
+    open_trade[ticker] = None
+    if verbose:
+        label = _REASON_LABEL.get(reason, reason.upper()[:6].ljust(6))
+        print(f"    {d}  {label} {ticker:5} entry={tr.entry_price:.2f} "
+              f"exit={close_today:.2f}  ret={ret*100:+.1f}%  "
+              f"deployed=${tr.deployed:.0f}  slot now ${slot_balance[ticker]:.0f}",
+              file=sys.stderr)
+
+
 def _wisecat_p_buy(
     ticker: str,
     history: pd.DataFrame,
@@ -218,10 +266,11 @@ def simulate_window(
     vix_history = getattr(context, "vix_history", None)
 
     for d in calendar:
-        # 1. For each open position, check stop-loss AND take-profit
-        #    against today's close. Stop-loss takes precedence on rare days
-        #    that gap through both bounds — same daily-close granularity
-        #    caveat as the rest of this simulator.
+        # 1. For each open position, evaluate exits in priority order:
+        #    hard stop > trailing stop > take-profit > scale-out > time decay.
+        #    Hard stop takes precedence on rare days that gap through several
+        #    bounds — same daily-close granularity caveat as the rest of this
+        #    simulator.
         for ticker in tickers:
             tr = open_trade[ticker]
             if tr is None:
@@ -229,32 +278,56 @@ def simulate_window(
             close_today = _close_on(histories[ticker], d)
             if close_today is None:
                 continue
+
+            # Update the peak first so trailing-stop math sees today's high
+            # close. Daily-close granularity — we don't see intraday spikes.
+            if tr.peak_price is None or close_today > tr.peak_price:
+                tr.peak_price = close_today
+
             ret = close_today / tr.entry_price - 1.0
+
+            # (a) Hard stop — pre-committed loss limit. Always wins.
             if ret <= -params.stop_loss_pct:
-                tr.exit_date = d
-                tr.exit_price = close_today
-                tr.exit_reason = "stop"
-                slot_balance[ticker] += tr.deployed * ret
-                all_trades.append(tr)
-                open_trade[ticker] = None
+                _close_trade(tr, d, close_today, "stop", slot_balance, ticker, all_trades, open_trade, verbose)
                 last_stop_date[ticker] = d
+                continue
+
+            # (b) Trailing stop — only fires after the position has armed
+            #     (peak ≥ entry * (1 + trailing_arm_pct)). Once armed, exit
+            #     when close < peak * (1 - trailing_stop_pct).
+            if params.trailing_stop_pct is not None and tr.peak_price is not None:
+                armed = tr.peak_price >= tr.entry_price * (1.0 + params.trailing_arm_pct)
+                if armed and close_today <= tr.peak_price * (1.0 - params.trailing_stop_pct):
+                    _close_trade(tr, d, close_today, "trailing", slot_balance, ticker, all_trades, open_trade, verbose)
+                    continue
+
+            # (c) Take-profit at fixed +N%.
+            if params.take_profit_pct is not None and ret >= params.take_profit_pct:
+                _close_trade(tr, d, close_today, "take_profit", slot_balance, ticker, all_trades, open_trade, verbose)
+                continue
+
+            # (d) Scale-out — partial exit at +scale_out_pct. Reduces deployed
+            #     capital but leaves the remainder running under stop/trail.
+            if (params.scale_out_pct is not None and not tr.scaled_out
+                    and ret >= params.scale_out_pct):
+                booked_pnl = tr.deployed * ret * params.scale_out_fraction
+                slot_balance[ticker] += booked_pnl
+                tr.deployed *= (1.0 - params.scale_out_fraction)
+                tr.scaled_out = True
                 if verbose:
-                    print(f"    {d}  STOP   {ticker:5} entry={tr.entry_price:.2f} "
-                          f"exit={close_today:.2f}  ret={ret*100:+.1f}%  "
-                          f"deployed=${tr.deployed:.0f}  slot now ${slot_balance[ticker]:.0f}",
+                    print(f"    {d}  SCALE  {ticker:5} entry={tr.entry_price:.2f} "
+                          f"close={close_today:.2f}  ret={ret*100:+.1f}%  "
+                          f"booked ${booked_pnl:.0f}  remaining deployed ${tr.deployed:.0f}",
                           file=sys.stderr)
-            elif params.take_profit_pct is not None and ret >= params.take_profit_pct:
-                tr.exit_date = d
-                tr.exit_price = close_today
-                tr.exit_reason = "take_profit"
-                slot_balance[ticker] += tr.deployed * ret
-                all_trades.append(tr)
-                open_trade[ticker] = None
-                if verbose:
-                    print(f"    {d}  TARGET {ticker:5} entry={tr.entry_price:.2f} "
-                          f"exit={close_today:.2f}  ret={ret*100:+.1f}%  "
-                          f"deployed=${tr.deployed:.0f}  slot now ${slot_balance[ticker]:.0f}",
-                          file=sys.stderr)
+                # do NOT continue — let other exits still evaluate this bar.
+
+            # (e) Time decay — if held long enough and the entry-horizon
+            #     conviction has rotted, free the slot.
+            if params.time_decay_days > 0 and (d - tr.entry_date).days >= params.time_decay_days:
+                p_buy_now = _wisecat_p_buy(ticker, histories[ticker], d, params.entry_horizon, context)
+                if p_buy_now is not None and p_buy_now < params.time_decay_pbuy_floor:
+                    _close_trade(tr, d, close_today, "time_decay", slot_balance, ticker, all_trades, open_trade, verbose)
+                    continue
 
         # 2. For each cash slot, score and enter if filter passes AND
         #    VIX-regime sizing allows a non-zero position.
@@ -460,6 +533,24 @@ def main() -> None:
     parser.add_argument("--take-profit", type=float, default=None,
                         help="Exit positions when they reach +N from entry "
                              "(e.g. 0.10 = +10%%). Disabled by default.")
+    parser.add_argument("--trailing-stop", type=float, default=None,
+                        help="Once armed, trail at -N from the peak close "
+                             "since entry (e.g. 0.05 = -5%%). Disabled by default.")
+    parser.add_argument("--trailing-arm", type=float, default=0.05,
+                        help="Peak-from-entry threshold that arms the trailing "
+                             "stop. Default 0.05 = +5%%.")
+    parser.add_argument("--scale-out", type=float, default=None,
+                        help="Take a partial profit at +N (e.g. 0.07 = +7%%). "
+                             "Combine with --trailing-stop or --take-profit "
+                             "to let the rest run. Disabled by default.")
+    parser.add_argument("--scale-out-fraction", type=float, default=0.5,
+                        help="Fraction of position to sell at --scale-out. Default 0.5.")
+    parser.add_argument("--time-decay-days", type=int, default=0,
+                        help="Force-exit positions held this long whose p_buy "
+                             "at the entry horizon has dropped below "
+                             "--time-decay-floor. 0 disables (default).")
+    parser.add_argument("--time-decay-floor", type=float, default=0.50,
+                        help="p_buy threshold for the time-decay exit. Default 0.50.")
     parser.add_argument("--no-vix-sizing", action="store_true",
                         help="Disable VIX-regime sizing (always full position).")
     parser.add_argument("--vix-low", type=float, default=20.0,
@@ -494,6 +585,12 @@ def main() -> None:
         entry_mode=args.entry_mode,
         cooldown_days=args.cooldown_days,
         take_profit_pct=args.take_profit,
+        trailing_stop_pct=args.trailing_stop,
+        trailing_arm_pct=args.trailing_arm,
+        scale_out_pct=args.scale_out,
+        scale_out_fraction=args.scale_out_fraction,
+        time_decay_days=args.time_decay_days,
+        time_decay_pbuy_floor=args.time_decay_floor,
     )
 
     print("=== Strategy Backtest ===", file=sys.stderr)
@@ -508,6 +605,16 @@ def main() -> None:
     print(f"  - Stop-loss: -{params.stop_loss_pct*100:.1f}% from entry", file=sys.stderr)
     if params.take_profit_pct is not None:
         print(f"  - Take-profit: +{params.take_profit_pct*100:.1f}% from entry", file=sys.stderr)
+    if params.trailing_stop_pct is not None:
+        print(f"  - Trailing stop: -{params.trailing_stop_pct*100:.1f}% from peak "
+              f"(arms after +{params.trailing_arm_pct*100:.1f}%)", file=sys.stderr)
+    if params.scale_out_pct is not None:
+        print(f"  - Scale-out: sell {params.scale_out_fraction*100:.0f}% of position at "
+              f"+{params.scale_out_pct*100:.1f}%", file=sys.stderr)
+    if params.time_decay_days > 0:
+        print(f"  - Time decay: exit after {params.time_decay_days}d if "
+              f"p_buy < {params.time_decay_pbuy_floor:.2f} at {params.entry_horizon}",
+              file=sys.stderr)
     print(f"  - Position cap: {100/len(tickers):.1f}% per slot", file=sys.stderr)
     if params.vix_sizing:
         print(f"  - VIX sizing: full < {params.vix_low:.0f}, half "

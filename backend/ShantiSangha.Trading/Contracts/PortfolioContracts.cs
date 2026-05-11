@@ -41,7 +41,8 @@ public record PortfolioActionDto(
     decimal? Shares,           // shares to sell/buy. null for hold.
     decimal? Price,            // current price; reference for the user
     decimal? Amount,           // dollar amount of the action
-    string Reason              // human-readable explanation
+    string Reason,             // human-readable explanation
+    BracketOrderDto? Bracket   // populated on BUY actions; null otherwise
 );
 
 public record PortfolioHoldingDto(
@@ -87,6 +88,7 @@ public record StrategySettingsDto(
     int CooldownDays,              // Rule 4
     decimal PositionCapPct,        // Rule 2
     int MinSectors,                // Rule 1
+    decimal SellSignalPSell,       // exit on momentum reversal
     DateTime UpdatedAt
 );
 
@@ -97,5 +99,59 @@ public record UpdateStrategySettingsRequest(
     string? EntryHorizon,
     int? CooldownDays,
     decimal? PositionCapPct,
-    int? MinSectors
+    int? MinSectors,
+    decimal? SellSignalPSell
+);
+
+// ---------- Bracket-order prep (BUY action enrichment) ---------------------
+
+/// <summary>
+/// Concrete numbers for placing a bracket order at the broker: entry,
+/// stop, target, dollar risk, R-multiple. Populated on BUY actions only.
+/// All values are advisory — the user still executes at their broker.
+/// </summary>
+public record BracketOrderDto(
+    decimal EntryPrice,        // current price; reference for limit-order placement
+    decimal StopPrice,         // entry * (1 - stopLossPct)
+    decimal TargetPrice,       // entry * (1 + takeProfitPct)
+    decimal RiskPerShare,      // entry - stopPrice (always positive)
+    decimal TotalRiskDollars,  // riskPerShare * shares
+    double  RMultiple          // (target - entry) / (entry - stopPrice)
+);
+
+// ---------- Journal (Rule 8) -----------------------------------------------
+
+public record JournalEntryDto(
+    Guid Id,
+    string Ticker,
+    string Kind,               // "Entry" | "Exit" | "Trim" | "AddOn" | "Note"
+    decimal? Price,
+    decimal? Shares,
+    string? Reason,
+    DateTime CreatedAt
+);
+
+public record CreateJournalEntryRequest(
+    string Ticker,
+    string Kind,
+    decimal? Price,
+    decimal? Shares,
+    string? Reason
+);
+
+// ---------- Backtest (Rules-sheet preview) ---------------------------------
+
+/// <summary>
+/// Returned by POST /api/wisecat/strategy/backtest. Summary stats over a
+/// fixed multi-regime window so the user can preview the envelope of
+/// their current rule constants before saving.
+/// </summary>
+public record StrategyBacktestResultDto(
+    string Window,                  // "2014-2024" etc — the regime span backtested
+    double AnnualizedReturnPct,     // e.g. 0.082 = 8.2%/yr
+    double MaxDrawdownPct,          // negative; e.g. -0.18 = -18%
+    int Trades,
+    double WinRatePct,              // 0..1
+    double SharpeApprox,            // mean / stdev of monthly returns × sqrt(12)
+    string Notes                    // free-form caveats from the runner
 );

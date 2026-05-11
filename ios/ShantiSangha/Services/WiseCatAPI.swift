@@ -67,4 +67,24 @@ enum WiseCatAPI {
     static func updateStrategySettings(_ body: UpdateStrategySettingsRequest) async throws -> StrategySettings {
         try await ApiService.shared.put("/wisecat/strategy/settings", body: body)
     }
+
+    // ---------- Backtest preview -------------------------------------------
+
+    static func runStrategyBacktest() async throws -> StrategyBacktestResult {
+        try await ApiService.shared.post("/wisecat/strategy/backtest")
+    }
+
+    // ---------- Journal (Rule 8) -------------------------------------------
+
+    static func listJournal(limit: Int = 50) async throws -> [TradeJournalEntry] {
+        try await ApiService.shared.get("/wisecat/journal?limit=\(limit)")
+    }
+
+    static func addJournalEntry(_ body: CreateJournalEntryRequest) async throws -> TradeJournalEntry {
+        try await ApiService.shared.post("/wisecat/journal", body: body)
+    }
+
+    static func deleteJournalEntry(_ id: UUID) async throws {
+        try await ApiService.shared.delete("/wisecat/journal/\(id.uuidString)")
+    }
 }

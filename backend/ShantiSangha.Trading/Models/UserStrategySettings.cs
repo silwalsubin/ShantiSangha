@@ -15,8 +15,9 @@ public class UserStrategySettings
     public decimal TakeProfitPct { get; set; } = 0.10m;        // Rule 11
     public decimal EntryThresholdPBuy { get; set; } = 0.60m;   // Rule 10
     public string EntryHorizon { get; set; } = "1W";           // Rule 10 — "1W" | "1M" | "1Y"
-    public int CooldownDays { get; set; } = 5;                 // Rule 4 (informational; not server-enforced)
+    public int CooldownDays { get; set; } = 5;                 // Rule 4 (server-enforced after AddStopOutLedger)
     public decimal PositionCapPct { get; set; } = 0.10m;       // Rule 2
     public int MinSectors { get; set; } = 8;                   // Rule 1
+    public decimal SellSignalPSell { get; set; } = 0.55m;      // advisory exit on p_sell at entry horizon
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

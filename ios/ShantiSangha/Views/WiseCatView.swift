@@ -10,6 +10,7 @@ struct WiseCatView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var showAddPosition = false
     @State private var showRules = false
+    @State private var showJournal = false
     @State private var pendingDelete: String?
     @State private var lastFetchAt: Date?
 
@@ -56,6 +57,14 @@ struct WiseCatView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: SacredSpacing.s) {
                     Button {
+                        showJournal = true
+                    } label: {
+                        Image(systemName: "book.closed")
+                            .foregroundColor(.sacredGold)
+                    }
+                    .accessibilityLabel("Journal")
+
+                    Button {
                         showRules = true
                     } label: {
                         Image(systemName: "slider.horizontal.3")
@@ -91,6 +100,9 @@ struct WiseCatView: View {
             Task { await vm.generatePlan() }
         }) {
             StrategyRulesView()
+        }
+        .sheet(isPresented: $showJournal) {
+            TradeJournalView()
         }
         .confirmationDialog("Remove this position?",
                             isPresented: Binding(
@@ -399,37 +411,43 @@ private struct BuyRow: View {
 
     var body: some View {
         NavigationLink(destination: WiseCatDetailView(ticker: action.ticker)) {
-            HStack(alignment: .center, spacing: SacredSpacing.m) {
-                VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
-                    Text(action.ticker)
-                        .font(.sacredHeading)
-                        .foregroundColor(.sacredText)
-                    Text(action.sector)
-                        .font(.sacredSmall)
-                        .foregroundColor(.sacredTextSecondary)
-                    if let price = action.price, price > 0 {
-                        Text(String(format: "$%.2f", price))
+            VStack(alignment: .leading, spacing: SacredSpacing.s) {
+                HStack(alignment: .center, spacing: SacredSpacing.m) {
+                    VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
+                        Text(action.ticker)
+                            .font(.sacredHeading)
+                            .foregroundColor(.sacredText)
+                        Text(action.sector)
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredTextSecondary)
+                        if let price = action.price, price > 0 {
+                            Text(String(format: "$%.2f", price))
+                                .font(.sacredCaption)
+                                .foregroundColor(.sacredMuted)
+                        }
+                    }
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: SacredSpacing.xxs) {
+                        Text("BUY")
+                            .font(.sacredButtonLabel)
+                            .foregroundColor(.sacredGreen)
+                        if let amount = action.amount, amount > 0 {
+                            Text(target(amount))
+                                .font(.sacredCaption)
+                                .foregroundColor(.sacredTextSecondary)
+                        }
+                        Text(shortReason)
                             .font(.sacredCaption)
                             .foregroundColor(.sacredMuted)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.trailing)
                     }
                 }
 
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: SacredSpacing.xxs) {
-                    Text("BUY")
-                        .font(.sacredButtonLabel)
-                        .foregroundColor(.sacredGreen)
-                    if let amount = action.amount, amount > 0 {
-                        Text(target(amount))
-                            .font(.sacredCaption)
-                            .foregroundColor(.sacredTextSecondary)
-                    }
-                    Text(shortReason)
-                        .font(.sacredCaption)
-                        .foregroundColor(.sacredMuted)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.trailing)
+                if let bracket = action.bracket {
+                    bracketChips(bracket)
                 }
             }
             .padding(.vertical, SacredSpacing.m)
@@ -437,6 +455,44 @@ private struct BuyRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    /// Three compact chips — entry / stop / target — plus an R-multiple
+    /// caption so the user can see the trade's reward-to-risk shape
+    /// before placing the bracket at their broker.
+    @ViewBuilder
+    private func bracketChips(_ b: BracketOrder) -> some View {
+        VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
+            HStack(spacing: SacredSpacing.xs) {
+                bracketChip(label: "Entry", value: String(format: "$%.2f", b.entryPrice),
+                            tint: .sacredText)
+                bracketChip(label: "Stop", value: String(format: "$%.2f", b.stopPrice),
+                            tint: .sacredRed)
+                bracketChip(label: "Target", value: String(format: "$%.2f", b.targetPrice),
+                            tint: .sacredGreen)
+            }
+            Text(String(format: "Risk $%.0f per share, $%.0f total · %.1fR",
+                        b.riskPerShare, b.totalRiskDollars, b.rMultiple))
+                .font(.sacredCaption)
+                .foregroundColor(.sacredMuted)
+        }
+    }
+
+    private func bracketChip(label: String, value: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(label.uppercased())
+                .font(.sacredCaption)
+                .foregroundColor(.sacredMuted)
+            Text(value)
+                .font(.sacredSmallSemibold)
+                .foregroundColor(tint)
+        }
+        .padding(.horizontal, SacredSpacing.xs)
+        .padding(.vertical, SacredSpacing.xxs)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.sacredBgCard.opacity(0.6))
+        )
     }
 
     private func target(_ v: Double) -> String {

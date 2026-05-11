@@ -13,7 +13,8 @@ public class PortfolioService(
     ILogger<PortfolioService> logger) : IPortfolioService
 {
     // ---------- Defaults — overridden per-user via UserStrategySettings --
-    private const double SellSignalPSell = 0.55;         // Advisory exit (not user-tunable yet)
+    // (All thresholds now come from UserStrategySettings; constants kept
+    // only as fallback for older callers.)
 
     // Hardcoded sector overrides for common large-caps. Falls back to "Unknown"
     // for anything not listed — the iOS side surfaces those so user can
@@ -232,6 +233,42 @@ public class PortfolioService(
         var row = await db.UserPortfolioPositions
             .FirstOrDefaultAsync(p => p.UserId == userId && p.Ticker == ticker, ct);
         if (row is null) return false;
+
+        // Rule 4 — if the position was removed at or below the user's
+        // stop-loss threshold, log a stop-out so the plan generator can
+        // block re-entry inside the cooldown window. Auto-detected from
+        // the latest cached close; not perfect, but explicit enough.
+        try
+        {
+            var settings = await strategySettings.GetOrCreateAsync(userId, ct);
+            var stopLossPct = settings.StopLossPct;
+            var latestClose = await db.TickerDailyCloses
+                .Where(b => b.Ticker == ticker)
+                .OrderByDescending(b => b.Date)
+                .Select(b => b.Close)
+                .FirstOrDefaultAsync(ct);
+            if (latestClose > 0 && row.CostBasis > 0)
+            {
+                var lossPct = (latestClose / row.CostBasis) - 1m;
+                if (lossPct <= -stopLossPct)
+                {
+                    db.StopOutLedgers.Add(new StopOutLedger
+                    {
+                        UserId = userId,
+                        Ticker = ticker,
+                        StoppedAt = DateTime.UtcNow,
+                        ExitPrice = latestClose,
+                        CostBasis = row.CostBasis,
+                        LossPct = Math.Round(lossPct, 4),
+                    });
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(e, "Stop-out detection failed for {Ticker}; remove will still proceed", ticker);
+        }
+
         db.UserPortfolioPositions.Remove(row);
         await db.SaveChangesAsync(ct);
         return true;
@@ -253,6 +290,17 @@ public class PortfolioService(
         var positionCapPct = (double)settings.PositionCapPct;
         var minSectors = settings.MinSectors;
         var horizon = settings.EntryHorizon;
+        var sellSignalPSell = (double)settings.SellSignalPSell;
+        var cooldownDays = settings.CooldownDays;
+
+        // Rule 4 — pull recent stop-outs so we can block re-entry. We only
+        // need the most-recent stop per ticker; oldest can be dropped.
+        var cooldownCutoff = DateTime.UtcNow.AddDays(-Math.Max(cooldownDays, 0));
+        var cooldownByTicker = await db.StopOutLedgers
+            .Where(s => s.UserId == userId && s.StoppedAt >= cooldownCutoff)
+            .GroupBy(s => s.Ticker)
+            .Select(g => new { Ticker = g.Key, StoppedAt = g.Max(x => x.StoppedAt) })
+            .ToDictionaryAsync(x => x.Ticker, x => x.StoppedAt, StringComparer.OrdinalIgnoreCase, ct);
 
         var positions = await db.UserPortfolioPositions
             .Where(p => p.UserId == userId)
@@ -428,8 +476,8 @@ public class PortfolioService(
                 reasons.Add($"Rule 3 violated: down {h.UnrealizedReturnPct * 100:+0.0;-0.0;0}% (below -{stopLossPct * 100:0}% stop)");
             if (h.UnrealizedReturnPct >= takeProfitPct)
                 reasons.Add($"Rule 11 hit: up {h.UnrealizedReturnPct * 100:+0.0}% (at or above +{takeProfitPct * 100:0}% target) — cash out");
-            if (h.PSell >= SellSignalPSell)
-                reasons.Add($"WiseCat 1M p_sell={h.PSell:0.00} ≥ {SellSignalPSell:0.00}");
+            if (h.PSell >= sellSignalPSell)
+                reasons.Add($"WiseCat {horizon} p_sell={h.PSell:0.00} ≥ {sellSignalPSell:0.00}");
 
             if (reasons.Count > 0)
             {
@@ -440,7 +488,8 @@ public class PortfolioService(
                     Shares: h.Shares,
                     Price: h.CurrentPrice,
                     Amount: h.MarketValue,
-                    Reason: string.Join("; ", reasons)
+                    Reason: string.Join("; ", reasons),
+                    Bracket: null
                 ));
                 willExit.Add(h.Ticker);
             }
@@ -462,7 +511,8 @@ public class PortfolioService(
                 Shares: sharesToSell,
                 Price: h.CurrentPrice,
                 Amount: excess,
-                Reason: $"Rule 2: {h.PercentOfPortfolio * 100:0.0}% of portfolio (cap is {positionCapPct * 100:0}%)"
+                Reason: $"Rule 2: {h.PercentOfPortfolio * 100:0.0}% of portfolio (cap is {positionCapPct * 100:0}%)",
+                Bracket: null
             ));
             trimTickers.Add(h.Ticker);
         }
@@ -482,9 +532,35 @@ public class PortfolioService(
             var price = bars.Count > 0 ? bars[^1].Close : 0m;
             var (pBuy, _) = ReadProbabilities(scoreByTicker, ticker, horizon);
             var sharesToBuy = price > 0 ? targetPerSlot / price : 0m;
-            var reason = pBuy >= entryThresholdPBuy
+
+            // Rule 4 — block re-entry if a stop-out is still inside the
+            // cooldown window. Surface the date the cooldown lifts so the
+            // user knows when to revisit.
+            string reason;
+            if (cooldownByTicker.TryGetValue(ticker, out var stoppedAt))
+            {
+                var lifts = stoppedAt.AddDays(cooldownDays);
+                reason = $"Rule 4: in cooldown after stop on {stoppedAt:MMM d}. " +
+                         $"Re-entry allowed from {lifts:MMM d}. Skip this slot for now.";
+                actions.Add(new PortfolioActionDto(
+                    Ticker: ticker,
+                    Sector: sector,
+                    Kind: PortfolioActionKind.Buy,            // BUY tile, null bracket = advisory only
+                    Shares: 0m,
+                    Price: price,
+                    Amount: 0m,
+                    Reason: reason,
+                    Bracket: null
+                ));
+                continue;
+            }
+
+            reason = pBuy >= entryThresholdPBuy
                 ? $"Missing sector + high-confidence buy (p_buy={pBuy:0.00} ≥ {entryThresholdPBuy:0.00})"
                 : $"Missing sector (p_buy={pBuy:0.00}, below {entryThresholdPBuy:0.00} — consider limit order or defer)";
+
+            var bracket = BuildBracket(price, sharesToBuy, stopLossPct, takeProfitPct);
+
             actions.Add(new PortfolioActionDto(
                 Ticker: ticker,
                 Sector: sector,
@@ -492,7 +568,8 @@ public class PortfolioService(
                 Shares: sharesToBuy,
                 Price: price,
                 Amount: targetPerSlot,
-                Reason: reason
+                Reason: reason,
+                Bracket: bracket
             ));
         }
 
@@ -508,7 +585,8 @@ public class PortfolioService(
                 Shares: null,
                 Price: h.CurrentPrice,
                 Amount: h.MarketValue,
-                Reason: $"In good shape. Set stop at {stopPrice:F2} (-{stopLossPct * 100:0}% from current)."
+                Reason: $"In good shape. Set stop at {stopPrice:F2} (-{stopLossPct * 100:0}% from current).",
+                Bracket: null
             ));
         }
 
@@ -528,6 +606,26 @@ public class PortfolioService(
     }
 
     // ---------- helpers -----------------------------------------------------
+
+    private static BracketOrderDto? BuildBracket(
+        decimal entryPrice, decimal shares, double stopLossPct, double takeProfitPct)
+    {
+        if (entryPrice <= 0 || shares <= 0) return null;
+        var stopPrice = Math.Round(entryPrice * (decimal)(1.0 - stopLossPct), 4);
+        var targetPrice = Math.Round(entryPrice * (decimal)(1.0 + takeProfitPct), 4);
+        var riskPerShare = entryPrice - stopPrice;
+        if (riskPerShare <= 0) return null;
+        var totalRisk = Math.Round(riskPerShare * shares, 2);
+        var rMultiple = (double)((targetPrice - entryPrice) / riskPerShare);
+        return new BracketOrderDto(
+            EntryPrice: Math.Round(entryPrice, 4),
+            StopPrice: stopPrice,
+            TargetPrice: targetPrice,
+            RiskPerShare: Math.Round(riskPerShare, 4),
+            TotalRiskDollars: totalRisk,
+            RMultiple: rMultiple
+        );
+    }
 
     private static string? ResolveHardcodedSector(string ticker)
     {
