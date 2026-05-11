@@ -1,8 +1,10 @@
 import SwiftUI
 
-/// Compact home-card surface for Wise Cat. Tapping opens the full WiseCatView.
+/// Compact home-card surface for Wise Cat. Reads the portfolio plan and
+/// only surfaces *actions* (Sell / Trim / Buy) — Hold positions are not
+/// counted, because a hold isn't an action. Tapping opens the Stocks tab.
 struct WiseCatHomeCard: View {
-    @StateObject private var vm = WiseCatViewModel()
+    @StateObject private var vm = PortfolioViewModel()
 
     var body: some View {
         NavigationLink(destination: WiseCatView()) {
@@ -10,12 +12,8 @@ struct WiseCatHomeCard: View {
                 VStack(alignment: .leading, spacing: SacredSpacing.lux) {
                     header
 
-                    if vm.watchlist.isEmpty || vm.signals.isEmpty {
-                        // Subtitle already conveys state — no body needed,
-                        // matches Today's Rhythm's empty-friendly shape.
-                        EmptyView()
-                    } else {
-                        statsRow
+                    if let plan = vm.plan, plan.positionCount > 0 {
+                        statsRow(plan)
                     }
                 }
                 .padding(SacredSpacing.lux)
@@ -23,7 +21,10 @@ struct WiseCatHomeCard: View {
             }
         }
         .buttonStyle(.plain)
-        .task { await vm.refresh() }
+        .task {
+            await vm.loadPortfolio()
+            await vm.generatePlan()
+        }
     }
 
     private var header: some View {
@@ -33,7 +34,7 @@ struct WiseCatHomeCard: View {
                     .font(.sacredSectionLabel)
                     .tracking(3)
                     .foregroundColor(.sacredLabel)
-                Text(headerSubtitle)
+                Text(subtitle)
                     .font(.sacredSmall)
                     .foregroundColor(.sacredMuted)
             }
@@ -41,18 +42,28 @@ struct WiseCatHomeCard: View {
         }
     }
 
-    private var headerSubtitle: String {
-        if vm.watchlist.isEmpty { return "Add a ticker to begin." }
-        if vm.signals.isEmpty { return "Today's reading is being prepared." }
-        return "Today's reading"
+    private var subtitle: String {
+        guard let plan = vm.plan else { return "Loading…" }
+        if plan.positionCount == 0 {
+            return "Build your portfolio."
+        }
+        let counts = actionCounts(in: plan)
+        let total = counts.sell + counts.trim + counts.buy
+        if total == 0 {
+            return "Portfolio aligned — no actions today."
+        }
+        return "\(total) action\(total == 1 ? "" : "s") this month"
     }
 
-    private var statsRow: some View {
-        let counts = actionCounts()
-        return HStack(spacing: 0) {
-            statCell(count: counts.buy, label: "Buy", activeColor: .sacredGreen)
-            statCell(count: counts.hold, label: "Hold", activeColor: .sacredText)
-            statCell(count: counts.sell, label: "Sell", activeColor: .sacredRed)
+    @ViewBuilder
+    private func statsRow(_ plan: PortfolioPlan) -> some View {
+        let counts = actionCounts(in: plan)
+        if counts.sell + counts.trim + counts.buy > 0 {
+            HStack(spacing: 0) {
+                statCell(count: counts.sell, label: "Sell", activeColor: .sacredRed)
+                statCell(count: counts.trim, label: "Trim", activeColor: .sacredGoldDark)
+                statCell(count: counts.buy,  label: "Buy",  activeColor: .sacredGreen)
+            }
         }
     }
 
@@ -69,16 +80,16 @@ struct WiseCatHomeCard: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func actionCounts() -> (buy: Int, hold: Int, sell: Int) {
-        var buy = 0, hold = 0, sell = 0
-        for sig in vm.signals {
-            switch WiseCatAction.from(sig.action) {
-            case .buy: buy += 1
-            case .hold: hold += 1
+    private func actionCounts(in plan: PortfolioPlan) -> (sell: Int, trim: Int, buy: Int) {
+        var sell = 0, trim = 0, buy = 0
+        for a in plan.actions {
+            switch a.kind {
             case .sell: sell += 1
+            case .trim: trim += 1
+            case .buy:  buy  += 1
+            case .hold: break  // intentionally not counted
             }
         }
-        return (buy, hold, sell)
+        return (sell, trim, buy)
     }
-
 }

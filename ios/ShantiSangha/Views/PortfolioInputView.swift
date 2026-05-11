@@ -11,6 +11,7 @@ struct PortfolioInputView: View {
     @State private var drafts: [PositionDraft] = []
     @State private var cashText: String = ""
     @State private var showPlan = false
+    @State private var showTickerSearch = false
 
     var body: some View {
         NavigationStack {
@@ -52,6 +53,13 @@ struct PortfolioInputView: View {
             .navigationDestination(isPresented: $showPlan) {
                 PortfolioPlanView(plan: vm.plan, regenerating: vm.generatingPlan) {
                     await vm.generatePlan()
+                }
+            }
+            .sheet(isPresented: $showTickerSearch) {
+                TickerSearchSheet(excluded: Set(drafts.map { $0.ticker.uppercased() })) { picked in
+                    var d = PositionDraft()
+                    d.ticker = picked
+                    drafts.append(d)
                 }
             }
         }
@@ -117,7 +125,7 @@ struct PortfolioInputView: View {
 
     private var addButton: some View {
         Button {
-            drafts.append(PositionDraft())
+            showTickerSearch = true
         } label: {
             HStack(spacing: SacredSpacing.s) {
                 Image(systemName: "plus.circle.fill")
@@ -126,6 +134,8 @@ struct PortfolioInputView: View {
                     .font(.sacredButtonLabel)
                     .foregroundColor(.sacredGold)
                 Spacer()
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.sacredMuted)
             }
             .padding(.horizontal, SacredSpacing.m)
             .padding(.vertical, SacredSpacing.s)
@@ -215,13 +225,11 @@ private struct PositionDraftRow: View {
                 Text("Ticker")
                     .font(.sacredCaption)
                     .foregroundColor(.sacredMuted)
-                TextField("AAPL", text: $draft.ticker)
+                Text(draft.ticker)
                     .font(.sacredSubheading)
                     .foregroundColor(.sacredText)
-                    .textInputAutocapitalization(.characters)
-                    .autocorrectionDisabled()
             }
-            .frame(width: 80)
+            .frame(width: 80, alignment: .leading)
 
             VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
                 Text("Shares")

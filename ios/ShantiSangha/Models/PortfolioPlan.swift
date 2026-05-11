@@ -24,13 +24,15 @@ struct SavePortfolioRequest: Codable {
     let cashBalance: Double?
 }
 
-/// Action kinds mirror PortfolioActionKind enum on the server.
-/// The server emits them as integers — keep these raw values aligned.
-enum PortfolioActionKind: Int, Codable, Hashable {
-    case sell = 0
-    case trim = 1
-    case buy  = 2
-    case hold = 3
+/// Action kinds mirror PortfolioActionKind enum on the server. The API
+/// project registers `JsonStringEnumConverter`, so enums come across the
+/// wire as their literal C# names ("Sell", "Trim", "Buy", "Hold") — not
+/// as integers. These raw values must match.
+enum PortfolioActionKind: String, Codable, Hashable {
+    case sell = "Sell"
+    case trim = "Trim"
+    case buy  = "Buy"
+    case hold = "Hold"
 
     var label: String {
         switch self {
