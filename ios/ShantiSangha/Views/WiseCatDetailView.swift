@@ -12,6 +12,12 @@ struct WiseCatDetailView: View {
     /// caption so the user can spot stale data while revalidation runs.
     @State private var refreshedAt: Date?
 
+    /// `nil` while the portfolio load is in flight; true / false after it
+    /// completes. Drives whether the bottom "Add to Portfolio" CTA shows.
+    /// Cheap fetch — just a list call — so we always do it on appear.
+    @State private var heldByUser: Bool?
+    @State private var showAddSheet = false
+
     var body: some View {
         ZStack {
             SacredBackground()
@@ -51,6 +57,66 @@ struct WiseCatDetailView: View {
         .task {
             hydrateFromCache()
             await load()
+            await loadHeldStatus()
+        }
+        .safeAreaInset(edge: .bottom) {
+            if heldByUser == false {
+                addToPortfolioCTA
+            }
+        }
+        .sheet(isPresented: $showAddSheet, onDismiss: {
+            // Position may have been saved — refresh held status so the
+            // CTA disappears without leaving the detail view.
+            Task { await loadHeldStatus() }
+        }) {
+            AddPositionView(
+                excludedTickers: [],
+                prefilledTicker: ticker
+            ) {
+                // onSaved fires before dismiss; loadHeldStatus reruns from
+                // onDismiss above. Nothing extra to do here.
+            }
+        }
+    }
+
+    private var addToPortfolioCTA: some View {
+        Button {
+            showAddSheet = true
+        } label: {
+            Text("Add to portfolio")
+                .font(.sacredButtonLabel)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(LinearGradient.sacredGoldShinyVertical)
+                .clipShape(Capsule())
+                .shadow(color: .sacredMuted.opacity(0.18), radius: 8, y: 4)
+        }
+        .padding(.horizontal, SacredSpacing.m)
+        .padding(.bottom, SacredSpacing.s)
+        .background(
+            // Soft fade so the button sits on the chrome cleanly when the
+            // chart scrolls under it. Sacred background, never a hard line.
+            LinearGradient(
+                colors: [Color.sacredBg.opacity(0), Color.sacredBg.opacity(0.92), Color.sacredBg],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 80)
+            .allowsHitTesting(false),
+            alignment: .bottom
+        )
+    }
+
+    private func loadHeldStatus() async {
+        do {
+            let positions = try await WiseCatAPI.listPortfolio()
+            let target = ticker.uppercased()
+            heldByUser = positions.contains(where: { $0.ticker.uppercased() == target })
+        } catch {
+            // If we can't tell, hide the CTA rather than risk a duplicate-add
+            // attempt that the backend would reject anyway.
+            heldByUser = true
         }
     }
 

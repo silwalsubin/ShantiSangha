@@ -139,6 +139,24 @@ public record CreateJournalEntryRequest(
     string? Reason
 );
 
+// ---------- Search enrichment ----------------------------------------------
+
+/// <summary>
+/// Symbol-search hit enriched with sector (from the TickerSectors cache +
+/// hardcoded overrides — never hits yfinance synchronously) and p_buy /
+/// p_sell at the user's entry horizon (null when not enough bars are
+/// cached locally to score; the detail view backfills on tap-in).
+/// </summary>
+public record EnrichedSymbolMatchDto(
+    string Symbol,
+    string Description,
+    string Type,
+    string? Sector,
+    double? PBuy,
+    double? PSell,
+    string? Horizon          // which horizon the scores reflect, if scored
+);
+
 // ---------- Backtest (Rules-sheet preview) ---------------------------------
 
 /// <summary>

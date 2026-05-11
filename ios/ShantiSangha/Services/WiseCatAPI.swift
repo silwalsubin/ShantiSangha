@@ -28,6 +28,14 @@ enum WiseCatAPI {
         return try await ApiService.shared.get("/wisecat/symbols/search?q=\(escaped)&limit=\(limit)")
     }
 
+    /// Enriched search — same shape as `searchSymbols` but each row may
+    /// carry `sector` + `pBuy` + `pSell` + `horizon`. Used by the in-app
+    /// search bar to render filter chips and signal badges.
+    static func searchSymbolsEnriched(_ query: String, limit: Int = 12) async throws -> [SymbolMatch] {
+        let escaped = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+        return try await ApiService.shared.get("/wisecat/symbols/search/enriched?q=\(escaped)&limit=\(limit)")
+    }
+
     static func getChart(_ ticker: String, range: ChartRange) async throws -> ChartHistory {
         try await ApiService.shared.get("/wisecat/chart/\(ticker)?period=\(range.rawValue)")
     }

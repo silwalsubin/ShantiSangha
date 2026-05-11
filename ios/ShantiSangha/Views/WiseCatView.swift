@@ -8,47 +8,66 @@ import SwiftUI
 struct WiseCatView: View {
     @StateObject private var vm = PortfolioViewModel()
     @Environment(\.scenePhase) private var scenePhase
-    @State private var showAddPosition = false
     @State private var showRules = false
     @State private var showJournal = false
     @State private var pendingDelete: String?
     @State private var lastFetchAt: Date?
+
+    // Global ticker search (replaces the old "+" button — search is the
+    // new entry point for both navigating to held tickers and adding new
+    // positions).
+    @State private var query = ""
+    @State private var searchResults: [SymbolMatch] = []
+    @State private var searching = false
+    @State private var searchTaskID = UUID()
+    @State private var selectedSectors: Set<String> = []
+
+    /// GICS-11 sector universe. Static (rather than derived from results)
+    /// so the filter chips don't reflow on every keystroke.
+    private let sectorFilters: [String] = [
+        "Information Technology", "Health Care", "Financials",
+        "Consumer Discretionary", "Consumer Staples", "Communication Services",
+        "Industrials", "Energy", "Utilities", "Materials", "Real Estate",
+    ]
 
     var body: some View {
         ZStack {
             SacredBackground()
                 .ignoresSafeArea()
 
-            ScrollView {
-                VStack(spacing: SacredSpacing.l) {
-                    if let plan = vm.plan, plan.positionCount > 0 {
-                        summary(plan)
-                        holdingsSection(plan)
-                        buysSection(plan)
-                        rulesFooter
-                    } else if vm.generatingPlan || vm.loading {
-                        ProgressView()
-                            .tint(.sacredGold)
-                            .frame(maxWidth: .infinity, minHeight: 200)
-                    } else {
-                        emptyState
-                    }
+            if !query.trimmingCharacters(in: .whitespaces).isEmpty {
+                searchResultsView
+            } else {
+                ScrollView {
+                    VStack(spacing: SacredSpacing.l) {
+                        if let plan = vm.plan, plan.positionCount > 0 {
+                            summary(plan)
+                            holdingsSection(plan)
+                            buysSection(plan)
+                        } else if vm.generatingPlan || vm.loading {
+                            ProgressView()
+                                .tint(.sacredGold)
+                                .frame(maxWidth: .infinity, minHeight: 200)
+                        } else {
+                            emptyState
+                        }
 
-                    if let err = vm.error {
-                        Text(err)
-                            .font(.sacredCaption)
-                            .foregroundColor(.sacredRed)
-                            .padding(.horizontal, SacredSpacing.m)
+                        if let err = vm.error {
+                            Text(err)
+                                .font(.sacredCaption)
+                                .foregroundColor(.sacredRed)
+                                .padding(.horizontal, SacredSpacing.m)
+                        }
                     }
+                    .padding(.horizontal, SacredSpacing.m)
+                    .padding(.top, SacredSpacing.l)
+                    .padding(.bottom, SacredSpacing.tabBarSafe)
                 }
-                .padding(.horizontal, SacredSpacing.m)
-                .padding(.top, SacredSpacing.l)
-                .padding(.bottom, SacredSpacing.tabBarSafe)
-            }
-            .refreshable {
-                // User-driven refresh — bypass throttle entirely.
-                lastFetchAt = Date()
-                await vm.generatePlan()
+                .refreshable {
+                    // User-driven refresh — bypass throttle entirely.
+                    lastFetchAt = Date()
+                    await vm.generatePlan()
+                }
             }
         }
         .navigationTitle("Stocks")
@@ -71,29 +90,16 @@ struct WiseCatView: View {
                             .foregroundColor(.sacredGold)
                     }
                     .accessibilityLabel("Edit rules")
-
-                    Button {
-                        showAddPosition = true
-                    } label: {
-                        Image(systemName: "plus")
-                            .foregroundColor(.sacredGold)
-                    }
-                    .accessibilityLabel("Add a stock")
                 }
             }
         }
-        .sheet(isPresented: $showAddPosition) {
-            AddPositionView(
-                excludedTickers: Set(vm.positions.map { $0.ticker.uppercased() })
-            ) {
-                // Refresh after a successful add. The add VM already
-                // updated its own `positions`, but this VM (the Stocks
-                // tab's) needs the position list + plan re-fetched.
-                Task {
-                    await vm.loadPortfolio()
-                    await vm.generatePlan()
-                }
-            }
+        .searchable(text: $query,
+                    placement: .navigationBarDrawer(displayMode: .always),
+                    prompt: Text("Search a stock"))
+        .textInputAutocapitalization(.characters)
+        .autocorrectionDisabled(true)
+        .onChange(of: query) { _, newValue in
+            scheduleSearch(for: newValue)
         }
         .sheet(isPresented: $showRules, onDismiss: {
             // Rule changes shift the plan output — regenerate.
@@ -125,9 +131,10 @@ struct WiseCatView: View {
         }
         .onAppear {
             // Tab switch or NavigationLink return — refresh if data is older
-            // than 30s. The pull-to-refresh and scene-phase paths cover the
-            // explicit cases; this catches in-app navigation drift.
-            Task { await refresh(force: false, maxAgeSeconds: 30) }
+            // than ~5s. Tight enough that returning from a detail-view "Add
+            // to portfolio" surfaces the new position immediately; the
+            // pull-to-refresh and scene-phase paths cover everything else.
+            Task { await refresh(force: false, maxAgeSeconds: 5) }
         }
         .onChange(of: scenePhase) { _, newPhase in
             // Background → foreground: always refresh, the prices and
@@ -146,6 +153,224 @@ struct WiseCatView: View {
         lastFetchAt = Date()
         await vm.loadPortfolio()
         await vm.generatePlan()
+    }
+
+    // MARK: - Search
+
+    /// Search-results screen that takes over the main scroll content
+    /// while the user is typing. Held tickers push to detail; new
+    /// tickers open AddPositionView pre-filled with that symbol. When
+    /// no Finnhub match comes back, an "Add <QUERY> manually" fallback
+    /// keeps the escape hatch open.
+    @ViewBuilder
+    private var searchResultsView: some View {
+        let trimmed = query.trimmingCharacters(in: .whitespaces).uppercased()
+        let heldSet = Set(vm.positions.map { $0.ticker.uppercased() })
+        let filtered = filteredResults(heldSet: heldSet)
+        let manualSymbol = SymbolMatch(symbol: trimmed, description: "", type: "")
+        let suggestManual = !trimmed.isEmpty
+            && selectedSectors.isEmpty
+            && !searchResults.contains(where: { $0.symbol.uppercased() == trimmed })
+
+        VStack(spacing: 0) {
+            sectorFilterRow
+
+            ScrollView {
+                VStack(spacing: SacredSpacing.s) {
+                    if searching && filtered.isEmpty {
+                        ProgressView()
+                            .tint(.sacredGold)
+                            .padding(.top, SacredSpacing.l)
+                    }
+
+                    ForEach(filtered) { match in
+                        searchResultRow(match: match,
+                                        held: heldSet.contains(match.symbol.uppercased()))
+                    }
+
+                    if suggestManual {
+                        searchResultRow(match: manualSymbol,
+                                        held: heldSet.contains(trimmed),
+                                        manualFallback: true)
+                    }
+
+                    if !searching && filtered.isEmpty && !suggestManual {
+                        Text(selectedSectors.isEmpty
+                             ? "No matches"
+                             : "No matches in the selected sector(s)")
+                            .font(.sacredCaption)
+                            .foregroundColor(.sacredMuted)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, SacredSpacing.l)
+                    }
+                }
+                .padding(.horizontal, SacredSpacing.m)
+                .padding(.top, SacredSpacing.m)
+                .padding(.bottom, SacredSpacing.tabBarSafe)
+            }
+        }
+    }
+
+    /// Horizontal chips along the top of search mode. Tapping a chip
+    /// toggles it; multiple chips can be active (OR semantics). An
+    /// unscored row (no sector resolved) is hidden whenever any chip is
+    /// active — better to hide than to lie about its sector.
+    private var sectorFilterRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: SacredSpacing.xs) {
+                ForEach(sectorFilters, id: \.self) { sector in
+                    sectorChip(sector)
+                }
+            }
+            .padding(.horizontal, SacredSpacing.m)
+            .padding(.vertical, SacredSpacing.xs)
+        }
+    }
+
+    private func sectorChip(_ sector: String) -> some View {
+        let active = selectedSectors.contains(sector)
+        return Button {
+            if active { selectedSectors.remove(sector) }
+            else { selectedSectors.insert(sector) }
+        } label: {
+            Text(sector)
+                .font(.sacredSmallSemibold)
+                .foregroundColor(active ? .white : .sacredText)
+                .padding(.horizontal, SacredSpacing.s)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(active ? Color.sacredGold : Color.sacredBgCard.opacity(0.6))
+                )
+                .overlay(
+                    Capsule()
+                        .stroke(active ? Color.clear : Color.sacredMuted.opacity(0.25),
+                                lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func filteredResults(heldSet: Set<String>) -> [SymbolMatch] {
+        if selectedSectors.isEmpty { return searchResults }
+        return searchResults.filter { match in
+            guard let s = match.sector else { return false }   // hide unscored when filtering
+            return selectedSectors.contains(s)
+        }
+    }
+
+    @ViewBuilder
+    private func searchResultRow(match: SymbolMatch,
+                                 held: Bool,
+                                 manualFallback: Bool = false) -> some View
+    {
+        // Both held and not-held tap into the detail view. The detail view
+        // surfaces an "Add to portfolio" CTA at the bottom when the ticker
+        // isn't already owned, so the user sees the full chart + signals
+        // BEFORE committing capital.
+        NavigationLink(destination: WiseCatDetailView(ticker: match.symbol)) {
+            searchRowContent(match: match, held: held, manualFallback: manualFallback)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func searchRowContent(match: SymbolMatch,
+                                  held: Bool,
+                                  manualFallback: Bool) -> some View
+    {
+        LuxCard {
+            HStack(alignment: .center, spacing: SacredSpacing.m) {
+                VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
+                    Text(match.symbol.uppercased())
+                        .font(.sacredHeading)
+                        .foregroundColor(.sacredText)
+                    if !match.description.isEmpty {
+                        Text(match.description)
+                            .font(.sacredCaption)
+                            .foregroundColor(.sacredTextSecondary)
+                            .lineLimit(1)
+                    } else if manualFallback {
+                        Text("Add manually — not in symbol search")
+                            .font(.sacredCaption)
+                            .foregroundColor(.sacredMuted)
+                    }
+                    if let sector = match.sector, !sector.isEmpty {
+                        Text(sector)
+                            .font(.sacredCaption)
+                            .foregroundColor(.sacredMuted)
+                    }
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: SacredSpacing.xxs) {
+                    if held {
+                        Text("IN PORTFOLIO")
+                            .font(.sacredCaption)
+                            .foregroundColor(.sacredGold)
+                    } else if !manualFallback {
+                        Text("VIEW")
+                            .font(.sacredButtonLabel)
+                            .foregroundColor(.sacredGold)
+                    } else {
+                        Text("ADD")
+                            .font(.sacredButtonLabel)
+                            .foregroundColor(.sacredGreen)
+                    }
+                    if let pBuy = match.pBuy, let horizon = match.horizon {
+                        probabilityChip(pBuy: pBuy, horizon: horizon)
+                    }
+                }
+            }
+            .padding(SacredSpacing.lux)
+            .frame(minHeight: 44)
+        }
+    }
+
+    /// Compact p_buy chip. Color is informational only — tinted by
+    /// strength bucket so the user can scan a list without inviting a
+    /// "highest first" leaderboard sort.
+    private func probabilityChip(pBuy: Double, horizon: String) -> some View {
+        let tint: Color = {
+            if pBuy >= 0.60 { return .sacredGreen }
+            if pBuy >= 0.50 { return .sacredGold }
+            return .sacredMuted
+        }()
+        return Text(String(format: "p_buy %.2f · %@", pBuy, horizon as NSString))
+            .font(.sacredCaption)
+            .foregroundColor(tint)
+    }
+
+    /// Cancellable, lightly-debounced search. Each keystroke spawns a
+    /// task that waits 250ms before hitting the symbol-search endpoint;
+    /// the previous task is cancelled by bumping `searchTaskID` so only
+    /// the latest query wins.
+    private func scheduleSearch(for raw: String) {
+        let trimmed = raw.trimmingCharacters(in: .whitespaces)
+        if trimmed.isEmpty {
+            searchResults = []
+            searching = false
+            return
+        }
+        let id = UUID()
+        searchTaskID = id
+        searching = true
+        Task {
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            guard searchTaskID == id else { return }
+            do {
+                let hits = try await WiseCatAPI.searchSymbolsEnriched(trimmed, limit: 12)
+                guard searchTaskID == id else { return }
+                await MainActor.run {
+                    self.searchResults = hits
+                    self.searching = false
+                }
+            } catch {
+                guard searchTaskID == id else { return }
+                await MainActor.run {
+                    self.searchResults = []
+                    self.searching = false
+                }
+            }
+        }
     }
 
     // MARK: - Sections
@@ -234,38 +459,15 @@ struct WiseCatView: View {
         }
     }
 
-    private var rulesFooter: some View {
-        LuxCard {
-            VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-                Text("Discipline")
-                    .font(.sacredSmallSemibold)
-                    .foregroundColor(.sacredMuted)
-                Text("Trade on your monthly day. -10% stop fires immediately. New entries require WiseCat 1M ≥ 0.70.")
-                    .font(.sacredSmall)
-                    .foregroundColor(.sacredTextSecondary)
-            }
-            .padding(SacredSpacing.lux)
-        }
-    }
-
     private var emptyState: some View {
         LuxCard {
             VStack(alignment: .leading, spacing: SacredSpacing.s) {
                 Text("Build your portfolio")
                     .font(.sacredSubheading)
                     .foregroundColor(.sacredText)
-                Text("Add the stocks you currently own (ticker, shares, cost per share). The app then tells you what to hold, trim, sell, and which sectors to fill.")
+                Text("Search a ticker above to add your first position (you'll enter shares + cost per share). The app then tells you what to hold, trim, sell, and which sectors to fill.")
                     .font(.sacredText)
                     .foregroundColor(.sacredTextSecondary)
-                Button {
-                    showAddPosition = true
-                } label: {
-                    Text("Add a stock")
-                        .font(.sacredButtonLabel)
-                        .foregroundColor(.sacredGold)
-                        .padding(.top, SacredSpacing.xs)
-                }
-                .frame(minHeight: 44, alignment: .leading)
             }
             .padding(SacredSpacing.lux)
         }

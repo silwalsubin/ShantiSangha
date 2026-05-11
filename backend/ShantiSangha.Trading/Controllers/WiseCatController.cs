@@ -85,6 +85,21 @@ public class WiseCatController(
         return Ok(results);
     }
 
+    /// <summary>
+    /// Enriched symbol search — adds sector (cache-only resolution) and
+    /// p_buy / p_sell at the user's entry horizon (scored from cached bars
+    /// only). Powers the in-app search bar's filter chips + signal badges.
+    /// </summary>
+    [HttpGet("symbols/search/enriched")]
+    public async Task<IActionResult> SearchSymbolsEnriched(string q, int limit = 12, CancellationToken ct = default)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+
+        var rows = await portfolio.SearchEnrichedAsync(user.Id, q ?? string.Empty, limit, ct);
+        return Ok(rows);
+    }
+
     [HttpGet("history/{ticker}")]
     public async Task<IActionResult> GetHistory(string ticker, int days = 90, CancellationToken ct = default)
     {

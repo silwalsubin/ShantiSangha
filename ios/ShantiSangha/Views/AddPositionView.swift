@@ -8,9 +8,23 @@ struct AddPositionView: View {
     /// step so the user doesn't try to "add" a duplicate (the backend
     /// would reject anyway).
     var excludedTickers: Set<String>
+    /// Pre-selected ticker. When non-nil the view opens directly on the
+    /// cost-basis form step and skips symbol search. Cancel still backs
+    /// out of the sheet entirely (no search step to fall back to).
+    var prefilledTicker: String?
     /// Called when a position is successfully saved. Parent should
     /// regenerate the plan and dismiss the sheet.
     var onSaved: () -> Void
+
+    init(excludedTickers: Set<String>,
+         prefilledTicker: String? = nil,
+         onSaved: @escaping () -> Void)
+    {
+        self.excludedTickers = excludedTickers
+        self.prefilledTicker = prefilledTicker
+        self.onSaved = onSaved
+        _picked = State(initialValue: prefilledTicker?.uppercased())
+    }
 
     @Environment(\.dismiss) private var dismiss
     @StateObject private var vm = PortfolioViewModel()
@@ -40,8 +54,9 @@ struct AddPositionView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") {
-                        if picked != nil {
-                            // Step back from form to search.
+                        // When prefilled we have no search step to fall back
+                        // to, so Cancel always dismisses the sheet outright.
+                        if picked != nil && prefilledTicker == nil {
                             picked = nil
                             sharesText = ""
                             costText = ""

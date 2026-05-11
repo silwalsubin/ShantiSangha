@@ -605,6 +605,116 @@ public class PortfolioService(
         );
     }
 
+    // ---------- Symbol search enrichment -----------------------------------
+
+    public async Task<IReadOnlyList<EnrichedSymbolMatchDto>> SearchEnrichedAsync(
+        Guid userId, string query, int limit, CancellationToken ct = default)
+    {
+        var trimmed = (query ?? string.Empty).Trim();
+        if (trimmed.Length < 1) return Array.Empty<EnrichedSymbolMatchDto>();
+
+        IReadOnlyList<SymbolMatch> hits;
+        try
+        {
+            hits = await marketData.SearchSymbolsAsync(trimmed, Math.Clamp(limit, 1, 25), ct);
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(e, "Symbol search failed for query {Query}", trimmed);
+            return Array.Empty<EnrichedSymbolMatchDto>();
+        }
+        if (hits.Count == 0) return Array.Empty<EnrichedSymbolMatchDto>();
+
+        var settings = await strategySettings.GetOrCreateAsync(userId, ct);
+        var horizon = settings.EntryHorizon;
+
+        var tickers = hits.Select(h => h.Symbol.ToUpperInvariant()).Distinct().ToList();
+
+        // Sector resolution — cache-only fast path. Falls back to hardcoded
+        // overrides; never hits yfinance synchronously (search latency
+        // budget is tight). Anything still unresolved stays null and the
+        // iOS sector filter just won't include it.
+        var sectorMap = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var t in tickers)
+        {
+            var hard = ResolveHardcodedSector(t);
+            if (hard is not null) sectorMap[t] = hard;
+        }
+        var stillMissing = tickers.Where(t => !sectorMap.ContainsKey(t)).ToList();
+        if (stillMissing.Count > 0)
+        {
+            var cached = await db.TickerSectors
+                .Where(s => stillMissing.Contains(s.Ticker))
+                .ToListAsync(ct);
+            foreach (var row in cached)
+            {
+                sectorMap[row.Ticker] = string.IsNullOrEmpty(row.Sector) ? null : row.Sector;
+            }
+        }
+
+        // Score only tickers that already have ≥100 cached bars. Backfill
+        // would dominate the request time and we're optimizing for keystroke
+        // latency, not coverage. The detail view backfills on tap-in.
+        const int MinBars = 100;
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var cutoff = today.AddDays(-450);
+        var scoreInputs = new List<ScoreInput>();
+        foreach (var t in tickers)
+        {
+            var bars = await db.TickerDailyCloses
+                .Where(b => b.Ticker == t && b.Date <= today && b.Date >= cutoff)
+                .OrderBy(b => b.Date)
+                .Select(b => new MarketBar(b.Date, b.Open, b.High, b.Low, b.Close, b.Volume))
+                .ToListAsync(ct);
+            if (bars.Count >= MinBars)
+            {
+                scoreInputs.Add(new ScoreInput(t, bars, bars[^1].Close));
+            }
+        }
+
+        var scoreByTicker = new Dictionary<string, TechnicalScore>(StringComparer.OrdinalIgnoreCase);
+        if (scoreInputs.Count > 0)
+        {
+            try
+            {
+                var scores = await marketData.ScoreAsync(scoreInputs, ct);
+                foreach (var s in scores) scoreByTicker[s.Ticker] = s;
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(e, "Search-enrichment scoring failed; returning unscored rows");
+            }
+        }
+
+        var results = new List<EnrichedSymbolMatchDto>(hits.Count);
+        foreach (var h in hits)
+        {
+            var key = h.Symbol.ToUpperInvariant();
+            sectorMap.TryGetValue(key, out var sector);
+
+            double? pBuy = null, pSell = null;
+            string? scoredHorizon = null;
+            if (scoreByTicker.TryGetValue(key, out var ts))
+            {
+                var (pb, ps) = ReadProbabilities(scoreByTicker, key, horizon);
+                pBuy = pb;
+                pSell = ps;
+                scoredHorizon = horizon;
+            }
+
+            results.Add(new EnrichedSymbolMatchDto(
+                Symbol: h.Symbol,
+                Description: h.Description,
+                Type: h.Type,
+                Sector: sector,
+                PBuy: pBuy,
+                PSell: pSell,
+                Horizon: scoredHorizon
+            ));
+        }
+        return results;
+    }
+
     // ---------- helpers -----------------------------------------------------
 
     private static BracketOrderDto? BuildBracket(

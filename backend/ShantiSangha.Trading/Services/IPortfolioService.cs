@@ -43,4 +43,16 @@ public interface IPortfolioService
         Guid userId,
         decimal? cashBalance,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Symbol search + side-data enrichment for the iOS search bar.
+    /// Reuses the existing sector cache (no yfinance fallback — speed
+    /// matters here) and scores from cached bars only (skips tickers with
+    /// &lt; 100 cached bars). Scores are at the user's entry horizon.
+    /// </summary>
+    Task<IReadOnlyList<EnrichedSymbolMatchDto>> SearchEnrichedAsync(
+        Guid userId,
+        string query,
+        int limit,
+        CancellationToken ct = default);
 }
