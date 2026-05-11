@@ -67,12 +67,12 @@ public class ReminderService(RemindersDbContext db) : IReminderService
         return ToResponse(reminder, today);
     }
 
-    public async Task<bool> UpdateAsync(
+    public async Task<ReminderResponse?> UpdateAsync(
         Guid id, Guid userId, UpdateReminderRequest body, CancellationToken ct = default)
     {
         var reminder = await db.Reminders
             .FirstOrDefaultAsync(r => r.Id == id && r.UserId == userId, ct);
-        if (reminder is null) return false;
+        if (reminder is null) return null;
 
         if (body.Label is not null)
         {
@@ -100,7 +100,7 @@ public class ReminderService(RemindersDbContext db) : IReminderService
             reminder.CompletedAt = null;
 
         await db.SaveChangesAsync(ct);
-        return true;
+        return ToResponse(reminder, DateOnly.FromDateTime(DateTime.UtcNow));
     }
 
     public async Task<bool> DeleteAsync(Guid id, Guid userId, CancellationToken ct = default)

@@ -60,8 +60,8 @@ public class RemindersController(IReminderService service, ICurrentUser currentU
 
         try
         {
-            var found = await service.UpdateAsync(id, user.Id, body, ct);
-            return found ? NoContent() : NotFound();
+            var updated = await service.UpdateAsync(id, user.Id, body, ct);
+            return updated is null ? NotFound() : Ok(updated);
         }
         catch (InvalidOperationException ex)
         {
