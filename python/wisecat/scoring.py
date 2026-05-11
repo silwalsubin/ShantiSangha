@@ -224,4 +224,16 @@ def _score_one_horizon_gbm(artifact: dict, feats: dict[str, float]) -> HorizonSc
 
 
 def _neutral_horizon() -> HorizonScore:
-    return HorizonScore(score=0.0, signals=[])
+    # All-zero probability triple is a wire-detectable sentinel: real softmax
+    # output sums to ~1.0, so (0, 0, 0) cannot occur from a successful GBM
+    # prediction. Downstream readers map this to Hold + zero conviction
+    # rather than misreading the Pydantic default (pHold=1.0) as a confident
+    # "fully Hold" verdict.
+    return HorizonScore(
+        score=0.0,
+        p_buy=0.0,
+        p_hold=0.0,
+        p_sell=0.0,
+        expected_return=0.0,
+        signals=[],
+    )

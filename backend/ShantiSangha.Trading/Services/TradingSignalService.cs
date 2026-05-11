@@ -12,8 +12,20 @@ public class TradingSignalService(
     IMarketDataClient marketData,
     ILogger<TradingSignalService> logger) : ITradingSignalService
 {
-    private const double BuyThreshold = 0.5;
-    private const double SellThreshold = -0.5;
+    // Probability-based verdict derivation. The legacy ±0.5 threshold on
+    // (pBuy − pSell) essentially never fired — it required the model to be
+    // near-certain. These thresholds operate on the raw class probabilities
+    // and err toward Hold when the model is uncertain.
+    //
+    // Rule: act only when the chosen class clears an absolute floor AND
+    // beats the highest competing class by a margin. With a 3-class softmax
+    // the random baseline is 0.33 per class, so 0.40 is "noticeably above
+    // chance" and 0.10 margin filters out near-ties.
+    //
+    // Per-horizon tuning (tighter floor for 1W, vol-regime calibration) is
+    // a deliberate follow-up — see the WiseCat audit Phase 2.
+    private const double ActionProbabilityFloor = 0.40;
+    private const double ActionMarginOverNextClass = 0.10;
 
     public async Task<IReadOnlyList<TradingSignalDto>> GetTodayAsync(Guid userId, CancellationToken ct = default)
     {
@@ -76,9 +88,9 @@ public class TradingSignalService(
         var composite1M = ClampComposite(tech1M.Score);
         var composite1Y = ClampComposite(tech1Y.Score);
 
-        var action1W = ToAction(composite1W);
-        var action1M = ToAction(composite1M);
-        var action1Y = ToAction(composite1Y);
+        var (action1W, conviction1W) = DeriveVerdict(tech1W.PBuy, tech1W.PHold, tech1W.PSell);
+        var (action1M, conviction1M) = DeriveVerdict(tech1M.PBuy, tech1M.PHold, tech1M.PSell);
+        var (action1Y, conviction1Y) = DeriveVerdict(tech1Y.PBuy, tech1Y.PHold, tech1Y.PSell);
 
         var reasoning = new SignalReasoning(
             Technical1W: tech1W.Contributions
@@ -111,9 +123,9 @@ public class TradingSignalService(
         existing.Action1W = action1W;
         existing.Action1M = action1M;
         existing.Action1Y = action1Y;
-        existing.Conviction1W = Math.Abs(composite1W);
-        existing.Conviction1M = Math.Abs(composite1M);
-        existing.Conviction1Y = Math.Abs(composite1Y);
+        existing.Conviction1W = conviction1W;
+        existing.Conviction1M = conviction1M;
+        existing.Conviction1Y = conviction1Y;
         existing.Technical1W = tech1W.Score;
         existing.Technical1M = tech1M.Score;
         existing.Technical1Y = tech1Y.Score;
@@ -149,10 +161,31 @@ public class TradingSignalService(
 
     private static double ClampComposite(double composite) => Math.Clamp(composite, -1.0, 1.0);
 
-    private static TradingAction ToAction(double composite) =>
-        composite > BuyThreshold ? TradingAction.Buy
-        : composite < SellThreshold ? TradingAction.Sell
-        : TradingAction.Hold;
+    internal static (TradingAction action, double conviction) DeriveVerdict(
+        double pBuy, double pHold, double pSell)
+    {
+        // All-zero sentinel from the Python neutral fallback (GBM artifact
+        // missing or scoring failed). Distinct from a real "fully Hold"
+        // prediction whose triple sums to ~1.0.
+        if (pBuy + pHold + pSell <= 0.001)
+        {
+            return (TradingAction.Hold, 0.0);
+        }
+
+        var competingForBuy = Math.Max(pHold, pSell);
+        if (pBuy >= ActionProbabilityFloor && pBuy >= competingForBuy + ActionMarginOverNextClass)
+        {
+            return (TradingAction.Buy, pBuy);
+        }
+
+        var competingForSell = Math.Max(pHold, pBuy);
+        if (pSell >= ActionProbabilityFloor && pSell >= competingForSell + ActionMarginOverNextClass)
+        {
+            return (TradingAction.Sell, pSell);
+        }
+
+        return (TradingAction.Hold, pHold);
+    }
 
     private async Task BackfillAsync(string ticker, DateOnly fromDate, CancellationToken ct)
     {
