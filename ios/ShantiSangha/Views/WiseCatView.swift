@@ -7,9 +7,11 @@ import SwiftUI
 /// keeps firing for them.
 struct WiseCatView: View {
     @StateObject private var vm = PortfolioViewModel()
+    @Environment(\.scenePhase) private var scenePhase
     @State private var showAddPosition = false
     @State private var showRules = false
     @State private var pendingDelete: String?
+    @State private var lastFetchAt: Date?
 
     var body: some View {
         ZStack {
@@ -42,7 +44,11 @@ struct WiseCatView: View {
                 .padding(.top, SacredSpacing.l)
                 .padding(.bottom, SacredSpacing.tabBarSafe)
             }
-            .refreshable { await vm.generatePlan() }
+            .refreshable {
+                // User-driven refresh — bypass throttle entirely.
+                lastFetchAt = Date()
+                await vm.generatePlan()
+            }
         }
         .navigationTitle("Stocks")
         .navigationBarTitleDisplayMode(.inline)
@@ -103,9 +109,31 @@ struct WiseCatView: View {
             Text("Your shares and cost basis will be deleted. The position can be re-added later.")
         }
         .task {
-            await vm.loadPortfolio()
-            await vm.generatePlan()
+            await refresh(force: true)
         }
+        .onAppear {
+            // Tab switch or NavigationLink return — refresh if data is older
+            // than 30s. The pull-to-refresh and scene-phase paths cover the
+            // explicit cases; this catches in-app navigation drift.
+            Task { await refresh(force: false, maxAgeSeconds: 30) }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            // Background → foreground: always refresh, the prices and
+            // model output are likely stale.
+            if newPhase == .active {
+                Task { await refresh(force: true) }
+            }
+        }
+    }
+
+    private func refresh(force: Bool, maxAgeSeconds: TimeInterval = 30) async {
+        if !force, let last = lastFetchAt,
+           Date().timeIntervalSince(last) < maxAgeSeconds {
+            return
+        }
+        lastFetchAt = Date()
+        await vm.loadPortfolio()
+        await vm.generatePlan()
     }
 
     // MARK: - Sections

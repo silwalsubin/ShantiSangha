@@ -302,14 +302,42 @@ public class PortfolioService(
             barsByTicker[ticker] = bars;
         }
 
-        // Score everything in one Lambda call. Score with the last cached close
-        // as the as-of price (no live quote — plan generation is monthly cadence).
+        // Live quotes for held tickers (Finnhub, 15-min delayed on free tier).
+        // The plan-time current price needs to reflect intraday moves — using
+        // last cached bar close means showing yesterday's price during a live
+        // session, which is what the user flagged as stale.
+        var livePrices = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+        if (heldTickers.Count > 0)
+        {
+            var quoteTasks = heldTickers.Select(async t =>
+            {
+                try
+                {
+                    var q = await marketData.GetQuoteAsync(t, ct);
+                    return (Ticker: t, Quote: q);
+                }
+                catch
+                {
+                    return (Ticker: t, Quote: (QuoteSnapshot?)null);
+                }
+            });
+            foreach (var (t, q) in await Task.WhenAll(quoteTasks))
+            {
+                if (q?.Price is { } p && p > 0) livePrices[t] = p;
+            }
+        }
+
+        // Score everything in one Lambda call. For held tickers we pass the
+        // live quote so the score reflects current pricing; for basket-only
+        // tickers (recommendations) the last cached close is fine — they're
+        // not in the user's portfolio yet, so freshness matters less.
         var scoreInputs = new List<ScoreInput>();
         foreach (var ticker in allTickers)
         {
             var bars = barsByTicker[ticker];
             if (bars.Count == 0) continue;
-            scoreInputs.Add(new ScoreInput(ticker, bars, bars[^1].Close));
+            var price = livePrices.TryGetValue(ticker, out var lp) ? lp : bars[^1].Close;
+            scoreInputs.Add(new ScoreInput(ticker, bars, price));
         }
 
         IReadOnlyList<TechnicalScore> scores = Array.Empty<TechnicalScore>();
@@ -332,7 +360,13 @@ public class PortfolioService(
         foreach (var pos in positions)
         {
             var bars = barsByTicker.TryGetValue(pos.Ticker, out var b) ? b : new List<MarketBar>();
-            var price = bars.Count > 0 ? bars[^1].Close : pos.CostBasis;  // fall back so MV isn't 0 on a brand-new ticker
+            // Price chain: live quote → last cached bar close → user's cost
+            // basis (last-resort fallback so a brand-new ticker doesn't show
+            // as $0).
+            decimal price;
+            if (livePrices.TryGetValue(pos.Ticker, out var lp)) price = lp;
+            else if (bars.Count > 0) price = bars[^1].Close;
+            else price = pos.CostBasis;
             var marketValue = pos.Shares * price;
             invested += marketValue;
             var unrealizedPct = pos.CostBasis > 0 ? (double)((price / pos.CostBasis) - 1m) : 0.0;

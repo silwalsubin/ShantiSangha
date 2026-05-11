@@ -5,6 +5,8 @@ import SwiftUI
 /// counted, because a hold isn't an action. Tapping opens the Stocks tab.
 struct WiseCatHomeCard: View {
     @StateObject private var vm = PortfolioViewModel()
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var lastFetchAt: Date?
 
     var body: some View {
         NavigationLink(destination: WiseCatView()) {
@@ -21,10 +23,23 @@ struct WiseCatHomeCard: View {
             }
         }
         .buttonStyle(.plain)
-        .task {
-            await vm.loadPortfolio()
-            await vm.generatePlan()
+        .task { await refresh(force: true) }
+        .onAppear { Task { await refresh(force: false, maxAgeSeconds: 60) } }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                Task { await refresh(force: true) }
+            }
         }
+    }
+
+    private func refresh(force: Bool, maxAgeSeconds: TimeInterval = 60) async {
+        if !force, let last = lastFetchAt,
+           Date().timeIntervalSince(last) < maxAgeSeconds {
+            return
+        }
+        lastFetchAt = Date()
+        await vm.loadPortfolio()
+        await vm.generatePlan()
     }
 
     private var header: some View {
