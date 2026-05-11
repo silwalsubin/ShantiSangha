@@ -14,6 +14,7 @@ public class PortfolioService(
     // ---------- Ratified rule thresholds (mirror plan_portfolio.py) -------
     private const double PositionCapPct = 0.10;          // Rule 2
     private const double StopLossPct = 0.10;             // Rule 3
+    private const double TakeProfitPct = 0.10;           // Rule 11 — symmetric exit on the upside
     private const double EntryThresholdPBuy = 0.70;      // Rule 10
     private const double SellSignalPSell = 0.55;         // Advisory exit
     private const int MinSectors = 8;                    // Rule 1
@@ -385,6 +386,8 @@ public class PortfolioService(
             var reasons = new List<string>();
             if (h.UnrealizedReturnPct <= -StopLossPct)
                 reasons.Add($"Rule 3 violated: down {h.UnrealizedReturnPct * 100:+0.0;-0.0;0}% (below -{StopLossPct * 100:0}% stop)");
+            if (h.UnrealizedReturnPct >= TakeProfitPct)
+                reasons.Add($"Rule 11 hit: up {h.UnrealizedReturnPct * 100:+0.0}% (at or above +{TakeProfitPct * 100:0}% target) — cash out");
             if (h.PSell1M >= SellSignalPSell)
                 reasons.Add($"WiseCat 1M p_sell={h.PSell1M:0.00} ≥ {SellSignalPSell:0.00}");
 

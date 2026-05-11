@@ -322,7 +322,10 @@ private struct HoldingRow: View {
     private var actionColor: Color {
         guard let action else { return .sacredText }
         switch action.kind {
-        case .sell: return .sacredRed
+        case .sell:
+            // Profit-taking exits read green even though the verb is still
+            // SELL — celebrates the win rather than punishing the row.
+            return holding.unrealizedReturnPct >= 0.10 ? .sacredGreen : .sacredRed
         case .trim: return .sacredGoldDark
         case .hold: return .sacredText
         case .buy:  return .sacredGreen
@@ -334,6 +337,7 @@ private struct HoldingRow: View {
         guard let action else { return nil }
         switch action.kind {
         case .sell:
+            if holding.unrealizedReturnPct >= 0.10 { return "Hit +10% target" }
             if holding.unrealizedReturnPct <= -0.10 { return "Past -10% stop" }
             if holding.pSell1M >= 0.55 { return "Model: exit signal" }
             return "Rule violation"

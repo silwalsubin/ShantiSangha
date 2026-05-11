@@ -65,6 +65,7 @@ class StrategyParams:
     vix_high: float = 30.0                # VIX > vix_high → no entry (vix_low ≤ VIX ≤ vix_high → half)
     entry_mode: str = "wisecat"           # "wisecat" (gate on p_buy) or "always" (always-in unless stopped or cooldown)
     cooldown_days: int = 0                # min calendar days after a stop before re-entry. 0 = immediate next signal.
+    take_profit_pct: float | None = None  # exit when (close / entry) - 1 >= take_profit_pct. None disables.
 
 
 # -------- Per-window simulation -----------------------------------------------
@@ -217,7 +218,10 @@ def simulate_window(
     vix_history = getattr(context, "vix_history", None)
 
     for d in calendar:
-        # 1. For each open position, check stop-loss against today's close.
+        # 1. For each open position, check stop-loss AND take-profit
+        #    against today's close. Stop-loss takes precedence on rare days
+        #    that gap through both bounds — same daily-close granularity
+        #    caveat as the rest of this simulator.
         for ticker in tickers:
             tr = open_trade[ticker]
             if tr is None:
@@ -236,6 +240,18 @@ def simulate_window(
                 last_stop_date[ticker] = d
                 if verbose:
                     print(f"    {d}  STOP   {ticker:5} entry={tr.entry_price:.2f} "
+                          f"exit={close_today:.2f}  ret={ret*100:+.1f}%  "
+                          f"deployed=${tr.deployed:.0f}  slot now ${slot_balance[ticker]:.0f}",
+                          file=sys.stderr)
+            elif params.take_profit_pct is not None and ret >= params.take_profit_pct:
+                tr.exit_date = d
+                tr.exit_price = close_today
+                tr.exit_reason = "take_profit"
+                slot_balance[ticker] += tr.deployed * ret
+                all_trades.append(tr)
+                open_trade[ticker] = None
+                if verbose:
+                    print(f"    {d}  TARGET {ticker:5} entry={tr.entry_price:.2f} "
                           f"exit={close_today:.2f}  ret={ret*100:+.1f}%  "
                           f"deployed=${tr.deployed:.0f}  slot now ${slot_balance[ticker]:.0f}",
                           file=sys.stderr)
@@ -441,6 +457,9 @@ def main() -> None:
                              "'always' = always-in unless stopped or in cooldown.")
     parser.add_argument("--cooldown-days", type=int, default=0,
                         help="Min calendar days after a stop before re-entry. Default 0.")
+    parser.add_argument("--take-profit", type=float, default=None,
+                        help="Exit positions when they reach +N from entry "
+                             "(e.g. 0.10 = +10%%). Disabled by default.")
     parser.add_argument("--no-vix-sizing", action="store_true",
                         help="Disable VIX-regime sizing (always full position).")
     parser.add_argument("--vix-low", type=float, default=20.0,
@@ -474,6 +493,7 @@ def main() -> None:
         vix_high=args.vix_high,
         entry_mode=args.entry_mode,
         cooldown_days=args.cooldown_days,
+        take_profit_pct=args.take_profit,
     )
 
     print("=== Strategy Backtest ===", file=sys.stderr)
@@ -486,6 +506,8 @@ def main() -> None:
         cd = f", {params.cooldown_days}d cooldown after stop" if params.cooldown_days else ""
         print(f"  - Entry: always-in{cd}", file=sys.stderr)
     print(f"  - Stop-loss: -{params.stop_loss_pct*100:.1f}% from entry", file=sys.stderr)
+    if params.take_profit_pct is not None:
+        print(f"  - Take-profit: +{params.take_profit_pct*100:.1f}% from entry", file=sys.stderr)
     print(f"  - Position cap: {100/len(tickers):.1f}% per slot", file=sys.stderr)
     if params.vix_sizing:
         print(f"  - VIX sizing: full < {params.vix_low:.0f}, half "
