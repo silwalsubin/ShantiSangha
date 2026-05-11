@@ -20,6 +20,7 @@ public static class DependencyInjection
         services.AddScoped<IWatchlistService, WatchlistService>();
         services.AddScoped<ITradingSignalService, TradingSignalService>();
         services.AddScoped<IMarketDataClient, MarketDataClient>();
+        services.AddScoped<IPortfolioService, PortfolioService>();
 
         services.AddScoped<RefreshMarketDataJob>();
         services.AddScoped<GenerateDailyTradingSignalsJob>();

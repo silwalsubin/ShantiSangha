@@ -4,6 +4,7 @@ import SwiftUI
 struct WiseCatView: View {
     @StateObject private var vm = WiseCatViewModel()
     @State private var showWatchlistEdit = false
+    @State private var showPortfolio = false
     /// Horizon that drives every row's action label + probability bar.
     /// 1M is the canonical default (matches what the home card highlights).
     @State private var selectedHorizon: WiseCatHorizon = .oneMonth
@@ -44,17 +45,30 @@ struct WiseCatView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showWatchlistEdit = true
-                } label: {
-                    Image(systemName: "pencil")
-                        .foregroundColor(.sacredGold)
+                HStack(spacing: SacredSpacing.s) {
+                    Button {
+                        showPortfolio = true
+                    } label: {
+                        Image(systemName: "briefcase")
+                            .foregroundColor(.sacredGold)
+                    }
+                    .accessibilityLabel("Portfolio and plan")
+
+                    Button {
+                        showWatchlistEdit = true
+                    } label: {
+                        Image(systemName: "pencil")
+                            .foregroundColor(.sacredGold)
+                    }
+                    .accessibilityLabel("Edit watchlist")
                 }
-                .accessibilityLabel("Edit watchlist")
             }
         }
         .sheet(isPresented: $showWatchlistEdit) {
             WiseCatWatchlistEditView(vm: vm)
+        }
+        .sheet(isPresented: $showPortfolio) {
+            PortfolioInputView()
         }
         .task { await vm.refresh() }
     }

@@ -13,6 +13,7 @@ public class WiseCatController(
     IWatchlistService watchlist,
     ITradingSignalService signals,
     IMarketDataClient marketData,
+    IPortfolioService portfolio,
     ICurrentUser currentUser) : ControllerBase
 {
     [HttpGet("watchlist")]
@@ -105,5 +106,42 @@ public class WiseCatController(
 
         var result = await marketData.GetChartHistoryAsync(ticker, normalized, ct);
         return result is null ? NotFound() : Ok(result);
+    }
+
+    // ---------- Portfolio (Mode B strategy support) -------------------------
+
+    [HttpGet("portfolio")]
+    public async Task<IActionResult> GetPortfolio(CancellationToken ct = default)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+        var items = await portfolio.ListAsync(user.Id, ct);
+        return Ok(items);
+    }
+
+    [HttpPost("portfolio")]
+    public async Task<IActionResult> SavePortfolio([FromBody] SavePortfolioRequest body, CancellationToken ct = default)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+        try
+        {
+            var positions = body?.Positions ?? Array.Empty<SavePortfolioPosition>();
+            var saved = await portfolio.ReplaceAsync(user.Id, positions, ct);
+            return Ok(saved);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpGet("portfolio/plan")]
+    public async Task<IActionResult> GetPortfolioPlan([FromQuery] decimal? cash = null, CancellationToken ct = default)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+        var plan = await portfolio.GeneratePlanAsync(user.Id, cash, ct);
+        return Ok(plan);
     }
 }

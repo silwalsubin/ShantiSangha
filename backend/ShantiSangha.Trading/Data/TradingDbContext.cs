@@ -8,6 +8,7 @@ public class TradingDbContext(DbContextOptions<TradingDbContext> options) : DbCo
     public DbSet<WatchlistItem> WatchlistItems => Set<WatchlistItem>();
     public DbSet<TickerDailyClose> TickerDailyCloses => Set<TickerDailyClose>();
     public DbSet<TradingSignal> TradingSignals => Set<TradingSignal>();
+    public DbSet<UserPortfolioPosition> UserPortfolioPositions => Set<UserPortfolioPosition>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -40,6 +41,16 @@ public class TradingDbContext(DbContextOptions<TradingDbContext> options) : DbCo
             e.Property(s => s.Action1Y).HasConversion<string>().HasMaxLength(8);
             e.Property(s => s.PriceAtSignal).HasPrecision(18, 4);
             e.Property(s => s.ReasoningJson).HasColumnType("jsonb");
+        });
+
+        modelBuilder.Entity<UserPortfolioPosition>(e =>
+        {
+            e.HasKey(p => p.Id);
+            e.HasIndex(p => p.UserId);
+            e.HasIndex(p => new { p.UserId, p.Ticker }).IsUnique();
+            e.Property(p => p.Ticker).HasMaxLength(16).IsRequired();
+            e.Property(p => p.Shares).HasPrecision(18, 6);
+            e.Property(p => p.CostBasis).HasPrecision(18, 4);
         });
     }
 }

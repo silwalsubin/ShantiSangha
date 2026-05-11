@@ -31,4 +31,22 @@ enum WiseCatAPI {
     static func getChart(_ ticker: String, range: ChartRange) async throws -> ChartHistory {
         try await ApiService.shared.get("/wisecat/chart/\(ticker)?period=\(range.rawValue)")
     }
+
+    // ---------- Portfolio (Mode B strategy support) ------------------------
+
+    static func listPortfolio() async throws -> [PortfolioPosition] {
+        try await ApiService.shared.get("/wisecat/portfolio")
+    }
+
+    static func savePortfolio(_ positions: [SavePortfolioPosition], cashBalance: Double? = nil) async throws -> [PortfolioPosition] {
+        let body = SavePortfolioRequest(positions: positions, cashBalance: cashBalance)
+        return try await ApiService.shared.post("/wisecat/portfolio", body: body)
+    }
+
+    static func getPortfolioPlan(cashBalance: Double? = nil) async throws -> PortfolioPlan {
+        if let cashBalance {
+            return try await ApiService.shared.get("/wisecat/portfolio/plan?cash=\(cashBalance)")
+        }
+        return try await ApiService.shared.get("/wisecat/portfolio/plan")
+    }
 }
