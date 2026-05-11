@@ -53,8 +53,8 @@ public record PortfolioHoldingDto(
     decimal MarketValue,
     double PercentOfPortfolio,
     double UnrealizedReturnPct,
-    double PBuy1M,
-    double PSell1M
+    double PBuy,
+    double PSell
 );
 
 public record SectorAllocationDto(
@@ -75,4 +75,27 @@ public record PortfolioPlanDto(
     IReadOnlyList<PortfolioHoldingDto> Holdings,
     IReadOnlyList<SectorAllocationDto> SectorBreakdown,
     IReadOnlyList<PortfolioActionDto> Actions
+);
+
+// ---------- Per-user strategy settings (Rules 1–11 constants) -------------
+
+public record StrategySettingsDto(
+    decimal StopLossPct,           // Rule 3
+    decimal TakeProfitPct,         // Rule 11
+    decimal EntryThresholdPBuy,    // Rule 10
+    string EntryHorizon,           // "1W" | "1M" | "1Y"
+    int CooldownDays,              // Rule 4
+    decimal PositionCapPct,        // Rule 2
+    int MinSectors,                // Rule 1
+    DateTime UpdatedAt
+);
+
+public record UpdateStrategySettingsRequest(
+    decimal? StopLossPct,
+    decimal? TakeProfitPct,
+    decimal? EntryThresholdPBuy,
+    string? EntryHorizon,
+    int? CooldownDays,
+    decimal? PositionCapPct,
+    int? MinSectors
 );

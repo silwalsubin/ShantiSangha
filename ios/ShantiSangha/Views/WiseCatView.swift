@@ -8,6 +8,7 @@ import SwiftUI
 struct WiseCatView: View {
     @StateObject private var vm = PortfolioViewModel()
     @State private var showAddPosition = false
+    @State private var showRules = false
     @State private var pendingDelete: String?
 
     var body: some View {
@@ -47,13 +48,23 @@ struct WiseCatView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showAddPosition = true
-                } label: {
-                    Image(systemName: "plus")
-                        .foregroundColor(.sacredGold)
+                HStack(spacing: SacredSpacing.s) {
+                    Button {
+                        showRules = true
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                            .foregroundColor(.sacredGold)
+                    }
+                    .accessibilityLabel("Edit rules")
+
+                    Button {
+                        showAddPosition = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .foregroundColor(.sacredGold)
+                    }
+                    .accessibilityLabel("Add a stock")
                 }
-                .accessibilityLabel("Add a stock")
             }
         }
         .sheet(isPresented: $showAddPosition) {
@@ -68,6 +79,12 @@ struct WiseCatView: View {
                     await vm.generatePlan()
                 }
             }
+        }
+        .sheet(isPresented: $showRules, onDismiss: {
+            // Rule changes shift the plan output — regenerate.
+            Task { await vm.generatePlan() }
+        }) {
+            StrategyRulesView()
         }
         .confirmationDialog("Remove this position?",
                             isPresented: Binding(
@@ -258,9 +275,9 @@ private struct HoldingRow: View {
                         .font(.sacredButtonLabel)
                         .foregroundColor(actionColor)
                     ProbabilityBar(
-                        pBuy: holding.pBuy1M,
-                        pHold: max(0, 1 - holding.pBuy1M - holding.pSell1M),
-                        pSell: holding.pSell1M,
+                        pBuy: holding.pBuy,
+                        pHold: max(0, 1 - holding.pBuy - holding.pSell),
+                        pSell: holding.pSell,
                         height: 8,
                         showLabels: false
                     )
@@ -339,7 +356,7 @@ private struct HoldingRow: View {
         case .sell:
             if holding.unrealizedReturnPct >= 0.10 { return "Hit +10% target" }
             if holding.unrealizedReturnPct <= -0.10 { return "Past -10% stop" }
-            if holding.pSell1M >= 0.55 { return "Model: exit signal" }
+            if holding.pSell >= 0.55 { return "Model: exit signal" }
             return "Rule violation"
         case .trim:
             return "Over 10% cap"

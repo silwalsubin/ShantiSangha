@@ -14,6 +14,7 @@ public class WiseCatController(
     ITradingSignalService signals,
     IMarketDataClient marketData,
     IPortfolioService portfolio,
+    IStrategySettingsService strategySettings,
     ICurrentUser currentUser) : ControllerBase
 {
     [HttpGet("watchlist")]
@@ -169,4 +170,37 @@ public class WiseCatController(
         var removed = await portfolio.RemoveAsync(user.Id, ticker, ct);
         return removed ? NoContent() : NotFound();
     }
+
+    // ---------- Strategy settings (Rule constants per user) ----------------
+
+    [HttpGet("strategy/settings")]
+    public async Task<IActionResult> GetStrategySettings(CancellationToken ct = default)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+        var row = await strategySettings.GetOrCreateAsync(user.Id, ct);
+        return Ok(ToDto(row));
+    }
+
+    [HttpPut("strategy/settings")]
+    public async Task<IActionResult> UpdateStrategySettings(
+        [FromBody] UpdateStrategySettingsRequest body,
+        CancellationToken ct = default)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+        try
+        {
+            var row = await strategySettings.UpdateAsync(user.Id, body, ct);
+            return Ok(ToDto(row));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    private static StrategySettingsDto ToDto(ShantiSangha.Trading.Models.UserStrategySettings r) =>
+        new(r.StopLossPct, r.TakeProfitPct, r.EntryThresholdPBuy, r.EntryHorizon,
+            r.CooldownDays, r.PositionCapPct, r.MinSectors, r.UpdatedAt);
 }

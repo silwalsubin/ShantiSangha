@@ -65,8 +65,8 @@ struct PortfolioHolding: Codable, Identifiable, Hashable {
     let marketValue: Double
     let percentOfPortfolio: Double
     let unrealizedReturnPct: Double
-    let pBuy1M: Double
-    let pSell1M: Double
+    let pBuy: Double
+    let pSell: Double
 
     var id: String { ticker }
 }

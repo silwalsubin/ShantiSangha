@@ -10,6 +10,7 @@ public class TradingDbContext(DbContextOptions<TradingDbContext> options) : DbCo
     public DbSet<TradingSignal> TradingSignals => Set<TradingSignal>();
     public DbSet<UserPortfolioPosition> UserPortfolioPositions => Set<UserPortfolioPosition>();
     public DbSet<TickerSector> TickerSectors => Set<TickerSector>();
+    public DbSet<UserStrategySettings> UserStrategySettings => Set<UserStrategySettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -60,6 +61,16 @@ public class TradingDbContext(DbContextOptions<TradingDbContext> options) : DbCo
             e.Property(t => t.Ticker).HasMaxLength(16);
             e.Property(t => t.Sector).HasMaxLength(64).IsRequired();
             e.Property(t => t.Name).HasMaxLength(256);
+        });
+
+        modelBuilder.Entity<UserStrategySettings>(e =>
+        {
+            e.HasKey(s => s.UserId);
+            e.Property(s => s.StopLossPct).HasPrecision(6, 4);
+            e.Property(s => s.TakeProfitPct).HasPrecision(6, 4);
+            e.Property(s => s.EntryThresholdPBuy).HasPrecision(6, 4);
+            e.Property(s => s.PositionCapPct).HasPrecision(6, 4);
+            e.Property(s => s.EntryHorizon).HasMaxLength(4).IsRequired();
         });
     }
 }

@@ -57,4 +57,14 @@ enum WiseCatAPI {
     static func removePortfolioPosition(_ ticker: String) async throws {
         try await ApiService.shared.delete("/wisecat/portfolio/position/\(ticker)")
     }
+
+    // ---------- Strategy settings (Rule constants per user) ----------------
+
+    static func getStrategySettings() async throws -> StrategySettings {
+        try await ApiService.shared.get("/wisecat/strategy/settings")
+    }
+
+    static func updateStrategySettings(_ body: UpdateStrategySettingsRequest) async throws -> StrategySettings {
+        try await ApiService.shared.put("/wisecat/strategy/settings", body: body)
+    }
 }

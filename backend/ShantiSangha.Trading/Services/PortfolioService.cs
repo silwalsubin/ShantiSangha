@@ -9,15 +9,11 @@ namespace ShantiSangha.Trading.Services;
 public class PortfolioService(
     TradingDbContext db,
     IMarketDataClient marketData,
+    IStrategySettingsService strategySettings,
     ILogger<PortfolioService> logger) : IPortfolioService
 {
-    // ---------- Ratified rule thresholds (mirror plan_portfolio.py) -------
-    private const double PositionCapPct = 0.10;          // Rule 2
-    private const double StopLossPct = 0.10;             // Rule 3
-    private const double TakeProfitPct = 0.10;           // Rule 11 — symmetric exit on the upside
-    private const double EntryThresholdPBuy = 0.70;      // Rule 10
-    private const double SellSignalPSell = 0.55;         // Advisory exit
-    private const int MinSectors = 8;                    // Rule 1
+    // ---------- Defaults — overridden per-user via UserStrategySettings --
+    private const double SellSignalPSell = 0.55;         // Advisory exit (not user-tunable yet)
 
     // Hardcoded sector overrides for common large-caps. Falls back to "Unknown"
     // for anything not listed — the iOS side surfaces those so user can
@@ -248,6 +244,16 @@ public class PortfolioService(
         decimal? cashBalance,
         CancellationToken ct = default)
     {
+        // Pull the user's tunable rule constants. First call seeds defaults
+        // (Mode D active-trader profile: -7% stop, +10% TP, 1W p_buy ≥ 0.60).
+        var settings = await strategySettings.GetOrCreateAsync(userId, ct);
+        var stopLossPct = (double)settings.StopLossPct;
+        var takeProfitPct = (double)settings.TakeProfitPct;
+        var entryThresholdPBuy = (double)settings.EntryThresholdPBuy;
+        var positionCapPct = (double)settings.PositionCapPct;
+        var minSectors = settings.MinSectors;
+        var horizon = settings.EntryHorizon;
+
         var positions = await db.UserPortfolioPositions
             .Where(p => p.UserId == userId)
             .OrderBy(p => p.Ticker)
@@ -331,7 +337,7 @@ public class PortfolioService(
             invested += marketValue;
             var unrealizedPct = pos.CostBasis > 0 ? (double)((price / pos.CostBasis) - 1m) : 0.0;
             var sector = sectorByTicker.TryGetValue(pos.Ticker, out var s) ? s : "Unknown";
-            var (pBuy, pSell) = ReadProbabilities(scoreByTicker, pos.Ticker);
+            var (pBuy, pSell) = ReadProbabilities(scoreByTicker, pos.Ticker, horizon);
             holdings.Add(new PortfolioHoldingDto(
                 Ticker: pos.Ticker,
                 Sector: sector,
@@ -341,8 +347,8 @@ public class PortfolioService(
                 MarketValue: marketValue,
                 PercentOfPortfolio: 0,        // filled below once total known
                 UnrealizedReturnPct: unrealizedPct,
-                PBuy1M: pBuy,
-                PSell1M: pSell
+                PBuy: pBuy,
+                PSell: pSell
             ));
         }
 
@@ -384,12 +390,12 @@ public class PortfolioService(
         foreach (var h in holdings)
         {
             var reasons = new List<string>();
-            if (h.UnrealizedReturnPct <= -StopLossPct)
-                reasons.Add($"Rule 3 violated: down {h.UnrealizedReturnPct * 100:+0.0;-0.0;0}% (below -{StopLossPct * 100:0}% stop)");
-            if (h.UnrealizedReturnPct >= TakeProfitPct)
-                reasons.Add($"Rule 11 hit: up {h.UnrealizedReturnPct * 100:+0.0}% (at or above +{TakeProfitPct * 100:0}% target) — cash out");
-            if (h.PSell1M >= SellSignalPSell)
-                reasons.Add($"WiseCat 1M p_sell={h.PSell1M:0.00} ≥ {SellSignalPSell:0.00}");
+            if (h.UnrealizedReturnPct <= -stopLossPct)
+                reasons.Add($"Rule 3 violated: down {h.UnrealizedReturnPct * 100:+0.0;-0.0;0}% (below -{stopLossPct * 100:0}% stop)");
+            if (h.UnrealizedReturnPct >= takeProfitPct)
+                reasons.Add($"Rule 11 hit: up {h.UnrealizedReturnPct * 100:+0.0}% (at or above +{takeProfitPct * 100:0}% target) — cash out");
+            if (h.PSell >= SellSignalPSell)
+                reasons.Add($"WiseCat 1M p_sell={h.PSell:0.00} ≥ {SellSignalPSell:0.00}");
 
             if (reasons.Count > 0)
             {
@@ -411,8 +417,8 @@ public class PortfolioService(
         foreach (var h in holdings)
         {
             if (willExit.Contains(h.Ticker)) continue;
-            if (h.PercentOfPortfolio <= PositionCapPct * 1.05) continue;
-            var targetValue = (decimal)PositionCapPct * total;
+            if (h.PercentOfPortfolio <= positionCapPct * 1.05) continue;
+            var targetValue = (decimal)positionCapPct * total;
             var excess = h.MarketValue - targetValue;
             var sharesToSell = h.CurrentPrice > 0 ? excess / h.CurrentPrice : 0m;
             actions.Add(new PortfolioActionDto(
@@ -422,7 +428,7 @@ public class PortfolioService(
                 Shares: sharesToSell,
                 Price: h.CurrentPrice,
                 Amount: excess,
-                Reason: $"Rule 2: {h.PercentOfPortfolio * 100:0.0}% of portfolio (cap is {PositionCapPct * 100:0}%)"
+                Reason: $"Rule 2: {h.PercentOfPortfolio * 100:0.0}% of portfolio (cap is {positionCapPct * 100:0}%)"
             ));
             trimTickers.Add(h.Ticker);
         }
@@ -434,17 +440,17 @@ public class PortfolioService(
             .Where(h => !willExit.Contains(h.Ticker))
             .Select(h => h.Sector)
             .ToHashSet();
-        var targetPerSlot = (decimal)PositionCapPct * total;
+        var targetPerSlot = (decimal)positionCapPct * total;
         foreach (var sector in missingSectors)
         {
             var ticker = SectorBasket[sector];
             var bars = barsByTicker.TryGetValue(ticker, out var b) ? b : new List<MarketBar>();
             var price = bars.Count > 0 ? bars[^1].Close : 0m;
-            var (pBuy, _) = ReadProbabilities(scoreByTicker, ticker);
+            var (pBuy, _) = ReadProbabilities(scoreByTicker, ticker, horizon);
             var sharesToBuy = price > 0 ? targetPerSlot / price : 0m;
-            var reason = pBuy >= EntryThresholdPBuy
-                ? $"Missing sector + high-confidence buy (p_buy={pBuy:0.00} ≥ {EntryThresholdPBuy:0.00})"
-                : $"Missing sector (p_buy={pBuy:0.00}, below {EntryThresholdPBuy:0.00} — consider limit order or defer)";
+            var reason = pBuy >= entryThresholdPBuy
+                ? $"Missing sector + high-confidence buy (p_buy={pBuy:0.00} ≥ {entryThresholdPBuy:0.00})"
+                : $"Missing sector (p_buy={pBuy:0.00}, below {entryThresholdPBuy:0.00} — consider limit order or defer)";
             actions.Add(new PortfolioActionDto(
                 Ticker: ticker,
                 Sector: sector,
@@ -460,7 +466,7 @@ public class PortfolioService(
         foreach (var h in holdings)
         {
             if (willExit.Contains(h.Ticker) || trimTickers.Contains(h.Ticker)) continue;
-            var stopPrice = h.CurrentPrice * (decimal)(1.0 - StopLossPct);
+            var stopPrice = h.CurrentPrice * (decimal)(1.0 - stopLossPct);
             actions.Add(new PortfolioActionDto(
                 Ticker: h.Ticker,
                 Sector: h.Sector,
@@ -468,7 +474,7 @@ public class PortfolioService(
                 Shares: null,
                 Price: h.CurrentPrice,
                 Amount: h.MarketValue,
-                Reason: $"In good shape. Set stop at {stopPrice:F2} (-{StopLossPct * 100:0}% from current)."
+                Reason: $"In good shape. Set stop at {stopPrice:F2} (-{stopLossPct * 100:0}% from current)."
             ));
         }
 
@@ -479,7 +485,7 @@ public class PortfolioService(
             CashBalance: cash,
             PositionCount: holdings.Count,
             SectorsCovered: heldBasketSectors.Count,
-            MinSectorsRequired: MinSectors,
+            MinSectorsRequired: minSectors,
             MissingSectors: missingSectors,
             Holdings: holdings,
             SectorBreakdown: sectorBreakdown,
@@ -575,10 +581,16 @@ public class PortfolioService(
     }
 
     private static (double pBuy, double pSell) ReadProbabilities(
-        Dictionary<string, TechnicalScore> scores, string ticker)
+        Dictionary<string, TechnicalScore> scores, string ticker, string horizon)
     {
         if (!scores.TryGetValue(ticker, out var ts)) return (0.0, 0.0);
-        return (ts.Horizon1M.PBuy, ts.Horizon1M.PSell);
+        var h = horizon.ToUpperInvariant() switch
+        {
+            "1W" => ts.Horizon1W,
+            "1Y" => ts.Horizon1Y,
+            _ => ts.Horizon1M,
+        };
+        return (h.PBuy, h.PSell);
     }
 
     private async Task BackfillAsync(string ticker, DateOnly fromDate, CancellationToken ct)
