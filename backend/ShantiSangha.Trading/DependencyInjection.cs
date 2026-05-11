@@ -22,7 +22,6 @@ public static class DependencyInjection
         services.AddScoped<IMarketDataClient, MarketDataClient>();
         services.AddScoped<IPortfolioService, PortfolioService>();
         services.AddScoped<IStrategySettingsService, StrategySettingsService>();
-        services.AddScoped<IJournalService, JournalService>();
         services.AddScoped<IStrategyBacktestService, StrategyBacktestService>();
 
         services.AddScoped<RefreshMarketDataJob>();

@@ -9,7 +9,6 @@ struct WiseCatView: View {
     @StateObject private var vm = PortfolioViewModel()
     @Environment(\.scenePhase) private var scenePhase
     @State private var showRules = false
-    @State private var showJournal = false
     @State private var pendingDelete: String?
     @State private var lastFetchAt: Date?
 
@@ -74,23 +73,13 @@ struct WiseCatView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: SacredSpacing.s) {
-                    Button {
-                        showJournal = true
-                    } label: {
-                        Image(systemName: "book.closed")
-                            .foregroundColor(.sacredGold)
-                    }
-                    .accessibilityLabel("Journal")
-
-                    Button {
-                        showRules = true
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .foregroundColor(.sacredGold)
-                    }
-                    .accessibilityLabel("Edit rules")
+                Button {
+                    showRules = true
+                } label: {
+                    Image(systemName: "slider.horizontal.3")
+                        .foregroundColor(.sacredGold)
                 }
+                .accessibilityLabel("Edit rules")
             }
         }
         .searchable(text: $query,
@@ -106,9 +95,6 @@ struct WiseCatView: View {
             Task { await vm.generatePlan() }
         }) {
             StrategyRulesView()
-        }
-        .sheet(isPresented: $showJournal) {
-            TradeJournalView()
         }
         .confirmationDialog("Remove this position?",
                             isPresented: Binding(

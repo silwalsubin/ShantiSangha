@@ -119,26 +119,6 @@ public record BracketOrderDto(
     double  RMultiple          // (target - entry) / (entry - stopPrice)
 );
 
-// ---------- Journal (Rule 8) -----------------------------------------------
-
-public record JournalEntryDto(
-    Guid Id,
-    string Ticker,
-    string Kind,               // "Entry" | "Exit" | "Trim" | "AddOn" | "Note"
-    decimal? Price,
-    decimal? Shares,
-    string? Reason,
-    DateTime CreatedAt
-);
-
-public record CreateJournalEntryRequest(
-    string Ticker,
-    string Kind,
-    decimal? Price,
-    decimal? Shares,
-    string? Reason
-);
-
 // ---------- Search enrichment ----------------------------------------------
 
 /// <summary>

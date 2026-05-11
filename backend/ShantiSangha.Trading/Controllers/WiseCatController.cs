@@ -15,7 +15,6 @@ public class WiseCatController(
     IMarketDataClient marketData,
     IPortfolioService portfolio,
     IStrategySettingsService strategySettings,
-    IJournalService journal,
     IStrategyBacktestService backtest,
     ICurrentUser currentUser) : ControllerBase
 {
@@ -215,42 +214,6 @@ public class WiseCatController(
         {
             return BadRequest(new { error = ex.Message });
         }
-    }
-
-    // ---------- Journal (Rule 8) -------------------------------------------
-
-    [HttpGet("journal")]
-    public async Task<IActionResult> GetJournal([FromQuery] int limit = 50, CancellationToken ct = default)
-    {
-        var user = await currentUser.GetAsync();
-        if (user is null) return Unauthorized();
-        var rows = await journal.ListAsync(user.Id, limit, ct);
-        return Ok(rows);
-    }
-
-    [HttpPost("journal")]
-    public async Task<IActionResult> AddJournal([FromBody] CreateJournalEntryRequest body, CancellationToken ct = default)
-    {
-        var user = await currentUser.GetAsync();
-        if (user is null) return Unauthorized();
-        try
-        {
-            var row = await journal.CreateAsync(user.Id, body, ct);
-            return Ok(row);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-    }
-
-    [HttpDelete("journal/{id:guid}")]
-    public async Task<IActionResult> DeleteJournal(Guid id, CancellationToken ct = default)
-    {
-        var user = await currentUser.GetAsync();
-        if (user is null) return Unauthorized();
-        var ok = await journal.DeleteAsync(user.Id, id, ct);
-        return ok ? NoContent() : NotFound();
     }
 
     // ---------- Backtest preview (Rules-sheet button) ----------------------
