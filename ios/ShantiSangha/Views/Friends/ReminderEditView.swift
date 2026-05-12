@@ -1,12 +1,13 @@
 import SwiftUI
 
-/// Add / edit a reminder. Reused for both connection-scoped dates
-/// (birthday, anniversary) and general personal reminders.
+/// Full-page add / edit reminder. Pushed onto the parent's NavigationStack
+/// from Home (tap a row) and ConnectionDetailView (Important Dates).
 ///
-/// The parent owns persistence; this sheet only collects the values
-/// and calls back via `onSave`. `onDelete` is non-nil only for the
-/// edit path so the destructive button stays out of the add flow.
-struct ReminderEditSheet: View {
+/// The parent owns persistence; this view only collects the values and
+/// calls back via `onSave`. `onDelete` is non-nil only for the edit path
+/// so the destructive button stays out of the add flow. Both callbacks
+/// dismiss the page (pop) when they succeed.
+struct ReminderEditView: View {
     let target: ReminderEditTarget
     let onSave: (_ label: String, _ date: String, _ recurrence: ReminderRecurrence) async -> Void
     let onDelete: (() async -> Void)?
@@ -26,35 +27,29 @@ struct ReminderEditSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: SacredSpacing.l) {
-                    labelSection
-                    dateSection
-                    recurrenceSection
-                    if onDelete != nil {
-                        deleteSection
-                    }
+        ScrollView {
+            VStack(spacing: SacredSpacing.l) {
+                labelSection
+                dateSection
+                recurrenceSection
+                if onDelete != nil {
+                    deleteSection
                 }
-                .padding(.horizontal, SacredSpacing.m)
-                .padding(.vertical, SacredSpacing.l)
             }
-            .background(SacredBackground().ignoresSafeArea())
-            .navigationTitle(target.isEditing ? "Edit reminder" : "Add reminder")
-            .navigationBarTitleDisplayMode(.inline)
-            .scrollDismissesKeyboard(.interactively)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") { dismiss() }
-                        .foregroundColor(.sacredMuted)
+            .padding(.horizontal, SacredSpacing.m)
+            .padding(.vertical, SacredSpacing.l)
+        }
+        .background(SacredBackground().ignoresSafeArea())
+        .navigationTitle(target.isEditing ? "Edit reminder" : "Add reminder")
+        .navigationBarTitleDisplayMode(.inline)
+        .scrollDismissesKeyboard(.interactively)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button(target.isEditing ? "Save" : "Add") {
+                    Task { await save() }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(target.isEditing ? "Save" : "Add") {
-                        Task { await save() }
-                    }
-                    .foregroundColor(canSave ? .sacredGold : .sacredMutedLight)
-                    .disabled(!canSave || saving || deleting)
-                }
+                .foregroundColor(canSave ? .sacredGold : .sacredMutedLight)
+                .disabled(!canSave || saving || deleting)
             }
         }
         .onAppear { seed() }
@@ -194,6 +189,7 @@ struct ReminderEditSheet: View {
         saving = true
         defer { saving = false }
         await onSave(trimmed, formatISODate(dateDraft), recurrenceDraft)
+        dismiss()
     }
 
     private func delete() async {
@@ -201,12 +197,11 @@ struct ReminderEditSheet: View {
         deleting = true
         defer { deleting = false }
         await onDelete()
+        dismiss()
     }
 
     // Parse / format in the user's local timezone so the DatePicker (which
-    // operates in local time) round-trips the same calendar day. Forcing
-    // UTC here previously shifted the day by ±1 every save for users west
-    // of UTC, silently corrupting birthdays/anniversaries on edit.
+    // operates in local time) round-trips the same calendar day.
     private func parseISODate(_ s: String) -> Date? {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
@@ -224,11 +219,11 @@ struct ReminderEditSheet: View {
     }
 }
 
-/// Sheet identity for the add/edit-reminder flow. `.new()` opens an empty
-/// form; `.new(initialLabel:)` pre-fills the label so empty-state preset
-/// rows can hand the user a one-tap path; `.edit(reminder)` pre-fills
-/// the whole row and offers a destructive "Delete" action.
-enum ReminderEditTarget: Identifiable {
+/// Navigation target for the add/edit-reminder flow. `.new()` opens an
+/// empty form; `.new(initialLabel:)` pre-fills the label so empty-state
+/// preset rows can hand the user a one-tap path; `.edit(reminder)`
+/// pre-fills the whole row and offers a destructive "Delete" action.
+enum ReminderEditTarget: Identifiable, Hashable {
     case new(initialLabel: String? = nil, connectionId: UUID? = nil)
     case edit(Reminder)
 

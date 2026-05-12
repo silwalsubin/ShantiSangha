@@ -10,7 +10,7 @@ struct HomeView: View {
     @StateObject private var health = HealthKitService.shared
     @StateObject private var weather = WeatherService.shared
     @StateObject private var connections = ConnectionsRepository.shared
-    @State private var showRemindersList = false
+    @State private var navTarget: ReminderEditTarget?
     @State private var reflection: String?
     @State private var reflectionDate: String?
     /// True when `reflection` is a prior day's reflection shown while today's
@@ -125,8 +125,30 @@ struct HomeView: View {
                 }
             }
         }
-        .navigationDestination(isPresented: $showRemindersList) {
-            RemindersView(vm: vm)
+        .navigationDestination(item: $navTarget) { target in
+            ReminderEditView(
+                target: target,
+                onSave: { label, date, recurrence in
+                    switch target {
+                    case .new(_, let connId):
+                        await vm.createReminder(
+                            label: label, date: date,
+                            recurrence: recurrence,
+                            connectionId: connId)
+                    case .edit(let reminder):
+                        await vm.updateReminder(
+                            id: reminder.id,
+                            label: label, date: date,
+                            recurrence: recurrence)
+                    }
+                },
+                onDelete: {
+                    if case .edit(let reminder) = target {
+                        return { await vm.deleteReminder(id: reminder.id) }
+                    }
+                    return nil
+                }()
+            )
         }
     }
 
@@ -144,7 +166,7 @@ struct HomeView: View {
                     allowSwipeToComplete: true,
                     showDateStamp: true,
                     avatarUrl: avatarUrl(for: reminder),
-                    onTap: { showRemindersList = true },
+                    onTap: { navTarget = .edit(reminder) },
                     onComplete: { Task { await vm.completeReminder(id: reminder.id) } },
                     activeSwipeId: Binding(
                         get: { vm.activeSwipeId },
@@ -180,7 +202,7 @@ struct HomeView: View {
                 .foregroundColor(.sacredTextSecondary)
 
             SacredPrimaryButton("Add your first reminder") {
-                showRemindersList = true
+                navTarget = .new()
             }
         }
         .frame(maxWidth: .infinity)

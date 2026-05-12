@@ -97,8 +97,8 @@ struct ConnectionDetailView: View {
         .scrollDismissesKeyboard(.interactively)
         .onAppear { seedDrafts() }
         .onChange(of: connection?.id) { _, _ in seedDrafts(force: true) }
-        .sheet(item: $dateEditTarget) { target in
-            ReminderEditSheet(
+        .navigationDestination(item: $dateEditTarget) { target in
+            ReminderEditView(
                 target: target,
                 onSave: { label, date, recurrence in
                     await saveDate(
@@ -818,7 +818,6 @@ struct ConnectionDetailView: View {
                     recurrence: recurrence)
             }
             saveError = nil
-            dateEditTarget = nil
             await loadDates()
         } catch {
             saveError = "Couldn't save. Try again."
@@ -830,7 +829,6 @@ struct ConnectionDetailView: View {
         do {
             try await ReminderRepository.shared.delete(id: entry.id)
             saveError = nil
-            dateEditTarget = nil
             await loadDates()
         } catch {
             saveError = "Couldn't delete. Try again."
