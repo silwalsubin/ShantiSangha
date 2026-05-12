@@ -124,7 +124,11 @@ struct PracticeRow: View {
             Image(systemName: "arrow.triangle.2.circlepath")
                 .font(.sacredText)
                 .foregroundColor(.sacredGold)
-                .frame(width: 24, height: 24)
+                .frame(width: 36, height: 36)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.sacredBgCard)
+                )
 
             Text(practice.title)
                 .font(.sacredTextMedium)
