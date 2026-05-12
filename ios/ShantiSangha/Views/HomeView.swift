@@ -68,10 +68,12 @@ struct HomeView: View {
                     } else if !vm.hasPractices && vm.reminders.isEmpty {
                         emptyState
                     } else {
-                        dailyRhythmCard
-                            .padding(.horizontal, SacredSpacing.m)
-                            .padding(.top, 34)
-                            .padding(.bottom, 20)
+                        if vm.totalPractices > 0 {
+                            dailyRhythmCard
+                                .padding(.horizontal, SacredSpacing.m)
+                                .padding(.top, 34)
+                                .padding(.bottom, 20)
+                        }
 
                         // Inline practice list — swipe to check in without leaving Home
                         if !vm.pendingPractices.isEmpty {
@@ -92,6 +94,12 @@ struct HomeView: View {
                                 .multilineTextAlignment(.center)
                                 .padding(.top, SacredSpacing.xs)
                                 .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        }
+
+                        if vm.totalRemindersForToday > 0 {
+                            remindersCard
+                                .padding(.horizontal, SacredSpacing.m)
+                                .padding(.top, SacredSpacing.lux)
                         }
                     }
 
@@ -277,45 +285,59 @@ struct HomeView: View {
                     Spacer()
                 }
 
-                HStack(spacing: 0) {
-                    if vm.totalPractices > 0 {
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            showRecurringSummary = true
-                        } label: {
-                            SacredProgressRing(
-                                label: "Practices",
-                                icon: "arrow.triangle.2.circlepath",
-                                done: vm.donePractices,
-                                total: vm.totalPractices,
-                                color: .sacredGold,
-                                isComplete: vm.allPracticesDone,
-                                almostDone: vm.totalPractices > 1 && vm.donePractices == vm.totalPractices - 1,
-                                ringPulse: ringPulse
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .frame(maxWidth: .infinity)
-                    }
-
-                    if vm.totalRemindersForToday > 0 {
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            showRemindersList = true
-                        } label: {
-                            SacredProgressRing(
-                                label: "Reminders",
-                                icon: "calendar.badge.clock",
-                                done: vm.doneRemindersForToday,
-                                total: vm.totalRemindersForToday,
-                                color: .sacredGoldDark,
-                                detail: vm.remindersSummaryDetail
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .frame(maxWidth: .infinity)
-                    }
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    showRecurringSummary = true
+                } label: {
+                    SacredProgressRing(
+                        label: "Practices",
+                        icon: "arrow.triangle.2.circlepath",
+                        done: vm.donePractices,
+                        total: vm.totalPractices,
+                        color: .sacredGold,
+                        isComplete: vm.allPracticesDone,
+                        almostDone: vm.totalPractices > 1 && vm.donePractices == vm.totalPractices - 1,
+                        ringPulse: ringPulse
+                    )
                 }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+            }
+            .padding(SacredSpacing.lux)
+        }
+    }
+
+    private var remindersCard: some View {
+        LuxCard {
+            VStack(alignment: .leading, spacing: SacredSpacing.lux) {
+                HStack {
+                    VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
+                        Text("REMINDERS")
+                            .font(.sacredSectionLabel)
+                            .tracking(3)
+                            .foregroundColor(.sacredLabel)
+                        Text(remindersSubtitle)
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
+                    }
+                    Spacer()
+                }
+
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    showRemindersList = true
+                } label: {
+                    SacredProgressRing(
+                        label: "Reminders",
+                        icon: "calendar.badge.clock",
+                        done: vm.doneRemindersForToday,
+                        total: vm.totalRemindersForToday,
+                        color: .sacredGoldDark,
+                        detail: vm.remindersSummaryDetail
+                    )
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
             }
             .padding(SacredSpacing.lux)
         }
@@ -323,13 +345,23 @@ struct HomeView: View {
 
     private var rhythmSubtitle: String {
         if vm.allPracticesDone { return "The circle is complete." }
-        if vm.totalPractices > 0 {
-            let remaining = max(vm.totalPractices - vm.donePractices, 0)
-            if remaining == 1 { return "One quiet step remains." }
-            if remaining > 1 { return "\(remaining) practices are waiting." }
-        }
-        if vm.totalRemindersForToday > 0 { return "Your reminders are in view." }
+        let remaining = max(vm.totalPractices - vm.donePractices, 0)
+        if remaining == 1 { return "One quiet step remains." }
+        if remaining > 1 { return "\(remaining) practices are waiting." }
         return "A clear day."
+    }
+
+    private var remindersSubtitle: String {
+        if vm.overdueRemindersCount > 0 {
+            return "\(vm.overdueRemindersCount) carried over."
+        }
+        if vm.dueTodayRemindersCount > 0 {
+            return "\(vm.dueTodayRemindersCount) due today."
+        }
+        if vm.upcomingRemindersCount > 0 {
+            return "Your reminders are in view."
+        }
+        return "Nothing pressing."
     }
 
     // MARK: - Gentle nudge
