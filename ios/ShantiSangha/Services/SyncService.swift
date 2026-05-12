@@ -29,14 +29,7 @@ actor SyncService {
     /// Queue a write operation for background sync
     func enqueue(method: String, path: String, body: Encodable? = nil, tempId: String? = nil) {
         guard let container = modelContainer else { return }
-        let bodyData: Data?
-        if let rawBody = body as? RawData {
-            bodyData = rawBody.data
-        } else if let body = body {
-            bodyData = try? JSONEncoder().encode(body)
-        } else {
-            bodyData = nil
-        }
+        let bodyData: Data? = body.flatMap { try? JSONEncoder().encode($0) }
 
         let context = ModelContext(container)
         let item = SyncQueueItem(method: method, path: path, body: bodyData, tempId: tempId)
