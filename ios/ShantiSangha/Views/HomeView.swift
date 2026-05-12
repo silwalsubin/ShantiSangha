@@ -10,7 +10,16 @@ struct HomeView: View {
     @StateObject private var health = HealthKitService.shared
     @StateObject private var weather = WeatherService.shared
     @StateObject private var connections = ConnectionsRepository.shared
+    /// Owns the Connection list for friend-profile navigation from Home.
+    /// `ConnectionDetailView` reads its model from this VM; the shared
+    /// `ConnectionsRepository` above is only used for avatar/label lookup.
+    @StateObject private var circleVM = CircleViewModel()
     @State private var navTarget: ReminderEditTarget?
+    @State private var profileTarget: ProfileNavTarget?
+    /// How many days into the future to show on Home. Anything beyond
+    /// this is quietly held back until it enters the window. Overdue
+    /// items always show regardless. User adjusts in Settings.
+    @AppStorage("reminders.horizonDays") private var horizonDays = 30
     @State private var reflection: String?
     @State private var reflectionDate: String?
     /// True when `reflection` is a prior day's reflection shown while today's
@@ -59,9 +68,7 @@ struct HomeView: View {
                     } else if vm.reminders.isEmpty {
                         emptyState
                     } else {
-                        remindersList
-                            .padding(.horizontal, SacredSpacing.m)
-                            .padding(.top, 34)
+                        remindersSection
                     }
                 }
                 .padding(.top, SacredSpacing.xl)
@@ -96,14 +103,20 @@ struct HomeView: View {
                 await loadReflection(force: true)
                 updateWidgetData()
                 await refreshWholeDayContext()
+                await circleVM.refresh()
             }
             .task {
+                // Kick off the Circle fetch up front so a friend's avatar
+                // tap on the very first frame doesn't land before the
+                // ConnectionDetailView can find its connection.
+                async let circleLoad: () = circleVM.refresh()
                 await vm.load()
                 await loadReflection()
                 updateWidgetData()
                 await refreshWholeDayContext()
                 await notifications.refreshUnreadCount()
                 await connections.refresh()
+                await circleLoad
             }
             .onChange(of: vm.overdueRemindersCount) { updateWidgetData() }
             .onChange(of: vm.dueTodayRemindersCount) { updateWidgetData() }
@@ -130,7 +143,7 @@ struct HomeView: View {
                 target: target,
                 onSave: { label, date, recurrence in
                     switch target {
-                    case .new(_, let connId):
+                    case .new(_, _, let connId):
                         await vm.createReminder(
                             label: label, date: date,
                             recurrence: recurrence,
@@ -150,36 +163,109 @@ struct HomeView: View {
                 }()
             )
         }
+        .navigationDestination(item: $profileTarget) { target in
+            ConnectionDetailView(connectionId: target.connectionId, vm: circleVM)
+        }
+    }
+
+    // MARK: - Reminders section
+
+    /// Wraps the horizon picker + reminders list (or empty-horizon state)
+    /// in a single VStack so the parent ViewBuilder stays shallow. Without
+    /// this, the body's type-checker times out on the nested if/else +
+    /// `let` binding.
+    @ViewBuilder
+    private var remindersSection: some View {
+        let visible = vm.pendingReminders.filter { $0.daysRemaining <= horizonDays }
+        VStack(spacing: 0) {
+            horizonPicker
+                .padding(.top, 28)
+                .padding(.horizontal, 16)
+            if visible.isEmpty {
+                emptyHorizonState
+            } else {
+                remindersList(visible)
+                    .padding(.top, 8)
+            }
+        }
+    }
+
+    // MARK: - Horizon picker
+
+    private static let horizonOptions = [7, 14, 30, 60, 90, 180]
+
+    /// Right-aligned chip above the list that lets the user dial how far
+    /// out Home reaches. Selection persists via @AppStorage so the next
+    /// open remembers their preference.
+    private var horizonPicker: some View {
+        HStack {
+            Spacer()
+            Menu {
+                ForEach(Self.horizonOptions, id: \.self) { days in
+                    Button {
+                        horizonDays = days
+                    } label: {
+                        HStack {
+                            Text("\(days) days")
+                            if horizonDays == days {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text("Next \(horizonDays) days")
+                        .font(.sacredSmallMedium)
+                        .foregroundColor(.sacredGold)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.sacredGold.opacity(0.7))
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(
+                    Capsule()
+                        .fill(Color.sacredGold.opacity(0.08))
+                        .overlay(Capsule().stroke(Color.sacredGold.opacity(0.22), lineWidth: 1))
+                )
+            }
+        }
     }
 
     // MARK: - Reminders list
 
-    /// Flat list of every incomplete reminder. No card chrome, no header —
-    /// the screen IS the list.
-    private var remindersList: some View {
-        let pending = vm.pendingReminders
-
-        return VStack(spacing: 0) {
-            ForEach(Array(pending.enumerated()), id: \.element.id) { index, reminder in
+    /// Flat list of every reminder within the user's chosen horizon
+    /// (overdue + next N days). Anything beyond the horizon is quietly
+    /// hidden — adjust via the chip above the list.
+    private func remindersList(_ items: [Reminder]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { idx, reminder in
                 ReminderRow(
                     reminder: reminder,
                     allowSwipeToComplete: true,
                     showDateStamp: true,
                     avatarUrl: avatarUrl(for: reminder),
+                    connectionLabel: connectionLabel(for: reminder),
                     onTap: { navTarget = .edit(reminder) },
                     onComplete: { Task { await vm.completeReminder(id: reminder.id) } },
+                    onAvatarTap: reminder.connectionId.map { cid in
+                        { profileTarget = ProfileNavTarget(connectionId: cid) }
+                    },
                     activeSwipeId: Binding(
                         get: { vm.activeSwipeId },
                         set: { vm.activeSwipeId = $0 }
                     )
                 )
 
-                if index < pending.count - 1 {
-                    Divider().padding(.leading, 104)
+                if idx < items.count - 1 {
+                    Divider()
+                        .padding(.leading, 104)
+                        .padding(.trailing, 16)
                 }
             }
         }
-        .animation(.easeOut(duration: 0.3), value: pending.map(\.id))
+        .animation(.easeOut(duration: 0.3), value: items.map(\.id))
     }
 
     /// Connection's avatar when the reminder belongs to someone in the
@@ -191,6 +277,14 @@ struct HomeView: View {
             return connection.ownerVisibleAvatarUrl
         }
         return profile.profile?.avatarUrl
+    }
+
+    /// Nickname (or display name) of the connection a reminder belongs
+    /// to. Returns nil for personal reminders so the row label renders
+    /// alone.
+    private func connectionLabel(for reminder: Reminder) -> String? {
+        guard let cid = reminder.connectionId else { return nil }
+        return connections.connection(for: cid)?.displayLabel
     }
 
     // MARK: - Empty state
@@ -209,13 +303,36 @@ struct HomeView: View {
         .padding(.top, 40)
     }
 
+    /// Shown when the user has reminders, but none fall within the
+    /// configured `horizonDays` window. Calm copy + the same primary CTA
+    /// so they can still add new ones without leaving Home.
+    private var emptyHorizonState: some View {
+        VStack(spacing: 16) {
+            Text("The next \(horizonDays) days are quiet.")
+                .font(.sacredText)
+                .foregroundColor(.sacredTextSecondary)
+
+            SacredPrimaryButton("Add a reminder") {
+                navTarget = .new()
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 40)
+    }
+
     // MARK: - Widget data sync
 
     private func updateWidgetData() {
+        let summaries = vm.pendingReminders.prefix(5).compactMap { r in
+            WidgetData.makeSummary(
+                id: r.id.uuidString,
+                label: r.label,
+                date: r.date,
+                daysRemaining: r.daysRemaining,
+                connectionLabel: connectionLabel(for: r))
+        }
         WidgetData.update(
-            reflection: reflection,
-            remindersOverdue: vm.overdueRemindersCount,
-            remindersDueToday: vm.dueTodayRemindersCount,
+            upcomingReminders: Array(summaries),
             userName: preferredFirstName
         )
         WidgetCenter.shared.reloadTimelines(ofKind: "ShantiSanghaReflection")
@@ -427,6 +544,11 @@ struct HomeView: View {
 
 }
 
+private struct ProfileNavTarget: Identifiable, Hashable {
+    let connectionId: UUID
+    var id: UUID { connectionId }
+}
+
 private struct DailyReflectionResponse: Decodable {
     let content: String?
     let fallback: FallbackReflection?
@@ -436,6 +558,7 @@ private struct DailyReflectionResponse: Decodable {
         let date: String
     }
 }
+
 
 // MARK: - Profile menu sheet
 

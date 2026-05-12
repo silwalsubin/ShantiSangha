@@ -1,5 +1,21 @@
 import Foundation
 
+/// Compact snapshot of one reminder for the widget. Avatars / connection
+/// details aren't included — widgets can't load remote images cleanly
+/// without async work, so the widget stays text-only.
+struct WidgetReminderSummary: Codable, Hashable, Identifiable {
+    let id: String
+    let label: String
+    /// 3-letter uppercase month, e.g. "MAY".
+    let monthAbbreviation: String
+    let day: Int
+    /// Server-computed days until the next occurrence (negative = overdue).
+    let daysRemaining: Int
+    /// Nickname / display name of the connection this reminder belongs
+    /// to, or nil for personal reminders. Rendered as "Didi · Birthday".
+    var connectionLabel: String? = nil
+}
+
 /// Shared data between the main app and widget extension.
 /// Both sides use the same App Group UserDefaults.
 enum WidgetData {
@@ -9,23 +25,22 @@ enum WidgetData {
         UserDefaults(suiteName: appGroupId)
     }
 
-    // MARK: - Reflection
-
-    static var reflection: String? {
-        get { defaults?.string(forKey: "widget.reflection") }
-        set { defaults?.set(newValue, forKey: "widget.reflection") }
-    }
-
     // MARK: - Reminders
 
-    static var remindersOverdue: Int {
-        get { defaults?.integer(forKey: "widget.remindersOverdue") ?? 0 }
-        set { defaults?.set(newValue, forKey: "widget.remindersOverdue") }
-    }
-
-    static var remindersDueToday: Int {
-        get { defaults?.integer(forKey: "widget.remindersDueToday") ?? 0 }
-        set { defaults?.set(newValue, forKey: "widget.remindersDueToday") }
+    /// The top N upcoming reminders the widget should render, ordered by
+    /// urgency (overdue → today → upcoming). The main app caps the list
+    /// at a handful of items — widgets re-fetch from this on every
+    /// timeline reload, so there's no point storing more than the widget
+    /// can show.
+    static var upcomingReminders: [WidgetReminderSummary] {
+        get {
+            guard let data = defaults?.data(forKey: "widget.upcomingReminders") else { return [] }
+            return (try? JSONDecoder().decode([WidgetReminderSummary].self, from: data)) ?? []
+        }
+        set {
+            guard let data = try? JSONEncoder().encode(newValue) else { return }
+            defaults?.set(data, forKey: "widget.upcomingReminders")
+        }
     }
 
     // MARK: - User
@@ -44,15 +59,45 @@ enum WidgetData {
 
     /// Call from the main app whenever data changes to keep widget fresh
     static func update(
-        reflection: String?,
-        remindersOverdue: Int,
-        remindersDueToday: Int,
+        upcomingReminders: [WidgetReminderSummary],
         userName: String?
     ) {
-        self.reflection = reflection
-        self.remindersOverdue = remindersOverdue
-        self.remindersDueToday = remindersDueToday
+        self.upcomingReminders = upcomingReminders
         self.userName = userName
         self.lastUpdated = Date()
+    }
+
+    // MARK: - Helpers
+
+    /// Maps a 1-based month number to its 3-letter uppercase abbreviation.
+    /// Shared between main app + widget so both render the same labels.
+    static func monthAbbreviation(_ monthNumber: Int) -> String {
+        let names = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+                     "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
+        guard (1...12).contains(monthNumber) else { return "" }
+        return names[monthNumber - 1]
+    }
+
+    /// Builds a `WidgetReminderSummary` from a "yyyy-MM-dd" date string.
+    /// Returns nil if the string is malformed.
+    static func makeSummary(
+        id: String,
+        label: String,
+        date: String,
+        daysRemaining: Int,
+        connectionLabel: String? = nil
+    ) -> WidgetReminderSummary? {
+        let parts = date.split(separator: "-")
+        guard parts.count >= 3,
+              let monthNum = Int(parts[1]),
+              let day = Int(parts[2]) else { return nil }
+        return WidgetReminderSummary(
+            id: id,
+            label: label,
+            monthAbbreviation: monthAbbreviation(monthNum),
+            day: day,
+            daysRemaining: daysRemaining,
+            connectionLabel: connectionLabel
+        )
     }
 }

@@ -8,12 +8,7 @@ struct SacredHomeHeader: View {
 
     var body: some View {
         VStack(spacing: SacredSpacing.xs) {
-            Text(dayOfWeek)
-                .font(.sacredSectionLabel)
-                .tracking(3)
-                .foregroundColor(.sacredLabel)
-            SacredDateStamp(date: Date(), isToday: true)
-                .padding(.top, 2)
+            SacredDateStamp(date: Date(), isToday: true, size: 60)
             Text(greeting)
                 .font(.sacredGreeting)
                 .foregroundColor(.sacredText)
@@ -22,11 +17,5 @@ struct SacredHomeHeader: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 6)
-    }
-
-    private var dayOfWeek: String {
-        let f = DateFormatter()
-        f.dateFormat = "EEEE"
-        return f.string(from: Date()).uppercased()
     }
 }

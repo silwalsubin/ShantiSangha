@@ -75,6 +75,15 @@ struct MainTabView: View {
                 .tag(1)
 
                 NavigationStack {
+                    CalendarView()
+                }
+                .tabItem {
+                    Image(systemName: "calendar")
+                    Text("Calendar")
+                }
+                .tag(2)
+
+                NavigationStack {
                     FriendsTabView()
                 }
                 .tabItem {
@@ -82,13 +91,13 @@ struct MainTabView: View {
                     Text("Circles")
                 }
                 .badge(friendsBadge.count)
-                .tag(2)
+                .tag(3)
             }
             .tint(.sacredGold)
             .task { await friendsBadge.refresh() }
             .sheet(item: deepLinkBinding) { token in
                 AcceptInvitationView(token: token.value) { _ in
-                    selectedTab = 2
+                    selectedTab = 3
                 }
             }
 

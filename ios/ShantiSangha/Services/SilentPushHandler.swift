@@ -12,11 +12,12 @@ enum SilentPushHandler {
         await AppLogger.shared.info("Push", "Silent push received: type=\(type)")
 
         let api = ApiService.shared
-        let dateStr = formatDate(Date())
 
         switch type {
         case "reflection":
-            await refreshReflection(api: api, dateStr: dateStr)
+            // Reflection is no longer surfaced in the widget; the in-app
+            // notification path below still wakes HomeView to refetch.
+            break
         case "voice":
             // Voice transcription completed — no widget data to update,
             // but reload timelines in case we add voice data to widget later
@@ -93,28 +94,30 @@ enum SilentPushHandler {
         await AppLogger.shared.info("Push", "Widget timelines reloaded after silent push")
     }
 
-    private static func refreshReflection(api: ApiService, dateStr: String) async {
-        do {
-            let response: DailyReflectionResponse = try await api.get("/reflection/today?date=\(dateStr)")
-            if let content = response.content, !content.isEmpty {
-                WidgetData.reflection = content
-                await AppLogger.shared.info("Push", "Reflection updated: \(content.prefix(40))...")
-            } else {
-                await AppLogger.shared.info("Push", "Reflection response empty, keeping existing")
-            }
-        } catch {
-            if !error.isCancellation {
-                await AppLogger.shared.error("Push", "Failed to refresh reflection: \(error.localizedDescription)")
-            }
-        }
-    }
-
     private static func refreshReminders(api: ApiService) async {
         do {
+            // Pull reminders + connections together so we can stamp each
+            // widget summary with the owner's nickname ("Didi · Birthday")
+            // rather than just the bare label. Connection fetch is allowed
+            // to fail quietly — the widget still works without the prefix.
             let reminders: [Reminder] = try await api.get("/reminders")
-            let pending = reminders.filter { $0.completedAt == nil }
-            WidgetData.remindersOverdue = pending.filter { $0.daysRemaining < 0 }.count
-            WidgetData.remindersDueToday = pending.filter { $0.daysRemaining == 0 }.count
+            let connections: [Connection] = (try? await ConnectionsAPI.list()) ?? []
+            let connectionsById = Dictionary(
+                uniqueKeysWithValues: connections.map { ($0.id, $0) })
+
+            let summaries = reminders
+                .filter { $0.completedAt == nil }
+                .sorted { $0.daysRemaining < $1.daysRemaining }
+                .prefix(5)
+                .compactMap { r in
+                    WidgetData.makeSummary(
+                        id: r.id.uuidString,
+                        label: r.label,
+                        date: r.date,
+                        daysRemaining: r.daysRemaining,
+                        connectionLabel: r.connectionId.flatMap { connectionsById[$0]?.displayLabel })
+                }
+            WidgetData.upcomingReminders = Array(summaries)
         } catch {
             if !error.isCancellation {
                 await AppLogger.shared.error("Push", "Failed to refresh reminders: \(error.localizedDescription)")
@@ -123,16 +126,6 @@ enum SilentPushHandler {
 
         WidgetData.lastUpdated = Date()
     }
-
-    private static func formatDate(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        return f.string(from: date)
-    }
-}
-
-private struct DailyReflectionResponse: Decodable {
-    let content: String?
 }
 
 extension Notification.Name {

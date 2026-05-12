@@ -5,9 +5,7 @@ import SwiftUI
 
 struct ShantiSanghaEntry: TimelineEntry {
     let date: Date
-    let reflection: String?
-    let remindersOverdue: Int
-    let remindersDueToday: Int
+    let upcomingReminders: [WidgetReminderSummary]
     let userName: String?
 }
 
@@ -18,8 +16,29 @@ struct ShantiSanghaProvider: TimelineProvider {
     func placeholder(in context: Context) -> ShantiSanghaEntry {
         ShantiSanghaEntry(
             date: Date(),
-            reflection: "Your practice has a rhythm now. The days you show up are the ones you shape.",
-            remindersOverdue: 0, remindersDueToday: 1,
+            upcomingReminders: [
+                WidgetReminderSummary(
+                    id: "placeholder-1",
+                    label: "Birthday",
+                    monthAbbreviation: "MAY",
+                    day: 16,
+                    daysRemaining: 4,
+                    connectionLabel: "Didi"),
+                WidgetReminderSummary(
+                    id: "placeholder-2",
+                    label: "Call mom",
+                    monthAbbreviation: "MAY",
+                    day: 18,
+                    daysRemaining: 6,
+                    connectionLabel: nil),
+                WidgetReminderSummary(
+                    id: "placeholder-3",
+                    label: "Anniversary",
+                    monthAbbreviation: "JUN",
+                    day: 5,
+                    daysRemaining: 24,
+                    connectionLabel: "Sarah")
+            ],
             userName: nil
         )
     }
@@ -40,9 +59,7 @@ struct ShantiSanghaProvider: TimelineProvider {
     private func localEntry() -> ShantiSanghaEntry {
         ShantiSanghaEntry(
             date: Date(),
-            reflection: WidgetData.reflection,
-            remindersOverdue: WidgetData.remindersOverdue,
-            remindersDueToday: WidgetData.remindersDueToday,
+            upcomingReminders: WidgetData.upcomingReminders,
             userName: WidgetData.userName
         )
     }
@@ -99,107 +116,186 @@ private struct SacredWidgetBackground: View {
     }
 }
 
-// MARK: - Small Widget (Reflection only)
+// MARK: - Date stamp tile
 
-struct ReflectionWidgetView: View {
-    let entry: ShantiSanghaEntry
+private struct MiniDateStamp: View {
+    let month: String
+    let day: Int
+    let isToday: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Image(systemName: "sparkle")
-                .font(.system(size: 12))
-                .foregroundColor(sacredGold)
-
-            Spacer()
-
-            if let reflection = entry.reflection, !reflection.isEmpty {
-                Text(reflection)
-                    .font(.system(size: 12, weight: .regular, design: .serif))
-                    .italic()
-                    .foregroundColor(sacredText)
-                    .lineLimit(6)
-                    .truncationMode(.tail)
-                    .minimumScaleFactor(0.85)
-            } else {
-                Text("Open the app to begin your practice.")
-                    .font(.system(size: 13, weight: .regular, design: .serif))
-                    .foregroundColor(sacredTextSecondary)
-            }
+        VStack(spacing: -1) {
+            Text(month)
+                .font(.system(size: 7, weight: .bold, design: .serif))
+                .tracking(0.5)
+                .foregroundColor(sacredMuted)
+            Text("\(day)")
+                .font(.system(size: 13, weight: .semibold, design: .serif))
+                .foregroundColor(isToday ? sacredGold : sacredText)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .frame(width: 30, height: 30)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(isToday ? sacredGold.opacity(0.12) : sacredBgCard)
+        )
     }
 }
 
-// MARK: - Medium Widget (Reflection + Reminders)
+private func relativeDayLabel(_ days: Int) -> String? {
+    if days < -1 { return "\(abs(days)) days ago" }
+    if days == -1 { return "Yesterday" }
+    if days == 0 { return "Today" }
+    if days == 1 { return "Tomorrow" }
+    if days < 14 { return "in \(days) days" }
+    return nil  // far-future reminders rely on the date stamp itself
+}
 
-struct DashboardWidgetView: View {
+/// "{Connection} · {label}" when the reminder belongs to a connection;
+/// just the label otherwise. The connection prefix is rendered slightly
+/// bolder so the eye lands on the person first.
+private func reminderLabelText(_ r: WidgetReminderSummary) -> Text {
+    if let conn = r.connectionLabel?.trimmingCharacters(in: .whitespacesAndNewlines),
+       !conn.isEmpty {
+        var attr = AttributedString()
+
+        var nameAttrs = AttributeContainer()
+        nameAttrs.inlinePresentationIntent = .stronglyEmphasized
+        attr.append(AttributedString(conn, attributes: nameAttrs))
+
+        var sepAttrs = AttributeContainer()
+        sepAttrs.foregroundColor = sacredMuted
+        attr.append(AttributedString(" · ", attributes: sepAttrs))
+
+        attr.append(AttributedString(r.label))
+        return Text(attr)
+    }
+    return Text(r.label)
+}
+
+// MARK: - Small Widget (Next reminder)
+
+struct NextReminderWidgetView: View {
     let entry: ShantiSanghaEntry
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Reflection — primary content. Hard-cap to 5 lines and let
-            // SwiftUI truncate with an ellipsis. Never use
-            // `fixedSize(vertical: true)` here — it would let the Text grow
-            // past the widget's bounds and mangle the layout.
-            if let reflection = entry.reflection, !reflection.isEmpty {
-                Text(reflection)
-                    .font(.system(size: 13, weight: .regular, design: .serif))
-                    .italic()
-                    .foregroundColor(sacredText)
-                    .lineLimit(5)
-                    .truncationMode(.tail)
-                    .minimumScaleFactor(0.85)
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-            } else {
-                Text("Open the app — today's reflection is being written.")
-                    .font(.system(size: 13, weight: .regular, design: .serif))
-                    .foregroundColor(sacredTextSecondary)
-            }
+            if let top = entry.upcomingReminders.first {
+                Spacer(minLength: 0)
 
-            Spacer()
-
-            // Reminders summary at bottom
-            if entry.remindersOverdue > 0 || entry.remindersDueToday > 0 {
-                HStack(spacing: 4) {
-                    Image(systemName: "calendar.badge.clock")
-                        .font(.system(size: 10))
-                    if entry.remindersOverdue > 0 {
-                        Text("\(entry.remindersOverdue) carried over")
-                    }
-                    if entry.remindersDueToday > 0 {
-                        if entry.remindersOverdue > 0 { Text("·") }
-                        Text("\(entry.remindersDueToday) today")
+                HStack(alignment: .top, spacing: 8) {
+                    MiniDateStamp(month: top.monthAbbreviation,
+                                  day: top.day,
+                                  isToday: top.daysRemaining == 0)
+                    VStack(alignment: .leading, spacing: 2) {
+                        reminderLabelText(top)
+                            .font(.system(size: 13, design: .serif))
+                            .foregroundColor(sacredText)
+                            .lineLimit(2)
+                        if let label = relativeDayLabel(top.daysRemaining) {
+                            Text(label)
+                                .font(.system(size: 10, design: .serif))
+                                .foregroundColor(top.daysRemaining < 0 ? sacredRed : sacredMuted)
+                        }
                     }
                 }
-                .font(.system(size: 10, design: .serif))
-                .foregroundColor(sacredMuted)
+
+                Spacer(minLength: 0)
+
+                if entry.upcomingReminders.count > 1 {
+                    Text("+ \(entry.upcomingReminders.count - 1) more")
+                        .font(.system(size: 10, design: .serif))
+                        .foregroundColor(sacredMuted)
+                }
+            } else {
+                Spacer(minLength: 0)
+                Text("Nothing on the horizon.")
+                    .font(.system(size: 12, design: .serif))
+                    .italic()
+                    .foregroundColor(sacredTextSecondary)
+                Spacer(minLength: 0)
             }
         }
         .padding(14)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+// MARK: - Medium Widget (Upcoming reminders list)
+
+struct UpcomingWidgetView: View {
+    let entry: ShantiSanghaEntry
+
+    private let visibleCount = 3
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if entry.upcomingReminders.isEmpty {
+                Spacer(minLength: 0)
+                Text("Nothing on the horizon.")
+                    .font(.system(size: 13, design: .serif))
+                    .italic()
+                    .foregroundColor(sacredTextSecondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                Spacer(minLength: 0)
+            } else {
+                ForEach(Array(entry.upcomingReminders.prefix(visibleCount))) { r in
+                    HStack(spacing: 10) {
+                        MiniDateStamp(month: r.monthAbbreviation,
+                                      day: r.day,
+                                      isToday: r.daysRemaining == 0)
+                        VStack(alignment: .leading, spacing: 1) {
+                            reminderLabelText(r)
+                                .font(.system(size: 12, design: .serif))
+                                .foregroundColor(sacredText)
+                                .lineLimit(1)
+                            if let label = relativeDayLabel(r.daysRemaining) {
+                                Text(label)
+                                    .font(.system(size: 9, design: .serif))
+                                    .foregroundColor(r.daysRemaining < 0 ? sacredRed : sacredMuted)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                    }
+                }
+
+                if entry.upcomingReminders.count > visibleCount {
+                    HStack {
+                        Spacer()
+                        Text("+ \(entry.upcomingReminders.count - visibleCount) more")
+                            .font(.system(size: 10, design: .serif))
+                            .foregroundColor(sacredMuted)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
 // MARK: - Widget Configuration
 
 struct ShantiSanghaReflectionWidget: Widget {
+    /// Kind string kept stable as `ShantiSanghaReflection` even though the
+    /// surface is now reminders — changing it would invalidate widgets
+    /// users have already pinned to their home screen.
     let kind: String = "ShantiSanghaReflection"
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: ShantiSanghaProvider()) { entry in
             if #available(iOS 17.0, *) {
-                ReflectionWidgetView(entry: entry)
+                NextReminderWidgetView(entry: entry)
                     .containerBackground(for: .widget) {
                         SacredWidgetBackground()
                     }
             } else {
-                ReflectionWidgetView(entry: entry)
+                NextReminderWidgetView(entry: entry)
                     .background(SacredWidgetBackground())
             }
         }
-        .configurationDisplayName("Daily Reflection")
-        .description("A personal observation the app wrote for you today.")
+        .configurationDisplayName("Next Reminder")
+        .description("The next reminder needing your attention.")
         .supportedFamilies([.systemSmall])
     }
 }
@@ -210,17 +306,17 @@ struct ShantiSanghaDashboardWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: ShantiSanghaProvider()) { entry in
             if #available(iOS 17.0, *) {
-                DashboardWidgetView(entry: entry)
+                UpcomingWidgetView(entry: entry)
                     .containerBackground(for: .widget) {
                         SacredWidgetBackground()
                     }
             } else {
-                DashboardWidgetView(entry: entry)
+                UpcomingWidgetView(entry: entry)
                     .background(SacredWidgetBackground())
             }
         }
-        .configurationDisplayName("Today's Reflection")
-        .description("Your daily reflection and reminders that need you.")
+        .configurationDisplayName("Upcoming Reminders")
+        .description("The next few reminders, dated.")
         .supportedFamilies([.systemMedium])
     }
 }
@@ -245,6 +341,10 @@ private let sacredBg = Color(UIColor { traits in
     traits.userInterfaceStyle == .dark ? UIColor(hex: "#1a1410") : UIColor(hex: "#faf5ed")
 })
 
+private let sacredBgCard = Color(UIColor { traits in
+    traits.userInterfaceStyle == .dark ? UIColor(hex: "#2a1f15") : UIColor(hex: "#f0e6d6")
+})
+
 private let sacredText = Color(UIColor { traits in
     traits.userInterfaceStyle == .dark ? UIColor(hex: "#f5ebe0") : UIColor(hex: "#2b1e10")
 })
@@ -260,6 +360,7 @@ private let sacredMuted = Color(UIColor { traits in
 private let sacredGold = Color(hex: "#c4873b")
 private let sacredGoldDark = Color(hex: "#8b5a1b")
 private let sacredGoldShine = Color(hex: "#e8c47a")
+private let sacredRed = Color(hex: "#b8503c")
 
 private extension Color {
     init(hex: String) {

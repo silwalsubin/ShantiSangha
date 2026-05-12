@@ -12,27 +12,39 @@ import SwiftUI
 struct SacredDateStamp: View {
     let date: Date
     var isToday: Bool = false
+    /// Edge length of the square tile. Fonts scale with `size` so the
+    /// large hero stamp in the Home header and the small inline stamp
+    /// in reminder rows share the same proportions.
+    var size: CGFloat = 40
 
     var body: some View {
         let day = Calendar.current.component(.day, from: date)
-        let month: String = {
-            let df = DateFormatter()
-            df.dateFormat = "MMM"
-            return df.string(from: date).uppercased()
-        }()
+        let month: String = formatted(date, "MMM")
+        let weekday: String = formatted(date, "EEE")
         VStack(spacing: 0) {
             Text(month)
-                .font(.system(size: 8, weight: .bold, design: .serif))
+                .font(.system(size: size * 0.18, weight: .bold, design: .serif))
                 .tracking(1)
                 .foregroundColor(.sacredMuted)
             Text("\(day)")
-                .font(.sacredTextSemibold)
+                .font(.system(size: size * 0.36, weight: .semibold, design: .serif))
                 .foregroundColor(isToday ? .sacredGold : .sacredText)
+            Text(weekday)
+                .font(.system(size: size * 0.16, weight: .bold, design: .serif))
+                .tracking(1)
+                .foregroundColor(.sacredMuted)
         }
-        .frame(width: 36, height: 36)
+        .padding(.vertical, size * 0.10)
+        .frame(width: size, height: size)
         .background(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: size * 0.2)
                 .fill(isToday ? Color.sacredGold.opacity(0.1) : Color.sacredBgCard)
         )
+    }
+
+    private func formatted(_ date: Date, _ pattern: String) -> String {
+        let df = DateFormatter()
+        df.dateFormat = pattern
+        return df.string(from: date).uppercased()
     }
 }

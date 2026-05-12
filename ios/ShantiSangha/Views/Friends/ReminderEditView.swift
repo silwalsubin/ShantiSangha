@@ -16,11 +16,16 @@ struct ReminderEditView: View {
 
     @State private var labelDraft: String = ""
     @State private var dateDraft: Date = Date()
+    @State private var displayedMonth: Date = Date()
     @State private var recurrenceDraft: ReminderRecurrence = .yearly
     @State private var saving = false
     @State private var deleting = false
     @State private var didSeed = false
     @State private var showDeleteConfirm = false
+    /// The full month grid is heavy visually — keep it collapsed by
+    /// default so the edit page reads as a short form. Tapping the date
+    /// summary expands it.
+    @State private var dateExpanded = false
 
     private var canSave: Bool {
         !labelDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -84,18 +89,47 @@ struct ReminderEditView: View {
         VStack(alignment: .leading, spacing: SacredSpacing.xs) {
             sectionLabel("DATE")
             SacredListCard {
-                DatePicker(
-                    "",
-                    selection: $dateDraft,
-                    displayedComponents: [.date]
-                )
-                .labelsHidden()
-                .datePickerStyle(.graphical)
-                .tint(.sacredGold)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
+                VStack(spacing: 0) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            dateExpanded.toggle()
+                        }
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } label: {
+                        HStack {
+                            Text(collapsedDateLabel(dateDraft))
+                                .font(.sacredText)
+                                .foregroundColor(.sacredGold)
+                            Spacer()
+                            Image(systemName: dateExpanded ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.sacredGold.opacity(0.55))
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    if dateExpanded {
+                        Divider().padding(.horizontal, 12)
+                        MonthCalendarPicker(
+                            displayedMonth: $displayedMonth,
+                            selectedDate: $dateDraft)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 14)
+                    }
+                }
             }
         }
+    }
+
+    /// "Saturday, May 16, 1987" — full date string used in the collapsed
+    /// row so the user sees what's saved without expanding the grid.
+    private func collapsedDateLabel(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "EEEE, MMMM d, yyyy"
+        return f.string(from: date)
     }
 
     private var recurrenceSection: some View {
@@ -172,15 +206,21 @@ struct ReminderEditView: View {
         guard !didSeed else { return }
         didSeed = true
         switch target {
-        case .new(let initialLabel, _):
+        case .new(let initialLabel, let initialDate, _):
             if let initialLabel, !initialLabel.isEmpty {
                 labelDraft = initialLabel
+            }
+            if let initialDate {
+                dateDraft = initialDate
             }
         case .edit(let reminder):
             labelDraft = reminder.label
             dateDraft = parseISODate(reminder.date) ?? Date()
             recurrenceDraft = reminder.recurrence
         }
+        // Open the picker on the seeded date's month so the user sees
+        // their saved date without having to navigate to it first.
+        displayedMonth = dateDraft
     }
 
     private func save() async {
@@ -224,13 +264,14 @@ struct ReminderEditView: View {
 /// preset rows can hand the user a one-tap path; `.edit(reminder)`
 /// pre-fills the whole row and offers a destructive "Delete" action.
 enum ReminderEditTarget: Identifiable, Hashable {
-    case new(initialLabel: String? = nil, connectionId: UUID? = nil)
+    case new(initialLabel: String? = nil, initialDate: Date? = nil, connectionId: UUID? = nil)
     case edit(Reminder)
 
     var id: String {
         switch self {
-        case .new(let label, let conn):
-            return "new:\(label ?? "")\(conn?.uuidString ?? "")"
+        case .new(let label, let date, let conn):
+            let dateBit = date.map { "\(Int($0.timeIntervalSinceReferenceDate))" } ?? ""
+            return "new:\(label ?? "")|\(dateBit)|\(conn?.uuidString ?? "")"
         case .edit(let reminder): return reminder.id.uuidString
         }
     }
@@ -241,12 +282,17 @@ enum ReminderEditTarget: Identifiable, Hashable {
     }
 
     var initialLabel: String? {
-        if case .new(let label, _) = self { return label }
+        if case .new(let label, _, _) = self { return label }
+        return nil
+    }
+
+    var initialDate: Date? {
+        if case .new(_, let date, _) = self { return date }
         return nil
     }
 
     var connectionId: UUID? {
-        if case .new(_, let id) = self { return id }
+        if case .new(_, _, let id) = self { return id }
         if case .edit(let r) = self { return r.connectionId }
         return nil
     }

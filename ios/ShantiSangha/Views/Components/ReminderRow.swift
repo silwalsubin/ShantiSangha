@@ -12,8 +12,21 @@ struct ReminderRow: View {
     /// row gets the same balanced silhouette — connection rows show the
     /// other person, own-reminder rows show the viewer's own avatar.
     var avatarUrl: String? = nil
+    /// Person prefix prepended to the label when the reminder belongs to
+    /// a connection — e.g. "Didi · Birthday". Caller passes the
+    /// connection's nickname (or display name) when scoping the row to a
+    /// shared surface like Home or Calendar where the same label
+    /// ("Birthday") repeats across people. Leave nil on per-connection
+    /// surfaces (the profile's Important Dates list) where the name is
+    /// already in the header.
+    var connectionLabel: String? = nil
     let onTap: () -> Void
     var onComplete: (() -> Void)? = nil
+    /// When set on a connection-scoped row, tapping the avatar opens the
+    /// connection's profile instead of the reminder editor. Lets shared
+    /// surfaces (Home, Calendar) double as a launch point into a friend's
+    /// detail view without an extra row chevron.
+    var onAvatarTap: (() -> Void)? = nil
     var activeSwipeId: Binding<String?>?
 
     @State private var offset: CGFloat = 0
@@ -54,17 +67,47 @@ struct ReminderRow: View {
         allowSwipeToComplete && onComplete != nil && reminder.completedAt == nil
     }
 
+    /// "{Connection} · {label}" when the row is connection-scoped; just
+    /// the bare label otherwise. The connection name is the bolder half
+    /// since it's the more identifying piece of info.
+    private var labelText: Text {
+        if let conn = connectionLabel?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !conn.isEmpty {
+            var attr = AttributedString()
+
+            var nameAttrs = AttributeContainer()
+            nameAttrs.inlinePresentationIntent = .stronglyEmphasized
+            attr.append(AttributedString(conn, attributes: nameAttrs))
+
+            var sepAttrs = AttributeContainer()
+            sepAttrs.foregroundColor = .sacredMuted
+            attr.append(AttributedString(" · ", attributes: sepAttrs))
+
+            attr.append(AttributedString(reminder.label))
+            return Text(attr)
+        }
+        return Text(reminder.label)
+    }
+
     @ViewBuilder
     private var content: some View {
         HStack(spacing: 12) {
             leadingSlot
 
             if avatarUrl != nil {
-                ProfileAvatarImage(rawUrl: avatarUrl, size: 28, borderWidth: 1)
+                if let onAvatarTap {
+                    Button(action: onAvatarTap) {
+                        ProfileAvatarImage(rawUrl: avatarUrl, size: 28, borderWidth: 1)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open profile")
+                } else {
+                    ProfileAvatarImage(rawUrl: avatarUrl, size: 28, borderWidth: 1)
+                }
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(reminder.label)
+                labelText
                     .font(.sacredTextMedium)
                     .foregroundColor(.sacredText)
                     .lineLimit(1)

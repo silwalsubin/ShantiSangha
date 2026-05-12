@@ -369,25 +369,24 @@ struct ConnectionDetailView: View {
 
     private func datesSection(_ c: Connection) -> some View {
         VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-            sectionLabel("IMPORTANT DATES")
+            datesSectionHeader
             if dates.isEmpty {
                 emptyDatesPresets
             } else {
                 SacredListCard {
                     VStack(spacing: 0) {
-                        let visible = datesExpanded ? dates : Array(dates.prefix(1))
-                        ForEach(Array(visible.enumerated()), id: \.element.id) { index, entry in
-                            SacredDateRow(
-                                date: parseISODate(entry.date) ?? Date(),
-                                label: entry.label,
-                                onTap: { dateEditTarget = .edit(entry) })
-                            if index < visible.count - 1 {
-                                Divider().padding(.leading, 64)
+                        if datesExpanded {
+                            ForEach(Array(dates.enumerated()), id: \.element.id) { index, entry in
+                                SacredDateRow(
+                                    date: parseISODate(entry.date) ?? Date(),
+                                    label: entry.label,
+                                    onTap: { dateEditTarget = .edit(entry) })
+                                if index < dates.count - 1 {
+                                    Divider().padding(.leading, 64)
+                                }
                             }
-                        }
-                        if dates.count > 1 {
-                            Divider().padding(.leading, 16)
-                            datesToggleRow(remaining: dates.count - 1)
+                        } else {
+                            collapsedDatesRow
                         }
                         Divider().padding(.leading, 16)
                         addDateButton(label: "Add another")
@@ -399,27 +398,51 @@ struct ConnectionDetailView: View {
         }
     }
 
-    /// Single row that flips between "+ N more" (collapsed) and
-    /// "Show less" (expanded) so the rest of the dates stay one tap
-    /// away in either direction without claiming a separate header
-    /// chevron.
-    private func datesToggleRow(remaining: Int) -> some View {
+    /// "IMPORTANT EVENTS" + an expand chevron when there's anything to
+    /// expand. The whole header is the tap target so users don't have
+    /// to aim for the chevron alone.
+    private var datesSectionHeader: some View {
         Button {
+            guard !dates.isEmpty else { return }
             withAnimation(.easeInOut(duration: 0.2)) {
                 datesExpanded.toggle()
             }
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         } label: {
-            HStack(spacing: 8) {
-                Image(systemName: datesExpanded ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 11, weight: .semibold))
-                Text(datesExpanded ? "Show less" : "+ \(remaining) more")
-                    .font(.sacredSmallSemibold)
+            HStack(spacing: 6) {
+                Text("IMPORTANT EVENTS")
+                    .font(.sacredSectionLabel)
+                    .foregroundColor(.sacredLabel)
+                if !dates.isEmpty {
+                    Image(systemName: datesExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.sacredLabel)
+                }
                 Spacer()
             }
-            .foregroundColor(.sacredGold)
+            .padding(.horizontal, 4)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Collapsed preview — every event reduced to its date stamp. Tap
+    /// anywhere in the row to expand into the labeled, stacked view.
+    private var collapsedDatesRow: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                datesExpanded = true
+            }
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        } label: {
+            HStack(spacing: 10) {
+                ForEach(dates) { entry in
+                    SacredDateStamp(date: parseISODate(entry.date) ?? Date())
+                }
+                Spacer(minLength: 0)
+            }
             .padding(.horizontal, 16)
-            .padding(.vertical, 14)
+            .padding(.vertical, 12)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
