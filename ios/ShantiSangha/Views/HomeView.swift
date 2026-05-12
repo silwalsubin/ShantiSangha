@@ -214,21 +214,17 @@ struct HomeView: View {
                     }
                 }
             } label: {
-                HStack(spacing: 4) {
+                HStack(spacing: 6) {
                     Text("Next \(horizonDays) days")
-                        .font(.sacredSmallMedium)
-                        .foregroundColor(.sacredGold)
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredGold.opacity(0.85))
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.sacredGold.opacity(0.7))
+                        .font(.system(size: 9, weight: .regular))
+                        .foregroundColor(.sacredGold.opacity(0.55))
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(
-                    Capsule()
-                        .fill(Color.sacredGold.opacity(0.08))
-                        .overlay(Capsule().stroke(Color.sacredGold.opacity(0.22), lineWidth: 1))
-                )
+                .padding(.vertical, 10)
+                .padding(.leading, 16)
+                .contentShape(Rectangle())
             }
         }
     }
