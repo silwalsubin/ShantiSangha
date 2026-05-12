@@ -10,7 +10,6 @@ struct HomeView: View {
     @StateObject private var health = HealthKitService.shared
     @StateObject private var weather = WeatherService.shared
     @State private var showNewPractice = false
-    @State private var showRecurringSummary = false
     @State private var showRemindersList = false
     @State private var reflection: String?
     @State private var reflectionDate: String?
@@ -68,11 +67,9 @@ struct HomeView: View {
                     } else if !vm.hasPractices && vm.reminders.isEmpty {
                         emptyState
                     } else {
-                        if vm.totalPractices > 0 {
-                            practicesPreviewCard
-                                .padding(.horizontal, SacredSpacing.m)
-                                .padding(.top, 34)
-                        }
+                        todaysChecklistCard
+                            .padding(.horizontal, SacredSpacing.m)
+                            .padding(.top, 34)
 
                         SacredGhostRow(icon: "plus", label: "Add practice") {
                             showNewPractice = true
@@ -87,12 +84,6 @@ struct HomeView: View {
                                 .multilineTextAlignment(.center)
                                 .padding(.top, SacredSpacing.xs)
                                 .transition(.opacity.combined(with: .move(edge: .bottom)))
-                        }
-
-                        if vm.pendingReminders.isEmpty == false {
-                            remindersPreviewCard
-                                .padding(.horizontal, SacredSpacing.m)
-                                .padding(.top, SacredSpacing.lux)
                         }
                     }
 
@@ -194,9 +185,6 @@ struct HomeView: View {
                 await vm.createPractice(title: title, deeperWhy: deeperWhy)
             }
         }
-        .navigationDestination(isPresented: $showRecurringSummary) {
-            RecurringSummaryView(vm: vm)
-        }
         .navigationDestination(isPresented: $showRemindersList) {
             RemindersView(vm: vm)
         }
@@ -212,39 +200,36 @@ struct HomeView: View {
         return email.lowercased() == "subinho09@gmail.com"
     }
 
-    // MARK: - Preview cards
+    // MARK: - Today's checklist
 
-    /// Compact preview: section header + up to 3 pending practice rows
-    /// + an optional "+N more" line that opens the full summary view.
-    private var practicesPreviewCard: some View {
-        let visible = Array(vm.pendingPractices.prefix(3))
-        let extra = max(vm.pendingPractices.count - visible.count, 0)
+    /// Today-scoped focus surface: pending practices + reminders that
+    /// need attention now (overdue + due today), in one card. Each row
+    /// keeps its own leading tile so a glance distinguishes a recurring
+    /// practice from a dated reminder. Reminders deferred past today
+    /// live behind "+ N upcoming reminders" which opens the full list.
+    private var todaysChecklistCard: some View {
+        let practices = vm.pendingPractices
+        let urgentReminders = vm.pendingReminders.filter { $0.daysRemaining <= 0 }
+        let laterReminderCount = vm.pendingReminders.count - urgentReminders.count
+        let total = practices.count + urgentReminders.count
+
         return LuxCard {
             VStack(alignment: .leading, spacing: SacredSpacing.m) {
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    showRecurringSummary = true
-                } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
-                            Text("TODAY'S RHYTHM")
-                                .font(.sacredSectionLabel)
-                                .tracking(3)
-                                .foregroundColor(.sacredLabel)
-                            Text(rhythmSubtitle)
-                                .font(.sacredSmall)
-                                .foregroundColor(.sacredMuted)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .regular))
-                            .foregroundColor(.sacredMuted.opacity(0.5))
+                HStack {
+                    VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
+                        Text("TODAY'S CHECKLIST")
+                            .font(.sacredSectionLabel)
+                            .tracking(3)
+                            .foregroundColor(.sacredLabel)
+                        Text(checklistSubtitle(total: total))
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
                     }
+                    Spacer()
                 }
-                .buttonStyle(.plain)
 
                 VStack(spacing: 0) {
-                    ForEach(Array(visible.enumerated()), id: \.element.id) { index, practice in
+                    ForEach(Array(practices.enumerated()), id: \.element.id) { index, practice in
                         PracticeRow(
                             practice: practice,
                             onDone: {
@@ -263,53 +248,13 @@ struct HomeView: View {
                         )
                         .transition(.opacity.combined(with: .move(edge: .trailing)))
 
-                        if index < visible.count - 1 {
-                            Divider().padding(.leading, 52)
+                        let hasMoreBelow = index < practices.count - 1 || !urgentReminders.isEmpty
+                        if hasMoreBelow {
+                            Divider().padding(.leading, 64)
                         }
                     }
 
-                    if extra > 0 {
-                        Divider().padding(.leading, 16)
-                        moreRow("+ \(extra) more") { showRecurringSummary = true }
-                    }
-                }
-                .animation(.easeOut(duration: 0.3), value: vm.pendingPractices.map(\.id))
-            }
-            .padding(SacredSpacing.m)
-        }
-    }
-
-    /// Compact preview: section header + up to 3 pending reminder rows
-    /// + an optional "+N more" line that opens the full reminders view.
-    private var remindersPreviewCard: some View {
-        let visible = Array(vm.pendingReminders.prefix(3))
-        let extra = max(vm.pendingReminders.count - visible.count, 0)
-        return LuxCard {
-            VStack(alignment: .leading, spacing: SacredSpacing.m) {
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    showRemindersList = true
-                } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
-                            Text("REMINDERS")
-                                .font(.sacredSectionLabel)
-                                .tracking(3)
-                                .foregroundColor(.sacredLabel)
-                            Text(remindersSubtitle)
-                                .font(.sacredSmall)
-                                .foregroundColor(.sacredMuted)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .regular))
-                            .foregroundColor(.sacredMuted.opacity(0.5))
-                    }
-                }
-                .buttonStyle(.plain)
-
-                VStack(spacing: 0) {
-                    ForEach(Array(visible.enumerated()), id: \.element.id) { index, reminder in
+                    ForEach(Array(urgentReminders.enumerated()), id: \.element.id) { index, reminder in
                         ReminderRow(
                             reminder: reminder,
                             allowSwipeToComplete: true,
@@ -322,19 +267,28 @@ struct HomeView: View {
                             )
                         )
 
-                        if index < visible.count - 1 {
-                            Divider().padding(.leading, 52)
+                        if index < urgentReminders.count - 1 {
+                            Divider().padding(.leading, 64)
                         }
                     }
 
-                    if extra > 0 {
+                    if laterReminderCount > 0 {
                         Divider().padding(.leading, 16)
-                        moreRow("+ \(extra) more") { showRemindersList = true }
+                        moreRow("+ \(laterReminderCount) upcoming reminder\(laterReminderCount == 1 ? "" : "s")") {
+                            showRemindersList = true
+                        }
                     }
                 }
+                .animation(.easeOut(duration: 0.3), value: vm.pendingPractices.map(\.id))
             }
             .padding(SacredSpacing.m)
         }
+    }
+
+    private func checklistSubtitle(total: Int) -> String {
+        if total == 0 { return "Nothing pressing." }
+        if total == 1 { return "One thing on your plate." }
+        return "\(total) things on your plate."
     }
 
     private func moreRow(_ label: String, action: @escaping () -> Void) -> some View {
@@ -370,28 +324,6 @@ struct HomeView: View {
         .padding(.top, 40)
     }
 
-    // MARK: - Card subtitles
-
-    private var rhythmSubtitle: String {
-        if vm.allPracticesDone { return "The circle is complete." }
-        let remaining = max(vm.totalPractices - vm.donePractices, 0)
-        if remaining == 1 { return "One quiet step remains." }
-        if remaining > 1 { return "\(remaining) practices are waiting." }
-        return "A clear day."
-    }
-
-    private var remindersSubtitle: String {
-        if vm.overdueRemindersCount > 0 {
-            return "\(vm.overdueRemindersCount) carried over."
-        }
-        if vm.dueTodayRemindersCount > 0 {
-            return "\(vm.dueTodayRemindersCount) due today."
-        }
-        if vm.upcomingRemindersCount > 0 {
-            return "Your reminders are in view."
-        }
-        return "Nothing pressing."
-    }
 
     // MARK: - Gentle nudge
 
