@@ -8,6 +8,10 @@ struct ReminderRow: View {
     var allowSwipeToComplete: Bool = false
     var hideDateBadge: Bool = false
     var showDateStamp: Bool = false
+    /// Avatar shown between the date stamp and the label. When set, every
+    /// row gets the same balanced silhouette — connection rows show the
+    /// other person, own-reminder rows show the viewer's own avatar.
+    var avatarUrl: String? = nil
     let onTap: () -> Void
     var onComplete: (() -> Void)? = nil
     var activeSwipeId: Binding<String?>?
@@ -54,6 +58,10 @@ struct ReminderRow: View {
     private var content: some View {
         HStack(spacing: 12) {
             leadingSlot
+
+            if avatarUrl != nil {
+                ProfileAvatarImage(rawUrl: avatarUrl, size: 28, borderWidth: 1)
+            }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(reminder.label)

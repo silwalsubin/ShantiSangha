@@ -9,6 +9,7 @@ struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
     @StateObject private var health = HealthKitService.shared
     @StateObject private var weather = WeatherService.shared
+    @StateObject private var connections = ConnectionsRepository.shared
     @State private var showRemindersList = false
     @State private var reflection: String?
     @State private var reflectionDate: String?
@@ -58,20 +59,9 @@ struct HomeView: View {
                     } else if vm.reminders.isEmpty {
                         emptyState
                     } else {
-                        todaysChecklistCard
+                        remindersList
                             .padding(.horizontal, SacredSpacing.m)
                             .padding(.top, 34)
-                    }
-
-                    // Wise Cat — astro-aware trading signals. Gated to a
-                    // single email while the feature is in private use;
-                    // every other user gets a clean home view without the
-                    // stocks surface. Flip the allow-list when we're ready
-                    // to roll it out more broadly.
-                    if isStocksAllowed(email: auth.user?.email) {
-                        WiseCatHomeCard()
-                            .padding(.horizontal, SacredSpacing.m)
-                            .padding(.top, SacredSpacing.l)
                     }
                 }
                 .padding(.top, SacredSpacing.xl)
@@ -113,6 +103,7 @@ struct HomeView: View {
                 updateWidgetData()
                 await refreshWholeDayContext()
                 await notifications.refreshUnreadCount()
+                await connections.refresh()
             }
             .onChange(of: vm.overdueRemindersCount) { updateWidgetData() }
             .onChange(of: vm.dueTodayRemindersCount) { updateWidgetData() }
@@ -139,93 +130,45 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Feature gating
+    // MARK: - Reminders list
 
-    /// Stocks (Wise Cat) is gated to a single email while in private
-    /// use. Returns true only for that account; everyone else gets a
-    /// clean home view without the stocks card.
-    private func isStocksAllowed(email: String?) -> Bool {
-        guard let email else { return false }
-        return email.lowercased() == "subinho09@gmail.com"
-    }
+    /// Flat list of every incomplete reminder. No card chrome, no header —
+    /// the screen IS the list.
+    private var remindersList: some View {
+        let pending = vm.pendingReminders
 
-    // MARK: - Today's checklist
+        return VStack(spacing: 0) {
+            ForEach(Array(pending.enumerated()), id: \.element.id) { index, reminder in
+                ReminderRow(
+                    reminder: reminder,
+                    allowSwipeToComplete: true,
+                    showDateStamp: true,
+                    avatarUrl: avatarUrl(for: reminder),
+                    onTap: { showRemindersList = true },
+                    onComplete: { Task { await vm.completeReminder(id: reminder.id) } },
+                    activeSwipeId: Binding(
+                        get: { vm.activeSwipeId },
+                        set: { vm.activeSwipeId = $0 }
+                    )
+                )
 
-    /// Today-scoped focus surface: reminders that need attention now
-    /// (overdue + due today). Reminders deferred past today live behind
-    /// "+ N upcoming reminders" which opens the full list.
-    private var todaysChecklistCard: some View {
-        let urgentReminders = vm.pendingReminders.filter { $0.daysRemaining <= 0 }
-        let laterReminderCount = vm.pendingReminders.count - urgentReminders.count
-
-        return LuxCard {
-            VStack(alignment: .leading, spacing: SacredSpacing.m) {
-                HStack {
-                    VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
-                        Text("TODAY'S CHECKLIST")
-                            .font(.sacredSectionLabel)
-                            .tracking(3)
-                            .foregroundColor(.sacredLabel)
-                        Text(checklistSubtitle(total: urgentReminders.count))
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredMuted)
-                    }
-                    Spacer()
+                if index < pending.count - 1 {
+                    Divider().padding(.leading, 104)
                 }
-
-                VStack(spacing: 0) {
-                    ForEach(Array(urgentReminders.enumerated()), id: \.element.id) { index, reminder in
-                        ReminderRow(
-                            reminder: reminder,
-                            allowSwipeToComplete: true,
-                            showDateStamp: true,
-                            onTap: { showRemindersList = true },
-                            onComplete: { Task { await vm.completeReminder(id: reminder.id) } },
-                            activeSwipeId: Binding(
-                                get: { vm.activeSwipeId },
-                                set: { vm.activeSwipeId = $0 }
-                            )
-                        )
-
-                        if index < urgentReminders.count - 1 {
-                            Divider().padding(.leading, 64)
-                        }
-                    }
-
-                    if laterReminderCount > 0 {
-                        Divider().padding(.leading, 16)
-                        moreRow("+ \(laterReminderCount) upcoming reminder\(laterReminderCount == 1 ? "" : "s")") {
-                            showRemindersList = true
-                        }
-                    }
-                }
-                .animation(.easeOut(duration: 0.3), value: vm.pendingReminders.map(\.id))
             }
-            .padding(SacredSpacing.m)
         }
+        .animation(.easeOut(duration: 0.3), value: pending.map(\.id))
     }
 
-    private func checklistSubtitle(total: Int) -> String {
-        if total == 0 { return "Nothing pressing." }
-        if total == 1 { return "One reminder needs you." }
-        return "\(total) reminders need you."
-    }
-
-    private func moreRow(_ label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack {
-                Text(label)
-                    .font(.sacredSmallMedium)
-                    .foregroundColor(.sacredGold)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .regular))
-                    .foregroundColor(.sacredMuted.opacity(0.5))
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+    /// Connection's avatar when the reminder belongs to someone in the
+    /// user's circle; otherwise the viewer's own avatar. Keeps every row
+    /// visually balanced — a face next to every label.
+    private func avatarUrl(for reminder: Reminder) -> String? {
+        if let cid = reminder.connectionId,
+           let connection = connections.connection(for: cid) {
+            return connection.ownerVisibleAvatarUrl
         }
-        .buttonStyle(.plain)
+        return profile.profile?.avatarUrl
     }
 
     // MARK: - Empty state
@@ -621,8 +564,25 @@ struct ProfileMenuSheet: View {
                 menuRow(icon: "gearshape", label: "Settings", subtitle: "Preferences")
             }
             .buttonStyle(.plain)
+
+            if isStocksAllowed(email: auth.user?.email) {
+                Divider().padding(.leading, 52)
+
+                NavigationLink(destination: WiseCatView()) {
+                    menuRow(icon: "chart.line.uptrend.xyaxis", label: "Wise Cat", subtitle: "Trading signals")
+                }
+                .buttonStyle(.plain)
+            }
         }
         .luxCardChrome()
+    }
+
+    /// Stocks (Wise Cat) is gated to a single email while in private use.
+    /// Returns true only for that account; everyone else gets a clean
+    /// profile menu without the stocks entry.
+    private func isStocksAllowed(email: String?) -> Bool {
+        guard let email else { return false }
+        return email.lowercased() == "subinho09@gmail.com"
     }
 
     private func menuRow(icon: String, label: String, subtitle: String, showsChevron: Bool = true) -> some View {
