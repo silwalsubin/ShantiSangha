@@ -7,14 +7,26 @@ struct SacredHomeHeader: View {
     let greeting: String
 
     var body: some View {
-        VStack(spacing: SacredSpacing.m) {
+        VStack(spacing: SacredSpacing.xs) {
+            Text(dayOfWeek)
+                .font(.sacredSectionLabel)
+                .tracking(3)
+                .foregroundColor(.sacredLabel)
             SacredDateStamp(date: Date(), isToday: true)
+                .padding(.top, 2)
             Text(greeting)
                 .font(.sacredGreeting)
                 .foregroundColor(.sacredText)
                 .multilineTextAlignment(.center)
+                .padding(.top, SacredSpacing.s)
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 6)
+    }
+
+    private var dayOfWeek: String {
+        let f = DateFormatter()
+        f.dateFormat = "EEEE"
+        return f.string(from: Date()).uppercased()
     }
 }
