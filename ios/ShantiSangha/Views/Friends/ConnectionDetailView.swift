@@ -855,7 +855,6 @@ struct ConnectionDetailView: View {
         f.dateFormat = "yyyy-MM-dd"
         f.calendar = Calendar(identifier: .gregorian)
         f.locale = Locale(identifier: "en_US_POSIX")
-        f.timeZone = TimeZone(identifier: "UTC")
         return f.date(from: s)
     }
 }

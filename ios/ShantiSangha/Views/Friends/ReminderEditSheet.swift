@@ -203,12 +203,15 @@ struct ReminderEditSheet: View {
         await onDelete()
     }
 
+    // Parse / format in the user's local timezone so the DatePicker (which
+    // operates in local time) round-trips the same calendar day. Forcing
+    // UTC here previously shifted the day by ±1 every save for users west
+    // of UTC, silently corrupting birthdays/anniversaries on edit.
     private func parseISODate(_ s: String) -> Date? {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
         f.calendar = Calendar(identifier: .gregorian)
         f.locale = Locale(identifier: "en_US_POSIX")
-        f.timeZone = TimeZone(identifier: "UTC")
         return f.date(from: s)
     }
 
@@ -217,7 +220,6 @@ struct ReminderEditSheet: View {
         f.dateFormat = "yyyy-MM-dd"
         f.calendar = Calendar(identifier: .gregorian)
         f.locale = Locale(identifier: "en_US_POSIX")
-        f.timeZone = TimeZone(identifier: "UTC")
         return f.string(from: d)
     }
 }
