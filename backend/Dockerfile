@@ -6,7 +6,6 @@ COPY ShantiSangha.sln .
 COPY ShantiSangha.Api/ShantiSangha.Api.csproj ShantiSangha.Api/
 COPY ShantiSangha.Shared/ShantiSangha.Shared.csproj ShantiSangha.Shared/
 COPY ShantiSangha.Identity/ShantiSangha.Identity.csproj ShantiSangha.Identity/
-COPY ShantiSangha.Practices/ShantiSangha.Practices.csproj ShantiSangha.Practices/
 COPY ShantiSangha.Reminders/ShantiSangha.Reminders.csproj ShantiSangha.Reminders/
 COPY ShantiSangha.Chat/ShantiSangha.Chat.csproj ShantiSangha.Chat/
 COPY ShantiSangha.Journal/ShantiSangha.Journal.csproj ShantiSangha.Journal/

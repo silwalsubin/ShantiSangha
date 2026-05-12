@@ -2,42 +2,15 @@ import Foundation
 import Combine
 
 /// ViewModel for the Home screen — "What needs your attention today?"
-/// Practices delegate to `PracticeRepository` for offline-first data;
-/// reminders go through `ReminderRepository` (online, no streaks).
+/// Reminders are the only thing on this surface now; they're served by
+/// `ReminderRepository` (online, no streaks).
 @MainActor
 class HomeViewModel: ObservableObject {
     @Published var loading = true
     @Published var activeSwipeId: String?
 
-    private let practiceRepo = PracticeRepository.shared
     private let reminderRepo = ReminderRepository.shared
     private var cancellables = Set<AnyCancellable>()
-
-    // MARK: - Practices
-
-    var practices: [Practice] { practiceRepo.practices }
-    var hasPractices: Bool { !practices.isEmpty }
-
-    /// Pending recurring practices (not checked in today)
-    var pendingPractices: [Practice] {
-        practices.filter { !$0.checkedIn }
-    }
-
-    /// All practices — pending first, then completed
-    var allPractices: [Practice] {
-        practices.sorted { !$0.checkedIn && $1.checkedIn }
-    }
-
-    var totalPractices: Int { practices.count }
-    var donePractices: Int { practices.filter { $0.checkedIn }.count }
-    var allPracticesDone: Bool { totalPractices > 0 && donePractices == totalPractices }
-
-    var completedPractices: [Practice] {
-        practices.filter { $0.checkedIn && $0.completedToday == true }
-    }
-    var skippedPractices: [Practice] {
-        practices.filter { $0.checkedIn && $0.completedToday == false }
-    }
 
     // MARK: - Reminders
 
@@ -99,43 +72,18 @@ class HomeViewModel: ObservableObject {
 
     init() {
         // Forward repo changes to trigger view updates
-        practiceRepo.$practices
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.objectWillChange.send() }
-            .store(in: &cancellables)
-
         reminderRepo.$reminders
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
 
-        practiceRepo.$loading
+        reminderRepo.$loading
             .receive(on: DispatchQueue.main)
             .assign(to: &$loading)
     }
 
     func load() async {
-        async let p: () = practiceRepo.refreshFromServer()
-        async let r: () = reminderRepo.refresh()
-        _ = await (p, r)
-    }
-
-    // MARK: - Practice operations
-
-    func checkIn(id: String, completed: Bool) async {
-        await practiceRepo.checkIn(id: id, completed: completed)
-    }
-
-    func undoCheckIn(id: String) async {
-        await practiceRepo.undoCheckIn(id: id)
-    }
-
-    func deletePractice(id: String) async {
-        await practiceRepo.deletePractice(id: id)
-    }
-
-    func createPractice(title: String, deeperWhy: String? = nil) async {
-        await practiceRepo.createPractice(title: title, deeperWhy: deeperWhy)
+        await reminderRepo.refresh()
     }
 
     // MARK: - Reminder operations

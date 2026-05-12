@@ -5,7 +5,7 @@ namespace ShantiSangha.Shared.Interfaces;
 /// modules. The Identity module uses this to filter user-search results so
 /// existing friends don't show up — without coupling to the Friends DbContext
 /// directly. Mirrors the pattern of `IProfileQueryService` (Identity → other
-/// modules) and `IPracticeQueryService` (Goals → other modules).
+/// modules).
 /// </summary>
 public interface IFriendsQueryService
 {

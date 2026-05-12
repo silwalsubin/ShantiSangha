@@ -62,7 +62,7 @@ class NotificationService: ObservableObject {
 
     // MARK: - Schedule all notifications based on current state
 
-    func reschedule(practices: [Practice], reminders: [Reminder]) {
+    func reschedule(reminders: [Reminder]) {
         guard isEnabled else {
             center.removeAllPendingNotificationRequests()
             return
@@ -73,37 +73,8 @@ class NotificationService: ObservableObject {
         let calendar = Calendar.current
         let now = Date()
 
-        for practice in practices {
-            scheduleStreakProtection(practice: practice, calendar: calendar, now: now)
-        }
         for reminder in reminders where reminder.completedAt == nil && reminder.remindersEnabled {
             scheduleReminderNudge(reminder: reminder, calendar: calendar, now: now)
-        }
-    }
-
-    // MARK: - Streak protection
-
-    /// Notify in the evening if a recurring practice hasn't been completed today
-    /// and the user has an active streak worth protecting.
-    private func scheduleStreakProtection(practice: Practice, calendar: Calendar, now: Date) {
-        // Only protect streaks of 2+ days
-        guard practice.currentStreak >= 2 && !practice.checkedIn else { return }
-
-        let body = "Your \(practice.currentStreak)-day \(practice.title) streak is still alive. One check-in keeps it going."
-
-        var dateComponents = DateComponents()
-        dateComponents.hour = reminderHour
-        dateComponents.minute = reminderMinute
-
-        // Only schedule if reminder time hasn't passed yet today
-        if let reminderToday = calendar.date(bySettingHour: reminderHour, minute: reminderMinute, second: 0, of: now),
-           reminderToday > now {
-            scheduleNotification(
-                id: "streak-\(practice.id)",
-                title: practice.title,
-                body: body,
-                dateComponents: dateComponents
-            )
         }
     }
 

@@ -10,7 +10,6 @@ using ShantiSangha.Chat.Services;
 using ShantiSangha.Shared;
 using ShantiSangha.Shared.Events;
 using ShantiSangha.Shared.Interfaces;
-using ShantiSangha.Shared.Models;
 
 namespace ShantiSangha.Chat.AI;
 
@@ -18,7 +17,6 @@ public class ChatService(
     ChatDbContext db,
     Kernel kernel,
     ISafetyService safety,
-    IPracticeQueryService practiceQuery,
     IReflectionQueryService reflectionQuery,
     IProfileQueryService profileQuery,
     IEventBus eventBus,
@@ -138,22 +136,17 @@ public class ChatService(
         CancellationToken cancellationToken,
         string? currentMessage = null)
     {
-        // Load all context in parallel — each task is fault-tolerant so a single
-        // failure doesn't kill the entire conversation.
         string? displayName = null;
         string? todaysReflection = null;
-        IReadOnlyList<PracticeSummaryDto> practiceDtos = [];
 
         try
         {
             var displayNameTask = profileQuery.GetDisplayNameAsync(userId, cancellationToken);
-            var practicesTask = practiceQuery.GetActivePracticesForContextAsync(userId, ct: cancellationToken);
             var reflectionTask = reflectionQuery.GetRecentReflectionAsync(userId, cancellationToken);
 
-            await Task.WhenAll(displayNameTask, practicesTask, reflectionTask);
+            await Task.WhenAll(displayNameTask, reflectionTask);
 
             displayName = displayNameTask.Result;
-            practiceDtos = practicesTask.Result;
             todaysReflection = reflectionTask.Result;
         }
         catch (Exception ex)
@@ -161,17 +154,9 @@ public class ChatService(
             logger.LogWarning(ex, "Failed to load some context for conversation {ConversationId} — continuing with partial context", conversationId);
         }
 
-        var practiceContexts = practiceDtos.Select(p => new PracticeContext(
-            Title: p.Title,
-            CurrentStreak: p.CurrentStreak,
-            LongestStreak: p.LongestStreak,
-            CheckedInToday: p.CheckedInToday,
-            DeeperWhy: p.DeeperWhy)).ToList();
-
         var systemPrompt = SystemPrompt.WithContext(
             displayName: displayName,
-            todaysReflection: todaysReflection,
-            practices: practiceContexts);
+            todaysReflection: todaysReflection);
 
         var history = new ChatHistory(systemPrompt);
 

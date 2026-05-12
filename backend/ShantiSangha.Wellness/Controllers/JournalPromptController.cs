@@ -18,7 +18,6 @@ public class JournalPromptController(
     WellnessDbContext db,
     ICurrentUser currentUser,
     Kernel kernel,
-    IPracticeQueryService practiceQuery,
     IReflectionQueryService reflectionQuery,
     ILogger<JournalPromptController> logger) : ControllerBase
 {
@@ -45,28 +44,13 @@ public class JournalPromptController(
         if (cached is not null)
             return Ok(new { Prompt = cached });
 
-        var practices = await practiceQuery.GetActivePracticesForContextAsync(user.Id, today, ct);
         var todaysReflection = await reflectionQuery.GetRecentReflectionAsync(user.Id, ct);
 
         // If the user has no context at all, return null — client falls back.
-        var hasContext = practices.Count > 0
-            || !string.IsNullOrWhiteSpace(todaysReflection);
-        if (!hasContext)
+        if (string.IsNullOrWhiteSpace(todaysReflection))
             return Ok(new { Prompt = (string?)null });
 
-        var contextParts = new List<string>();
-
-        foreach (var g in practices)
-        {
-            var streak = g.CurrentStreak > 0 ? $" ({g.CurrentStreak}-day streak)" : "";
-            var why = !string.IsNullOrWhiteSpace(g.DeeperWhy) ? $" Why: \"{g.DeeperWhy}\"" : "";
-            contextParts.Add($"- {g.Title}{streak}{why}");
-        }
-
-        if (!string.IsNullOrWhiteSpace(todaysReflection))
-            contextParts.Add($"Today's reflection: \"{todaysReflection}\"");
-
-        var context = string.Join("\n\n", contextParts);
+        var context = $"Today's reflection: \"{todaysReflection}\"";
 
         try
         {
@@ -78,8 +62,8 @@ public class JournalPromptController(
 
                 Rules:
                 - ONE sentence. Under 20 words. A question or invitation.
-                - Be SPECIFIC to their context — reference their actual streaks,
-                  practices, or today's reflection. Generic prompts are worthless.
+                - Be SPECIFIC to their context — reference today's reflection.
+                  Generic prompts are worthless.
                 - Never give advice. Never mention what they haven't done.
                 - Never use exclamation marks. No emojis.
                 - Tone: warm, curious, unhurried. Like a friend asking the right
@@ -93,7 +77,6 @@ public class JournalPromptController(
                 - "Write about anything that comes to mind."
 
                 Good examples:
-                - "Twelve days of meditation. What has changed in how you wake up?"
                 - "What would you say to the version of you from a month ago?"
                 - "What is growing in you that you haven't named yet?"
 

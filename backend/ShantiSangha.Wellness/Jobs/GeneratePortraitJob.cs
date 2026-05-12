@@ -13,13 +13,12 @@ namespace ShantiSangha.Wellness.Jobs;
 
 /// <summary>
 /// Generates a living portrait of the user — who they are through the lens of
-/// their practice, their patterns, and their reflections. Cached per user,
-/// regenerated when the underlying context changes meaningfully.
+/// their reflections and patterns. Cached per user, regenerated when the
+/// underlying context changes meaningfully.
 /// </summary>
 public class GeneratePortraitJob(
     WellnessDbContext db,
     Kernel kernel,
-    IPracticeQueryService practiceQuery,
     IProfileQueryService profileQuery,
     ILogger<GeneratePortraitJob> logger)
 {
@@ -27,9 +26,7 @@ public class GeneratePortraitJob(
     {
         try
         {
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
             var displayName = await profileQuery.GetDisplayNameAsync(userId);
-            var practices = await practiceQuery.GetActivePracticesForContextAsync(userId, today);
 
             var recentReflections = await db.DailyReflections
                 .Where(r => r.UserId == userId)
@@ -47,17 +44,6 @@ public class GeneratePortraitJob(
                 contextParts.Add($"Their name is {displayName}.");
 
             contextParts.Add($"They have been using the app for {totalReflections} days.");
-
-            if (practices.Count > 0)
-            {
-                var practiceLines = practices.Select(p =>
-                {
-                    var streak = p.CurrentStreak > 0 ? $" (streak: {p.CurrentStreak} days, longest: {p.LongestStreak})" : " (no active streak)";
-                    var why = !string.IsNullOrWhiteSpace(p.DeeperWhy) ? $" Why: \"{p.DeeperWhy}\"" : "";
-                    return $"  - {p.Title}{streak}{why}";
-                });
-                contextParts.Add($"Active practices:\n{string.Join("\n", practiceLines)}");
-            }
 
             if (recentReflections.Count > 0)
             {
@@ -120,31 +106,29 @@ public class GeneratePortraitJob(
     {
         var dayContext = totalDays switch
         {
-            0 => "This person just started. You know almost nothing yet. Write a seed portrait based on what they've chosen to practice. End with: 'As you practice, this portrait will grow with you.'",
-            < 7 => "This person is new. You have limited data. Write what you can see so far — their chosen practices, their early patterns. Keep it grounded in what's real, not what you imagine.",
-            < 30 => "You have a few weeks of data. You can start to see patterns — which practices stick, which daily reflections keep echoing, how they show up. Name what you notice.",
+            0 => "This person just started. You know almost nothing yet. Write a brief seed portrait acknowledging this is their first day. End with: 'As you reflect, this portrait will grow with you.'",
+            < 7 => "This person is new. You have limited data. Write what you can see so far — their early reflections, what they seem to be noticing. Keep it grounded in what's real, not what you imagine.",
+            < 30 => "You have a few weeks of data. You can start to see themes — which observations keep echoing, how they show up across reflections. Name what you notice.",
             _ => "You have deep history. You can see arcs, shifts, contradictions, and growth. This portrait should feel like it could only describe THIS person — specific, earned, true."
         };
 
         return $"""
             You write a living portrait of a person — who they are as seen through
-            their spiritual practice, their patterns, and their reflections.
+            their reflections and patterns over time.
 
-            This portrait appears at the top of their Journey page. It is the app
-            telling them who they are, based on everything it knows. The reader
-            should think: "yes, that's me" — or better, "I hadn't thought of it
-            that way."
+            This portrait is the app telling them who they are, based on everything
+            it knows. The reader should think: "yes, that's me" — or better,
+            "I hadn't thought of it that way."
 
             {dayContext}
 
             Rules:
             - 3 to 5 sentences. No more. Every word must earn its place.
-            - Write in second person ("You are..." / "You carry..." / "Your practice...")
-            - Anchor in practice patterns and daily reflections — what they actually do
-              and what's actually been observed about them.
-            - Reference specific numbers (streak days, practice counts) naturally.
+            - Write in second person ("You are..." / "You carry..." / "Your way of...")
+            - Anchor in their reflection history — what's actually been observed
+              about them over time.
             - Name thematic threads only when they are visible in the provided
-              reflections or practice history.
+              reflections.
             - The tone is warm, observant, unhurried. Like a wise teacher who has
               been watching quietly and finally speaks.
             - Never give advice. Never instruct. Only observe and reflect back.

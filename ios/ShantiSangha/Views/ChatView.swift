@@ -255,14 +255,7 @@ struct ChatView: View {
     }
 
     private func loadOpeningPrompt() async {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
         do {
-            let practices: [Practice] = try await api.get("/practices/today?date=\(f.string(from: Date()))")
-            if let practice = practices.first(where: { !$0.checkedIn }) {
-                openingPrompt = "You are carrying \(practice.title) today. What feels alive around it?"
-                return
-            }
             let reminders: [Reminder] = try await api.get("/reminders")
             if let upcoming = reminders.first(where: { $0.completedAt == nil && $0.daysRemaining <= 7 }) {
                 openingPrompt = "\(upcoming.label) is in your field. What would help you meet it clearly?"

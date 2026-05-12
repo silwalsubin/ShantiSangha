@@ -16,18 +16,6 @@ enum WidgetData {
         set { defaults?.set(newValue, forKey: "widget.reflection") }
     }
 
-    // MARK: - Practices
-
-    static var practicesDone: Int {
-        get { defaults?.integer(forKey: "widget.practicesDone") ?? 0 }
-        set { defaults?.set(newValue, forKey: "widget.practicesDone") }
-    }
-
-    static var practicesTotal: Int {
-        get { defaults?.integer(forKey: "widget.practicesTotal") ?? 0 }
-        set { defaults?.set(newValue, forKey: "widget.practicesTotal") }
-    }
-
     // MARK: - Reminders
 
     static var remindersOverdue: Int {
@@ -57,15 +45,11 @@ enum WidgetData {
     /// Call from the main app whenever data changes to keep widget fresh
     static func update(
         reflection: String?,
-        practicesDone: Int,
-        practicesTotal: Int,
         remindersOverdue: Int,
         remindersDueToday: Int,
         userName: String?
     ) {
         self.reflection = reflection
-        self.practicesDone = practicesDone
-        self.practicesTotal = practicesTotal
         self.remindersOverdue = remindersOverdue
         self.remindersDueToday = remindersDueToday
         self.userName = userName

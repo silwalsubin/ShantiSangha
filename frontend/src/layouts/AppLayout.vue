@@ -16,7 +16,6 @@ const route = useRoute()
 const navItems = [
   { icon: 'vajra', label: 'Home', href: '/app/home' },
   { icon: 'dialogue', label: 'Reflect', href: '/app/reflect' },
-  { icon: 'diya', label: 'Journey', href: '/app/journey' },
 ]
 
 function isActive(href: string) {

@@ -6,8 +6,6 @@ import SwiftUI
 struct ShantiSanghaEntry: TimelineEntry {
     let date: Date
     let reflection: String?
-    let practicesDone: Int
-    let practicesTotal: Int
     let remindersOverdue: Int
     let remindersDueToday: Int
     let userName: String?
@@ -21,7 +19,6 @@ struct ShantiSanghaProvider: TimelineProvider {
         ShantiSanghaEntry(
             date: Date(),
             reflection: "Your practice has a rhythm now. The days you show up are the ones you shape.",
-            practicesDone: 2, practicesTotal: 4,
             remindersOverdue: 0, remindersDueToday: 1,
             userName: nil
         )
@@ -44,8 +41,6 @@ struct ShantiSanghaProvider: TimelineProvider {
         ShantiSanghaEntry(
             date: Date(),
             reflection: WidgetData.reflection,
-            practicesDone: WidgetData.practicesDone,
-            practicesTotal: WidgetData.practicesTotal,
             remindersOverdue: WidgetData.remindersOverdue,
             remindersDueToday: WidgetData.remindersDueToday,
             userName: WidgetData.userName
@@ -104,56 +99,6 @@ private struct SacredWidgetBackground: View {
     }
 }
 
-// MARK: - Sacred progress ring
-//
-// Matches the gradient-stroked ring used in `SacredProgressRing` on Home.
-// Sized for the widget canvas (52pt vs 118pt on Home).
-private struct SacredWidgetRing: View {
-    let done: Int
-    let total: Int
-    var size: CGFloat = 52
-    var lineWidth: CGFloat = 5
-
-    var body: some View {
-        let progress = total > 0 ? Double(done) / Double(total) : 0
-
-        ZStack {
-            // Track
-            Circle()
-                .stroke(sacredMuted.opacity(0.12), lineWidth: lineWidth)
-
-            // Progress arc — gradient-stroked, matching SacredProgressRing
-            if done > 0 {
-                Circle()
-                    .trim(from: 0, to: progress)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                sacredGold.opacity(0.7),
-                                sacredGold,
-                                sacredGold.opacity(0.8)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
-                    )
-                    .rotationEffect(.degrees(-90))
-            }
-
-            VStack(spacing: 0) {
-                Text("\(done)")
-                    .font(.system(size: 18, weight: .bold, design: .serif))
-                    .foregroundColor(done > 0 ? sacredGold : sacredMuted)
-                Text("of \(total)")
-                    .font(.system(size: 8, design: .serif))
-                    .foregroundColor(sacredMuted)
-            }
-        }
-        .frame(width: size, height: size)
-    }
-}
-
 // MARK: - Small Widget (Reflection only)
 
 struct ReflectionWidgetView: View {
@@ -186,36 +131,30 @@ struct ReflectionWidgetView: View {
     }
 }
 
-// MARK: - Medium Widget (Progress + Reflection)
+// MARK: - Medium Widget (Reflection + Reminders)
 
 struct DashboardWidgetView: View {
     let entry: ShantiSanghaEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 12) {
-                VStack(spacing: 4) {
-                    SacredWidgetRing(done: entry.practicesDone, total: entry.practicesTotal)
-
-                    Text("Practices")
-                        .font(.system(size: 9, weight: .semibold, design: .serif))
-                        .foregroundColor(sacredTextSecondary)
-                }
-
-                // Reflection — takes remaining space. Hard-cap to 5 lines and
-                // let SwiftUI truncate with an ellipsis. Never use
-                // `fixedSize(vertical: true)` here — it would let the Text
-                // grow past the widget's bounds and mangle the layout.
-                if let reflection = entry.reflection, !reflection.isEmpty {
-                    Text(reflection)
-                        .font(.system(size: 12, weight: .regular, design: .serif))
-                        .italic()
-                        .foregroundColor(sacredText)
-                        .lineLimit(5)
-                        .truncationMode(.tail)
-                        .minimumScaleFactor(0.85)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                }
+        VStack(alignment: .leading, spacing: 8) {
+            // Reflection — primary content. Hard-cap to 5 lines and let
+            // SwiftUI truncate with an ellipsis. Never use
+            // `fixedSize(vertical: true)` here — it would let the Text grow
+            // past the widget's bounds and mangle the layout.
+            if let reflection = entry.reflection, !reflection.isEmpty {
+                Text(reflection)
+                    .font(.system(size: 13, weight: .regular, design: .serif))
+                    .italic()
+                    .foregroundColor(sacredText)
+                    .lineLimit(5)
+                    .truncationMode(.tail)
+                    .minimumScaleFactor(0.85)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            } else {
+                Text("Open the app — today's reflection is being written.")
+                    .font(.system(size: 13, weight: .regular, design: .serif))
+                    .foregroundColor(sacredTextSecondary)
             }
 
             Spacer()
@@ -280,8 +219,8 @@ struct ShantiSanghaDashboardWidget: Widget {
                     .background(SacredWidgetBackground())
             }
         }
-        .configurationDisplayName("Today's Practice")
-        .description("Your daily practice progress and reflection.")
+        .configurationDisplayName("Today's Reflection")
+        .description("Your daily reflection and reminders that need you.")
         .supportedFamilies([.systemMedium])
     }
 }

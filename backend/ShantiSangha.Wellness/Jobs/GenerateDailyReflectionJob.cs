@@ -12,7 +12,6 @@ namespace ShantiSangha.Wellness.Jobs;
 public class GenerateDailyReflectionJob(
     WellnessDbContext db,
     Kernel kernel,
-    IPracticeQueryService practiceQuery,
     IProfileQueryService profileQuery,
     IPushNotificationService pushService,
     ILogger<GenerateDailyReflectionJob> logger)
@@ -27,7 +26,6 @@ public class GenerateDailyReflectionJob(
         try
         {
             var displayName = await profileQuery.GetDisplayNameAsync(userId);
-            var practices = await practiceQuery.GetActivePracticesForContextAsync(userId, today);
 
             // Get previous reflections — now used for CONTINUITY, not just deduplication
             var previousReflections = await db.DailyReflections
@@ -45,25 +43,6 @@ public class GenerateDailyReflectionJob(
 
             if (displayName is not null)
                 contextParts.Add($"Their name is {displayName}.");
-
-            // Goals with pattern data
-            var milestoneThresholds = new HashSet<int> { 7, 14, 30, 60, 100, 365 };
-            var milestonesHitToday = new List<string>();
-            foreach (var p in practices)
-            {
-                var streak = p.CurrentStreak > 0 ? $" (current streak: {p.CurrentStreak} days, longest: {p.LongestStreak})" : " (no active streak)";
-                var why = !string.IsNullOrWhiteSpace(p.DeeperWhy) ? $" Their deeper why: \"{p.DeeperWhy}\"" : "";
-                var checkedIn = p.CheckedInToday ? " — completed today" : " — not yet done today";
-                contextParts.Add($"- practice: {p.Title}{streak}{checkedIn}{why}");
-
-                if (p.CheckedInToday && milestoneThresholds.Contains(p.CurrentStreak))
-                {
-                    milestonesHitToday.Add($"{p.Title} reached {p.CurrentStreak} days today");
-                }
-            }
-
-            if (milestonesHitToday.Count > 0)
-                contextParts.Add($"MILESTONE(S) HIT TODAY:\n{string.Join("\n", milestonesHitToday.Select(m => $"  - {m}"))}");
 
             // Check days since last visit
             var lastReflection = previousReflections.FirstOrDefault();
@@ -170,8 +149,8 @@ public class GenerateDailyReflectionJob(
             ReflectionType.Seed => """
                 TODAY'S MODE: SEED-PLANTING
                 Your job today is to plant curiosity. Notice something that is
-                forming — a pattern, a shift, a connection between two parts of
-                their practice — but DON'T resolve it. Leave it open.
+                forming — a pattern, a shift, a quiet thread in their reflections —
+                but DON'T resolve it. Leave it open.
 
                 End with something that makes them want to come back tomorrow:
                 "I'm watching something form." or "This might be clearer tomorrow."
@@ -196,9 +175,9 @@ public class GenerateDailyReflectionJob(
 
             ReflectionType.Callback => $"""
                 TODAY'S MODE: CALLBACK
-                Reference something from their past — a reflection, a pattern, or
-                a moment from their earlier practice — and connect it to where they
-                are now. This creates a "the app remembers my story" feeling.
+                Reference something from their past — a reflection or a moment
+                from their earlier days — and connect it to where they are now.
+                This creates a "the app remembers my story" feeling.
 
                 Use their previous reflections as source material. Find a specific
                 one from at least 4 days ago and show how something has shifted,
@@ -210,9 +189,9 @@ public class GenerateDailyReflectionJob(
 
             _ => """
                 TODAY'S MODE: REGULAR
-                Write a warm, specific observation about their current practice.
-                Ground it in their actual data. Notice something they might not
-                have seen about their own patterns.
+                Write a warm, specific observation grounded in their previous
+                reflections. Notice something they might not have seen about
+                their own patterns.
 
                 This is the standard reflection — no narrative tricks. Just a
                 clear, honest mirror.
@@ -229,28 +208,20 @@ public class GenerateDailyReflectionJob(
 
             Your job is to NOTICE something. Not to advise. Not to motivate.
             Not to teach. To observe something about their patterns, their
-            practice, their journey that they might not have seen themselves.
+            inner life, their journey that they might not have seen themselves.
 
             Rules:
             - Maximum 50 words. Two to three SHORT sentences. Never more.
-            - Be SPECIFIC. Reference actual data — their streaks, their journal
-              themes, their patterns. A reflection that could apply to anyone is
+            - Be SPECIFIC. Reference actual data — journal themes, patterns from
+              prior reflections. A reflection that could apply to anyone is
               worthless.
             - ONLY speak to what they HAVE done, never what they haven't.
-              Do not mention incomplete practices, dormant commitments, or missed
-              days. If a practice has no activity, ignore it completely.
+              Do not mention what they're missing or behind on.
             - Never give advice or instructions. No "try to..." or "consider..."
             - Never use exclamation marks. Never be peppy.
             - Never judge, evaluate, or imply they should do more.
             - If they've been away, welcome them without guilt.
             - If you notice a pattern in what they DO, NAME it.
-            - If a MILESTONE is noted in the context (a streak threshold crossed
-              today — 7, 14, 30, 60, 100, or 365 days), acknowledge it simply.
-              No gamification language. No "congrats" or "achievement." Observe
-              what this number means about them. Example: "Thirty days of
-              meditation. The practice has become a person, not a task."
-            - At 14+ day milestones, use IDENTITY language. Not "great streak"
-              but "this is who you are now." The practice is part of them.
             - Read the NARRATIVE MODE instruction carefully. It tells you whether
               to write a regular observation, plant a seed, follow up on
               yesterday's seed, or callback to something from their past. Follow

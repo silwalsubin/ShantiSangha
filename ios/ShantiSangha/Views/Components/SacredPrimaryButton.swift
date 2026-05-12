@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The sacred-gold primary action button used for commit moments across the
-/// app ("Save", "Try again", "Use this place", "Set your first practice").
+/// app ("Save", "Try again", "Use this place", "Add your first reminder").
 ///
 /// Two shapes cover every primary CTA in the codebase:
 /// - `.pill` — compact, inline or centered (errors, empty states,

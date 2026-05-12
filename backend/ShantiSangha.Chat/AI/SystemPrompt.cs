@@ -82,11 +82,10 @@ public static class SystemPrompt
 
     public static string WithContext(
         string? displayName,
-        string? todaysReflection,
-        IEnumerable<PracticeContext>? practices = null)
+        string? todaysReflection)
     {
         // Stablest content first so OpenAI's automatic prompt caching can match
-        // the prefix across turns: Base → name → reflection → practices.
+        // the prefix across turns: Base → name → reflection.
         var parts = new List<string> { Base };
 
         if (displayName is not null)
@@ -109,44 +108,6 @@ public static class SystemPrompt
                 If they don't bring it up, don't force it in.
                 """);
 
-        var practiceList = practices?.ToList();
-        if (practiceList is { Count: > 0 })
-        {
-            var practiceLines = practiceList.Select(p =>
-            {
-                var streakInfo = p.CurrentStreak > 0
-                    ? $" (current streak: {p.CurrentStreak} days, longest: {p.LongestStreak} days)"
-                    : " (no active streak)";
-                var todayStatus = p.CheckedInToday
-                    ? " — checked in today"
-                    : " — not yet checked in today";
-                var whyInfo = !string.IsNullOrWhiteSpace(p.DeeperWhy)
-                    ? $"\n  Why it matters to them: \"{p.DeeperWhy}\""
-                    : "";
-                return $"- [Daily practice] {p.Title}{streakInfo}{todayStatus}{whyInfo}";
-            });
-
-            parts.Add($"""
-                ## Their daily practices
-                These are the recurring practices this person is actively keeping. Use this to
-                understand what matters to them right now. Weave practice awareness into
-                conversation naturally — celebrate streaks, gently check in on practices that
-                seem stalled, and help them see the spiritual dimension of their commitments.
-                Do not list their practices back to them unless they ask. Instead, let this
-                knowledge inform how you respond — like a friend who remembers what they're
-                working on.
-
-                {string.Join("\n", practiceLines)}
-                """);
-        }
-
         return string.Join("\n\n---\n\n", parts);
     }
 }
-
-public record PracticeContext(
-    string Title,
-    int CurrentStreak,
-    int LongestStreak,
-    bool CheckedInToday,
-    string? DeeperWhy);

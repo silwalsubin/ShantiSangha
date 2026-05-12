@@ -11,6 +11,10 @@ class SyncStatus: ObservableObject {
 
 /// Manages queued writes for offline-first sync.
 /// When online: sends immediately. When offline: queues for later.
+///
+/// No feature currently enqueues work — reminders write through the server
+/// directly and don't need an offline cache. Kept here as the infrastructure
+/// hook for any future offline-capable feature.
 actor SyncService {
     static let shared = SyncService()
 
@@ -94,17 +98,8 @@ actor SyncService {
             }
 
             do {
-                let response = try await sendItem(item)
-
-                // Handle temp ID replacement for create operations
-                if let tempId = item.tempId, let created = response {
-                    await replaceTempId(tempId, with: created, in: context)
-                    await log(.info, "Created \(item.path) → \(created.id)")
-                } else {
-                    await markResourceSynced(from: item.path)
-                    await log(.info, "Synced \(item.method) \(item.path)")
-                }
-
+                try await sendItem(item)
+                await log(.info, "Synced \(item.method) \(item.path)")
                 context.delete(item)
             } catch {
                 if case ApiError.httpError(let statusCode, let responseData) = error {
@@ -151,18 +146,12 @@ actor SyncService {
         }
     }
 
-    /// Send a single queue item. Returns decoded Practice for POST creates.
-    private func sendItem(_ item: SyncQueueItem) async throws -> Practice? {
+    /// Send a single queue item. Generic — no per-feature decoding.
+    private func sendItem(_ item: SyncQueueItem) async throws {
         switch item.method {
         case "POST":
             if let body = item.body {
-                if item.tempId != nil {
-                    // Create operation — decode the response to get real ID
-                    let created: Practice = try await api.postRaw(item.path, body: body)
-                    return created
-                } else {
-                    let _: EmptyResponse = try await api.postRaw(item.path, body: body)
-                }
+                let _: EmptyResponse = try await api.postRaw(item.path, body: body)
             }
         case "PATCH":
             if let body = item.body {
@@ -172,36 +161,6 @@ actor SyncService {
             try await api.delete(item.path)
         default:
             break
-        }
-        return nil
-    }
-
-    /// Replace temp ID with real server ID in local DB and remaining queue items
-    private func replaceTempId(_ tempId: String, with created: Practice, in context: ModelContext) async {
-        // Update local CachedPractice: delete temp, insert real
-        await MainActor.run {
-            let repo = PracticeRepository.shared
-            repo.replaceTempWithReal(tempId: tempId, real: created)
-        }
-
-        // Rewrite paths in remaining queue items that reference the temp ID
-        let descriptor = FetchDescriptor<SyncQueueItem>()
-        if let remaining = try? context.fetch(descriptor) {
-            for item in remaining where item.path.contains(tempId) {
-                item.path = item.path.replacingOccurrences(of: tempId, with: created.id)
-            }
-        }
-    }
-
-    /// Mark the resource as synced in the local DB
-    private func markResourceSynced(from path: String) async {
-        // Extract resource ID from paths like /practices/{id}/checkin or /practices/{id}
-        let parts = path.split(separator: "/")
-        guard parts.count >= 2 else { return }
-        let resourceId = String(parts[1])
-
-        await MainActor.run {
-            PracticeRepository.shared.markSynced(id: resourceId)
         }
     }
 

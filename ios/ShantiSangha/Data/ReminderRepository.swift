@@ -1,9 +1,8 @@
 import Foundation
 
-/// Repository for reminders (the new module that unifies the legacy
-/// one-time goals + connection "important dates"). Talks directly to
-/// the backend — reminders aren't streak-tracked so they don't need
-/// the offline-first SwiftData cache that practices get.
+/// Repository for reminders — dated one-shots, optional connection-scoped
+/// ("important dates"), with light recurrence. Talks directly to the
+/// backend; no local SwiftData cache.
 @MainActor
 final class ReminderRepository: ObservableObject {
     static let shared = ReminderRepository()

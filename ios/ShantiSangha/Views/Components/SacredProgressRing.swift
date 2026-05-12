@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Sacred progress ring — the gold-stroked circle the Home tab uses for
-/// "Practices" and "Goals". Built on top of `GoldShineRing` so the filled
+/// Sacred progress ring — the gold-stroked circle used across the app to
+/// show ratio-based progress. Built on top of `GoldShineRing` so the filled
 /// portion picks up device tilt.
 ///
 /// Pass `detail` instead of a count when the ring should show a textual

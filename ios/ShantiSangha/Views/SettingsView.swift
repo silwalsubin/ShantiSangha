@@ -58,12 +58,10 @@ struct SettingsView: View {
                                     let result = await notifications.requestPermission()
                                     if !result { notifications.isEnabled = false }
                                 }
-                                notifications.reschedule(
-                                    practices: PracticeRepository.shared.practices,
-                                    reminders: ReminderRepository.shared.reminders)
+                                notifications.reschedule(reminders: ReminderRepository.shared.reminders)
                             }
                         } else {
-                            notifications.reschedule(practices: [], reminders: [])
+                            notifications.reschedule(reminders: [])
                         }
                     }
 
@@ -137,7 +135,7 @@ struct SettingsView: View {
                                 ? "—"
                                 : "\(health.minutesWrittenToday) min"
                         )
-                        Text("Meditation check-ins will be recorded in the Health app alongside your other practices.")
+                        Text("Meditation check-ins will be recorded in the Health app.")
                             .font(.sacredSmall)
                             .foregroundColor(.sacredMuted)
                             .fixedSize(horizontal: false, vertical: true)
@@ -301,9 +299,7 @@ struct SettingsView: View {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Done") {
                             showTimePicker = false
-                            notifications.reschedule(
-                                practices: PracticeRepository.shared.practices,
-                                reminders: ReminderRepository.shared.reminders)
+                            notifications.reschedule(reminders: ReminderRepository.shared.reminders)
                         }
                         .foregroundColor(.sacredGold)
                     }

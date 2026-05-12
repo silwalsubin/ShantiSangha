@@ -2,11 +2,11 @@
 
 ## Features
 See `docs/features/` for detailed feature documentation (purpose, value, how it works, key files, API endpoints).
-- [Home](docs/features/dashboard.md) — daily landing page with reflection and practice progress
+- [Home](docs/features/dashboard.md) — daily landing page with reflection and reminders
 - [Reflection](docs/features/reflection.md) — AI-generated daily observation drawn from the user's real data
 - [Chat](docs/features/chat.md) — AI spiritual companion (GPT-4o, SSE streaming)
 - [Journal](docs/features/journal.md) — private reflection writing
-- [Goals](docs/features/goals.md) — daily intentions with streak-based discipline tracking
+- Reminders — date-based one-time or yearly nudges (bills, birthdays, appointments)
 - [Voice](docs/features/voice.md) — audio notes with async transcription
 - [Friends](docs/features/friends.md) — quiet shared accountability; aggregated activity only, never content
 - [User search](docs/features/user-search.md) — find people by display name + optional location

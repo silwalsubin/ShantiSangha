@@ -75,8 +75,8 @@ enum SilentPushHandler {
             break
         }
 
-        // Always refresh reminders/practices since they're in the widget
-        await refreshRemindersAndPractices(api: api, dateStr: dateStr)
+        // Always refresh reminders since they're in the widget
+        await refreshReminders(api: api)
 
         // Force UserDefaults to flush to disk before telling WidgetKit to reload —
         // the widget runs in a separate process and needs to see the updated values
@@ -109,8 +109,7 @@ enum SilentPushHandler {
         }
     }
 
-    private static func refreshRemindersAndPractices(api: ApiService, dateStr: String) async {
-        // Fetch reminders
+    private static func refreshReminders(api: ApiService) async {
         do {
             let reminders: [Reminder] = try await api.get("/reminders")
             let pending = reminders.filter { $0.completedAt == nil }
@@ -119,17 +118,6 @@ enum SilentPushHandler {
         } catch {
             if !error.isCancellation {
                 await AppLogger.shared.error("Push", "Failed to refresh reminders: \(error.localizedDescription)")
-            }
-        }
-
-        // Fetch practices
-        do {
-            let items: [Practice] = try await api.get("/practices/today?date=\(dateStr)")
-            WidgetData.practicesDone = items.filter { $0.checkedIn }.count
-            WidgetData.practicesTotal = items.count
-        } catch {
-            if !error.isCancellation {
-                await AppLogger.shared.error("Push", "Failed to refresh practices: \(error.localizedDescription)")
             }
         }
 

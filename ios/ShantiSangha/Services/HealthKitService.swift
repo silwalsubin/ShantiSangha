@@ -1,14 +1,10 @@
 import Foundation
 import HealthKit
 
-/// Phase 1: write-only integration with Apple Health.
-/// When the user completes a meditation-type recurring goal, we log a
-/// mindful session covering the last `defaultSessionMinutes` minutes, so
-/// ShantiSangha contributes to the user's Health / Fitness app alongside
-/// whatever else they practice.
-///
-/// Reads (sleep, HRV, mindfulness from other apps) land in Phase 2, when
-/// the backend gains a wellness-context endpoint.
+/// Apple Health integration — read sleep, steps, and mindfulness minutes
+/// from any source (Calm, Headspace, Apple Mindful) so the daily reflection
+/// can sense the whole day. Write support exists for future meditation
+/// check-ins but no feature currently calls it.
 @MainActor
 final class HealthKitService: ObservableObject {
     static let shared = HealthKitService()
@@ -248,19 +244,5 @@ final class HealthKitService: ObservableObject {
         let seconds = samples.reduce(0.0) { $0 + $1.endDate.timeIntervalSince($1.startDate) }
         guard seconds > 0 else { return nil }
         return Int(seconds / 60.0)
-    }
-
-    // MARK: - Classification
-
-    /// Heuristic: does this recurring goal title count as a "mindful" practice
-    /// that should be mirrored to Apple Health? Phase 2 will replace this with
-    /// an explicit per-goal setting.
-    static func countsAsMindful(title: String) -> Bool {
-        let lower = title.lowercased()
-        let keywords = ["meditat", "mindful", "breath", "pranayam", " sit ", "sitting", "dhyan", "japa", "mantra"]
-        if keywords.contains(where: { lower.contains($0) }) { return true }
-        // Starts-with match for short titles like "Sit" or "Breathe"
-        let firstWord = lower.split(separator: " ").first.map(String.init) ?? lower
-        return ["sit", "breathe", "meditate"].contains(firstWord)
     }
 }

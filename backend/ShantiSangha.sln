@@ -9,8 +9,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShantiSangha.Shared", "Shan
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShantiSangha.Identity", "ShantiSangha.Identity\ShantiSangha.Identity.csproj", "{BD113F9B-B63D-4785-90B9-B1E98D610CB0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShantiSangha.Practices", "ShantiSangha.Practices\ShantiSangha.Practices.csproj", "{2A0E1AA8-DC36-4242-B188-8489D8417C81}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShantiSangha.Chat", "ShantiSangha.Chat\ShantiSangha.Chat.csproj", "{33DA0774-E184-49AB-B59B-77170D4C229E}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShantiSangha.Journal", "ShantiSangha.Journal\ShantiSangha.Journal.csproj", "{F78BB8E0-7436-494D-A054-4DFB79E2A9A2}"
@@ -48,10 +46,6 @@ Global
 		{BD113F9B-B63D-4785-90B9-B1E98D610CB0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BD113F9B-B63D-4785-90B9-B1E98D610CB0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BD113F9B-B63D-4785-90B9-B1E98D610CB0}.Release|Any CPU.Build.0 = Release|Any CPU
-		{2A0E1AA8-DC36-4242-B188-8489D8417C81}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2A0E1AA8-DC36-4242-B188-8489D8417C81}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2A0E1AA8-DC36-4242-B188-8489D8417C81}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2A0E1AA8-DC36-4242-B188-8489D8417C81}.Release|Any CPU.Build.0 = Release|Any CPU
 		{33DA0774-E184-49AB-B59B-77170D4C229E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{33DA0774-E184-49AB-B59B-77170D4C229E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{33DA0774-E184-49AB-B59B-77170D4C229E}.Release|Any CPU.ActiveCfg = Release|Any CPU

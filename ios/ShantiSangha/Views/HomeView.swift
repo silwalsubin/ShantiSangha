@@ -9,7 +9,6 @@ struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
     @StateObject private var health = HealthKitService.shared
     @StateObject private var weather = WeatherService.shared
-    @State private var showNewPractice = false
     @State private var showRemindersList = false
     @State private var reflection: String?
     @State private var reflectionDate: String?
@@ -19,8 +18,6 @@ struct HomeView: View {
     /// Hides the reflection card for the rest of the day after the user
     /// dismisses it. A new day or a different reflection will surface again.
     @State private var reflectionDismissed: Bool = false
-    @State private var practicesCompleted = false
-    @State private var ringPulse = false
     @State private var showProfileMenu = false
     @StateObject private var notifications = NotificationsViewModel()
     @Environment(\.scenePhase) private var scenePhase
@@ -55,36 +52,15 @@ struct HomeView: View {
                         .transition(.opacity.combined(with: .move(edge: .top)))
                     }
 
-                    if shouldShowNudge {
-                        SacredNudgeCard(icon: "leaf", message: nudgeMessage)
-                            .padding(.top, SacredSpacing.m)
-                            .padding(.horizontal, SacredSpacing.m)
-                    }
-
                     if vm.loading {
                         ProgressView()
                             .frame(maxWidth: .infinity, minHeight: 200)
-                    } else if !vm.hasPractices && vm.reminders.isEmpty {
+                    } else if vm.reminders.isEmpty {
                         emptyState
                     } else {
                         todaysChecklistCard
                             .padding(.horizontal, SacredSpacing.m)
                             .padding(.top, 34)
-
-                        SacredGhostRow(icon: "plus", label: "Add practice") {
-                            showNewPractice = true
-                        }
-                        .padding(.horizontal, SacredSpacing.m)
-                        .padding(.top, SacredSpacing.lux)
-
-                        if practicesCompleted {
-                            Text("All practices complete. You showed up today.")
-                                .font(.sacredText)
-                                .foregroundColor(.sacredTextSecondary)
-                                .multilineTextAlignment(.center)
-                                .padding(.top, SacredSpacing.xs)
-                                .transition(.opacity.combined(with: .move(edge: .bottom)))
-                        }
                     }
 
                     // Wise Cat — astro-aware trading signals. Gated to a
@@ -135,12 +111,9 @@ struct HomeView: View {
                 await vm.load()
                 await loadReflection()
                 updateWidgetData()
-                // Sync completion state on initial load (no haptic)
-                practicesCompleted = vm.allPracticesDone
                 await refreshWholeDayContext()
                 await notifications.refreshUnreadCount()
             }
-            .onChange(of: vm.donePractices) { updateWidgetData() }
             .onChange(of: vm.overdueRemindersCount) { updateWidgetData() }
             .onChange(of: vm.dueTodayRemindersCount) { updateWidgetData() }
             // Foreground refresh — pull truth from server when the app
@@ -154,35 +127,11 @@ struct HomeView: View {
                 }
             }
             .onChange(of: reflection) { _, _ in syncReflectionDismissedFlag() }
-            .onChange(of: vm.allPracticesDone) { _, allDone in
-                if allDone {
-                    // Haptic + animate in the completion state
-                    UINotificationFeedbackGenerator().notificationOccurred(.success)
-                    withAnimation(.easeOut(duration: 0.5)) {
-                        practicesCompleted = true
-                    }
-                    // Pulse the ring glow
-                    withAnimation(.easeInOut(duration: 0.8).repeatCount(2, autoreverses: true)) {
-                        ringPulse = true
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
-                        ringPulse = false
-                    }
-                } else {
-                    withAnimation { practicesCompleted = false }
-                    ringPulse = false
-                }
-            }
             .onReceive(NotificationCenter.default.publisher(for: .silentPushReceived)) { notification in
                 let type = notification.userInfo?["type"] as? String
                 Task {
                     if type == "reflection" { await loadReflection(force: true) }
                 }
-            }
-        }
-        .navigationDestination(isPresented: $showNewPractice) {
-            NewPracticeView { title, deeperWhy in
-                await vm.createPractice(title: title, deeperWhy: deeperWhy)
             }
         }
         .navigationDestination(isPresented: $showRemindersList) {
@@ -202,16 +151,12 @@ struct HomeView: View {
 
     // MARK: - Today's checklist
 
-    /// Today-scoped focus surface: pending practices + reminders that
-    /// need attention now (overdue + due today), in one card. Each row
-    /// keeps its own leading tile so a glance distinguishes a recurring
-    /// practice from a dated reminder. Reminders deferred past today
-    /// live behind "+ N upcoming reminders" which opens the full list.
+    /// Today-scoped focus surface: reminders that need attention now
+    /// (overdue + due today). Reminders deferred past today live behind
+    /// "+ N upcoming reminders" which opens the full list.
     private var todaysChecklistCard: some View {
-        let practices = vm.pendingPractices
         let urgentReminders = vm.pendingReminders.filter { $0.daysRemaining <= 0 }
         let laterReminderCount = vm.pendingReminders.count - urgentReminders.count
-        let total = practices.count + urgentReminders.count
 
         return LuxCard {
             VStack(alignment: .leading, spacing: SacredSpacing.m) {
@@ -221,7 +166,7 @@ struct HomeView: View {
                             .font(.sacredSectionLabel)
                             .tracking(3)
                             .foregroundColor(.sacredLabel)
-                        Text(checklistSubtitle(total: total))
+                        Text(checklistSubtitle(total: urgentReminders.count))
                             .font(.sacredSmall)
                             .foregroundColor(.sacredMuted)
                     }
@@ -229,31 +174,6 @@ struct HomeView: View {
                 }
 
                 VStack(spacing: 0) {
-                    ForEach(Array(practices.enumerated()), id: \.element.id) { index, practice in
-                        PracticeRow(
-                            practice: practice,
-                            onDone: {
-                                Task {
-                                    UINotificationFeedbackGenerator().notificationOccurred(.success)
-                                    await vm.checkIn(id: practice.id, completed: true)
-                                }
-                            },
-                            onSkip: { Task { await vm.checkIn(id: practice.id, completed: false) } },
-                            onUndo: { Task { await vm.undoCheckIn(id: practice.id) } },
-                            onDelete: { Task { await vm.deletePractice(id: practice.id) } },
-                            activeSwipeId: Binding(
-                                get: { vm.activeSwipeId },
-                                set: { vm.activeSwipeId = $0 }
-                            )
-                        )
-                        .transition(.opacity.combined(with: .move(edge: .trailing)))
-
-                        let hasMoreBelow = index < practices.count - 1 || !urgentReminders.isEmpty
-                        if hasMoreBelow {
-                            Divider().padding(.leading, 64)
-                        }
-                    }
-
                     ForEach(Array(urgentReminders.enumerated()), id: \.element.id) { index, reminder in
                         ReminderRow(
                             reminder: reminder,
@@ -279,7 +199,7 @@ struct HomeView: View {
                         }
                     }
                 }
-                .animation(.easeOut(duration: 0.3), value: vm.pendingPractices.map(\.id))
+                .animation(.easeOut(duration: 0.3), value: vm.pendingReminders.map(\.id))
             }
             .padding(SacredSpacing.m)
         }
@@ -287,8 +207,8 @@ struct HomeView: View {
 
     private func checklistSubtitle(total: Int) -> String {
         if total == 0 { return "Nothing pressing." }
-        if total == 1 { return "One thing on your plate." }
-        return "\(total) things on your plate."
+        if total == 1 { return "One reminder needs you." }
+        return "\(total) reminders need you."
     }
 
     private func moreRow(_ label: String, action: @escaping () -> Void) -> some View {
@@ -312,36 +232,16 @@ struct HomeView: View {
 
     private var emptyState: some View {
         VStack(spacing: 16) {
-            Text("You haven't set any practices yet.")
+            Text("Nothing on your plate yet.")
                 .font(.sacredText)
                 .foregroundColor(.sacredTextSecondary)
 
-            SacredPrimaryButton("Set your first practice") {
-                showNewPractice = true
+            SacredPrimaryButton("Add your first reminder") {
+                showRemindersList = true
             }
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 40)
-    }
-
-
-    // MARK: - Gentle nudge
-
-    private static let nudgeMessages = [
-        "Your practices are here when you're ready.",
-        "No rush. Just a quiet reminder that you showed up by opening the app.",
-        "Even a small step counts. What feels doable right now?",
-        "The day isn't over yet. You're here — that matters.",
-        "A moment of stillness is still a practice.",
-        "You opened the app. That's the hardest part.",
-        "Whatever you can do today is enough.",
-    ]
-
-    @State private var nudgeMessage = Self.nudgeMessages.randomElement()!
-
-    private var shouldShowNudge: Bool {
-        let hour = Calendar.current.component(.hour, from: Date())
-        return hour >= 18 && !vm.loading && vm.totalPractices > 0 && vm.donePractices == 0
     }
 
     // MARK: - Widget data sync
@@ -349,8 +249,6 @@ struct HomeView: View {
     private func updateWidgetData() {
         WidgetData.update(
             reflection: reflection,
-            practicesDone: vm.donePractices,
-            practicesTotal: vm.totalPractices,
             remindersOverdue: vm.overdueRemindersCount,
             remindersDueToday: vm.dueTodayRemindersCount,
             userName: preferredFirstName

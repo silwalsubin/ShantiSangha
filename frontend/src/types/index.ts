@@ -6,36 +6,6 @@
  * but anything shared should be defined and exported from this file.
  */
 
-// --- Practices (recurring) ---
-
-export interface PracticeTask {
-  id: string
-  title: string
-  checkedIn: boolean
-  completedToday: boolean | null
-  feedbackMessage: string | null
-  saving: boolean
-}
-
-export interface Practice {
-  id: string
-  title: string
-  deeperWhy: string | null
-  currentStreak: number
-  longestStreak: number
-  frequency: string | null
-  frequencyTarget: number | null
-  createdAt: string
-}
-
-export interface CheckIn {
-  id: string
-  date: string
-  completed: boolean
-  note: string | null
-  createdAt: string
-}
-
 // --- Reminders (date-based, one-time or yearly) ---
 
 export type ReminderRecurrence = 'none' | 'yearly'

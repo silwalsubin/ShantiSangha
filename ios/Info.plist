@@ -13,7 +13,7 @@
 	<key>NSHealthShareUsageDescription</key>
 	<string>ShantiSangha reads your sleep, heart rate variability, and mindfulness minutes so your daily reflection can understand your whole day — not just the time you spend in the app.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>ShantiSangha records your meditation check-ins as mindful minutes so they show up alongside your other practices in the Apple Health app.</string>
+	<string>ShantiSangha records your meditation check-ins as mindful minutes in the Apple Health app.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>ShantiSangha uses your location to set your home base and read today's weather so your reflection can sense the sky you're living under.</string>
 	<key>NSCameraUsageDescription</key>
