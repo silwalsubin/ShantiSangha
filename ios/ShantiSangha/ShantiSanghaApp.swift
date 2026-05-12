@@ -129,6 +129,18 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNot
         let type = userInfo["type"] as? String ?? "unknown"
         AppLogger.shared.info("Push", "didReceive response: \(type)")
 
+        // Tap-routing: only fires here (not in willPresent / silent paths)
+        // because didReceive is iOS's explicit "user opened this banner"
+        // signal. The Circles tab picks up the routing intent and pushes
+        // the matching chat thread.
+        if type == "friend_message",
+           let raw = userInfo["friendshipId"] as? String,
+           let friendshipId = UUID(uuidString: raw) {
+            Task { @MainActor in
+                DeepLinkRouter.shared.handleChatNotification(friendshipId: friendshipId)
+            }
+        }
+
         Task {
             await SilentPushHandler.handle(userInfo: userInfo)
         }

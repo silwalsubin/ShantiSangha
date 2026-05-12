@@ -8,6 +8,7 @@ struct FriendsTabView: View {
     /// The main connection list moved to `circleVM`.
     @StateObject private var vm = FriendsViewModel()
     @StateObject private var circleVM = CircleViewModel()
+    @StateObject private var deepLinks = DeepLinkRouter.shared
     @State private var showShare = false
     @State private var shareItems: [Any] = []
     @State private var showAddLocal = false
@@ -214,11 +215,18 @@ struct FriendsTabView: View {
         .task {
             await vm.refresh()
             await circleVM.refresh()
+            resolvePendingChat()
         }
         .refreshable {
             await vm.refresh()
             await circleVM.refresh()
         }
+        // Two triggers because the routing intent and the connection
+        // list arrive in either order: a warm-launch tap sets the
+        // friendship id while connections are already loaded; a
+        // cold-launch tap sets it before the first refresh completes.
+        .onChange(of: deepLinks.pendingChatFriendshipId) { _, _ in resolvePendingChat() }
+        .onChange(of: circleVM.connections) { _, _ in resolvePendingChat() }
         .sheet(isPresented: $showShare) { ShareSheet(items: shareItems) }
         .sheet(isPresented: $showAddLocal) {
             AddConnectionView(vm: circleVM)
@@ -233,6 +241,22 @@ struct FriendsTabView: View {
                 ConnectionDetailView(connectionId: id, vm: circleVM)
             }
         }
+    }
+
+    // MARK: - Notification deep link
+
+    /// Resolves a "new message" notification tap into a chat push.
+    /// No-ops until the matching Connection is in `circleVM.connections`
+    /// — the `.onChange(of: circleVM.connections)` retry covers the
+    /// cold-launch case where connections load after the tap fires.
+    private func resolvePendingChat() {
+        guard let friendshipId = deepLinks.pendingChatFriendshipId else { return }
+        guard let conn = circleVM.connections.first(where: { $0.friendshipId == friendshipId }),
+              conn.messageable else {
+            return
+        }
+        deepLinks.clearChat()
+        navTarget = .chat(conn.id)
     }
 
     // MARK: - Circle directory

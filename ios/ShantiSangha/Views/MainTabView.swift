@@ -112,6 +112,15 @@ struct MainTabView: View {
         .onChange(of: selectedTab) { _, _ in
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
+        // Tap on a "new message" notification → jump to Circles so the
+        // tab's own router can resolve the friendship id and push the
+        // chat thread. We only switch tabs here; we don't clear the
+        // routing intent (FriendsTabView clears it once it resolves).
+        .onChange(of: deepLinks.pendingChatFriendshipId) { _, newValue in
+            if newValue != nil {
+                selectedTab = 3
+            }
+        }
         .onAppear { MotionManager.shared.start() }
         .onDisappear { MotionManager.shared.stop() }
     }
