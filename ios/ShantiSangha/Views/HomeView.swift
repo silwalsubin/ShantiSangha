@@ -33,7 +33,7 @@ struct HomeView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
-                    SacredHomeHeader(dateLabel: todayLabel, greeting: timeGreeting)
+                    SacredHomeHeader(greeting: timeGreeting)
 
                     // Whole-day context strip — sleep, steps, weather. Only
                     // appears when the user has enabled Health / Weather in
@@ -569,11 +569,6 @@ struct HomeView: View {
         return "Good evening\(name)"
     }
 
-    private var todayLabel: String {
-        let f = DateFormatter()
-        f.dateFormat = "EEEE, MMM d"
-        return f.string(from: Date()).uppercased()
-    }
 }
 
 private struct DailyReflectionResponse: Decodable {
