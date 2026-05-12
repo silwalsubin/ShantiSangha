@@ -96,8 +96,11 @@ struct WiseCatHomeCard: View {
     }
 
     private func actionCounts(in plan: PortfolioPlan) -> (sell: Int, trim: Int, buy: Int) {
+        // Only count actions on tickers the user already holds — new-pick
+        // recommendations live on the full Stocks tab, not the home card.
+        let owned = Set(plan.holdings.map { $0.ticker })
         var sell = 0, trim = 0, buy = 0
-        for a in plan.actions {
+        for a in plan.actions where owned.contains(a.ticker) {
             switch a.kind {
             case .sell: sell += 1
             case .trim: trim += 1
