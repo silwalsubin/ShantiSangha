@@ -69,23 +69,16 @@ struct HomeView: View {
                         emptyState
                     } else {
                         if vm.totalPractices > 0 {
-                            dailyRhythmCard
+                            practicesPreviewCard
                                 .padding(.horizontal, SacredSpacing.m)
                                 .padding(.top, 34)
-                                .padding(.bottom, 20)
-                        }
-
-                        // Inline practice list — swipe to check in without leaving Home
-                        if !vm.pendingPractices.isEmpty {
-                            inlinePractices
-                                .padding(.top, SacredSpacing.xs)
                         }
 
                         SacredGhostRow(icon: "plus", label: "Add practice") {
                             showNewPractice = true
                         }
                         .padding(.horizontal, SacredSpacing.m)
-                        .padding(.top, vm.pendingPractices.isEmpty ? SacredSpacing.xs : SacredSpacing.lux)
+                        .padding(.top, SacredSpacing.lux)
 
                         if practicesCompleted {
                             Text("All practices complete. You showed up today.")
@@ -96,8 +89,8 @@ struct HomeView: View {
                                 .transition(.opacity.combined(with: .move(edge: .bottom)))
                         }
 
-                        if vm.totalRemindersForToday > 0 {
-                            remindersCard
+                        if vm.pendingReminders.isEmpty == false {
+                            remindersPreviewCard
                                 .padding(.horizontal, SacredSpacing.m)
                                 .padding(.top, SacredSpacing.lux)
                         }
@@ -219,36 +212,146 @@ struct HomeView: View {
         return email.lowercased() == "subinho09@gmail.com"
     }
 
-    // MARK: - Inline practice list
+    // MARK: - Preview cards
 
-    private var inlinePractices: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(vm.pendingPractices.enumerated()), id: \.element.id) { index, practice in
-                PracticeRow(
-                    practice: practice,
-                    onDone: {
-                        Task {
-                            UINotificationFeedbackGenerator().notificationOccurred(.success)
-                            await vm.checkIn(id: practice.id, completed: true)
+    /// Compact preview: section header + up to 3 pending practice rows
+    /// + an optional "+N more" line that opens the full summary view.
+    private var practicesPreviewCard: some View {
+        let visible = Array(vm.pendingPractices.prefix(3))
+        let extra = max(vm.pendingPractices.count - visible.count, 0)
+        return LuxCard {
+            VStack(alignment: .leading, spacing: SacredSpacing.m) {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    showRecurringSummary = true
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
+                            Text("TODAY'S RHYTHM")
+                                .font(.sacredSectionLabel)
+                                .tracking(3)
+                                .foregroundColor(.sacredLabel)
+                            Text(rhythmSubtitle)
+                                .font(.sacredSmall)
+                                .foregroundColor(.sacredMuted)
                         }
-                    },
-                    onSkip: { Task { await vm.checkIn(id: practice.id, completed: false) } },
-                    onUndo: { Task { await vm.undoCheckIn(id: practice.id) } },
-                    onDelete: { Task { await vm.deletePractice(id: practice.id) } },
-                    activeSwipeId: Binding(
-                        get: { vm.activeSwipeId },
-                        set: { vm.activeSwipeId = $0 }
-                    )
-                )
-                .transition(.opacity.combined(with: .move(edge: .trailing)))
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .regular))
+                            .foregroundColor(.sacredMuted.opacity(0.5))
+                    }
+                }
+                .buttonStyle(.plain)
 
-                if index < vm.pendingPractices.count - 1 {
-                    Divider()
-                        .padding(.leading, 52)
+                VStack(spacing: 0) {
+                    ForEach(Array(visible.enumerated()), id: \.element.id) { index, practice in
+                        PracticeRow(
+                            practice: practice,
+                            onDone: {
+                                Task {
+                                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                                    await vm.checkIn(id: practice.id, completed: true)
+                                }
+                            },
+                            onSkip: { Task { await vm.checkIn(id: practice.id, completed: false) } },
+                            onUndo: { Task { await vm.undoCheckIn(id: practice.id) } },
+                            onDelete: { Task { await vm.deletePractice(id: practice.id) } },
+                            activeSwipeId: Binding(
+                                get: { vm.activeSwipeId },
+                                set: { vm.activeSwipeId = $0 }
+                            )
+                        )
+                        .transition(.opacity.combined(with: .move(edge: .trailing)))
+
+                        if index < visible.count - 1 {
+                            Divider().padding(.leading, 52)
+                        }
+                    }
+
+                    if extra > 0 {
+                        Divider().padding(.leading, 16)
+                        moreRow("+ \(extra) more") { showRecurringSummary = true }
+                    }
+                }
+                .animation(.easeOut(duration: 0.3), value: vm.pendingPractices.map(\.id))
+            }
+            .padding(SacredSpacing.m)
+        }
+    }
+
+    /// Compact preview: section header + up to 3 pending reminder rows
+    /// + an optional "+N more" line that opens the full reminders view.
+    private var remindersPreviewCard: some View {
+        let visible = Array(vm.pendingReminders.prefix(3))
+        let extra = max(vm.pendingReminders.count - visible.count, 0)
+        return LuxCard {
+            VStack(alignment: .leading, spacing: SacredSpacing.m) {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    showRemindersList = true
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
+                            Text("REMINDERS")
+                                .font(.sacredSectionLabel)
+                                .tracking(3)
+                                .foregroundColor(.sacredLabel)
+                            Text(remindersSubtitle)
+                                .font(.sacredSmall)
+                                .foregroundColor(.sacredMuted)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .regular))
+                            .foregroundColor(.sacredMuted.opacity(0.5))
+                    }
+                }
+                .buttonStyle(.plain)
+
+                VStack(spacing: 0) {
+                    ForEach(Array(visible.enumerated()), id: \.element.id) { index, reminder in
+                        ReminderRow(
+                            reminder: reminder,
+                            allowSwipeToComplete: true,
+                            showDateStamp: true,
+                            onTap: { showRemindersList = true },
+                            onComplete: { Task { await vm.completeReminder(id: reminder.id) } },
+                            activeSwipeId: Binding(
+                                get: { vm.activeSwipeId },
+                                set: { vm.activeSwipeId = $0 }
+                            )
+                        )
+
+                        if index < visible.count - 1 {
+                            Divider().padding(.leading, 52)
+                        }
+                    }
+
+                    if extra > 0 {
+                        Divider().padding(.leading, 16)
+                        moreRow("+ \(extra) more") { showRemindersList = true }
+                    }
                 }
             }
+            .padding(SacredSpacing.m)
         }
-        .animation(.easeOut(duration: 0.3), value: vm.pendingPractices.map(\.id))
+    }
+
+    private func moreRow(_ label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Text(label)
+                    .font(.sacredSmallMedium)
+                    .foregroundColor(.sacredGold)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundColor(.sacredMuted.opacity(0.5))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Empty state
@@ -267,81 +370,7 @@ struct HomeView: View {
         .padding(.top, 40)
     }
 
-    // MARK: - Today's rhythm
-
-    private var dailyRhythmCard: some View {
-        LuxCard {
-            VStack(alignment: .leading, spacing: SacredSpacing.lux) {
-                HStack {
-                    VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
-                        Text("TODAY'S RHYTHM")
-                            .font(.sacredSectionLabel)
-                            .tracking(3)
-                            .foregroundColor(.sacredLabel)
-                        Text(rhythmSubtitle)
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredMuted)
-                    }
-                    Spacer()
-                }
-
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    showRecurringSummary = true
-                } label: {
-                    SacredProgressRing(
-                        label: "Practices",
-                        icon: "arrow.triangle.2.circlepath",
-                        done: vm.donePractices,
-                        total: vm.totalPractices,
-                        color: .sacredGold,
-                        isComplete: vm.allPracticesDone,
-                        almostDone: vm.totalPractices > 1 && vm.donePractices == vm.totalPractices - 1,
-                        ringPulse: ringPulse
-                    )
-                }
-                .buttonStyle(.plain)
-                .frame(maxWidth: .infinity)
-            }
-            .padding(SacredSpacing.lux)
-        }
-    }
-
-    private var remindersCard: some View {
-        LuxCard {
-            VStack(alignment: .leading, spacing: SacredSpacing.lux) {
-                HStack {
-                    VStack(alignment: .leading, spacing: SacredSpacing.xxs) {
-                        Text("REMINDERS")
-                            .font(.sacredSectionLabel)
-                            .tracking(3)
-                            .foregroundColor(.sacredLabel)
-                        Text(remindersSubtitle)
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredMuted)
-                    }
-                    Spacer()
-                }
-
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    showRemindersList = true
-                } label: {
-                    SacredProgressRing(
-                        label: "Reminders",
-                        icon: "calendar.badge.clock",
-                        done: vm.doneRemindersForToday,
-                        total: vm.totalRemindersForToday,
-                        color: .sacredGoldDark,
-                        detail: vm.remindersSummaryDetail
-                    )
-                }
-                .buttonStyle(.plain)
-                .frame(maxWidth: .infinity)
-            }
-            .padding(SacredSpacing.lux)
-        }
-    }
+    // MARK: - Card subtitles
 
     private var rhythmSubtitle: String {
         if vm.allPracticesDone { return "The circle is complete." }
