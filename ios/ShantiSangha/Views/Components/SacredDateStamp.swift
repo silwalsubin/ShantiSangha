@@ -15,8 +15,7 @@ struct SacredDateStamp: View {
     var body: some View {
         let day = Calendar.current.component(.day, from: date)
         let month: String = formatted(date, "MMM")
-        let weekday: String = formatted(date, "EEE")
-        VStack(spacing: 0) {
+        VStack(spacing: size * 0.02) {
             Text(month)
                 .font(.system(size: size * 0.18, weight: .bold, design: .serif))
                 .tracking(1)
@@ -24,12 +23,7 @@ struct SacredDateStamp: View {
             Text("\(day)")
                 .font(.system(size: size * 0.36, weight: .semibold, design: .serif))
                 .foregroundColor(.sacredText)
-            Text(weekday)
-                .font(.system(size: size * 0.16, weight: .bold, design: .serif))
-                .tracking(1)
-                .foregroundColor(.sacredMuted)
         }
-        .padding(.vertical, size * 0.10)
         .frame(width: size, height: size)
         .background(
             RoundedRectangle(cornerRadius: size * 0.2)
