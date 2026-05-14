@@ -6,14 +6,18 @@ import SwiftUI
 /// follow-ups like "move that to next Friday" resolve correctly.
 struct AgentChatView: View {
     @State private var messages: [AgentMessage] = []
-    @State private var inputText = ""
+    @State private var inputText: String
     @State private var sending = false
+
+    init(prefill: String = "") {
+        _inputText = State(initialValue: prefill)
+    }
+
     @State private var loadingHistory = true
     @State private var failedSendText: String?
     @State private var showClearConfirmation = false
     @State private var editTarget: ReminderEditTarget?
     @State private var activeSwipeId: String?
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ZStack {
@@ -28,17 +32,9 @@ struct AgentChatView: View {
         }
         .navigationTitle("Assistant")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.sacredSmall)
-                        .foregroundColor(.sacredMuted)
-                }
-                .accessibilityLabel("Close")
-            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 if !messages.isEmpty {
                     Button {
@@ -226,7 +222,9 @@ struct AgentChatView: View {
             text: $inputText,
             placeholder: "Ask about your reminders…",
             canSend: !inputText.trimmingCharacters(in: .whitespaces).isEmpty && !sending,
-            onSend: { Task { await send() } })
+            onSend: { Task { await send() } },
+            accessories: { SacredVoiceInputButton(text: $inputText) },
+            banner: { EmptyView() })
     }
 
     private var emptyState: some View {

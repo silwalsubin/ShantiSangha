@@ -30,6 +30,10 @@ struct HomeView: View {
     @State private var reflectionDismissed: Bool = false
     @State private var showProfileMenu = false
     @State private var showChatSheet = false
+    /// Transcript captured by the Home pill's mic. Passed through to
+    /// AgentChatView when the sheet opens; cleared on dismiss so the
+    /// next dictation starts from an empty slate.
+    @State private var voicePrefill: String = ""
     @StateObject private var notifications = NotificationsViewModel()
     @Environment(\.scenePhase) private var scenePhase
 
@@ -143,12 +147,11 @@ struct HomeView: View {
                 .padding(.horizontal, SacredSpacing.m)
                 .padding(.bottom, SacredSpacing.s)
         }
-        .sheet(isPresented: $showChatSheet) {
-            NavigationStack {
-                AgentChatView()
-            }
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
+        .navigationDestination(isPresented: $showChatSheet) {
+            AgentChatView(prefill: voicePrefill)
+        }
+        .onChange(of: showChatSheet) { _, isShown in
+            if !isShown { voicePrefill = "" }
         }
         .navigationDestination(item: $navTarget) { target in
             ReminderEditView(
@@ -182,39 +185,57 @@ struct HomeView: View {
 
     // MARK: - Chat affordance
 
-    /// Floating pill above the tab bar. Tap pulls up the assistant chat as
-    /// a sheet so the user can ask anything without leaving Home. The
-    /// chat is a tool — Home is the landing.
+    /// Floating pill above the tab bar. The mic dictates in place
+    /// (press-and-hold) and on release opens the assistant sheet with
+    /// the transcript pre-filled; tap anywhere else on the pill opens
+    /// the sheet empty. The chat is a tool — Home is the landing.
     private var chatAffordance: some View {
-        Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            showChatSheet = true
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "sparkles")
-                    .font(.sacredText)
-                    .foregroundColor(.sacredGold)
-                Text("Ask anything…")
-                    .font(.sacredText)
-                    .foregroundColor(.sacredMuted)
-                Spacer(minLength: 0)
+        HStack(spacing: 12) {
+            SacredVoiceInputButton(
+                text: $voicePrefill,
+                size: 28,
+                onComplete: {
+                    if !voicePrefill.trimmingCharacters(in: .whitespaces).isEmpty {
+                        showChatSheet = true
+                    }
+                }
+            )
+
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                showChatSheet = true
+            } label: {
+                HStack(spacing: 0) {
+                    Text("Ask anything…")
+                        .font(.sacredText)
+                        .foregroundColor(.sacredMuted)
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                showChatSheet = true
+            } label: {
                 Image(systemName: "arrow.up.circle.fill")
-                    .font(.system(size: 22))
+                    .font(.system(size: 28))
                     .foregroundColor(.sacredGold)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 24)
-                    .fill(Color.sacredBgCard)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 24)
-                            .stroke(Color.sacredGold.opacity(0.22), lineWidth: 1)
-                    )
-            )
-            .shadow(color: .sacredMuted.opacity(0.18), radius: 14, y: 6)
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 24)
+                .fill(Color.sacredBgCard)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24)
+                        .stroke(Color.sacredGold.opacity(0.22), lineWidth: 1)
+                )
+        )
+        .shadow(color: .sacredMuted.opacity(0.18), radius: 14, y: 6)
     }
 
     // MARK: - Reminders section
