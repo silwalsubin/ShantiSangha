@@ -215,7 +215,6 @@ struct NextReminderWidgetView: View {
                 Spacer(minLength: 0)
             }
         }
-        .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
@@ -269,7 +268,6 @@ struct UpcomingWidgetView: View {
                 Spacer(minLength: 0)
             }
         }
-        .padding(14)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
@@ -284,6 +282,10 @@ struct ShantiSanghaReflectionWidget: Widget {
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: ShantiSanghaProvider()) { entry in
+            // iOS 17+ applies ~16pt content margins automatically when
+            // `.containerBackground` is used, so the view itself adds no
+            // inner padding. Pre-iOS-17 has no system margins, so we
+            // restore the explicit padding on the fallback path.
             if #available(iOS 17.0, *) {
                 NextReminderWidgetView(entry: entry)
                     .containerBackground(for: .widget) {
@@ -291,6 +293,7 @@ struct ShantiSanghaReflectionWidget: Widget {
                     }
             } else {
                 NextReminderWidgetView(entry: entry)
+                    .padding(14)
                     .background(SacredWidgetBackground())
             }
         }
@@ -312,6 +315,7 @@ struct ShantiSanghaDashboardWidget: Widget {
                     }
             } else {
                 UpcomingWidgetView(entry: entry)
+                    .padding(14)
                     .background(SacredWidgetBackground())
             }
         }
