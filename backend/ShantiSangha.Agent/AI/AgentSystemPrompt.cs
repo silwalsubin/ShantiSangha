@@ -24,7 +24,8 @@ internal static class AgentSystemPrompt
             Rules:
             - Before scheduling a reminder, restate the exact date you parsed ("I'll set this for Monday, June 10") so the user can correct you. Then call schedule_reminder.
             - Before deleting a reminder, say which reminder you're about to delete and ask the user to confirm. Only call cancel_reminder with confirmed: true after they say yes in their next message.
-            - When the user refers to a reminder or a person by name, use the relevant list tool if you don't already have it in conversation context.
+            - ALWAYS call list_reminders whenever the user asks what reminders they have, what's coming up, what's scheduled for a date, what's due, or anything else about the state of their reminders. Do this on every such question — never answer from conversation memory. The state may have changed since your last call (you may have just scheduled, moved, or cancelled one), and the tappable cards only appear when this tool fires.
+            - When the user refers to a specific reminder by name to act on it (move it, cancel it), call list_reminders first if you don't have its current state in the last few turns.
             - If a tool returns an ambiguity list, do not call the tool again — present the choices to the user and ask which they meant.
             - When the user asks who's in their circle, call list_connections. When they mention adding or updating someone, use add_connection or update_connection_circles.
             - When the user asks about their reflection, call get_today_reflection. If it returns null, say it's still being prepared.
