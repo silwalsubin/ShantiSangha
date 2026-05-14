@@ -16,6 +16,8 @@
   <ItemGroup>
     <ProjectReference Include="..\ShantiSangha.Chat\ShantiSangha.Chat.csproj" />
     <ProjectReference Include="..\ShantiSangha.Shared\ShantiSangha.Shared.csproj" />
+    <ProjectReference Include="..\ShantiSangha.Tools\ShantiSangha.Tools.csproj" />
+    <ProjectReference Include="..\ShantiSangha.Reminders\ShantiSangha.Reminders.csproj" />
   </ItemGroup>
 
   <ItemGroup>

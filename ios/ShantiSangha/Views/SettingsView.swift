@@ -314,6 +314,9 @@ struct SettingsView: View {
     #if DEBUG
     private var debugLinks: some View {
         VStack(spacing: 12) {
+            NavigationLink(destination: AgentChatView()) {
+                debugRow(icon: "sparkles.rectangle.stack", label: "Assistant (beta)", badge: nil)
+            }
             NavigationLink(destination: HangfireDebugView()) {
                 debugRow(icon: "gearshape.2", label: "Hangfire Jobs", badge: nil)
             }

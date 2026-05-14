@@ -24,10 +24,13 @@
     <PackageReference Include="Serilog.AspNetCore" Version="8.0.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="5.0.1" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.9.0" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="1.3.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\ShantiSangha.Shared\ShantiSangha.Shared.csproj" />
+    <ProjectReference Include="..\ShantiSangha.Tools\ShantiSangha.Tools.csproj" />
+    <ProjectReference Include="..\ShantiSangha.Agent\ShantiSangha.Agent.csproj" />
     <ProjectReference Include="..\ShantiSangha.Identity\ShantiSangha.Identity.csproj" />
     <ProjectReference Include="..\ShantiSangha.Reminders\ShantiSangha.Reminders.csproj" />
     <ProjectReference Include="..\ShantiSangha.Chat\ShantiSangha.Chat.csproj" />

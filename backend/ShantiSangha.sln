@@ -25,6 +25,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShantiSangha.Trading", "Sha
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShantiSangha.Reminders", "ShantiSangha.Reminders\ShantiSangha.Reminders.csproj", "{D1E2F3A4-B5C6-7890-1234-567890ABCDEF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShantiSangha.Tools", "ShantiSangha.Tools\ShantiSangha.Tools.csproj", "{5841E1BD-3162-424C-90B9-201E935FF15C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShantiSangha.Agent", "ShantiSangha.Agent\ShantiSangha.Agent.csproj", "{7842EDCF-9DFF-48BB-9763-E5BFE4F81262}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -78,5 +82,13 @@ Global
 		{D1E2F3A4-B5C6-7890-1234-567890ABCDEF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D1E2F3A4-B5C6-7890-1234-567890ABCDEF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D1E2F3A4-B5C6-7890-1234-567890ABCDEF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5841E1BD-3162-424C-90B9-201E935FF15C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5841E1BD-3162-424C-90B9-201E935FF15C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5841E1BD-3162-424C-90B9-201E935FF15C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5841E1BD-3162-424C-90B9-201E935FF15C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7842EDCF-9DFF-48BB-9763-E5BFE4F81262}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7842EDCF-9DFF-48BB-9763-E5BFE4F81262}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7842EDCF-9DFF-48BB-9763-E5BFE4F81262}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7842EDCF-9DFF-48BB-9763-E5BFE4F81262}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

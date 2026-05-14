@@ -17,6 +17,7 @@ using ShantiSangha.Friends.Realtime;
 using ShantiSangha.Identity;
 using ShantiSangha.Journal;
 using ShantiSangha.Notifications;
+using ShantiSangha.Agent;
 using ShantiSangha.Reminders;
 using ShantiSangha.Shared;
 using ShantiSangha.Trading;
@@ -102,6 +103,12 @@ try
     builder.Services.AddFriendsModule(connStr, appConfig.FriendsMediaBucketName, appConfig.RedisUrl);
     builder.Services.AddNotificationsModule(connStr);
 
+    // Agent: the in-app GPT-4o chat that can call backend operations as tools.
+    // Same tool catalog (ShantiSangha.Tools) is also exposed externally via MCP
+    // at /mcp so Claude Desktop / Cursor can connect with a Firebase JWT.
+    builder.Services.AddAgentModule();
+    builder.Services.AddShantiSanghaMcp();
+
     if (appConfig.WisecatEnabled)
     {
         builder.Services.AddTradingModule(connStr, appConfig.WisecatFunctionName!);
@@ -121,6 +128,7 @@ try
         .AddApplicationPart(typeof(ShantiSangha.Friends.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Notifications.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Trading.DependencyInjection).Assembly)
+        .AddApplicationPart(typeof(ShantiSangha.Agent.DependencyInjection).Assembly)
         .AddJsonOptions(opts =>
         {
             opts.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
@@ -342,6 +350,10 @@ try
 
     // Realtime chat WebSocket — auth + membership handled inside.
     app.MapChatRealtime();
+
+    // MCP server — same tool catalog as the in-app /api/agent/chat surface.
+    // External clients (Claude Desktop, Cursor) connect here with a Firebase JWT.
+    app.MapMcp("/mcp").RequireAuthorization();
 
     // Server version info (keep as minimal API — host-level concern)
     var serverGitHash = builder.Configuration["GIT_HASH"] ?? "dev";
