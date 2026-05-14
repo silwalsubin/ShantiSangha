@@ -20,6 +20,7 @@ public class FriendsDbContext(DbContextOptions<FriendsDbContext> options) : DbCo
     public DbSet<Person> Persons => Set<Person>();
     public DbSet<Connection> Connections => Set<Connection>();
     public DbSet<ConnectionAttachment> ConnectionAttachments => Set<ConnectionAttachment>();
+    public DbSet<FriendMessageSuggestion> MessageSuggestions => Set<FriendMessageSuggestion>();
 
     protected override void OnModelCreating(ModelBuilder mb)
     {
@@ -114,6 +115,20 @@ public class FriendsDbContext(DbContextOptions<FriendsDbContext> options) : DbCo
             // sweep all of a user's attachments without scanning.
             e.HasIndex(a => a.OwnerUserId);
             e.Property(a => a.Kind).HasConversion<string>();
+        });
+
+        mb.Entity<FriendMessageSuggestion>(e =>
+        {
+            e.ToTable("FriendMessageSuggestions");
+            e.Property(s => s.Kind).HasConversion<string>();
+            // One suggestion per (message, user). The detector inserts two
+            // rows per message — one per participant — so each side has
+            // independent dismissed / accepted state.
+            e.HasIndex(s => new { s.FriendMessageId, s.UserId }).IsUnique();
+            // Per-user fetch path: "show me all my active suggestions for
+            // this conversation's messages." Indexed for the LEFT JOIN
+            // inside the message-list query.
+            e.HasIndex(s => new { s.UserId, s.DismissedAt, s.CreatedReminderId });
         });
 
         mb.Entity<FriendRequest>(e =>

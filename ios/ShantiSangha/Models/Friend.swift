@@ -82,9 +82,24 @@ struct FriendMessage: Codable, Identifiable, Equatable {
     /// Reaction roll-ups by emoji. Optional so older cached payloads
     /// (saved before reactions shipped) decode cleanly.
     let reactions: [FriendMessageReactionSummary]?
+    /// Inline reminder shortcut attached by the server when the detector
+    /// finds a reminder-shaped statement in `body`. Optional — most
+    /// messages won't carry one. The card disappears once the user
+    /// dismisses or accepts (server-side state, mirrored in the field).
+    var suggestion: FriendMessageSuggestion?
 
     var isDeleted: Bool { deletedAt != nil }
     var isEdited:  Bool { editedAt != nil && deletedAt == nil }
+}
+
+struct FriendMessageSuggestion: Codable, Equatable {
+    let id: UUID
+    let kind: String      // "reminder" for V1
+    let label: String
+    let date: String      // yyyy-MM-dd
+    let recurrence: String
+    let dismissed: Bool
+    let accepted: Bool
 }
 
 struct FriendMessageReactionSummary: Codable, Equatable, Identifiable {

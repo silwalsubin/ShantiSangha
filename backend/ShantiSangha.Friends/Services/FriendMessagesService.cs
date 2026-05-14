@@ -1,7 +1,9 @@
+using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using ShantiSangha.Friends.Contracts;
 using ShantiSangha.Friends.Data;
+using ShantiSangha.Friends.Jobs;
 using ShantiSangha.Friends.Models;
 using ShantiSangha.Friends.Realtime;
 using ShantiSangha.Friends.Storage;
@@ -15,6 +17,7 @@ public class FriendMessagesService(
     IProfileQueryService profileQuery,
     IPushNotificationService push,
     IChatRealtimeHub realtime,
+    IBackgroundJobClient backgroundJobs,
     ILogger<FriendMessagesService> logger) : IFriendMessagesService
 {
     private static readonly TimeSpan UploadUrlLifetime = TimeSpan.FromMinutes(15);
@@ -55,7 +58,7 @@ public class FriendMessagesService(
             .ToListAsync(ct);
 
         rows.Reverse();
-        return await MaterializeAsync(rows);
+        return await MaterializeAsync(rows, userId);
     }
 
     public async Task<List<FriendMessageResponse>?> ListMediaMessagesAsync(
@@ -83,7 +86,7 @@ public class FriendMessagesService(
 
         // Newest-first list — the archive renders most-recent at the top
         // (Apple Photos style), unlike the chat which renders oldest-first.
-        return await MaterializeAsync(rows);
+        return await MaterializeAsync(rows, userId);
     }
 
     public async Task<FriendMessageResponse?> SendTextAsync(
@@ -112,11 +115,25 @@ public class FriendMessagesService(
         db.Messages.Add(msg);
         await db.SaveChangesAsync(ct);
 
-        var dto = await MaterializeOneAsync(msg);
+        var dto = await MaterializeOneAsync(msg, userId);
         // Realtime broadcast for both-online instant delivery; APNs push
         // remains the offline / app-backgrounded fallback.
         await BroadcastSafelyAsync("message_received", f.Id, new { conversationId = f.Id, message = dto }, ct);
         await NotifyRecipientAsync(f, userId, msg, ct);
+
+        // Fire the reminder-suggestion detector async. Most messages
+        // hit the regex pre-filter and stop without ever running the
+        // LLM, so this is cheap. When the job finds a high-confidence
+        // reminder, it publishes a `suggestion_ready` event over the
+        // same realtime hub so the card appears inline live.
+        try
+        {
+            backgroundJobs.Enqueue<DetectReminderSuggestionJob>(j => j.RunAsync(msg.Id));
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to enqueue reminder-suggestion detector for message {MessageId}", msg.Id);
+        }
 
         return dto;
     }
@@ -188,7 +205,7 @@ public class FriendMessagesService(
         db.Messages.Add(msg);
         await db.SaveChangesAsync(ct);
 
-        var dto = await MaterializeOneAsync(msg);
+        var dto = await MaterializeOneAsync(msg, userId);
         await BroadcastSafelyAsync("message_received", f.Id, new { conversationId = f.Id, message = dto }, ct);
         await NotifyRecipientAsync(f, userId, msg, ct);
 
@@ -291,7 +308,7 @@ public class FriendMessagesService(
         msg.EditedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
 
-        var dto = await MaterializeOneAsync(msg);
+        var dto = await MaterializeOneAsync(msg, userId);
         await BroadcastSafelyAsync("message_edited", f.Id, new { conversationId = f.Id, message = dto }, ct);
         return dto;
     }
@@ -310,7 +327,7 @@ public class FriendMessagesService(
 
         // Idempotent — already-deleted just returns the row as-is.
         if (msg.DeletedAt is not null)
-            return await MaterializeOneAsync(msg);
+            return await MaterializeOneAsync(msg, userId);
 
         // Capture media key before clearing; remove the S3 object after
         // SaveChanges so a failed S3 delete doesn't roll back the row.
@@ -331,7 +348,7 @@ public class FriendMessagesService(
             }
         }
 
-        var dto = await MaterializeOneAsync(msg);
+        var dto = await MaterializeOneAsync(msg, userId);
         await BroadcastSafelyAsync("message_deleted", f.Id, new
         {
             conversationId = f.Id,
@@ -381,7 +398,7 @@ public class FriendMessagesService(
             await db.SaveChangesAsync(ct);
         }
 
-        var dto = await MaterializeOneAsync(msg);
+        var dto = await MaterializeOneAsync(msg, userId);
         await BroadcastSafelyAsync("message_reactions_changed", f.Id, new
         {
             conversationId = f.Id,
@@ -406,13 +423,13 @@ public class FriendMessagesService(
         if (existing is null)
         {
             // Idempotent: nothing to remove. Return the current state.
-            return await MaterializeOneAsync(msg);
+            return await MaterializeOneAsync(msg, userId);
         }
 
         db.MessageReactions.Remove(existing);
         await db.SaveChangesAsync(ct);
 
-        var dto = await MaterializeOneAsync(msg);
+        var dto = await MaterializeOneAsync(msg, userId);
         await BroadcastSafelyAsync("message_reactions_changed", f.Id, new
         {
             conversationId = f.Id,
@@ -474,15 +491,31 @@ public class FriendMessagesService(
         await db.Friendships.FirstOrDefaultAsync(
             f => f.Id == friendshipId && (f.UserAId == userId || f.UserBId == userId), ct);
 
-    private async Task<List<FriendMessageResponse>> MaterializeAsync(List<FriendMessage> messages)
+    private async Task<List<FriendMessageResponse>> MaterializeAsync(List<FriendMessage> messages, Guid viewerUserId)
     {
+        if (messages.Count == 0) return new List<FriendMessageResponse>(0);
+
+        // Batch-fetch the viewer's suggestion rows for every message in
+        // this page in a single query — avoids N round-trips when scrolling
+        // history. Materialize the lookup into a dict so MaterializeOneAsync
+        // doesn't have to re-query.
+        var messageIds = messages.Select(m => m.Id).ToList();
+        var suggestions = await db.MessageSuggestions
+            .AsNoTracking()
+            .Where(s => s.UserId == viewerUserId && messageIds.Contains(s.FriendMessageId))
+            .ToDictionaryAsync(s => s.FriendMessageId);
+
         var result = new List<FriendMessageResponse>(messages.Count);
         foreach (var m in messages)
-            result.Add(await MaterializeOneAsync(m));
+        {
+            suggestions.TryGetValue(m.Id, out var suggestion);
+            result.Add(await MaterializeOneAsync(m, viewerUserId, prefetchedSuggestion: suggestion));
+        }
         return result;
     }
 
-    private async Task<FriendMessageResponse> MaterializeOneAsync(FriendMessage m)
+    private async Task<FriendMessageResponse> MaterializeOneAsync(
+        FriendMessage m, Guid viewerUserId, FriendMessageSuggestion? prefetchedSuggestion = null)
     {
         FriendMessageReplyPreview? replyPreview = null;
         if (m.ReplyToMessageId is { } replyId)
@@ -544,6 +577,30 @@ public class FriendMessagesService(
                 .ToList();
         }
 
+        // Suggestion attachment — null when no row exists for this
+        // (message, viewer) pair. `prefetchedSuggestion` skips the lookup
+        // when the caller already batch-fetched it via MaterializeAsync.
+        FriendMessageSuggestion? suggestionRow = prefetchedSuggestion;
+        if (suggestionRow is null && !isDeleted)
+        {
+            suggestionRow = await db.MessageSuggestions
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.FriendMessageId == m.Id && s.UserId == viewerUserId);
+        }
+
+        FriendMessageSuggestionDto? suggestionDto = null;
+        if (suggestionRow is not null && !isDeleted)
+        {
+            suggestionDto = new FriendMessageSuggestionDto(
+                suggestionRow.Id,
+                suggestionRow.Kind.ToString().ToLowerInvariant(),
+                suggestionRow.Label,
+                suggestionRow.WhenDate.ToString("yyyy-MM-dd"),
+                suggestionRow.Recurrence,
+                Dismissed: suggestionRow.DismissedAt.HasValue,
+                Accepted: suggestionRow.CreatedReminderId.HasValue);
+        }
+
         return new FriendMessageResponse(
             m.Id,
             m.FriendshipId,
@@ -559,7 +616,8 @@ public class FriendMessagesService(
             m.ReadAt,
             m.EditedAt,
             m.DeletedAt,
-            reactions);
+            reactions,
+            suggestionDto);
     }
 
     private static string ExtensionForImage(string contentType) => contentType.ToLowerInvariant() switch

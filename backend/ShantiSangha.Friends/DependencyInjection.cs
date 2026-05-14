@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ShantiSangha.Friends.Data;
+using ShantiSangha.Friends.Detection;
+using ShantiSangha.Friends.Jobs;
 using ShantiSangha.Friends.Realtime;
 using ShantiSangha.Friends.Services;
 using ShantiSangha.Friends.Storage;
@@ -60,6 +62,14 @@ public static class DependencyInjection
         // "is this user in this conversation?" without knowing about
         // friendships specifically. Group chats will plug in their own.
         services.AddScoped<IConversationMembershipService, FriendshipMembershipService>();
+
+        // Reminder-suggestion detector: regex pre-filter is stateless +
+        // pure (static), LLM extractor depends on Kernel (scoped), the
+        // Hangfire job pulls them together. Hangfire will activate the
+        // job via the DI container per invocation.
+        services.AddScoped<IReminderExtractor, ReminderExtractor>();
+        services.AddScoped<DetectReminderSuggestionJob>();
+        services.AddScoped<IFriendMessageSuggestionService, FriendMessageSuggestionService>();
 
         return services;
     }

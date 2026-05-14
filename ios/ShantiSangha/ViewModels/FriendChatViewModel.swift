@@ -183,7 +183,8 @@ final class FriendChatViewModel: ObservableObject {
             readAt: incoming.readAt ?? local.readAt,
             editedAt: incoming.editedAt ?? local.editedAt,
             deletedAt: incoming.deletedAt ?? local.deletedAt,
-            reactions: incoming.reactions)
+            reactions: incoming.reactions,
+            suggestion: incoming.suggestion ?? local.suggestion)
     }
 
     func loadOlder() async {
@@ -522,7 +523,8 @@ final class FriendChatViewModel: ObservableObject {
             readAt: m.readAt,
             editedAt: m.editedAt,
             deletedAt: m.deletedAt,
-            reactions: reactions)
+            reactions: reactions,
+            suggestion: m.suggestion)
     }
 
     /// Apply a `message_reactions_changed` realtime event — replace the
@@ -532,6 +534,61 @@ final class FriendChatViewModel: ObservableObject {
     func applyReactionsChanged(messageId: UUID, reactions: [FriendMessageReactionSummary]) {
         guard let i = messages.firstIndex(where: { $0.id == messageId }) else { return }
         replaceReactions(at: i, with: reactions)
+    }
+
+    // MARK: - Reminder suggestions
+
+    /// Apply a `suggestion_ready` realtime event — attach the suggestion
+    /// to the matching message inline so the card appears without a
+    /// chat refresh. No-op if the message isn't in the current view's
+    /// loaded window (e.g. user scrolled far back).
+    func applySuggestionReady(messageId: UUID, suggestion: FriendMessageSuggestion) {
+        guard let i = messages.firstIndex(where: { $0.id == messageId }) else { return }
+        // Don't overwrite an already-actioned suggestion. If the user
+        // already dismissed or accepted before the WS event landed
+        // (unlikely but possible on slow links), respect that.
+        if let existing = messages[i].suggestion, existing.dismissed || existing.accepted { return }
+        messages[i].suggestion = suggestion
+    }
+
+    /// Mark the local suggestion as dismissed and persist server-side.
+    /// On error we revert the local flag so the card reappears and the
+    /// user can retry.
+    func dismissSuggestion(messageId: UUID) async {
+        guard let i = messages.firstIndex(where: { $0.id == messageId }),
+              let s = messages[i].suggestion else { return }
+        messages[i].suggestion = FriendMessageSuggestion(
+            id: s.id, kind: s.kind, label: s.label, date: s.date,
+            recurrence: s.recurrence, dismissed: true, accepted: s.accepted)
+
+        do {
+            try await FriendsAPI.dismissSuggestion(messageId: messageId)
+        } catch {
+            if !error.isCancellation {
+                AppLogger.shared.error("Friends", "Suggestion dismiss failed: \(error)")
+            }
+            if let j = messages.firstIndex(where: { $0.id == messageId }) {
+                messages[j].suggestion = s
+            }
+        }
+    }
+
+    /// Called after the user has saved a real reminder created from the
+    /// suggestion. Links the two and stops the card from reappearing.
+    func acceptSuggestion(messageId: UUID, reminderId: UUID) async {
+        guard let i = messages.firstIndex(where: { $0.id == messageId }),
+              let s = messages[i].suggestion else { return }
+        messages[i].suggestion = FriendMessageSuggestion(
+            id: s.id, kind: s.kind, label: s.label, date: s.date,
+            recurrence: s.recurrence, dismissed: s.dismissed, accepted: true)
+
+        do {
+            try await FriendsAPI.acceptSuggestion(messageId: messageId, reminderId: reminderId)
+        } catch {
+            if !error.isCancellation {
+                AppLogger.shared.error("Friends", "Suggestion accept failed: \(error)")
+            }
+        }
     }
 
     // MARK: - Realtime lifecycle
@@ -579,6 +636,11 @@ final class FriendChatViewModel: ObservableObject {
             client.onReactionsChanged = { [weak self] msgId, reactions in
                 Task { @MainActor [weak self] in
                     self?.applyReactionsChanged(messageId: msgId, reactions: reactions)
+                }
+            }
+            client.onSuggestionReady = { [weak self] msgId, suggestion in
+                Task { @MainActor [weak self] in
+                    self?.applySuggestionReady(messageId: msgId, suggestion: suggestion)
                 }
             }
 
@@ -724,7 +786,8 @@ final class FriendChatViewModel: ObservableObject {
                 readAt: readAt,
                 editedAt: m.editedAt,
                 deletedAt: m.deletedAt,
-                reactions: m.reactions)
+                reactions: m.reactions,
+                suggestion: m.suggestion)
         }
     }
 

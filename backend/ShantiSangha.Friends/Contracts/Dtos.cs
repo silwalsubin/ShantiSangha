@@ -68,7 +68,25 @@ public record FriendMessageResponse(
     DateTime? ReadAt,
     DateTime? EditedAt,
     DateTime? DeletedAt,
-    List<FriendMessageReactionSummary> Reactions);
+    List<FriendMessageReactionSummary> Reactions,
+    FriendMessageSuggestionDto? Suggestion = null);
+
+/// <summary>
+/// Inline reminder-shortcut surfaced under a friend-chat bubble when the
+/// detector finds a reminder-shaped statement in the message body. The
+/// LLM extracts label + date once per message and writes a row per
+/// conversation participant — each side has independent dismissed /
+/// accepted state. Null on the wire means: no suggestion for this
+/// message + this viewer.
+/// </summary>
+public record FriendMessageSuggestionDto(
+    Guid Id,
+    string Kind,        // "reminder" for V1
+    string Label,
+    string Date,        // yyyy-MM-dd
+    string Recurrence,
+    bool Dismissed,
+    bool Accepted);
 
 /// <summary>One emoji's roll-up for a message: who reacted, by user
 /// id. Clients derive `Count` from the list and check membership of

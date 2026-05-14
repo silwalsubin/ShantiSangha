@@ -24,6 +24,10 @@ final class ChatRealtimeClient {
     var onMessagesRead:    ((_ readByUserId: UUID, _ lastMessageId: UUID, _ readAt: String) -> Void)?
     var onTyping:          ((_ fromUserId: UUID, _ isTyping: Bool) -> Void)?
     var onReactionsChanged: ((_ messageId: UUID, _ reactions: [FriendMessageReactionSummary]) -> Void)?
+    /// Fired when the server-side detector has finished processing a
+    /// message and produced a reminder suggestion for it. The view model
+    /// finds the matching message and attaches the suggestion inline.
+    var onSuggestionReady: ((_ messageId: UUID, _ suggestion: FriendMessageSuggestion) -> Void)?
 
     private let tokenProvider: TokenProvider
     private let baseURL: String
@@ -185,6 +189,29 @@ final class ChatRealtimeClient {
                let data = try? JSONSerialization.data(withJSONObject: rawReactions),
                let reactions = try? Self.decoder.decode([FriendMessageReactionSummary].self, from: data) {
                 onReactionsChanged?(id, reactions)
+            }
+        case "suggestion_ready":
+            // Server-side detector finished and produced a reminder
+            // suggestion. The envelope carries the message id this
+            // suggestion attaches to plus the extracted fields.
+            if let id = (envelope["messageId"] as? String).flatMap(UUID.init(uuidString:)),
+               let label = envelope["label"] as? String,
+               let date = envelope["date"] as? String {
+                let recurrence = (envelope["recurrence"] as? String) ?? "none"
+                // Synthesize a client-side FriendMessageSuggestion. The
+                // suggestion id field gets a fresh UUID for the client
+                // record; persisted state is keyed server-side by
+                // (messageId, userId), so the synthesized id is local-only
+                // and never sent back. dismissed/accepted start false.
+                let suggestion = FriendMessageSuggestion(
+                    id: UUID(),
+                    kind: "reminder",
+                    label: label,
+                    date: date,
+                    recurrence: recurrence,
+                    dismissed: false,
+                    accepted: false)
+                onSuggestionReady?(id, suggestion)
             }
         default:
             break

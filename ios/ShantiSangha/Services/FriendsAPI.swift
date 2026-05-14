@@ -151,6 +151,24 @@ enum FriendsAPI {
             "/friends/\(friendshipId.uuidString.lowercased())/messages/\(messageId.uuidString.lowercased())/reactions")
     }
 
+    // MARK: - Reminder suggestions
+
+    /// Dismiss the inline reminder-suggestion card for a specific message
+    /// (per-user state; doesn't affect the other participant's view).
+    static func dismissSuggestion(messageId: UUID) async throws {
+        let _: EmptyResponse = try await ApiService.shared.post(
+            "/friend-messages/\(messageId.uuidString.lowercased())/suggestion/dismiss")
+    }
+
+    struct AcceptSuggestionBody: Encodable { let reminderId: UUID }
+    /// Link a suggestion to the reminder the user just created from it.
+    /// Stops the card from re-appearing for that message.
+    static func acceptSuggestion(messageId: UUID, reminderId: UUID) async throws {
+        let _: EmptyResponse = try await ApiService.shared.post(
+            "/friend-messages/\(messageId.uuidString.lowercased())/suggestion/accept",
+            body: AcceptSuggestionBody(reminderId: reminderId))
+    }
+
     /// Direct PUT upload of binary data to a presigned S3 URL — used by image
     /// and voice attachment flows. Returns when the upload is complete; throws
     /// on non-2xx.

@@ -30,6 +30,11 @@ struct FriendChatView: View {
     @State private var jumpToMessageId: UUID?
     @State private var highlightedMessageId: UUID?
     @State private var showProfile = false
+    /// The reminder suggestion the user just tapped "Schedule" on. When
+    /// non-nil, pushes ReminderEditView pre-filled with the extracted
+    /// label + date. After save, we POST /suggestion/accept linking the
+    /// new reminder back to the message so the card stops re-appearing.
+    @State private var suggestionScheduleTarget: SuggestionScheduleTarget?
     /// Mirrors the composer's internal `@FocusState`. The composer pings
     /// us on focus change so we can scroll the latest message above the
     /// keyboard rise.
@@ -91,6 +96,37 @@ struct FriendChatView: View {
         }
         .navigationDestination(isPresented: $showProfile) {
             ConnectionDetailView(connectionId: connection.id, vm: circleVM)
+        }
+        .navigationDestination(item: $suggestionScheduleTarget) { target in
+            let initialDate = SuggestionScheduleTarget.parse(target.date)
+            let recurrence: ReminderRecurrence = target.recurrence == "yearly" ? .yearly : .none
+            ReminderEditView(
+                target: .new(initialLabel: target.label,
+                             initialDate: initialDate,
+                             connectionId: target.connectionId),
+                onSave: { label, dateString, savedRecurrence in
+                    do {
+                        let created = try await ReminderRepository.shared.create(
+                            label: label,
+                            date: dateString,
+                            recurrence: savedRecurrence,
+                            connectionId: target.connectionId)
+                        await vm.acceptSuggestion(
+                            messageId: target.messageId, reminderId: created.id)
+                    } catch {
+                        if !error.isCancellation {
+                            AppLogger.shared.error("Friends", "Suggestion-driven reminder create failed: \(error)")
+                        }
+                    }
+                },
+                onDelete: nil)
+            // Suppress the "yearly" default when the LLM said "none" —
+            // pre-fill the recurrence by passing it as an env value? We
+            // can't; ReminderEditView.recurrenceDraft is internal. The
+            // recurrence binding will start at the editor's default
+            // (yearly) — acceptable for V1; users can flip it before
+            // saving. TODO: thread recurrence pre-fill through ReminderEditTarget.
+            _ = recurrence
         }
         .sheet(item: $reactionPickerTarget) { target in
             ReactionPickerSheet(
@@ -325,7 +361,20 @@ struct FriendChatView: View {
                                 }
                             },
                             onTapReplyPreview: { parentId in jumpToMessage(parentId) },
-                            onTapAvatar: { showProfile = true })
+                            onTapAvatar: { showProfile = true },
+                            onScheduleSuggestion: {
+                                if let s = msg.suggestion {
+                                    suggestionScheduleTarget = SuggestionScheduleTarget(
+                                        messageId: msg.id,
+                                        label: s.label,
+                                        date: s.date,
+                                        recurrence: s.recurrence,
+                                        connectionId: connection.id)
+                                }
+                            },
+                            onDismissSuggestion: {
+                                Task { await vm.dismissSuggestion(messageId: msg.id) }
+                            })
                     }
                     .id(msg.id.uuidString)
                     .onLongPressGesture {
@@ -651,6 +700,14 @@ private struct MessageBubble: View {
     let onTapReaction: (String) -> Void
     let onTapReplyPreview: (UUID) -> Void
     let onTapAvatar: () -> Void
+    let onScheduleSuggestion: () -> Void
+    let onDismissSuggestion: () -> Void
+
+    private var visibleSuggestion: FriendMessageSuggestion? {
+        guard let s = message.suggestion else { return nil }
+        if s.dismissed || s.accepted { return nil }
+        return s
+    }
 
     /// Reserved width for the avatar gutter on the friend's side. Even
     /// on continuation rows (where we hide the avatar), the slot stays
@@ -691,6 +748,14 @@ private struct MessageBubble: View {
                     }
                     .padding(.bottom, hasReactions ? 12 : 0)
                     .padding(.trailing, hasReactions ? 4 : 0)
+                if let s = visibleSuggestion {
+                    SuggestionCard(
+                        suggestion: s,
+                        alignment: fromFriend ? .leading : .trailing,
+                        onSchedule: onScheduleSuggestion,
+                        onDismiss: onDismissSuggestion)
+                        .padding(.top, 4)
+                }
                 metaLine
             }
             .padding(.vertical, 4)
@@ -965,5 +1030,105 @@ private struct SwipeToReplyRow<Content: View>: View {
                         }
                 )
         }
+    }
+}
+
+// MARK: - Inline reminder-suggestion target
+
+/// Identifiable navigation target for the reminder editor opened from a
+/// suggestion card. Carries the message id so we can POST /accept once
+/// the user saves.
+private struct SuggestionScheduleTarget: Identifiable, Hashable {
+    let messageId: UUID
+    let label: String
+    let date: String  // yyyy-MM-dd
+    let recurrence: String
+    let connectionId: UUID
+
+    var id: String { "\(messageId.uuidString)|\(label)|\(date)" }
+
+    static func parse(_ iso: String) -> Date? {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f.date(from: iso)
+    }
+}
+
+// MARK: - Inline reminder-suggestion card
+
+/// Sacred-gold tinted card that appears below a message bubble when the
+/// server detected a reminder-shaped statement in the body. Tapping
+/// "Schedule" opens the normal reminder editor pre-filled; tapping
+/// "Not now" dismisses just that suggestion.
+private struct SuggestionCard: View {
+    let suggestion: FriendMessageSuggestion
+    let alignment: HorizontalAlignment
+    let onSchedule: () -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            if alignment == .trailing { Spacer(minLength: 32) }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                        .font(.sacredMicroBold)
+                        .foregroundColor(.sacredGold)
+                    Text("REMINDER?")
+                        .font(.sacredMicroBold)
+                        .tracking(1)
+                        .foregroundColor(.sacredGold)
+                }
+                Text(suggestion.label)
+                    .font(.sacredTextSemibold)
+                    .foregroundColor(.sacredText)
+                Text(prettyDate(suggestion.date))
+                    .font(.sacredSmall)
+                    .foregroundColor(.sacredMuted)
+                HStack(spacing: 8) {
+                    Button(action: onSchedule) {
+                        Text("Schedule")
+                            .font(.sacredSmallSemibold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Capsule().fill(Color.sacredGold))
+                    }
+                    .buttonStyle(.plain)
+                    Button(action: onDismiss) {
+                        Text("Not now")
+                            .font(.sacredSmallSemibold)
+                            .foregroundColor(.sacredMuted)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Capsule().stroke(Color.sacredMuted.opacity(0.25), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.top, 2)
+            }
+            .padding(12)
+            .frame(maxWidth: 260, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color.sacredGold.opacity(0.08))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.sacredGold.opacity(0.30), lineWidth: 1)
+            )
+            if alignment == .leading { Spacer(minLength: 32) }
+        }
+    }
+
+    private func prettyDate(_ iso: String) -> String {
+        let parser = DateFormatter()
+        parser.dateFormat = "yyyy-MM-dd"
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        guard let d = parser.date(from: iso) else { return iso }
+        let f = DateFormatter()
+        f.dateFormat = "EEEE, MMM d"
+        return f.string(from: d)
     }
 }
