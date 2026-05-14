@@ -48,19 +48,8 @@ struct HomeView: View {
                     WholeDayContextStrip(health: health, weather: weather)
                         .padding(.top, 10)
 
-                    // Daily reflection. Today's if ready, else yesterday's (or
-                    // day-before's) as a fallback with a subtle chip. Home is
-                    // never empty — the server returns a fallback reflection
-                    // when today's hasn't been composed yet.
-                    if let reflection, !reflectionDismissed {
-                        ReflectionCardView(
-                            content: reflection,
-                            caption: reflectionIsFallback ? "TODAY'S IS BEING WRITTEN" : nil,
-                            onClose: { dismissReflection() }
-                        )
-                        .padding(.top, SacredSpacing.l)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
+                    // Daily reflection used to live here. It now opens as
+                    // the first turn in the Assistant tab each morning.
 
                     if vm.loading {
                         ProgressView()

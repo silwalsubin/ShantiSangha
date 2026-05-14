@@ -8,6 +8,8 @@ using ShantiSangha.Agent.Data;
 using ShantiSangha.Agent.Models;
 using ShantiSangha.Shared;
 using ShantiSangha.Shared.Interfaces;
+using ShantiSangha.Tools.Circles;
+using ShantiSangha.Tools.Reflection;
 using ShantiSangha.Tools.Reminders;
 
 namespace ShantiSangha.Agent.AI;
@@ -49,6 +51,12 @@ public class AgentOrchestrator(
         scopedKernel.Plugins.AddFromObject(
             services.GetRequiredService<RemindersTool>(),
             pluginName: "reminders");
+        scopedKernel.Plugins.AddFromObject(
+            services.GetRequiredService<CirclesTool>(),
+            pluginName: "circles");
+        scopedKernel.Plugins.AddFromObject(
+            services.GetRequiredService<ReflectionTool>(),
+            pluginName: "reflection");
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var history = new ChatHistory(AgentSystemPrompt.Build(today, displayName));
@@ -84,11 +92,22 @@ public class AgentOrchestrator(
             history, settings, scopedKernel, timeout.Token))
         {
             var text = chunk.Content;
-            if (!string.IsNullOrEmpty(text))
+            if (string.IsNullOrEmpty(text)) continue;
+
+            // Semantic Kernel's auto-invoke produces two assistant rounds
+            // around a tool call (narration → tool → narration). The
+            // streaming joins them without whitespace, so we get
+            // "Let me do that now.Your reminder…". Detect the seam — prior
+            // ends in sentence punctuation, next starts uppercase with no
+            // leading whitespace — and insert a paragraph break.
+            if (NeedsRoundBreak(assembled, text))
             {
-                assembled.Append(text);
-                yield return text;
+                assembled.Append("\n\n");
+                yield return "\n\n";
             }
+
+            assembled.Append(text);
+            yield return text;
         }
 
         var assistantContent = assembled.ToString().Trim();
@@ -104,5 +123,14 @@ public class AgentOrchestrator(
             });
             await db.SaveChangesAsync(CancellationToken.None);
         }
+    }
+
+    private static bool NeedsRoundBreak(System.Text.StringBuilder soFar, string next)
+    {
+        if (soFar.Length == 0 || next.Length == 0) return false;
+        var lastChar = soFar[soFar.Length - 1];
+        if (lastChar != '.' && lastChar != '!' && lastChar != '?') return false;
+        var firstChar = next[0];
+        return char.IsLetter(firstChar) && char.IsUpper(firstChar);
     }
 }

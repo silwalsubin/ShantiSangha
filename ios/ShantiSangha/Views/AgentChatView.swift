@@ -104,6 +104,15 @@ struct AgentChatView: View {
                     role: $0.role == "user" ? .user : .assistant,
                     content: $0.content)
             }
+
+            // Surface today's reflection as the first assistant turn if the
+            // server hasn't greeted yet this UTC day. Idempotent on the
+            // server side — safe to call on every mount.
+            if let greeting = try? await AgentChatService.shared.morningGreeting() {
+                messages.append(AgentMessage(
+                    role: greeting.role == "user" ? .user : .assistant,
+                    content: greeting.content))
+            }
         } catch {
             if !error.isCancellation {
                 AppLogger.shared.error("Agent", "History load failed: \(error)")

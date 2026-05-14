@@ -3,6 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using ShantiSangha.Agent.AI;
 using ShantiSangha.Agent.Data;
 using ShantiSangha.Tools;
+using ShantiSangha.Tools.Circles;
+using ShantiSangha.Tools.Reflection;
 using ShantiSangha.Tools.Reminders;
 
 namespace ShantiSangha.Agent;
@@ -29,7 +31,9 @@ public static class DependencyInjection
         services
             .AddMcpServer()
             .WithHttpTransport()
-            .WithTools<RemindersTool>();
+            .WithTools<RemindersTool>()
+            .WithTools<CirclesTool>()
+            .WithTools<ReflectionTool>();
 
         return services;
     }

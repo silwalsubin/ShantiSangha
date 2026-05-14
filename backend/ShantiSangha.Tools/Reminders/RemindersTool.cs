@@ -117,7 +117,7 @@ public sealed class RemindersTool(IReminderService reminders, ICurrentUser curre
         var user = await RequireUserAsync();
 
         var all = await reminders.ListAsync(user.Id, connectionId: null, date: null, ct);
-        var lookup = ReminderLookup.FindByLabel(all, label);
+        var lookup = LabeledLookup.FindByLabel(all, r => r.Label, label);
 
         if (lookup.Outcome == LookupOutcome.None)
             return Error($"No reminder matches '{label}'.");
@@ -166,7 +166,7 @@ public sealed class RemindersTool(IReminderService reminders, ICurrentUser curre
             return Error("Confirmation required. Ask the user to confirm before calling this tool with confirmed: true.");
 
         var all = await reminders.ListAsync(user.Id, connectionId: null, date: null, ct);
-        var lookup = ReminderLookup.FindByLabel(all, label);
+        var lookup = LabeledLookup.FindByLabel(all, r => r.Label, label);
 
         if (lookup.Outcome == LookupOutcome.None)
             return Error($"No reminder matches '{label}'.");

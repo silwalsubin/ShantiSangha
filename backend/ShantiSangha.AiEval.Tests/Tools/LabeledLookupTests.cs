@@ -4,7 +4,7 @@ using Xunit;
 
 namespace ShantiSangha.AiEval.Tests.Tools;
 
-public class ReminderLookupTests
+public class LabeledLookupTests
 {
     private static ReminderResponse Make(string label, int daysOut = 1) =>
         new(
@@ -18,10 +18,13 @@ public class ReminderLookupTests
             DateTime.UtcNow,
             daysOut);
 
+    private static LookupResult<ReminderResponse> Find(IReadOnlyList<ReminderResponse> items, string label)
+        => LabeledLookup.FindByLabel(items, r => r.Label, label);
+
     [Fact]
     public void NoneWhenListEmpty()
     {
-        var result = ReminderLookup.FindByLabel(Array.Empty<ReminderResponse>(), "anything");
+        var result = Find(Array.Empty<ReminderResponse>(), "anything");
         Assert.Equal(LookupOutcome.None, result.Outcome);
     }
 
@@ -33,7 +36,7 @@ public class ReminderLookupTests
             Make("dad's birthday"),
             Make("dad's birthday party"),
         };
-        var result = ReminderLookup.FindByLabel(reminders, "dad's birthday");
+        var result = Find(reminders, "dad's birthday");
         Assert.Equal(LookupOutcome.Single, result.Outcome);
         Assert.Equal("dad's birthday", result.Match!.Label);
     }
@@ -42,7 +45,7 @@ public class ReminderLookupTests
     public void CaseInsensitive()
     {
         var reminders = new[] { Make("Electric Bill") };
-        var result = ReminderLookup.FindByLabel(reminders, "electric bill");
+        var result = Find(reminders, "electric bill");
         Assert.Equal(LookupOutcome.Single, result.Outcome);
     }
 
@@ -54,7 +57,7 @@ public class ReminderLookupTests
             Make("Sarah's wedding"),
             Make("Mom's birthday"),
         };
-        var result = ReminderLookup.FindByLabel(reminders, "wedding");
+        var result = Find(reminders, "wedding");
         Assert.Equal(LookupOutcome.Single, result.Outcome);
         Assert.Equal("Sarah's wedding", result.Match!.Label);
     }
@@ -67,7 +70,7 @@ public class ReminderLookupTests
             Make("Doctor appointment"),
             Make("Doctor follow-up"),
         };
-        var result = ReminderLookup.FindByLabel(reminders, "doctor");
+        var result = Find(reminders, "doctor");
         Assert.Equal(LookupOutcome.Ambiguous, result.Outcome);
         Assert.Equal(2, result.Candidates.Count);
     }
@@ -76,7 +79,7 @@ public class ReminderLookupTests
     public void TokenMatchWhenNoSubstring()
     {
         var reminders = new[] { Make("Pay the electric bill") };
-        var result = ReminderLookup.FindByLabel(reminders, "electric pay");
+        var result = Find(reminders, "electric pay");
         Assert.Equal(LookupOutcome.Single, result.Outcome);
     }
 
@@ -84,7 +87,7 @@ public class ReminderLookupTests
     public void NoMatchReturnsNone()
     {
         var reminders = new[] { Make("Dad's birthday") };
-        var result = ReminderLookup.FindByLabel(reminders, "anniversary");
+        var result = Find(reminders, "anniversary");
         Assert.Equal(LookupOutcome.None, result.Outcome);
     }
 
@@ -92,7 +95,24 @@ public class ReminderLookupTests
     public void EmptyLabelReturnsNone()
     {
         var reminders = new[] { Make("Dad's birthday") };
-        var result = ReminderLookup.FindByLabel(reminders, "   ");
+        var result = Find(reminders, "   ");
         Assert.Equal(LookupOutcome.None, result.Outcome);
+    }
+
+    // ── Cross-type sanity: works with any T + Func<T,string> ──
+
+    private record Connection(string DisplayName);
+
+    [Fact]
+    public void GenericOverConnectionType()
+    {
+        var people = new[]
+        {
+            new Connection("Aarav Sharma"),
+            new Connection("Aarav Patel"),
+        };
+        var result = LabeledLookup.FindByLabel(people, c => c.DisplayName, "Aarav");
+        Assert.Equal(LookupOutcome.Ambiguous, result.Outcome);
+        Assert.Equal(2, result.Candidates.Count);
     }
 }
