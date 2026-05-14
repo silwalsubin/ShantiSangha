@@ -57,22 +57,13 @@ struct MainTabView: View {
         ZStack(alignment: .top) {
             TabView(selection: $selectedTab) {
                 NavigationStack {
-                    AgentChatView()
-                }
-                .tabItem {
-                    Image(systemName: "sparkles")
-                    Text("Assistant")
-                }
-                .tag(0)
-
-                NavigationStack {
                     HomeView()
                 }
                 .tabItem {
                     Image("tab.vajra")
                     Text("Home")
                 }
-                .tag(1)
+                .tag(0)
 
                 NavigationStack {
                     ReflectView()
@@ -81,7 +72,7 @@ struct MainTabView: View {
                     Image("tab.dialogue")
                     Text("Reflect")
                 }
-                .tag(2)
+                .tag(1)
 
                 NavigationStack {
                     CalendarView()
@@ -90,7 +81,7 @@ struct MainTabView: View {
                     Image(systemName: "calendar")
                     Text("Calendar")
                 }
-                .tag(3)
+                .tag(2)
 
                 NavigationStack {
                     FriendsTabView()
@@ -100,13 +91,13 @@ struct MainTabView: View {
                     Text("Circles")
                 }
                 .badge(friendsBadge.count)
-                .tag(4)
+                .tag(3)
             }
             .tint(.sacredGold)
             .task { await friendsBadge.refresh() }
             .sheet(item: deepLinkBinding) { token in
                 AcceptInvitationView(token: token.value) { _ in
-                    selectedTab = 4
+                    selectedTab = 3
                 }
             }
 
@@ -127,7 +118,7 @@ struct MainTabView: View {
         // routing intent (FriendsTabView clears it once it resolves).
         .onChange(of: deepLinks.pendingChatFriendshipId) { _, newValue in
             if newValue != nil {
-                selectedTab = 4
+                selectedTab = 3
             }
         }
         .onAppear { MotionManager.shared.start() }

@@ -13,6 +13,7 @@ struct AgentChatView: View {
     @State private var showClearConfirmation = false
     @State private var editTarget: ReminderEditTarget?
     @State private var activeSwipeId: String?
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ZStack {
@@ -28,6 +29,16 @@ struct AgentChatView: View {
         .navigationTitle("Assistant")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredMuted)
+                }
+                .accessibilityLabel("Close")
+            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 if !messages.isEmpty {
                     Button {

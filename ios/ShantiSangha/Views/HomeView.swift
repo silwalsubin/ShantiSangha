@@ -29,11 +29,12 @@ struct HomeView: View {
     /// dismisses it. A new day or a different reflection will surface again.
     @State private var reflectionDismissed: Bool = false
     @State private var showProfileMenu = false
+    @State private var showChatSheet = false
     @StateObject private var notifications = NotificationsViewModel()
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .bottom) {
             SacredBackground()
                 .ignoresSafeArea()
 
@@ -48,8 +49,19 @@ struct HomeView: View {
                     WholeDayContextStrip(health: health, weather: weather)
                         .padding(.top, 10)
 
-                    // Daily reflection used to live here. It now opens as
-                    // the first turn in the Assistant tab each morning.
+                    // Daily reflection. Today's if ready, else yesterday's
+                    // (or day-before's) as a fallback with a subtle chip.
+                    // Home is never empty — the server returns a fallback
+                    // reflection when today's hasn't been composed yet.
+                    if let reflection, !reflectionDismissed {
+                        ReflectionCardView(
+                            content: reflection,
+                            caption: reflectionIsFallback ? "TODAY'S IS BEING WRITTEN" : nil,
+                            onClose: { dismissReflection() }
+                        )
+                        .padding(.top, SacredSpacing.l)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
 
                     if vm.loading {
                         ProgressView()
@@ -61,7 +73,7 @@ struct HomeView: View {
                     }
                 }
                 .padding(.top, SacredSpacing.xl)
-                .padding(.bottom, SacredSpacing.tabBarSafe)
+                .padding(.bottom, SacredSpacing.tabBarSafe + 56)
             }
             .background(Color.clear)
             .toolbar {
@@ -126,6 +138,17 @@ struct HomeView: View {
                     if type == "reflection" { await loadReflection(force: true) }
                 }
             }
+
+            chatAffordance
+                .padding(.horizontal, SacredSpacing.m)
+                .padding(.bottom, SacredSpacing.s)
+        }
+        .sheet(isPresented: $showChatSheet) {
+            NavigationStack {
+                AgentChatView()
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
         .navigationDestination(item: $navTarget) { target in
             ReminderEditView(
@@ -155,6 +178,43 @@ struct HomeView: View {
         .navigationDestination(item: $profileTarget) { target in
             ConnectionDetailView(connectionId: target.connectionId, vm: circleVM)
         }
+    }
+
+    // MARK: - Chat affordance
+
+    /// Floating pill above the tab bar. Tap pulls up the assistant chat as
+    /// a sheet so the user can ask anything without leaving Home. The
+    /// chat is a tool — Home is the landing.
+    private var chatAffordance: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            showChatSheet = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.sacredText)
+                    .foregroundColor(.sacredGold)
+                Text("Ask anything…")
+                    .font(.sacredText)
+                    .foregroundColor(.sacredMuted)
+                Spacer(minLength: 0)
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundColor(.sacredGold)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(Color.sacredBgCard)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 24)
+                            .stroke(Color.sacredGold.opacity(0.22), lineWidth: 1)
+                    )
+            )
+            .shadow(color: .sacredMuted.opacity(0.18), radius: 14, y: 6)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Reminders section
