@@ -12,13 +12,12 @@ import SwiftUI
 struct SacredDateRow<Trailing: View>: View {
     let date: Date
     let label: String
-    var isToday: Bool = false
     var onTap: (() -> Void)? = nil
     @ViewBuilder var trailing: () -> Trailing
 
     var body: some View {
         let content = HStack(spacing: 12) {
-            SacredDateStamp(date: date, isToday: isToday)
+            SacredDateStamp(date: date)
 
             Text(label)
                 .font(.sacredTextMedium)
@@ -43,10 +42,9 @@ struct SacredDateRow<Trailing: View>: View {
 }
 
 extension SacredDateRow where Trailing == EmptyView {
-    init(date: Date, label: String, isToday: Bool = false, onTap: (() -> Void)? = nil) {
+    init(date: Date, label: String, onTap: (() -> Void)? = nil) {
         self.date = date
         self.label = label
-        self.isToday = isToday
         self.onTap = onTap
         self.trailing = { EmptyView() }
     }

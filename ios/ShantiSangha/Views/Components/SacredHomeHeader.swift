@@ -8,7 +8,7 @@ struct SacredHomeHeader: View {
 
     var body: some View {
         VStack(spacing: SacredSpacing.xs) {
-            SacredDateStamp(date: Date(), isToday: true, size: 60)
+            SacredDateStamp(date: Date(), size: 60)
             Text(greeting)
                 .font(.sacredGreeting)
                 .foregroundColor(.sacredText)

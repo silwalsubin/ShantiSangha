@@ -142,7 +142,7 @@ struct ReminderRow: View {
     @ViewBuilder
     private var leadingSlot: some View {
         if showDateStamp, let parsed = parseISODate(reminder.date) {
-            SacredDateStamp(date: parsed, isToday: reminder.daysRemaining == 0)
+            SacredDateStamp(date: parsed)
         } else {
             Image(systemName: "calendar.badge.clock")
                 .font(.sacredText)

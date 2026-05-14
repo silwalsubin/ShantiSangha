@@ -5,13 +5,8 @@ import SwiftUI
 /// leading slot for one-time goals; now shared so the Connection
 /// profile's "Important Dates" rows render with the same visual weight
 /// as a goal row.
-///
-/// `isToday` swaps the day glyph to gold and tints the background — keep
-/// it false for past/future dates that are reference-only (anniversaries,
-/// birthdays, "day we met").
 struct SacredDateStamp: View {
     let date: Date
-    var isToday: Bool = false
     /// Edge length of the square tile. Fonts scale with `size` so the
     /// large hero stamp in the Home header and the small inline stamp
     /// in reminder rows share the same proportions.
@@ -28,7 +23,7 @@ struct SacredDateStamp: View {
                 .foregroundColor(.sacredMuted)
             Text("\(day)")
                 .font(.system(size: size * 0.36, weight: .semibold, design: .serif))
-                .foregroundColor(isToday ? .sacredGold : .sacredText)
+                .foregroundColor(.sacredText)
             Text(weekday)
                 .font(.system(size: size * 0.16, weight: .bold, design: .serif))
                 .tracking(1)
@@ -38,7 +33,7 @@ struct SacredDateStamp: View {
         .frame(width: size, height: size)
         .background(
             RoundedRectangle(cornerRadius: size * 0.2)
-                .fill(isToday ? Color.sacredGold.opacity(0.1) : Color.sacredBgCard)
+                .fill(Color.sacredBgCard)
         )
     }
 
