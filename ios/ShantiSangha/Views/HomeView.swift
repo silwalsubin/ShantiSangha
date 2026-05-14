@@ -20,14 +20,6 @@ struct HomeView: View {
     /// this is quietly held back until it enters the window. Overdue
     /// items always show regardless. User adjusts in Settings.
     @AppStorage("reminders.horizonDays") private var horizonDays = 30
-    @State private var reflection: String?
-    @State private var reflectionDate: String?
-    /// True when `reflection` is a prior day's reflection shown while today's
-    /// is still being composed. Drives the "TODAY'S IS BEING WRITTEN" chip.
-    @State private var reflectionIsFallback: Bool = false
-    /// Hides the reflection card for the rest of the day after the user
-    /// dismisses it. A new day or a different reflection will surface again.
-    @State private var reflectionDismissed: Bool = false
     @State private var showProfileMenu = false
     @State private var showChatSheet = false
     /// Transcript captured by the Home pill's mic. Passed through to
@@ -53,20 +45,6 @@ struct HomeView: View {
                     WholeDayContextStrip(health: health, weather: weather)
                         .padding(.top, 10)
 
-                    // Daily reflection. Today's if ready, else yesterday's
-                    // (or day-before's) as a fallback with a subtle chip.
-                    // Home is never empty — the server returns a fallback
-                    // reflection when today's hasn't been composed yet.
-                    if let reflection, !reflectionDismissed {
-                        ReflectionCardView(
-                            content: reflection,
-                            caption: reflectionIsFallback ? "TODAY'S IS BEING WRITTEN" : nil,
-                            onClose: { dismissReflection() }
-                        )
-                        .padding(.top, SacredSpacing.l)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
-
                     if vm.loading {
                         ProgressView()
                             .frame(maxWidth: .infinity, minHeight: 200)
@@ -83,29 +61,22 @@ struct HomeView: View {
             .toolbar {
                 if #available(iOS 26.0, *) {
                     ToolbarItem(placement: .topBarTrailing) {
-                        HStack(spacing: 14) {
-                            notificationsBellButton
-                            profileMenuButton
-                        }
+                        profileMenuButton
                     }
                     .sharedBackgroundVisibility(.hidden)
                 } else {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        HStack(spacing: 14) {
-                            notificationsBellButton
-                            profileMenuButton
-                        }
+                        profileMenuButton
                     }
                 }
             }
             .fullScreenCover(isPresented: $showProfileMenu) {
-                ProfileMenuSheet()
+                ProfileMenuSheet(unreadNotifications: notifications.unreadCount)
                     .environmentObject(auth)
                     .environmentObject(profile)
             }
             .refreshable {
                 await vm.load()
-                await loadReflection(force: true)
                 updateWidgetData()
                 await refreshWholeDayContext()
                 await circleVM.refresh()
@@ -116,7 +87,6 @@ struct HomeView: View {
                 // ConnectionDetailView can find its connection.
                 async let circleLoad: () = circleVM.refresh()
                 await vm.load()
-                await loadReflection()
                 updateWidgetData()
                 await refreshWholeDayContext()
                 await notifications.refreshUnreadCount()
@@ -133,13 +103,6 @@ struct HomeView: View {
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
                     Task { await notifications.refreshUnreadCount() }
-                }
-            }
-            .onChange(of: reflection) { _, _ in syncReflectionDismissedFlag() }
-            .onReceive(NotificationCenter.default.publisher(for: .silentPushReceived)) { notification in
-                let type = notification.userInfo?["type"] as? String
-                Task {
-                    if type == "reflection" { await loadReflection(force: true) }
                 }
             }
 
@@ -418,103 +381,6 @@ struct HomeView: View {
             .components(separatedBy: " ").first
     }
 
-    // MARK: - Reflection
-
-    private static let cachedReflectionKey = "home.reflection.content"
-    private static let cachedReflectionDateKey = "home.reflection.date"
-    /// Signature of the reflection the user dismissed — composed of today's
-    /// calendar date and the reflection content. A new day or a different
-    /// reflection produces a different signature and surfaces the card again.
-    private static let dismissedReflectionKey = "home.reflection.dismissed.signature"
-
-    private func reflectionSignature(_ content: String) -> String {
-        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
-        return "\(df.string(from: Date()))::\(content)"
-    }
-
-    private func syncReflectionDismissedFlag() {
-        guard let content = reflection else {
-            reflectionDismissed = false
-            return
-        }
-        let stored = UserDefaults.standard.string(forKey: Self.dismissedReflectionKey)
-        reflectionDismissed = (stored == reflectionSignature(content))
-    }
-
-    private func dismissReflection() {
-        guard let content = reflection else { return }
-        UserDefaults.standard.set(reflectionSignature(content), forKey: Self.dismissedReflectionKey)
-        withAnimation(.easeOut(duration: 0.3)) {
-            reflectionDismissed = true
-        }
-    }
-
-    private func loadReflection(force: Bool = false) async {
-        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
-        let dateStr = df.string(from: Date())
-
-        // Hydrate from persistent cache first so Home is never empty on tab
-        // switch / relaunch. Only today's real reflection is cached — fallbacks
-        // aren't persisted so we always re-check the server for the real one.
-        if !force, reflection == nil {
-            let defaults = UserDefaults.standard
-            if let cachedDate = defaults.string(forKey: Self.cachedReflectionDateKey),
-               cachedDate == dateStr,
-               let cachedContent = defaults.string(forKey: Self.cachedReflectionKey),
-               !cachedContent.isEmpty {
-                reflection = cachedContent
-                reflectionDate = cachedDate
-                reflectionIsFallback = false
-                return
-            }
-        }
-
-        // In-memory fast path — already have today's real reflection. If the
-        // state is a fallback we still re-check the server in case today's
-        // has been composed since the last fetch.
-        if !force, reflection != nil, reflectionDate == dateStr, !reflectionIsFallback { return }
-
-        do {
-            let response: DailyReflectionResponse = try await ApiService.shared.get("/reflection/today?date=\(dateStr)")
-
-            if let content = response.content, !content.isEmpty {
-                // Today's is ready — persist and end the fallback state if any.
-                persistReflection(content, date: dateStr)
-                return
-            }
-
-            // Today's isn't ready yet. The server enqueued generation and
-            // returned the most recent prior reflection as a fallback. Show
-            // it with a caption; when the silent push "type: reflection"
-            // arrives, loadReflection(force: true) swaps in the real one.
-            if let fallback = response.fallback, !fallback.content.isEmpty {
-                reflection = fallback.content
-                reflectionDate = fallback.date
-                reflectionIsFallback = true
-                return
-            }
-
-            // Brand-new user with no prior reflections at all. Leave the card
-            // hidden; generation will catch up, silent push will wake us.
-            reflection = nil
-            reflectionDate = nil
-            reflectionIsFallback = false
-        } catch {
-            if !error.isCancellation {
-                AppLogger.shared.error("Reflection", "Failed: \(error.localizedDescription)")
-            }
-        }
-    }
-
-    private func persistReflection(_ content: String, date: String) {
-        reflection = content
-        reflectionDate = date
-        reflectionIsFallback = false
-        let defaults = UserDefaults.standard
-        defaults.set(content, forKey: Self.cachedReflectionKey)
-        defaults.set(date, forKey: Self.cachedReflectionDateKey)
-    }
-
     // MARK: - Profile
 
     private var profileMenuButton: some View {
@@ -525,67 +391,33 @@ struct HomeView: View {
         }
         .buttonStyle(.plain)
         .fixedSize()
-        .accessibilityLabel("Profile menu")
-    }
-
-    /// Bell-icon entry to the in-app notifications inbox.
-    ///
-    /// The bell sits inside a circular parchment chip whose geometry
-    /// (36pt diameter, 2pt sacredGold-opacity-0.42 stroke) is identical
-    /// to the profile avatar — so the two toolbar elements read as a
-    /// paired set of circles, not "outline glyph next to filled image".
-    /// The avatar carries a face, the bell carries a glyph; same form,
-    /// different content.
-    ///
-    /// Two visual states, driven by content:
-    ///   - empty inbox: outlined bell, calm and restrained
-    ///   - unread > 0: filled bell + bindi-like gold dot anchored to
-    ///     the chip's rim. The icon literally fills *because* there's
-    ///     something waiting — no iOS-style red badge.
-    private var notificationsBellButton: some View {
-        NavigationLink(destination: NotificationsView()) {
-            ZStack(alignment: .topTrailing) {
-                Circle()
-                    .fill(Color.sacredBgCard.opacity(0.72))
-                    .overlay(
-                        Image(systemName: notifications.unreadCount > 0 ? "bell.fill" : "bell")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.sacredGold)
-                    )
-                    .frame(width: 36, height: 36)
-                    // Shared chrome — gold ring + drop shadow. Same
-                    // modifier ProfileAvatarImage uses, so if the chip
-                    // geometry ever changes there's only one place to
-                    // update.
-                    .sacredCircularChrome()
-                    .frame(width: 44, height: 44)   // 44pt touch target
-
-                if notifications.unreadCount > 0 {
-                    // Bindi-like sacred dot now sits ON the chip's rim,
-                    // not floating in space. Offset places it at the
-                    // chip's ~1:30 position, overlapping the gold border.
-                    Circle()
-                        .fill(LinearGradient.sacredGoldShinyVertical)
-                        .frame(width: 10, height: 10)
-                        .overlay(Circle().stroke(Color.sacredBg, lineWidth: 2))
-                        .shadow(color: .sacredGold.opacity(0.45), radius: 3)
-                        .offset(x: -4, y: 4)
-                }
-            }
-        }
-        .buttonStyle(.plain)
         .accessibilityLabel(
             notifications.unreadCount > 0
-                ? "Notifications, \(notifications.unreadCount) unread"
-                : "Notifications"
+                ? "Profile menu, \(notifications.unreadCount) unread notifications"
+                : "Profile menu"
         )
     }
 
+    /// Single toolbar chip — the user's avatar doubles as the notifications
+    /// signal. Unread notifications light the same bindi-style gold dot
+    /// that used to sit on the bell chip; tap opens the profile menu,
+    /// which carries the notifications row at the top.
     @ViewBuilder
     private var profileMenuAvatar: some View {
-        ProfileAvatarImage(rawUrl: profile.profile?.avatarUrl, size: 36, shadow: true)
-        .frame(width: 44, height: 44)
-        .contentShape(Circle())
+        ZStack(alignment: .topTrailing) {
+            ProfileAvatarImage(rawUrl: profile.profile?.avatarUrl, size: 36, shadow: true)
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
+
+            if notifications.unreadCount > 0 {
+                Circle()
+                    .fill(LinearGradient.sacredGoldShinyVertical)
+                    .frame(width: 10, height: 10)
+                    .overlay(Circle().stroke(Color.sacredBg, lineWidth: 2))
+                    .shadow(color: .sacredGold.opacity(0.45), radius: 3)
+                    .offset(x: -4, y: 4)
+            }
+        }
     }
 
     // MARK: - Whole-day context
@@ -615,22 +447,16 @@ private struct ProfileNavTarget: Identifiable, Hashable {
     var id: UUID { connectionId }
 }
 
-private struct DailyReflectionResponse: Decodable {
-    let content: String?
-    let fallback: FallbackReflection?
-
-    struct FallbackReflection: Decodable {
-        let content: String
-        let date: String
-    }
-}
-
-
 // MARK: - Profile menu sheet
 
 /// Identity-scoped surface on Home: birth chart, settings, sign out.
 /// Owns its own NavigationStack so pushes stay inside the sheet.
 struct ProfileMenuSheet: View {
+    /// Passed in from Home so the Notifications row can show the same
+    /// unread count that drives the toolbar avatar's bindi dot. Single
+    /// source of truth (HomeView's NotificationsViewModel); the sheet
+    /// just renders it.
+    let unreadNotifications: Int
     @EnvironmentObject var auth: AuthService
     @EnvironmentObject var profile: ProfileService
     @Environment(\.dismiss) private var dismiss
@@ -747,6 +573,19 @@ struct ProfileMenuSheet: View {
 
     private var menuList: some View {
         VStack(spacing: 0) {
+            NavigationLink(destination: NotificationsView()) {
+                menuRow(
+                    icon: unreadNotifications > 0 ? "bell.fill" : "bell",
+                    label: "Notifications",
+                    subtitle: unreadNotifications > 0
+                        ? "\(unreadNotifications) unread"
+                        : "Inbox"
+                )
+            }
+            .buttonStyle(.plain)
+
+            Divider().padding(.leading, 52)
+
             if let email = auth.user?.email {
                 accountHeader(email: email)
 

@@ -12,7 +12,7 @@ The core feature of ShantiSangha. A conversational AI that helps users process e
 - User creates a conversation and sends messages
 - Backend streams responses via Server-Sent Events (SSE) using GPT-4o
 - Messages are stored as conversation history for the user
-- The companion uses current goals, today's reflection, and Jyotish context when available
+- The companion uses the user's display name + recent conversation history for context
 - Each conversation belongs to one user, identified via JWT `sub` claim
 
 ## Key files

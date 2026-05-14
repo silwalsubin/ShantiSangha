@@ -12,9 +12,9 @@ public class NotificationsDbContext(DbContextOptions<NotificationsDbContext> opt
         mb.Entity<AppNotification>(e =>
         {
             // Module-prefixed table name to avoid collisions with the
-            // existing Identity SafetyEvents / Wellness DailyReflections /
-            // anything else in the same Postgres database. Same lesson the
-            // Friends module learned the hard way.
+            // existing Identity SafetyEvents / anything else in the same
+            // Postgres database. Same lesson the Friends module learned
+            // the hard way.
             e.ToTable("AppNotifications");
 
             // Unread-badge query: count rows where RecipientUserId = me AND

@@ -4,7 +4,7 @@
 Connect with people you trust and message them inside the app — text, images, and voice. This is the deliberate social surface; everything else in ShantiSangha remains a private solo space.
 
 ## Value
-- Bring trusted people into your practice circle without leaking your solo records (journals, AI chats, reflections)
+- Bring trusted people into your practice circle without leaking your solo records (journals, AI chats)
 - Each message is deliberately authored for the recipient — a sharp boundary against the rest of your private content
 - Privacy by default: friend messages bypass the AI entirely, are never embedded or indexed, and are hard-deleted when the friendship ends
 
@@ -19,7 +19,7 @@ Connect with people you trust and message them inside the app — text, images, 
 
 ## What friends see / never see
 - **See**: Display Name, messages sent to/from each other in the chat thread
-- **Never see**: journal entries, AI chat history, voice notes (solo), reflections, goal titles, goal counts, streaks, deeper-why text, calendar history
+- **Never see**: journal entries, AI chat history, voice notes (solo), reminders, calendar history
 
 ## Privacy guarantees
 - Friend messages are NEVER sent to OpenAI / Anthropic / any model provider

@@ -80,12 +80,10 @@ public static class SystemPrompt
         Remember: you are not here to fix anyone. You are here to walk beside them.
         """;
 
-    public static string WithContext(
-        string? displayName,
-        string? todaysReflection)
+    public static string WithContext(string? displayName)
     {
         // Stablest content first so OpenAI's automatic prompt caching can match
-        // the prefix across turns: Base → name → reflection.
+        // the prefix across turns: Base → name.
         var parts = new List<string> { Base };
 
         if (displayName is not null)
@@ -93,19 +91,6 @@ public static class SystemPrompt
                 ## About this person
                 Their name is {displayName}. Use it naturally in conversation when it feels
                 right — not in every response.
-                """);
-
-        if (!string.IsNullOrWhiteSpace(todaysReflection))
-            parts.Add($"""
-                ## The reflection shown to them on Home today
-                When this person opened the app today, they read this reflection written for them:
-
-                "{todaysReflection}"
-
-                This is the AI-generated observation they saw first. They may reference it
-                ("what you said about X", "that pattern you mentioned"). Be ready to discuss
-                it. You can build on it, but do not simply repeat it — they already read it.
-                If they don't bring it up, don't force it in.
                 """);
 
         return string.Join("\n\n---\n\n", parts);

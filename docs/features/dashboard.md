@@ -1,27 +1,23 @@
 # Home
 
 ## Purpose
-The daily landing page. Sets the tone for the user's practice and surfaces the two things that matter today: the reflection and the practices.
+The daily landing page. Sets the tone for the day and surfaces what's coming next from the user's reminder list.
 
 ## Value
 - First thing users see — determines if they engage or leave
-- The daily reflection gives them a reason to open the app (something they didn't ask for, written about them)
-- Practice progress circles show at-a-glance whether today's discipline is done
-- Quick check-in actions reduce friction
+- A clean view of upcoming reminders (birthdays, bills, appointments, todos) so the user knows what their day and week hold
+- Quick access to the AI assistant via the chat pill at the bottom
 
 ## How it works
-- Time-aware greeting (morning/afternoon/evening)
-- Daily reflection card below the greeting (see `docs/features/reflection.md`)
-- Progress circles for recurring practices and one-time goals
-- Check-in flow for each practice/goal
-- FAB for adding a new task
-- Evening nudge card appears after 6 PM if practices are still undone
+- Time-aware greeting (morning/afternoon/evening) above the day's date stamp
+- Upcoming reminders list — overdue, due today, and the next 7/30-day horizon
+- Chat pill above the tab bar — tap to talk to the AI agent, press-and-hold the mic to dictate
+- Profile avatar in the top-right opens the profile menu; carries a bindi dot when there are unread notifications
 
 ## Key files
 - iOS: `ios/ShantiSangha/Views/HomeView.swift`
 - Frontend: `frontend/src/pages/app/home.vue`
 
 ## Data sources
-- `/api/reflection/today?date=YYYY-MM-DD` — today's AI reflection
-- `/api/goals/today?date=YYYY-MM-DD` — today's recurring practices
-- `/api/goals?date=YYYY-MM-DD` — all goals (for milestone circle)
+- `/api/reminders` — full reminder list (filtered client-side by horizon)
+- `/api/notifications/unread-count` — drives the avatar bindi dot

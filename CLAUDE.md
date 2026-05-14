@@ -2,8 +2,7 @@
 
 ## Features
 See `docs/features/` for detailed feature documentation (purpose, value, how it works, key files, API endpoints).
-- [Home](docs/features/dashboard.md) — daily landing page with reflection and reminders
-- [Reflection](docs/features/reflection.md) — AI-generated daily observation drawn from the user's real data
+- [Home](docs/features/dashboard.md) — daily landing page with reminders
 - [Chat](docs/features/chat.md) — AI spiritual companion (GPT-4o, SSE streaming)
 - [Journal](docs/features/journal.md) — private reflection writing
 - Reminders — date-based one-time or yearly nudges (bills, birthdays, appointments)

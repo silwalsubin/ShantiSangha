@@ -18,13 +18,12 @@ public class JournalPromptController(
     WellnessDbContext db,
     ICurrentUser currentUser,
     Kernel kernel,
-    IReflectionQueryService reflectionQuery,
     ILogger<JournalPromptController> logger) : ControllerBase
 {
     /// <summary>
-    /// Returns a one-sentence journal prompt personalized to the user, cached
-    /// once per user per day. If no context is available (new user), returns
-    /// null and the client falls back to its static prompt list.
+    /// Returns a one-sentence journal prompt for the user, cached once per
+    /// user per day. The prompt is a generic invitation since the app no
+    /// longer maintains a per-user daily context to anchor on.
     /// </summary>
     [HttpGet("prompt")]
     public async Task<IActionResult> GetPrompt([FromQuery] string? date, CancellationToken ct)
@@ -44,14 +43,6 @@ public class JournalPromptController(
         if (cached is not null)
             return Ok(new { Prompt = cached });
 
-        var todaysReflection = await reflectionQuery.GetRecentReflectionAsync(user.Id, ct);
-
-        // If the user has no context at all, return null — client falls back.
-        if (string.IsNullOrWhiteSpace(todaysReflection))
-            return Ok(new { Prompt = (string?)null });
-
-        var context = $"Today's reflection: \"{todaysReflection}\"";
-
         try
         {
             var chat = kernel.GetRequiredService<IChatCompletionService>(AiModels.FastServiceId);
@@ -62,8 +53,6 @@ public class JournalPromptController(
 
                 Rules:
                 - ONE sentence. Under 20 words. A question or invitation.
-                - Be SPECIFIC to their context — reference today's reflection.
-                  Generic prompts are worthless.
                 - Never give advice. Never mention what they haven't done.
                 - Never use exclamation marks. No emojis.
                 - Tone: warm, curious, unhurried. Like a friend asking the right
@@ -82,7 +71,7 @@ public class JournalPromptController(
 
                 Respond with ONLY the prompt. Nothing else.
                 """);
-            history.AddUserMessage($"Context about this person:\n{context}");
+            history.AddUserMessage("Write a fresh journal prompt for today.");
 
             var result = await chat.GetChatMessageContentAsync(history, cancellationToken: ct);
             var prompt = result.Content?.Trim().Trim('"').Trim();

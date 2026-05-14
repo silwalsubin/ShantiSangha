@@ -17,7 +17,6 @@ public class ChatService(
     ChatDbContext db,
     Kernel kernel,
     ISafetyService safety,
-    IReflectionQueryService reflectionQuery,
     IProfileQueryService profileQuery,
     IEventBus eventBus,
     ILogger<ChatService> logger) : IChatService
@@ -137,26 +136,17 @@ public class ChatService(
         string? currentMessage = null)
     {
         string? displayName = null;
-        string? todaysReflection = null;
 
         try
         {
-            var displayNameTask = profileQuery.GetDisplayNameAsync(userId, cancellationToken);
-            var reflectionTask = reflectionQuery.GetRecentReflectionAsync(userId, cancellationToken);
-
-            await Task.WhenAll(displayNameTask, reflectionTask);
-
-            displayName = displayNameTask.Result;
-            todaysReflection = reflectionTask.Result;
+            displayName = await profileQuery.GetDisplayNameAsync(userId, cancellationToken);
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to load some context for conversation {ConversationId} — continuing with partial context", conversationId);
         }
 
-        var systemPrompt = SystemPrompt.WithContext(
-            displayName: displayName,
-            todaysReflection: todaysReflection);
+        var systemPrompt = SystemPrompt.WithContext(displayName: displayName);
 
         var history = new ChatHistory(systemPrompt);
 

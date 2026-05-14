@@ -8,7 +8,7 @@ People share their deepest fears, struggles, and vulnerabilities here — things
 
 ## Rules
 
-- **Solo content is never shared with another user.** Journal entries, AI chat history, voice notes, daily reflections, goal titles, and "deeper why" text are NEVER visible to anyone else. This is the user's private record of self, and it stays private no matter who their friends are.
+- **Solo content is never shared with another user.** Journal entries, AI chat history, voice notes, and reminders are NEVER visible to anyone else. This is the user's private record of self, and it stays private no matter who their friends are.
 - **No analytics on content** — we may track usage events (taps, sessions) but NEVER analyze the content of conversations, journals, voice notes, or friend messages for business purposes
 - **AI conversations are private** — the AI processes content to respond, but nothing is stored beyond what the user sees in their own account
 - **Limited public identity, no public profile page.** Any signed-in user can search the directory by display name + location and find your Display Name, avatar, and city/state/country. Beyond that, there is no public profile page, no follower counts, no follower graph, and no way to see who else is in another user's friend list.
@@ -20,7 +20,7 @@ People share their deepest fears, struggles, and vulnerabilities here — things
 A user may consciously connect with other users as Friends. Once connected, friends can send each other text, images, and voice messages. This is the ONLY social surface the app permits, and the boundary between "solo content" and "friend content" is sharp:
 
 - **What a friend sees about you:** your chosen Display Name, and the messages you have explicitly sent to them. Nothing else.
-- **What a friend NEVER sees:** journal entries, AI chat history, voice notes (the solo kind), daily reflections, goal titles, goal counts, streaks, "deeper why" text, calendar history, or anything else you wrote for yourself rather than for them.
+- **What a friend NEVER sees:** journal entries, AI chat history, voice notes (the solo kind), reminders, calendar history, or anything else you wrote for yourself rather than for them.
 - **Friend messages are deliberately authored content.** Sending a text, image, or voice message to a friend is an explicit, per-message act of disclosure. This is categorically different from your solo records, which are never shared.
 - **Friendships are private to the pair.** Friend A cannot see who else is in your friend list. There is no friend graph, no friends-of-friends, no public list. Each friendship row is independent.
 - **Symmetric and ephemeral.** Either side can end a friendship at any time. When they do, the message thread is hard-deleted on both sides, the read grant is revoked, and stored media (images, voice files) is removed from object storage. No notification — the connection simply disappears.
@@ -35,11 +35,11 @@ Any signed-in user can search the directory of all users by display name and opt
 - Avatar (default initials circle if not set)
 - City / State / Country (if the user has set them via the location gate)
 
-Search NEVER exposes: email address, friend list, message history, journal entries, AI chats, voice notes, reflections, goal data, streaks, birth details, timezone, reminder schedule, push tokens, or anything other than the four fields listed above. Existing friends and your own row are filtered out of results so search is a discovery tool, not a directory of your existing relationships.
+Search NEVER exposes: email address, friend list, message history, journal entries, AI chats, voice notes, reminders, push tokens, or anything other than the four fields listed above. Existing friends and your own row are filtered out of results so search is a discovery tool, not a directory of your existing relationships.
 
 ## How this shows up in the product
 
-- The app never asks users to share their reflections
+- The app never asks users to share their journals, voice notes, or AI chats
 - No "share to social" buttons anywhere
 - The privacy page is written in warm, human language — not legalese
 - Empty states say "this is your private space" to reinforce safety

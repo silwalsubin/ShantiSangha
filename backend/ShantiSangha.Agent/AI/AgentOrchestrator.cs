@@ -11,7 +11,6 @@ using ShantiSangha.Reminders.Services;
 using ShantiSangha.Shared;
 using ShantiSangha.Shared.Interfaces;
 using ShantiSangha.Tools.Circles;
-using ShantiSangha.Tools.Reflection;
 using ShantiSangha.Tools.Reminders;
 
 namespace ShantiSangha.Agent.AI;
@@ -58,9 +57,6 @@ public class AgentOrchestrator(
         scopedKernel.Plugins.AddFromObject(
             services.GetRequiredService<CirclesTool>(),
             pluginName: "circles");
-        scopedKernel.Plugins.AddFromObject(
-            services.GetRequiredService<ReflectionTool>(),
-            pluginName: "reflection");
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var history = new ChatHistory(AgentSystemPrompt.Build(today, displayName));

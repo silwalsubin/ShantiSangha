@@ -19,38 +19,12 @@ final class AgentChatService {
         let attachedReminders: [Reminder]?
     }
 
-    struct MorningResponse: Decodable {
-        let greeted: Bool
-        let message: HistoryMessage?
-    }
-
     /// One frame in the live reply stream — either a chunk of prose or a
     /// list of reminders the assistant referenced and the app should
     /// render as interactive cards.
     enum StreamEvent {
         case text(String)
         case reminders([Reminder])
-    }
-
-    /// Asks the server whether today's reflection should be surfaced as
-    /// the first assistant turn. Idempotent — server gates on "any
-    /// assistant message from today already exists." Returns the new
-    /// message to append, or nil if nothing to show (already greeted, or
-    /// no reflection available yet).
-    func morningGreeting() async throws -> HistoryMessage? {
-        let token = try await Auth.auth().currentUser?.getIDToken()
-        let baseURL = await ApiService.shared.getBaseURL()
-        guard let url = URL(string: "\(baseURL)/agent/morning") else {
-            throw URLError(.badURL)
-        }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        if let token {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        let (data, _) = try await URLSession.shared.data(for: request)
-        let resp = try JSONDecoder().decode(MorningResponse.self, from: data)
-        return resp.message
     }
 
     func fetchHistory() async throws -> [HistoryMessage] {

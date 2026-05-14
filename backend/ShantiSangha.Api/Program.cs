@@ -57,7 +57,7 @@ try
     // Two chat models are registered under named service keys so each surface
     // can pick the right tier: Smart (gpt-4o) for synthesis-heavy work (chart
     // chat, chart reading), Fast (gpt-4o-mini) for short stylistic output
-    // (titles, summaries, reflections, journal prompts). See Shared/AiModels.cs.
+    // (titles, summaries, journal prompts). See Shared/AiModels.cs.
 #pragma warning disable SKEXP0010
     var kernelBuilder = builder.Services.AddKernel()
         .AddOpenAIChatCompletion(AiModels.SmartModel, appConfig.OpenAiApiKey, serviceId: AiModels.SmartServiceId)
@@ -273,20 +273,6 @@ try
     {
         var recurring = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
 
-        // Runs hourly; pre-generates daily reflections overnight in each user's
-        // local timezone so first-open is instant.
-        recurring.AddOrUpdate<ShantiSangha.Wellness.Jobs.ScheduleDailyReflectionsJob>(
-            "pregenerate-daily-reflections",
-            job => job.RunAsync(),
-            "0 * * * *");
-
-        // Runs hourly; sends today's reflection to each user's lock screen at
-        // their configured reminder hour (local time).
-        recurring.AddOrUpdate<ShantiSangha.Wellness.Jobs.SendMorningReflectionPushJob>(
-            "morning-reflection-push",
-            job => job.RunAsync(),
-            "0 * * * *");
-
         if (appConfig.WisecatEnabled)
         {
             // Wise Cat — pulls only the bars we don't already have, then
@@ -450,30 +436,6 @@ try
     {
         jobs.Enqueue<ShantiSangha.Trading.Jobs.GenerateDailyTradingSignalsJob>(j => j.RunAsync());
         return Results.Ok(new { triggered = "GenerateDailyTradingSignalsJob" });
-    }).RequireAuthorization();
-
-    // Debug: Force-regenerate reflection (deletes today's reflection, then enqueues job)
-    app.MapPost("/api/debug/hangfire/test-reflection", async (HttpContext ctx, IBackgroundJobClient jobs) =>
-    {
-        var currentUser = ctx.RequestServices.GetRequiredService<ShantiSangha.Shared.Interfaces.ICurrentUser>();
-        var user = await currentUser.GetAsync();
-        var userId = user!.Id;
-        var utcToday = DateOnly.FromDateTime(DateTime.UtcNow);
-        var yesterday = utcToday.AddDays(-1);
-        var tomorrow = utcToday.AddDays(1);
-
-        var wellnessDb = ctx.RequestServices.GetRequiredService<ShantiSangha.Wellness.Data.WellnessDbContext>();
-        var existing = await wellnessDb.DailyReflections
-            .Where(r => r.UserId == userId && r.Date >= yesterday && r.Date <= tomorrow)
-            .ToListAsync();
-        if (existing.Count > 0)
-        {
-            wellnessDb.DailyReflections.RemoveRange(existing);
-            await wellnessDb.SaveChangesAsync();
-        }
-
-        jobs.Enqueue<ShantiSangha.Wellness.Jobs.GenerateDailyReflectionJob>(j => j.RunAsync(userId, (DateOnly?)null));
-        return Results.Ok(new { triggered = "GenerateDailyReflectionJob", userId, deleted = existing.Count });
     }).RequireAuthorization();
 
     // Health check at root (no /api prefix)

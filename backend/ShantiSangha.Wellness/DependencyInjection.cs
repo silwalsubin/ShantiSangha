@@ -1,9 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using ShantiSangha.Shared.Interfaces;
 using ShantiSangha.Wellness.Data;
-using ShantiSangha.Wellness.Jobs;
 using ShantiSangha.Wellness.Services;
 using ShantiSangha.Wellness.Storage;
 
@@ -27,11 +25,6 @@ public static class DependencyInjection
         });
 
         services.AddScoped<IVoiceService, VoiceService>();
-        services.AddScoped<IReflectionQueryService, ReflectionQueryService>();
-        services.AddScoped<GenerateDailyReflectionJob>();
-        services.AddScoped<GeneratePortraitJob>();
-        services.AddScoped<ScheduleDailyReflectionsJob>();
-        services.AddScoped<SendMorningReflectionPushJob>();
 
         return services;
     }

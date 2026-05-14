@@ -51,7 +51,7 @@ public interface IProfileQueryService
 
     /// <summary>
     /// Returns all user profiles that have a reminder hour set (non-null),
-    /// along with their timezone. Used by the morning reflection push job.
+    /// along with their timezone. Used by daily push-notification jobs.
     /// </summary>
     Task<IReadOnlyList<UserReminderInfo>> GetUsersWithRemindersAsync(CancellationToken ct = default);
 }

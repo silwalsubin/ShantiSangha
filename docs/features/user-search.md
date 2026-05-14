@@ -17,7 +17,7 @@ Find people on ShantiSangha by name and (optional) location, so you can connect 
 
 ## What search shows / never shows
 - **Shows**: Display Name, avatar (or default initials circle), city/state/country
-- **Never shows**: email, friend list, messages, journals, AI chats, voice notes, reflections, goals, streaks, birth details, timezone, push tokens, or anything other than the four fields above
+- **Never shows**: email, friend list, messages, journals, AI chats, voice notes, reminders, push tokens, or anything other than the four fields above
 
 ## Filters
 - Existing friends are excluded from results

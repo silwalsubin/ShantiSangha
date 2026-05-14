@@ -14,10 +14,6 @@ enum SilentPushHandler {
         let api = ApiService.shared
 
         switch type {
-        case "reflection":
-            // Reflection is no longer surfaced in the widget; the in-app
-            // notification path below still wakes HomeView to refetch.
-            break
         case "voice":
             // Voice transcription completed — no widget data to update,
             // but reload timelines in case we add voice data to widget later

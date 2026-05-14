@@ -8,7 +8,7 @@ namespace ShantiSangha.Shared;
 /// Keep the number of tiers small. Smart = synthesis quality matters (chart
 /// reading, chart chat). Fast = short stylistic output where a larger model
 /// would be ~15× more expensive for no measurable quality win (titles,
-/// summaries, short reflections, journal prompts).
+/// summaries, journal prompts).
 /// </summary>
 public static class AiModels
 {

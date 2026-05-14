@@ -6,7 +6,7 @@ public class Profile
     public Guid UserId { get; set; }
     public string? DisplayName { get; set; }
     public string? Timezone { get; set; }
-    /// <summary>Local-time hour (0–23) at which the user wants their morning reflection push. Null = no morning push.</summary>
+    /// <summary>Local-time hour (0–23) at which the user wants their daily reminder push. Null = no morning push.</summary>
     public int? ReminderHour { get; set; }
     public bool NotifyOnFriendMessages { get; set; } = true;
     public bool OnboardingCompleted { get; set; }

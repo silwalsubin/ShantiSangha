@@ -184,10 +184,6 @@ struct SettingsView: View {
                         } else {
                             infoRow(icon: "hourglass", label: "Fetching…", value: "")
                         }
-                        Text("Your reflection will learn to sense the weather you're living under.")
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredMuted)
-                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
 

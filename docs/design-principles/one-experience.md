@@ -15,16 +15,17 @@ A spiritual practice should feel effortless — open the app, ground yourself, r
 - **Unified timeline** — conversations, journals, and voice notes appear together in Reflect, not in separate silos
 - **Smooth transitions** — fade between tabs (0.15s ease) so navigation feels like flowing, not jumping
 - **Consistent card patterns** — same rounded corners, same shadows, same interaction feedback everywhere
-- **Empty states are invitations** — "Start your first reflection" not "No data found"
+- **Empty states are invitations** — "Begin your first entry" not "No data found"
 
 ## The flow
 
 ```
 Open app
-  → Home: ground yourself (daily reflection, check in on practices)
+  → Home: ground yourself (see what's coming up today)
     → Reflect: process what you feel (talk, write, or speak)
-      → Journey: see how you've grown (practice history and fulfilled commitments)
-        → Home: tomorrow, begin again
+      → Calendar: hold the shape of your week
+        → Circles: stay in touch with your people
+          → Home: tomorrow, begin again
 ```
 
 This is not a linear funnel. Users can enter at any tab. But the *feeling* should be circular — a daily practice that brings you back.

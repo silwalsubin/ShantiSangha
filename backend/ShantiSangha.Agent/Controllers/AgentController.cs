@@ -22,7 +22,6 @@ public class AgentController(
     AgentDbContext db,
     ICurrentUser currentUser,
     IReminderService reminders,
-    IReflectionQueryService reflections,
     ILogger<AgentController> logger) : ControllerBase
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -178,61 +177,4 @@ public class AgentController(
         return NoContent();
     }
 
-    /// <summary>
-    /// Seed today's morning reflection as the first assistant turn if the
-    /// user hasn't seen anything from the agent yet today. Idempotent —
-    /// safe to call on every screen mount. The greeting is persisted in
-    /// AgentMessages so it counts toward the replay window and survives
-    /// reloads.
-    /// </summary>
-    [HttpPost("morning")]
-    public async Task<IActionResult> Morning(CancellationToken ct = default)
-    {
-        var user = await currentUser.GetAsync();
-        if (user is null) return Unauthorized();
-
-        // "Today" approximated as UTC midnight. iOS-local TZ refinements
-        // can come later — V1 just gates against same-UTC-day repeats.
-        var todayUtc = DateTime.UtcNow.Date;
-        var alreadyGreeted = await db.AgentMessages
-            .AnyAsync(m =>
-                m.UserId == user.Id &&
-                m.Role == AgentMessageRole.Assistant &&
-                m.CreatedAt >= todayUtc, ct);
-
-        if (alreadyGreeted)
-        {
-            return Ok(new { greeted = true });
-        }
-
-        var reflection = await reflections.GetRecentReflectionAsync(user.Id, ct);
-        if (string.IsNullOrWhiteSpace(reflection))
-        {
-            return Ok(new { greeted = false, message = (object?)null });
-        }
-
-        var content = $"Good morning. Here's the reflection for today:\n\n{reflection.Trim()}";
-
-        var row = new AgentMessage
-        {
-            Id = Guid.NewGuid(),
-            UserId = user.Id,
-            Role = AgentMessageRole.Assistant,
-            Content = content,
-            CreatedAt = DateTime.UtcNow,
-        };
-        db.AgentMessages.Add(row);
-        await db.SaveChangesAsync(ct);
-
-        return Ok(new
-        {
-            greeted = false,
-            message = new
-            {
-                role = "assistant",
-                content = row.Content,
-                attachedReminders = Array.Empty<object>(),
-            },
-        });
-    }
 }
