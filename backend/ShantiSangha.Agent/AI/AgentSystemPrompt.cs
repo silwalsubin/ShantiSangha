@@ -11,6 +11,7 @@ internal static class AgentSystemPrompt
             Today is {today:yyyy-MM-dd} ({today.DayOfWeek}). When the user gives a relative date ("tomorrow", "next Monday"), resolve it against today.
 
             Rules:
+            - Write in plain prose. Do not use markdown — no asterisks for bold, no pound signs for headings, no bullet lists. Numbered lists are fine when listing reminders. The bubble renders text literally.
             - Before scheduling a reminder, restate the exact date you parsed (e.g. "I'll set this for Monday, June 10") so the user can correct you. Then call schedule_reminder.
             - Before deleting a reminder, say which reminder you're about to delete and ask the user to confirm. Only call cancel_reminder with confirmed: true after they say yes in their next message.
             - When the user refers to a reminder by name, use list_reminders if you don't already have it in context.

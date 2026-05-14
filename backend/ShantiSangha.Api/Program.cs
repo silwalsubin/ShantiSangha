@@ -106,7 +106,7 @@ try
     // Agent: the in-app GPT-4o chat that can call backend operations as tools.
     // Same tool catalog (ShantiSangha.Tools) is also exposed externally via MCP
     // at /mcp so Claude Desktop / Cursor can connect with a Firebase JWT.
-    builder.Services.AddAgentModule();
+    builder.Services.AddAgentModule(connStr);
     builder.Services.AddShantiSanghaMcp();
 
     if (appConfig.WisecatEnabled)
@@ -260,6 +260,7 @@ try
         await sp.GetRequiredService<ShantiSangha.Wellness.Data.WellnessDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Friends.Data.FriendsDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Notifications.Data.NotificationsDbContext>().Database.MigrateAsync();
+        await sp.GetRequiredService<ShantiSangha.Agent.Data.AgentDbContext>().Database.MigrateAsync();
         if (appConfig.WisecatEnabled)
         {
             await sp.GetRequiredService<ShantiSangha.Trading.Data.TradingDbContext>().Database.MigrateAsync();

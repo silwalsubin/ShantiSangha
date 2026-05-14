@@ -3,16 +3,24 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using ShantiSangha.Agent.AI;
 using ShantiSangha.Agent.Contracts;
+using ShantiSangha.Agent.Data;
+using ShantiSangha.Agent.Models;
+using ShantiSangha.Shared.Interfaces;
 
 namespace ShantiSangha.Agent.Controllers;
 
 [ApiController]
 [Authorize]
 [Route("api/agent")]
-public class AgentController(AgentOrchestrator orchestrator, ILogger<AgentController> logger) : ControllerBase
+public class AgentController(
+    AgentOrchestrator orchestrator,
+    AgentDbContext db,
+    ICurrentUser currentUser,
+    ILogger<AgentController> logger) : ControllerBase
 {
     [HttpPost("chat")]
     public async Task Chat(
@@ -72,5 +80,39 @@ public class AgentController(AgentOrchestrator orchestrator, ILogger<AgentContro
             return "I'm temporarily unavailable — the language model is out of capacity. Please try again later.";
         }
         return "Something went wrong. Please try again.";
+    }
+
+    [HttpGet("messages")]
+    public async Task<IActionResult> GetMessages(CancellationToken ct = default)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+
+        var messages = await db.AgentMessages
+            .Where(m => m.UserId == user.Id)
+            .OrderBy(m => m.CreatedAt)
+            .Select(m => new
+            {
+                id = m.Id,
+                role = m.Role == AgentMessageRole.User ? "user" : "assistant",
+                content = m.Content,
+                createdAt = m.CreatedAt,
+            })
+            .ToListAsync(ct);
+
+        return Ok(messages);
+    }
+
+    [HttpDelete("messages")]
+    public async Task<IActionResult> ClearMessages(CancellationToken ct = default)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+
+        await db.AgentMessages
+            .Where(m => m.UserId == user.Id)
+            .ExecuteDeleteAsync(ct);
+
+        return NoContent();
     }
 }

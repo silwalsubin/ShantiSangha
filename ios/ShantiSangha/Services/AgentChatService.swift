@@ -1,16 +1,47 @@
 import Foundation
 import FirebaseAuth
 
-/// SSE-streaming client for the in-app agent at `POST /api/agent/chat`.
-/// Mirrors the framing used by `ChatView.sendMessage`: each event is
-/// `data: <json-encoded string>\n\n`, terminator is `data: [DONE]\n\n`.
+/// SSE-streaming client for the in-app agent at `POST /api/agent/chat`,
+/// plus history fetch + clear at `GET/DELETE /api/agent/messages`.
 ///
-/// The agent endpoint is stateless from the client's perspective — every
-/// request is one self-contained user message; conversation memory will
-/// be added later if the spike succeeds.
+/// SSE framing matches `ChatView.sendMessage`: each event is
+/// `data: <json-encoded string>\n\n`, terminator is `data: [DONE]\n\n`.
 final class AgentChatService {
     static let shared = AgentChatService()
     private init() {}
+
+    struct HistoryMessage: Decodable {
+        let role: String
+        let content: String
+    }
+
+    func fetchHistory() async throws -> [HistoryMessage] {
+        let token = try await Auth.auth().currentUser?.getIDToken()
+        let baseURL = await ApiService.shared.getBaseURL()
+        guard let url = URL(string: "\(baseURL)/agent/messages") else {
+            throw URLError(.badURL)
+        }
+        var request = URLRequest(url: url)
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        let (data, _) = try await URLSession.shared.data(for: request)
+        return try JSONDecoder().decode([HistoryMessage].self, from: data)
+    }
+
+    func clearHistory() async throws {
+        let token = try await Auth.auth().currentUser?.getIDToken()
+        let baseURL = await ApiService.shared.getBaseURL()
+        guard let url = URL(string: "\(baseURL)/agent/messages") else {
+            throw URLError(.badURL)
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        _ = try await URLSession.shared.data(for: request)
+    }
 
     /// Streams the assistant's reply token-by-token. Throws on transport
     /// errors; the caller is expected to surface a friendly fallback.

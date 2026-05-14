@@ -2,13 +2,15 @@ import SwiftUI
 
 /// Agent chat — the in-app surface where GPT-4o can call backend
 /// operations as tools. Spike scope: Reminders only (list / schedule /
-/// reschedule / cancel). Stateless per turn — no conversation history
-/// is persisted in this iteration.
+/// reschedule / cancel). Server persists the last N turns per user so
+/// follow-ups like "move that to next Friday" resolve correctly.
 struct AgentChatView: View {
     @State private var messages: [AgentMessage] = []
     @State private var inputText = ""
     @State private var sending = false
+    @State private var loadingHistory = true
     @State private var failedSendText: String?
+    @State private var showClearConfirmation = false
 
     var body: some View {
         ZStack {
@@ -24,6 +26,32 @@ struct AgentChatView: View {
         .navigationTitle("Assistant")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if !messages.isEmpty {
+                    Button {
+                        showClearConfirmation = true
+                    } label: {
+                        Image(systemName: "arrow.counterclockwise")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
+                    }
+                }
+            }
+        }
+        .task { await loadHistory() }
+        .confirmationDialog(
+            "Start fresh?",
+            isPresented: $showClearConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Clear conversation", role: .destructive) {
+                Task { await clearHistory() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This deletes everything you've said to the assistant. It won't touch your reminders.")
+        }
     }
 
     // MARK: - Subviews
@@ -32,7 +60,11 @@ struct AgentChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: SacredSpacing.m) {
-                    if messages.isEmpty {
+                    if loadingHistory {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 80)
+                    } else if messages.isEmpty {
                         emptyState
                             .padding(.top, 40)
                     }
@@ -61,6 +93,32 @@ struct AgentChatView: View {
             .onChange(of: messages.last?.content) {
                 proxy.scrollTo("bottom")
             }
+        }
+    }
+
+    private func loadHistory() async {
+        do {
+            let history = try await AgentChatService.shared.fetchHistory()
+            messages = history.map {
+                AgentMessage(
+                    role: $0.role == "user" ? .user : .assistant,
+                    content: $0.content)
+            }
+        } catch {
+            if !error.isCancellation {
+                AppLogger.shared.error("Agent", "History load failed: \(error)")
+            }
+        }
+        loadingHistory = false
+    }
+
+    private func clearHistory() async {
+        do {
+            try await AgentChatService.shared.clearHistory()
+            messages = []
+            failedSendText = nil
+        } catch {
+            AppLogger.shared.error("Agent", "History clear failed: \(error)")
         }
     }
 
