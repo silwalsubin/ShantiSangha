@@ -3,12 +3,14 @@ import SwiftUI
 /// Sacred-styled month calendar used on the Calendar tab and inside the
 /// reminder edit page. Caller owns both the displayed month and the
 /// selected date via bindings; the picker handles month chevrons and a
-/// tap-the-title year picker. Pass `dotCount` when reminder dots should
-/// render on tiles (Calendar tab); leave nil for a clean picker view.
+/// tap-the-title year picker. Pass `dotStates` when reminder dots should
+/// render on tiles (Calendar tab); each entry is `true` for completed
+/// reminders (rendered green) and `false` for pending (rendered gold).
+/// Leave nil for a clean picker view.
 struct MonthCalendarPicker: View {
     @Binding var displayedMonth: Date
     @Binding var selectedDate: Date
-    var dotCount: ((Date) -> Int)? = nil
+    var dotStates: ((Date) -> [Bool])? = nil
 
     private let calendar = Calendar.current
 
@@ -152,7 +154,8 @@ struct MonthCalendarPicker: View {
         let dayNum = calendar.component(.day, from: date)
         let isToday = calendar.isDate(date, inSameDayAs: Date())
         let isSelected = calendar.isDate(date, inSameDayAs: selectedDate)
-        let count = dotCount?(date) ?? 0
+        let states = dotStates?(date) ?? []
+        let count = states.count
 
         return Button {
             selectedDate = date
@@ -183,16 +186,18 @@ struct MonthCalendarPicker: View {
                 }
 
                 if count > 0 {
+                    let visible = Array(states.prefix(3))
+                    let overflowAllCompleted = count > 3 && states.dropFirst(3).allSatisfy { $0 }
                     HStack(spacing: 3) {
-                        ForEach(0..<min(count, 3), id: \.self) { _ in
+                        ForEach(Array(visible.enumerated()), id: \.offset) { _, completed in
                             Circle()
-                                .fill(Color.sacredGold)
+                                .fill(completed ? Color.sacredGreen : Color.sacredGold)
                                 .frame(width: 4, height: 4)
                         }
                         if count > 3 {
                             Text("·")
                                 .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(.sacredGold)
+                                .foregroundColor(overflowAllCompleted ? .sacredGreen : .sacredGold)
                         }
                     }
                     .frame(height: 4)

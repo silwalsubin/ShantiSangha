@@ -169,20 +169,13 @@ struct ReminderRow: View {
     }
 
     /// Replaces the right-side date label when a reminder is completed.
-    /// Small checkmark + "DONE" tag so the row still parses at a glance
-    /// while reading clearly as past-tense.
+    /// Bare green checkmark — the strikethrough on the label already
+    /// reads as past-tense, so no badge chrome is needed.
     private var doneBadge: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "checkmark")
-                .font(.system(size: 10, weight: .semibold))
-            Text("DONE")
-                .font(.sacredSmallSemibold)
-                .tracking(1.5)
-        }
-        .foregroundColor(.sacredGreen)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
-        .background(Capsule().fill(Color.sacredGreen.opacity(0.12)))
+        Image(systemName: "checkmark")
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundColor(.sacredGreen)
+            .padding(.trailing, 4)
     }
 
     private var dueDateLabel: String {

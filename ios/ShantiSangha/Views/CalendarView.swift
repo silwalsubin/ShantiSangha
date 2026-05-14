@@ -13,6 +13,10 @@ struct CalendarView: View {
     @State private var selectedDate = Date()
     @State private var navTarget: ReminderEditTarget?
     @State private var activeSwipeId: String?
+    /// Set when we push to the reminder editor so we know the next
+    /// `onAppear` is a return from that push (not a tab activation) and
+    /// should preserve the user's selection instead of snapping to today.
+    @State private var returningFromEdit = false
 
     private let calendar = Calendar.current
 
@@ -25,7 +29,7 @@ struct CalendarView: View {
                     MonthCalendarPicker(
                         displayedMonth: $displayedMonth,
                         selectedDate: $selectedDate,
-                        dotCount: { remindersForDate($0).count })
+                        dotStates: { remindersForDate($0).map { $0.completedAt != nil } })
                         .padding(.top, 8)
                         .onChange(of: displayedMonth) { _, new in
                             selectedDate = pinSelection(to: new)
@@ -93,6 +97,18 @@ struct CalendarView: View {
             await reminderRepo.refresh()
             await connections.refresh()
         }
+        .onAppear {
+            if returningFromEdit {
+                returningFromEdit = false
+            } else {
+                let today = Date()
+                selectedDate = today
+                displayedMonth = today
+            }
+        }
+        .onDisappear {
+            if navTarget != nil { returningFromEdit = true }
+        }
     }
 
     /// Returns a date guaranteed to live inside `month` — today when today
@@ -114,9 +130,9 @@ struct CalendarView: View {
         return VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text(longDateLabel(selectedDate))
-                    .font(.sacredSectionLabel)
-                    .tracking(3)
-                    .foregroundColor(.sacredLabel)
+                    .font(.system(size: 16, weight: .semibold, design: .serif))
+                    .tracking(0.3)
+                    .foregroundColor(.sacredText)
                 Spacer()
                 Button {
                     navTarget = .new(initialDate: selectedDate)
@@ -148,23 +164,53 @@ struct CalendarView: View {
                 .padding(.horizontal, 4)
                 .padding(.vertical, 8)
             } else {
-                ForEach(Array(items.enumerated()), id: \.element.id) { idx, r in
-                    ReminderRow(
-                        reminder: r,
-                        showDateStamp: true,
-                        avatarUrl: avatarUrl(for: r),
-                        connectionLabel: connectionLabel(for: r),
-                        onTap: { navTarget = .edit(r) },
-                        activeSwipeId: Binding(
-                            get: { activeSwipeId },
-                            set: { activeSwipeId = $0 }
-                        )
+                let pending = items.filter { $0.completedAt == nil }
+                let completed = items.filter { $0.completedAt != nil }
+                if !pending.isEmpty {
+                    section(items: pending, color: .sacredGold, label: "Pending")
+                }
+                if !completed.isEmpty {
+                    section(items: completed, color: .sacredGreen, label: "Done")
+                        .padding(.top, pending.isEmpty ? 0 : 20)
+                }
+            }
+        }
+    }
+
+    /// Headed reminder section — dot + caps label, then the rows with the
+    /// same hairline divider used everywhere else. Pulls double duty as
+    /// both the visual grouping and the dot-color key for the grid above.
+    @ViewBuilder
+    private func section(items: [Reminder], color: Color, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(color)
+                    .frame(width: 7, height: 7)
+                Text(label)
+                    .font(.system(size: 13, weight: .semibold, design: .serif))
+                    .tracking(0.3)
+                    .foregroundColor(.sacredText)
+            }
+            .padding(.horizontal, 4)
+            .padding(.bottom, 12)
+
+            ForEach(Array(items.enumerated()), id: \.element.id) { idx, r in
+                ReminderRow(
+                    reminder: r,
+                    showDateStamp: true,
+                    avatarUrl: avatarUrl(for: r),
+                    connectionLabel: connectionLabel(for: r),
+                    onTap: { navTarget = .edit(r) },
+                    activeSwipeId: Binding(
+                        get: { activeSwipeId },
+                        set: { activeSwipeId = $0 }
                     )
-                    if idx < items.count - 1 {
-                        Divider()
-                            .padding(.leading, 104)
-                            .padding(.trailing, 16)
-                    }
+                )
+                if idx < items.count - 1 {
+                    Divider()
+                        .padding(.leading, 104)
+                        .padding(.trailing, 16)
                 }
             }
         }
@@ -175,7 +221,7 @@ struct CalendarView: View {
     private func longDateLabel(_ date: Date) -> String {
         let f = DateFormatter()
         f.dateFormat = "EEEE, MMMM d"
-        return f.string(from: date).uppercased()
+        return f.string(from: date)
     }
 
     /// Reminders matching `date`. Yearly recurrence matches on month + day
