@@ -6,6 +6,8 @@ using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using ShantiSangha.Agent.Data;
 using ShantiSangha.Agent.Models;
+using ShantiSangha.Reminders.Contracts;
+using ShantiSangha.Reminders.Services;
 using ShantiSangha.Shared;
 using ShantiSangha.Shared.Interfaces;
 using ShantiSangha.Tools.Circles;
@@ -19,12 +21,14 @@ public class AgentOrchestrator(
     IServiceProvider services,
     ICurrentUser currentUser,
     IProfileQueryService profileQuery,
+    IReminderService reminderService,
+    RemindersListSink remindersSink,
     AgentDbContext db)
 {
     private static readonly TimeSpan LoopTimeout = TimeSpan.FromSeconds(45);
     private const int HistoryReplayCount = 20;
 
-    public async IAsyncEnumerable<string> StreamAsync(
+    public async IAsyncEnumerable<AgentStreamEvent> StreamAsync(
         string userMessage,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -103,11 +107,27 @@ public class AgentOrchestrator(
             if (NeedsRoundBreak(assembled, text))
             {
                 assembled.Append("\n\n");
-                yield return "\n\n";
+                yield return new AgentStreamEvent.Text("\n\n");
             }
 
             assembled.Append(text);
-            yield return text;
+            yield return new AgentStreamEvent.Text(text);
+        }
+
+        // After the LLM finishes (and any tool calls have completed), drain
+        // the sink to learn which reminders the assistant referenced. Look
+        // them up live so the cards reflect current state, not whatever the
+        // LLM saw — by the time the user reads the reply, the relevant
+        // truth is now, not the snapshot mid-loop.
+        var attachedReminderIds = remindersSink.Drain();
+        IReadOnlyList<ReminderResponse> attachedReminders = Array.Empty<ReminderResponse>();
+        if (attachedReminderIds.Count > 0)
+        {
+            attachedReminders = await LookupRemindersAsync(user.Id, attachedReminderIds, cancellationToken);
+            if (attachedReminders.Count > 0)
+            {
+                yield return new AgentStreamEvent.Reminders(attachedReminders);
+            }
         }
 
         var assistantContent = assembled.ToString().Trim();
@@ -119,10 +139,29 @@ public class AgentOrchestrator(
                 UserId = user.Id,
                 Role = AgentMessageRole.Assistant,
                 Content = assistantContent,
+                Attachments = AgentMessageAttachmentsCodec.Encode(
+                    new AgentMessageAttachments(
+                        attachedReminders.Count > 0
+                            ? attachedReminders.Select(r => r.Id).ToList()
+                            : null)),
                 CreatedAt = DateTime.UtcNow,
             });
             await db.SaveChangesAsync(CancellationToken.None);
         }
+    }
+
+    private async Task<IReadOnlyList<ReminderResponse>> LookupRemindersAsync(
+        Guid userId, IReadOnlyList<Guid> ids, CancellationToken ct)
+    {
+        if (ids.Count == 0) return Array.Empty<ReminderResponse>();
+        var all = await reminderService.ListAsync(userId, connectionId: null, date: null, ct);
+        var byId = all.ToDictionary(r => r.Id);
+        var ordered = new List<ReminderResponse>(ids.Count);
+        foreach (var id in ids)
+        {
+            if (byId.TryGetValue(id, out var r)) ordered.Add(r);
+        }
+        return ordered;
     }
 
     private static bool NeedsRoundBreak(System.Text.StringBuilder soFar, string next)

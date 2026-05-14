@@ -12,6 +12,7 @@ public static class DependencyInjection
         services.AddScoped<RemindersTool>();
         services.AddScoped<CirclesTool>();
         services.AddScoped<ReflectionTool>();
+        services.AddScoped<RemindersListSink>();
         return services;
     }
 }

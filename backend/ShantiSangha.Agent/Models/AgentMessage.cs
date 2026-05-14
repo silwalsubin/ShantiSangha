@@ -9,4 +9,13 @@ public class AgentMessage
     public AgentMessageRole Role { get; set; }
     public string Content { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
+
+    /// <summary>
+    /// JSON-encoded list of resource IDs the assistant referenced this
+    /// turn (currently <c>{ "reminderIds": [...] }</c>). Null for user
+    /// messages and for assistant messages that didn't trigger an inline
+    /// card surface. The client expands these on history load to render
+    /// live cards alongside the prose.
+    /// </summary>
+    public string? Attachments { get; set; }
 }

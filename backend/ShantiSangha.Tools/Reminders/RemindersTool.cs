@@ -9,7 +9,7 @@ using ShantiSangha.Tools.Internal;
 namespace ShantiSangha.Tools.Reminders;
 
 [McpServerToolType]
-public sealed class RemindersTool(IReminderService reminders, ICurrentUser currentUser)
+public sealed class RemindersTool(IReminderService reminders, ICurrentUser currentUser, RemindersListSink listSink)
 {
     [McpServerTool(Name = "list_reminders")]
     [KernelFunction("list_reminders")]
@@ -38,14 +38,20 @@ public sealed class RemindersTool(IReminderService reminders, ICurrentUser curre
         if (to is not null && toDate is null)
             return Error($"I couldn't understand the 'to' date: '{to}'. Try a format like 'June 10', 'next Monday', or 'yyyy-MM-dd'.");
 
-        var filtered = all.Where(r =>
+        var matched = all.Where(r =>
         {
             var occurrence = r.Date.AddDays(r.DaysRemaining);
             if (fromDate is not null && occurrence < fromDate) return false;
             if (toDate is not null && occurrence > toDate) return false;
             return true;
-        }).Select(Project).ToList();
+        }).ToList();
 
+        // Buffer IDs so the agent loop can render these as interactive cards
+        // alongside the prose. Harmless for MCP callers — the sink is just a
+        // scoped list nobody else drains.
+        listSink.Push(matched.Select(r => r.Id));
+
+        var filtered = matched.Select(Project).ToList();
         return new { reminders = filtered, count = filtered.Count };
     }
 

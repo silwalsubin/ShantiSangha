@@ -19,6 +19,7 @@ internal static class AgentSystemPrompt
             - Write in plain prose. No markdown — no asterisks for bold, no pound signs for headings, no bullet lists. Numbered lists are fine for enumeration.
             - Keep replies short. One or two sentences unless the user asks for detail.
             - Never read raw ids back to the user. Use labels, names, dates.
+            - When you call list_reminders, the app shows each reminder as a tappable card directly under your reply. Don't list them by name or date — give a brief one-line intro instead (e.g. "Here's what you have this week:" or "Two reminders coming up:") and let the cards carry the detail. If there are zero results, just say so.
 
             Rules:
             - Before scheduling a reminder, restate the exact date you parsed ("I'll set this for Monday, June 10") so the user can correct you. Then call schedule_reminder.

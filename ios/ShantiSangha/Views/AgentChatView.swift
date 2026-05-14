@@ -11,6 +11,8 @@ struct AgentChatView: View {
     @State private var loadingHistory = true
     @State private var failedSendText: String?
     @State private var showClearConfirmation = false
+    @State private var editTarget: ReminderEditTarget?
+    @State private var activeSwipeId: String?
 
     var body: some View {
         ZStack {
@@ -50,6 +52,32 @@ struct AgentChatView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This deletes everything you've said to the assistant. It won't touch your reminders.")
+        }
+        .navigationDestination(item: $editTarget) { target in
+            ReminderEditView(
+                target: target,
+                onSave: { label, date, recurrence in
+                    if case .edit(let original) = target {
+                        if let updated = try? await ReminderRepository.shared.update(
+                            id: original.id,
+                            label: label,
+                            date: date,
+                            recurrence: recurrence)
+                        {
+                            patchAttachedReminder(updated)
+                        }
+                    }
+                },
+                onDelete: {
+                    if case .edit(let reminder) = target {
+                        return {
+                            try? await ReminderRepository.shared.delete(id: reminder.id)
+                            removeAttachedReminder(reminder.id)
+                        }
+                    }
+                    return nil
+                }()
+            )
         }
     }
 
@@ -101,7 +129,8 @@ struct AgentChatView: View {
             messages = history.map {
                 AgentMessage(
                     role: $0.role == "user" ? .user : .assistant,
-                    content: $0.content)
+                    content: $0.content,
+                    attachedReminders: $0.attachedReminders ?? [])
             }
 
             // Surface today's reflection as the first assistant turn if the
@@ -110,7 +139,8 @@ struct AgentChatView: View {
             if let greeting = try? await AgentChatService.shared.morningGreeting() {
                 messages.append(AgentMessage(
                     role: greeting.role == "user" ? .user : .assistant,
-                    content: greeting.content))
+                    content: greeting.content,
+                    attachedReminders: greeting.attachedReminders ?? []))
             }
         } catch {
             if !error.isCancellation {
@@ -132,7 +162,7 @@ struct AgentChatView: View {
 
     @ViewBuilder
     private func messageRow(_ msg: AgentMessage) -> some View {
-        if msg.role == .assistant && msg.content.isEmpty && sending {
+        if msg.role == .assistant && msg.content.isEmpty && msg.attachedReminders.isEmpty && sending {
             EmptyView()
         } else {
             bubble(msg).id(msg.id)
@@ -141,7 +171,7 @@ struct AgentChatView: View {
 
     private var showTypingIndicator: Bool {
         guard sending, let last = messages.last else { return false }
-        return last.role == .assistant && last.content.isEmpty
+        return last.role == .assistant && last.content.isEmpty && last.attachedReminders.isEmpty
     }
 
     private var typingIndicator: some View {
@@ -220,11 +250,53 @@ struct AgentChatView: View {
         "Cancel the electric bill reminder.",
     ]
 
+    @ViewBuilder
     private func bubble(_ msg: AgentMessage) -> some View {
         let side: SacredChatSide = msg.role == .user ? .mine : .theirs
-        return SacredChatBubbleRow(side: side) {
-            Text(msg.content)
+        VStack(alignment: msg.role == .user ? .trailing : .leading, spacing: SacredSpacing.s) {
+            if !msg.content.isEmpty {
+                SacredChatBubbleRow(side: side) {
+                    Text(msg.content)
+                }
+            }
+            if !msg.attachedReminders.isEmpty {
+                reminderAttachments(msg.attachedReminders)
+            }
         }
+    }
+
+    /// Interactive cards for reminders the assistant referenced this turn.
+    /// Tap pushes the edit page; swipe-right marks complete (mirrors Home).
+    /// On complete / delete the card drops out of the bubble so the chat
+    /// reflects the user's most recent action.
+    private func reminderAttachments(_ reminders: [Reminder]) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(reminders.enumerated()), id: \.element.id) { idx, reminder in
+                ReminderRow(
+                    reminder: reminder,
+                    allowSwipeToComplete: true,
+                    showDateStamp: true,
+                    onTap: { editTarget = .edit(reminder) },
+                    onComplete: {
+                        Task {
+                            _ = try? await ReminderRepository.shared.markComplete(id: reminder.id)
+                            removeAttachedReminder(reminder.id)
+                        }
+                    },
+                    activeSwipeId: $activeSwipeId
+                )
+
+                if idx < reminders.count - 1 {
+                    Divider()
+                        .padding(.leading, 104)
+                        .padding(.trailing, 16)
+                }
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.sacredBgCard.opacity(0.5))
+        )
     }
 
     // MARK: - Send
@@ -241,16 +313,22 @@ struct AgentChatView: View {
         messages.append(AgentMessage(id: assistantId, role: .assistant, content: ""))
 
         do {
-            for try await chunk in AgentChatService.shared.stream(message: text) {
-                if let idx = messages.firstIndex(where: { $0.id == assistantId }) {
+            for try await event in AgentChatService.shared.stream(message: text) {
+                guard let idx = messages.firstIndex(where: { $0.id == assistantId }) else { continue }
+                switch event {
+                case .text(let chunk):
                     messages[idx].content += chunk
+                case .reminders(let items):
+                    messages[idx].attachedReminders = items
                 }
             }
         } catch {
             if !error.isCancellation {
                 AppLogger.shared.error("Agent", "Stream error: \(error)")
                 failedSendText = text
-                if let idx = messages.firstIndex(where: { $0.id == assistantId }), messages[idx].content.isEmpty {
+                if let idx = messages.firstIndex(where: { $0.id == assistantId }),
+                   messages[idx].content.isEmpty,
+                   messages[idx].attachedReminders.isEmpty {
                     messages[idx].content = "Sorry, something went wrong. Please try again."
                 }
             }
@@ -264,6 +342,22 @@ struct AgentChatView: View {
         failedSendText = nil
         await send()
     }
+
+    // MARK: - Card state
+
+    private func patchAttachedReminder(_ updated: Reminder) {
+        for i in messages.indices {
+            if let j = messages[i].attachedReminders.firstIndex(where: { $0.id == updated.id }) {
+                messages[i].attachedReminders[j] = updated
+            }
+        }
+    }
+
+    private func removeAttachedReminder(_ id: UUID) {
+        for i in messages.indices {
+            messages[i].attachedReminders.removeAll { $0.id == id }
+        }
+    }
 }
 
 // MARK: - Model
@@ -273,11 +367,18 @@ struct AgentMessage: Identifiable {
     let id: UUID
     let role: Role
     var content: String
+    var attachedReminders: [Reminder]
 
-    init(id: UUID = UUID(), role: Role, content: String) {
+    init(
+        id: UUID = UUID(),
+        role: Role,
+        content: String,
+        attachedReminders: [Reminder] = []
+    ) {
         self.id = id
         self.role = role
         self.content = content
+        self.attachedReminders = attachedReminders
     }
 }
 

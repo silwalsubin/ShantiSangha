@@ -6,6 +6,9 @@ import FirebaseAuth
 ///
 /// SSE framing matches `ChatView.sendMessage`: each event is
 /// `data: <json-encoded string>\n\n`, terminator is `data: [DONE]\n\n`.
+/// In addition, the agent can emit `event: reminders\ndata: <json-array>\n\n`
+/// frames carrying the reminders that the assistant referenced this turn —
+/// the client renders these as tappable cards under the bubble.
 final class AgentChatService {
     static let shared = AgentChatService()
     private init() {}
@@ -13,11 +16,20 @@ final class AgentChatService {
     struct HistoryMessage: Decodable {
         let role: String
         let content: String
+        let attachedReminders: [Reminder]?
     }
 
     struct MorningResponse: Decodable {
         let greeted: Bool
         let message: HistoryMessage?
+    }
+
+    /// One frame in the live reply stream — either a chunk of prose or a
+    /// list of reminders the assistant referenced and the app should
+    /// render as interactive cards.
+    enum StreamEvent {
+        case text(String)
+        case reminders([Reminder])
     }
 
     /// Asks the server whether today's reflection should be surfaced as
@@ -69,11 +81,12 @@ final class AgentChatService {
         _ = try await URLSession.shared.data(for: request)
     }
 
-    /// Streams the assistant's reply token-by-token. Throws on transport
+    /// Streams the assistant's reply token-by-token, interleaved with any
+    /// structured attachments (reminder lists). Throws on transport
     /// errors; the caller is expected to surface a friendly fallback.
     func stream(
         message: String
-    ) -> AsyncThrowingStream<String, Error> {
+    ) -> AsyncThrowingStream<StreamEvent, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
@@ -105,9 +118,14 @@ final class AgentChatService {
 
                             guard let eventText = String(data: eventData, encoding: .utf8) else { continue }
 
+                            var eventName: String? = nil
                             var dataParts: [String] = []
                             for line in eventText.split(separator: "\n", omittingEmptySubsequences: false) {
-                                if line.hasPrefix("data: ") {
+                                if line.hasPrefix("event: ") {
+                                    eventName = String(line.dropFirst(7))
+                                } else if line.hasPrefix("event:") {
+                                    eventName = String(line.dropFirst(6))
+                                } else if line.hasPrefix("data: ") {
                                     dataParts.append(String(line.dropFirst(6)))
                                 } else if line.hasPrefix("data:") {
                                     dataParts.append(String(line.dropFirst(5)))
@@ -115,13 +133,18 @@ final class AgentChatService {
                             }
                             let payload = dataParts.joined(separator: "\n")
                             if payload.isEmpty || payload == "[DONE]" { continue }
+                            guard let payloadData = payload.data(using: .utf8) else { continue }
 
-                            guard let payloadData = payload.data(using: .utf8),
-                                  let decoded = try? JSONDecoder().decode(String.self, from: payloadData) else {
-                                continue
+                            switch eventName {
+                            case "reminders":
+                                if let reminders = try? JSONDecoder().decode([Reminder].self, from: payloadData) {
+                                    continuation.yield(.reminders(reminders))
+                                }
+                            default:
+                                if let decoded = try? JSONDecoder().decode(String.self, from: payloadData) {
+                                    continuation.yield(.text(decoded))
+                                }
                             }
-
-                            continuation.yield(decoded)
                         }
                     }
                     continuation.finish()

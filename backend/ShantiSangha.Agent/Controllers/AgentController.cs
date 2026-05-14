@@ -9,6 +9,7 @@ using ShantiSangha.Agent.AI;
 using ShantiSangha.Agent.Contracts;
 using ShantiSangha.Agent.Data;
 using ShantiSangha.Agent.Models;
+using ShantiSangha.Reminders.Services;
 using ShantiSangha.Shared.Interfaces;
 
 namespace ShantiSangha.Agent.Controllers;
@@ -20,9 +21,12 @@ public class AgentController(
     AgentOrchestrator orchestrator,
     AgentDbContext db,
     ICurrentUser currentUser,
+    IReminderService reminders,
     IReflectionQueryService reflections,
     ILogger<AgentController> logger) : ControllerBase
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
     [HttpPost("chat")]
     public async Task Chat(
         [FromBody] AgentChatRequest body,
@@ -40,14 +44,22 @@ public class AgentController(
 
         try
         {
-            await foreach (var chunk in orchestrator.StreamAsync(body.Message, cancellationToken))
+            await foreach (var evt in orchestrator.StreamAsync(body.Message, cancellationToken))
             {
-                await WriteChunkAsync(chunk, cancellationToken);
+                switch (evt)
+                {
+                    case AgentStreamEvent.Text text:
+                        await WriteTextChunkAsync(text.Chunk, cancellationToken);
+                        break;
+                    case AgentStreamEvent.Reminders r:
+                        await WriteRemindersAsync(r.Items, cancellationToken);
+                        break;
+                }
             }
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            await WriteChunkAsync(
+            await WriteTextChunkAsync(
                 "\n\n(That took longer than expected. Please try again with a shorter request.)",
                 cancellationToken);
         }
@@ -58,17 +70,26 @@ public class AgentController(
             // indicator resolves instead of hanging forever, and log details
             // server-side for diagnosis.
             logger.LogError(ex, "Agent chat failed mid-stream");
-            await WriteChunkAsync(FriendlyMessageFor(ex), CancellationToken.None);
+            await WriteTextChunkAsync(FriendlyMessageFor(ex), CancellationToken.None);
         }
 
         await HttpContext.Response.WriteAsync("data: [DONE]\n\n", Encoding.UTF8, CancellationToken.None);
         await HttpContext.Response.Body.FlushAsync(CancellationToken.None);
     }
 
-    private async Task WriteChunkAsync(string text, CancellationToken ct)
+    private async Task WriteTextChunkAsync(string text, CancellationToken ct)
     {
         var payload = JsonSerializer.Serialize(text);
         await HttpContext.Response.WriteAsync($"data: {payload}\n\n", Encoding.UTF8, ct);
+        await HttpContext.Response.Body.FlushAsync(ct);
+    }
+
+    private async Task WriteRemindersAsync(
+        IReadOnlyList<Reminders.Contracts.ReminderResponse> items, CancellationToken ct)
+    {
+        var payload = JsonSerializer.Serialize(items, JsonOptions);
+        await HttpContext.Response.WriteAsync(
+            $"event: reminders\ndata: {payload}\n\n", Encoding.UTF8, ct);
         await HttpContext.Response.Body.FlushAsync(ct);
     }
 
@@ -89,19 +110,59 @@ public class AgentController(
         var user = await currentUser.GetAsync();
         if (user is null) return Unauthorized();
 
-        var messages = await db.AgentMessages
+        var rows = await db.AgentMessages
             .Where(m => m.UserId == user.Id)
             .OrderBy(m => m.CreatedAt)
             .Select(m => new
             {
-                id = m.Id,
-                role = m.Role == AgentMessageRole.User ? "user" : "assistant",
-                content = m.Content,
-                createdAt = m.CreatedAt,
+                m.Id,
+                m.Role,
+                m.Content,
+                m.Attachments,
+                m.CreatedAt,
             })
             .ToListAsync(ct);
 
-        return Ok(messages);
+        // Expand attachments per row. The agent surfaces stale reminders by
+        // re-querying live state on each fetch, so cards always show today's
+        // truth — completed/deleted reminders simply drop out.
+        var allReminderIds = rows
+            .Select(r => AgentMessageAttachmentsCodec.Decode(r.Attachments)?.ReminderIds)
+            .Where(ids => ids is not null && ids.Count > 0)
+            .SelectMany(ids => ids!)
+            .Distinct()
+            .ToList();
+
+        Dictionary<Guid, Reminders.Contracts.ReminderResponse>? reminderLookup = null;
+        if (allReminderIds.Count > 0)
+        {
+            var all = await reminders.ListAsync(user.Id, connectionId: null, date: null, ct);
+            reminderLookup = all
+                .Where(r => allReminderIds.Contains(r.Id))
+                .ToDictionary(r => r.Id);
+        }
+
+        var result = rows.Select(m =>
+        {
+            var ids = AgentMessageAttachmentsCodec.Decode(m.Attachments)?.ReminderIds;
+            var attachedReminders = ids is null || reminderLookup is null
+                ? Array.Empty<Reminders.Contracts.ReminderResponse>()
+                : ids
+                    .Where(id => reminderLookup.ContainsKey(id))
+                    .Select(id => reminderLookup[id])
+                    .ToArray();
+
+            return new
+            {
+                id = m.Id,
+                role = m.Role == AgentMessageRole.User ? "user" : "assistant",
+                content = m.Content,
+                attachedReminders,
+                createdAt = m.CreatedAt,
+            };
+        }).ToList();
+
+        return Ok(result);
     }
 
     [HttpDelete("messages")]
@@ -166,7 +227,12 @@ public class AgentController(
         return Ok(new
         {
             greeted = false,
-            message = new { role = "assistant", content = row.Content },
+            message = new
+            {
+                role = "assistant",
+                content = row.Content,
+                attachedReminders = Array.Empty<object>(),
+            },
         });
     }
 }
