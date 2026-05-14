@@ -127,6 +127,11 @@ struct AgentChatView: View {
             .onChange(of: messages.last?.content) {
                 proxy.scrollTo("bottom")
             }
+            .onChange(of: messages.last?.attachedReminders.count) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo("bottom") }
+                }
+            }
         }
     }
 
