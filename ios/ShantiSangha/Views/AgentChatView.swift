@@ -25,7 +25,6 @@ struct AgentChatView: View {
         }
         .navigationTitle("Assistant")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 if !messages.isEmpty {
