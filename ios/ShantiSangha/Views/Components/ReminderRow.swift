@@ -67,9 +67,14 @@ struct ReminderRow: View {
         allowSwipeToComplete && onComplete != nil && reminder.completedAt == nil
     }
 
+    private var isCompleted: Bool {
+        reminder.completedAt != nil
+    }
+
     /// "{Connection} · {label}" when the row is connection-scoped; just
     /// the bare label otherwise. The connection name is the bolder half
-    /// since it's the more identifying piece of info.
+    /// since it's the more identifying piece of info. Strikethrough kicks
+    /// in when the reminder is completed so the row visibly reads as done.
     private var labelText: Text {
         if let conn = connectionLabel?.trimmingCharacters(in: .whitespacesAndNewlines),
            !conn.isEmpty {
@@ -77,16 +82,25 @@ struct ReminderRow: View {
 
             var nameAttrs = AttributeContainer()
             nameAttrs.inlinePresentationIntent = .stronglyEmphasized
+            if isCompleted { nameAttrs.strikethroughStyle = .single }
             attr.append(AttributedString(conn, attributes: nameAttrs))
 
             var sepAttrs = AttributeContainer()
             sepAttrs.foregroundColor = .sacredMuted
             attr.append(AttributedString(" · ", attributes: sepAttrs))
 
-            attr.append(AttributedString(reminder.label))
+            var labelAttrs = AttributeContainer()
+            if isCompleted { labelAttrs.strikethroughStyle = .single }
+            attr.append(AttributedString(reminder.label, attributes: labelAttrs))
             return Text(attr)
         }
-        return Text(reminder.label)
+        var bare = AttributedString(reminder.label)
+        if isCompleted {
+            var attrs = AttributeContainer()
+            attrs.strikethroughStyle = .single
+            bare.setAttributes(attrs)
+        }
+        return Text(bare)
     }
 
     @ViewBuilder
@@ -109,13 +123,15 @@ struct ReminderRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 labelText
                     .font(.sacredTextMedium)
-                    .foregroundColor(.sacredText)
+                    .foregroundColor(isCompleted ? .sacredMuted : .sacredText)
                     .lineLimit(1)
             }
 
             Spacer()
 
-            if !hideDateBadge && !showDateStamp {
+            if isCompleted {
+                doneBadge
+            } else if !hideDateBadge && !showDateStamp {
                 Text(dueDateLabel)
                     .font(reminder.daysRemaining <= 0 ? .sacredSmallSemibold : .sacredSmall)
                     .foregroundColor(
@@ -125,6 +141,7 @@ struct ReminderRow: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        .opacity(isCompleted ? 0.55 : 1)
         .background(
             Group {
                 if swipeActive {
@@ -149,6 +166,23 @@ struct ReminderRow: View {
                 .foregroundColor(.sacredGold)
                 .frame(width: 24, height: 24)
         }
+    }
+
+    /// Replaces the right-side date label when a reminder is completed.
+    /// Small checkmark + "DONE" tag so the row still parses at a glance
+    /// while reading clearly as past-tense.
+    private var doneBadge: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "checkmark")
+                .font(.system(size: 10, weight: .semibold))
+            Text("DONE")
+                .font(.sacredSmallSemibold)
+                .tracking(1.5)
+        }
+        .foregroundColor(.sacredGreen)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 3)
+        .background(Capsule().fill(Color.sacredGreen.opacity(0.12)))
     }
 
     private var dueDateLabel: String {

@@ -279,8 +279,9 @@ struct AgentChatView: View {
                     onTap: { editTarget = .edit(reminder) },
                     onComplete: {
                         Task {
-                            _ = try? await ReminderRepository.shared.markComplete(id: reminder.id)
-                            removeAttachedReminder(reminder.id)
+                            if let updated = try? await ReminderRepository.shared.markComplete(id: reminder.id) {
+                                patchAttachedReminder(updated)
+                            }
                         }
                     },
                     activeSwipeId: $activeSwipeId

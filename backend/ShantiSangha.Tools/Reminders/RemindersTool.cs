@@ -40,6 +40,11 @@ public sealed class RemindersTool(IReminderService reminders, ICurrentUser curre
 
         var matched = all.Where(r =>
         {
+            // Completed reminders aren't "what's coming up" — they live on
+            // the original chat turn as a "Done" card. Hide them from
+            // future state queries so the assistant only surfaces pending
+            // work.
+            if (r.CompletedAt is not null) return false;
             var occurrence = r.Date.AddDays(r.DaysRemaining);
             if (fromDate is not null && occurrence < fromDate) return false;
             if (toDate is not null && occurrence > toDate) return false;
