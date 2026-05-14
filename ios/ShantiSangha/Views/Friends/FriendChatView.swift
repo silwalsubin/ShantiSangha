@@ -97,12 +97,13 @@ struct FriendChatView: View {
         .navigationDestination(isPresented: $showProfile) {
             ConnectionDetailView(connectionId: connection.id, vm: circleVM)
         }
+        // TODO: thread recurrence pre-fill through ReminderEditTarget.
+        // For V1 the editor opens with its default recurrence (yearly);
+        // users can flip it before saving when the LLM extracted "none".
         .navigationDestination(item: $suggestionScheduleTarget) { target in
-            let initialDate = SuggestionScheduleTarget.parse(target.date)
-            let recurrence: ReminderRecurrence = target.recurrence == "yearly" ? .yearly : .none
             ReminderEditView(
                 target: .new(initialLabel: target.label,
-                             initialDate: initialDate,
+                             initialDate: SuggestionScheduleTarget.parse(target.date),
                              connectionId: target.connectionId),
                 onSave: { label, dateString, savedRecurrence in
                     do {
@@ -120,13 +121,6 @@ struct FriendChatView: View {
                     }
                 },
                 onDelete: nil)
-            // Suppress the "yearly" default when the LLM said "none" —
-            // pre-fill the recurrence by passing it as an env value? We
-            // can't; ReminderEditView.recurrenceDraft is internal. The
-            // recurrence binding will start at the editor's default
-            // (yearly) — acceptable for V1; users can flip it before
-            // saving. TODO: thread recurrence pre-fill through ReminderEditTarget.
-            _ = recurrence
         }
         .sheet(item: $reactionPickerTarget) { target in
             ReactionPickerSheet(
