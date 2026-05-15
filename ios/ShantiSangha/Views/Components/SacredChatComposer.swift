@@ -22,6 +22,10 @@ struct SacredChatComposer<Banner: View, Accessories: View>: View {
     /// Fired when the inner text field's focus changes. The friend chat
     /// uses this to scroll the latest message above the keyboard rise.
     var onFocusChange: ((Bool) -> Void)? = nil
+    /// When true, the composer claims focus shortly after mounting. Used
+    /// for intentional entry surfaces where the next natural action is
+    /// typing.
+    var focusOnAppear: Bool = false
     @ViewBuilder var accessories: () -> Accessories
     @ViewBuilder var banner: () -> Banner
 
@@ -36,6 +40,7 @@ struct SacredChatComposer<Banner: View, Accessories: View>: View {
         canSend: Bool,
         onSend: @escaping () -> Void,
         onFocusChange: ((Bool) -> Void)? = nil,
+        focusOnAppear: Bool = false,
         @ViewBuilder accessories: @escaping () -> Accessories,
         @ViewBuilder banner: @escaping () -> Banner
     ) {
@@ -45,6 +50,7 @@ struct SacredChatComposer<Banner: View, Accessories: View>: View {
         self.canSend = canSend
         self.onSend = onSend
         self.onFocusChange = onFocusChange
+        self.focusOnAppear = focusOnAppear
         self.accessories = accessories
         self.banner = banner
     }
@@ -83,7 +89,16 @@ struct SacredChatComposer<Banner: View, Accessories: View>: View {
                 .fill(Color.sacredGold.opacity(0.1))
                 .frame(height: 0.5),
             alignment: .top)
+        .onAppear(perform: focusIfNeeded)
         .onChange(of: focused) { _, new in onFocusChange?(new) }
+    }
+
+    private func focusIfNeeded() {
+        guard focusOnAppear else { return }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            focused = true
+        }
     }
 }
 
@@ -97,13 +112,15 @@ extension SacredChatComposer where Banner == EmptyView, Accessories == EmptyView
         placeholder: String = "Message",
         canSend: Bool,
         onSend: @escaping () -> Void,
-        onFocusChange: ((Bool) -> Void)? = nil
+        onFocusChange: ((Bool) -> Void)? = nil,
+        focusOnAppear: Bool = false
     ) {
         self._text = text
         self.placeholder = placeholder
         self.canSend = canSend
         self.onSend = onSend
         self.onFocusChange = onFocusChange
+        self.focusOnAppear = focusOnAppear
         self.accessories = { EmptyView() }
         self.banner = { EmptyView() }
     }

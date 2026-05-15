@@ -40,11 +40,21 @@ struct AgentChatView: View {
             }
             .background(Color.sacredBg)
         }
-        .navigationTitle("Assistant")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                Image("tab.vajra")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 30, height: 30)
+                    .foregroundColor(.sacredGold)
+                    .accessibilityLabel("Assistant")
+            }
+
             ToolbarItem(placement: .navigationBarTrailing) {
                 if !messages.isEmpty {
                     Button {
@@ -252,6 +262,7 @@ struct AgentChatView: View {
             canSend: !inputText.trimmingCharacters(in: .whitespaces).isEmpty && !sending,
             onSend: { Task { await send() } },
             onFocusChange: { composerFocused = $0 },
+            focusOnAppear: true,
             accessories: { SacredVoiceInputButton(text: $inputText) },
             banner: { EmptyView() })
     }
