@@ -4,9 +4,10 @@ import SwiftUI
 /// SF Symbol style + point size so the two buttons read as a matched
 /// pair when placed side by side.
 ///
-/// While held, partial transcripts flow into `text` (appended after
-/// whatever the user had already typed). On release the field stays
-/// populated so the user can review and edit before tapping send.
+/// Each press replaces `text` with a fresh dictation — same behavior as
+/// Apple's system dictation (Notes, Siri). Whatever was in the field
+/// (typed or from a previous dictation) is wiped on press-down so the
+/// new utterance lands cleanly.
 ///
 /// `onComplete` fires after the recognizer stops, after `text` has been
 /// updated with the final transcript — used by the Home pill to open
@@ -17,7 +18,6 @@ struct SacredVoiceInputButton: View {
     var onComplete: (() -> Void)? = nil
 
     @StateObject private var recognizer = AssistantVoiceRecognizer()
-    @State private var baseText: String = ""
     @State private var isHolding: Bool = false
     @State private var showAlert: Bool = false
 
@@ -31,7 +31,7 @@ struct SacredVoiceInputButton: View {
                     .onChanged { _ in
                         guard !isHolding else { return }
                         isHolding = true
-                        baseText = text
+                        text = ""
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         Task { await recognizer.start() }
                     }
@@ -43,8 +43,7 @@ struct SacredVoiceInputButton: View {
             )
             .onChange(of: recognizer.transcript) { _, transcript in
                 guard isHolding || recognizer.isRecording else { return }
-                let separator = baseText.isEmpty ? "" : " "
-                text = baseText + separator + transcript
+                text = transcript
             }
             .onChange(of: recognizer.errorMessage) { _, msg in
                 if msg != nil { showAlert = true }
