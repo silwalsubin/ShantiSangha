@@ -82,7 +82,7 @@ class NotificationService: ObservableObject {
 
     /// Notify when a reminder is due tomorrow (evening before) and due today (morning of).
     private func scheduleReminderNudge(reminder: Reminder, calendar: Calendar, now: Date) {
-        let daysRemaining = reminder.daysRemaining
+        let daysRemaining = reminder.localDaysRemaining
         let id = reminder.id.uuidString
 
         if daysRemaining == 1 {

@@ -109,7 +109,11 @@ struct SacredAssistantMessageRow<Content: View>: View {
                 Circle()
                     .fill(Color.sacredBgCard)
                     .overlay(Circle().stroke(Color.sacredGold.opacity(0.18), lineWidth: 1))
-                SacredIconView(icon: .diya, size: 14)
+                Image("tab.vajra")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 15, height: 15)
                     .foregroundColor(.sacredGold)
             }
             .frame(width: 28, height: 28)

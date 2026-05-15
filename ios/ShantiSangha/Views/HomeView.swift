@@ -240,7 +240,7 @@ struct HomeView: View {
     /// `let` binding.
     @ViewBuilder
     private var remindersSection: some View {
-        let visible = vm.pendingReminders.filter { $0.daysRemaining <= horizonDays }
+        let visible = vm.pendingReminders.filter { $0.localDaysRemaining <= horizonDays }
         VStack(spacing: 0) {
             horizonPicker
                 .padding(.top, 28)
@@ -393,7 +393,7 @@ struct HomeView: View {
                 id: r.id.uuidString,
                 label: r.label,
                 date: r.date,
-                daysRemaining: r.daysRemaining,
+                daysRemaining: r.localDaysRemaining,
                 connectionLabel: connectionLabel(for: r))
         }
         WidgetData.update(

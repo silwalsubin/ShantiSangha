@@ -121,23 +121,54 @@ private struct SacredWidgetBackground: View {
 private struct MiniDateStamp: View {
     let month: String
     let day: Int
-    let isToday: Bool
+    let daysRemaining: Int
 
     var body: some View {
         VStack(spacing: -1) {
             Text(month)
                 .font(.system(size: 7, weight: .bold, design: .serif))
                 .tracking(0.5)
-                .foregroundColor(sacredMuted)
+                .foregroundColor(monthColor)
             Text("\(day)")
                 .font(.system(size: 13, weight: .semibold, design: .serif))
-                .foregroundColor(isToday ? sacredGold : sacredText)
+                .foregroundColor(dayColor)
         }
         .frame(width: 30, height: 30)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(isToday ? sacredGold.opacity(0.12) : sacredBgCard)
+                .fill(backgroundColor)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(strokeColor, lineWidth: 1)
+                )
         )
+    }
+
+    private var isPast: Bool { daysRemaining < 0 }
+    private var isToday: Bool { daysRemaining == 0 }
+
+    private var monthColor: Color {
+        if isPast { return sacredMuted.opacity(0.62) }
+        if isToday { return sacredTextSecondary }
+        return sacredMuted
+    }
+
+    private var dayColor: Color {
+        if isPast { return sacredMuted }
+        if isToday { return sacredGold }
+        return sacredText
+    }
+
+    private var backgroundColor: Color {
+        if isPast { return sacredBgCard.opacity(0.56) }
+        if isToday { return sacredGold.opacity(0.12) }
+        return sacredBgCard
+    }
+
+    private var strokeColor: Color {
+        if isPast { return sacredRed.opacity(0.16) }
+        if isToday { return sacredGold.opacity(0.22) }
+        return .clear
     }
 }
 
@@ -148,6 +179,12 @@ private func relativeDayLabel(_ days: Int) -> String? {
     if days == 1 { return "Tomorrow" }
     if days < 14 { return "in \(days) days" }
     return nil  // far-future reminders rely on the date stamp itself
+}
+
+private func relativeDayColor(_ days: Int) -> Color {
+    if days < 0 { return sacredRed }
+    if days == 0 { return sacredGold }
+    return sacredMuted
 }
 
 /// "{Connection} · {label}" when the reminder belongs to a connection;
@@ -185,7 +222,7 @@ struct NextReminderWidgetView: View {
                 HStack(alignment: .top, spacing: 8) {
                     MiniDateStamp(month: top.monthAbbreviation,
                                   day: top.day,
-                                  isToday: top.daysRemaining == 0)
+                                  daysRemaining: top.daysRemaining)
                     VStack(alignment: .leading, spacing: 2) {
                         reminderLabelText(top)
                             .font(.system(size: 13, design: .serif))
@@ -194,7 +231,7 @@ struct NextReminderWidgetView: View {
                         if let label = relativeDayLabel(top.daysRemaining) {
                             Text(label)
                                 .font(.system(size: 10, design: .serif))
-                                .foregroundColor(top.daysRemaining < 0 ? sacredRed : sacredMuted)
+                                .foregroundColor(relativeDayColor(top.daysRemaining))
                         }
                     }
                 }
@@ -241,7 +278,7 @@ struct UpcomingWidgetView: View {
                     HStack(spacing: 10) {
                         MiniDateStamp(month: r.monthAbbreviation,
                                       day: r.day,
-                                      isToday: r.daysRemaining == 0)
+                                      daysRemaining: r.daysRemaining)
                         VStack(alignment: .leading, spacing: 1) {
                             reminderLabelText(r)
                                 .font(.system(size: 12, design: .serif))
@@ -250,7 +287,7 @@ struct UpcomingWidgetView: View {
                             if let label = relativeDayLabel(r.daysRemaining) {
                                 Text(label)
                                     .font(.system(size: 9, design: .serif))
-                                    .foregroundColor(r.daysRemaining < 0 ? sacredRed : sacredMuted)
+                                    .foregroundColor(relativeDayColor(r.daysRemaining))
                             }
                         }
                         Spacer(minLength: 0)

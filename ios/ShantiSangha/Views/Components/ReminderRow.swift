@@ -125,6 +125,13 @@ struct ReminderRow: View {
                     .font(.sacredTextMedium)
                     .foregroundColor(isCompleted ? .sacredMuted : .sacredText)
                     .lineLimit(1)
+
+                if showDateStamp, let status = relativeDateLabel {
+                    Text(status)
+                        .font(localDaysRemaining <= 0 ? .sacredSmallSemibold : .sacredSmall)
+                        .foregroundColor(dateStatusColor)
+                        .lineLimit(1)
+                }
             }
 
             Spacer()
@@ -133,10 +140,8 @@ struct ReminderRow: View {
                 doneBadge
             } else if !hideDateBadge && !showDateStamp {
                 Text(dueDateLabel)
-                    .font(reminder.daysRemaining <= 0 ? .sacredSmallSemibold : .sacredSmall)
-                    .foregroundColor(
-                        reminder.daysRemaining < 0 ? .sacredRed :
-                        reminder.daysRemaining == 0 ? .sacredGold : .sacredMuted)
+                    .font(localDaysRemaining <= 0 ? .sacredSmallSemibold : .sacredSmall)
+                    .foregroundColor(dateStatusColor)
             }
         }
         .padding(.horizontal, 16)
@@ -159,7 +164,7 @@ struct ReminderRow: View {
     @ViewBuilder
     private var leadingSlot: some View {
         if showDateStamp, let parsed = parseISODate(reminder.date) {
-            SacredDateStamp(date: parsed)
+            SacredDateStamp(date: parsed, daysRemaining: localDaysRemaining)
         } else {
             Image(systemName: "calendar.badge.clock")
                 .font(.sacredText)
@@ -179,20 +184,34 @@ struct ReminderRow: View {
     }
 
     private var dueDateLabel: String {
-        let days = reminder.daysRemaining
-        if days == 0 { return "Today" }
-        if days == 1 { return "Tomorrow" }
-        if days < 0, let date = parseISODate(reminder.date) {
-            let f = DateFormatter()
-            f.dateFormat = "MMM d"
-            return "Past \(f.string(from: date))"
-        }
+        if let relativeDateLabel { return relativeDateLabel }
         if let date = parseISODate(reminder.date) {
             let f = DateFormatter()
             f.dateFormat = "MMM d"
             return f.string(from: date)
         }
         return ""
+    }
+
+    private var relativeDateLabel: String? {
+        let days = localDaysRemaining
+        if days < -1 { return "\(abs(days)) days ago" }
+        if days == -1 { return "Yesterday" }
+        if days == 0 { return "Today" }
+        if days == 1 { return "Tomorrow" }
+        if days < 14 { return "in \(days) days" }
+        return nil
+    }
+
+    private var dateStatusColor: Color {
+        if isCompleted { return .sacredMuted }
+        if localDaysRemaining < 0 { return .sacredRed }
+        if localDaysRemaining == 0 { return .sacredGold }
+        return .sacredMuted
+    }
+
+    private var localDaysRemaining: Int {
+        reminder.localDaysRemaining
     }
 
     private func parseISODate(_ s: String) -> Date? {

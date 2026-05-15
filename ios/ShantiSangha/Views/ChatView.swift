@@ -312,7 +312,7 @@ struct ChatView: View {
     private func loadOpeningPrompt() async {
         do {
             let reminders: [Reminder] = try await api.get("/reminders")
-            if let upcoming = reminders.first(where: { $0.completedAt == nil && $0.daysRemaining <= 7 }) {
+            if let upcoming = reminders.first(where: { $0.completedAt == nil && $0.localDaysRemaining <= 7 }) {
                 openingPrompt = "\(upcoming.label) is in your field. What would help you meet it clearly?"
             }
         } catch {

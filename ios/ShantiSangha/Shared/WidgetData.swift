@@ -96,8 +96,28 @@ enum WidgetData {
             label: label,
             monthAbbreviation: monthAbbreviation(monthNum),
             day: day,
-            daysRemaining: daysRemaining,
+            daysRemaining: localDaysRemaining(from: date) ?? daysRemaining,
             connectionLabel: connectionLabel
         )
+    }
+
+    private static func localDaysRemaining(from date: String) -> Int? {
+        let parts = date.split(separator: "-")
+        guard parts.count >= 3,
+              let year = Int(parts[0]),
+              let month = Int(parts[1]),
+              let day = Int(parts[2]) else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        var components = DateComponents()
+        components.calendar = calendar
+        components.timeZone = calendar.timeZone
+        components.year = year
+        components.month = month
+        components.day = day
+        guard let dueDate = calendar.date(from: components) else { return nil }
+        let today = calendar.startOfDay(for: Date())
+        let due = calendar.startOfDay(for: dueDate)
+        return calendar.dateComponents([.day], from: today, to: due).day
     }
 }

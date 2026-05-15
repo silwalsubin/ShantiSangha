@@ -22,6 +22,42 @@ struct Reminder: Codable, Identifiable, Equatable, Hashable {
     let completedAt: String?
     let createdAt: String
     let daysRemaining: Int
+
+    /// Device-local interpretation of the backend's DateOnly string.
+    /// The API's `daysRemaining` can drift around UTC/local midnight;
+    /// UI, widgets, and notifications should read this value instead.
+    var localDaysRemaining: Int {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        guard let parts = Self.parseDateParts(date) else { return daysRemaining }
+        let today = calendar.startOfDay(for: Date())
+
+        var components = DateComponents()
+        components.calendar = calendar
+        components.timeZone = calendar.timeZone
+        components.year = recurrence == .yearly ? calendar.component(.year, from: today) : parts.year
+        components.month = parts.month
+        components.day = parts.day
+
+        guard var due = calendar.date(from: components) else { return daysRemaining }
+        due = calendar.startOfDay(for: due)
+
+        if recurrence == .yearly && due < today,
+           let nextYear = calendar.date(byAdding: .year, value: 1, to: due) {
+            due = nextYear
+        }
+
+        return calendar.dateComponents([.day], from: today, to: due).day ?? daysRemaining
+    }
+
+    private static func parseDateParts(_ value: String) -> (year: Int, month: Int, day: Int)? {
+        let parts = value.split(separator: "-")
+        guard parts.count >= 3,
+              let year = Int(parts[0]),
+              let month = Int(parts[1]),
+              let day = Int(parts[2]) else { return nil }
+        return (year, month, day)
+    }
 }
 
 struct CreateReminderRequest: Encodable {

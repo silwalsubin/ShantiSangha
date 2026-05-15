@@ -5,6 +5,8 @@ import SwiftUI
 /// reschedule / cancel). Server persists the last N turns per user so
 /// follow-ups like "move that to next Friday" resolve correctly.
 struct AgentChatView: View {
+    @EnvironmentObject private var profile: ProfileService
+    @StateObject private var connections = ConnectionsRepository.shared
     @State private var messages: [AgentMessage] = []
     @State private var inputText: String
     @State private var sending = false
@@ -55,7 +57,7 @@ struct AgentChatView: View {
                 }
             }
         }
-        .task { await loadHistory() }
+        .task { await loadInitialData() }
         .confirmationDialog(
             "Start fresh?",
             isPresented: $showClearConfirmation,
@@ -332,6 +334,8 @@ struct AgentChatView: View {
                     reminder: reminder,
                     allowSwipeToComplete: true,
                     showDateStamp: true,
+                    avatarUrl: avatarUrl(for: reminder),
+                    connectionLabel: connectionLabel(for: reminder),
                     onTap: { editTarget = .edit(reminder) },
                     onComplete: {
                         Task {
@@ -357,6 +361,12 @@ struct AgentChatView: View {
     }
 
     // MARK: - Send
+
+    private func loadInitialData() async {
+        async let connectionLoad: Void = connections.refresh()
+        await loadHistory()
+        _ = await connectionLoad
+    }
 
     private func send() async {
         let text = inputText.trimmingCharacters(in: .whitespaces)
@@ -428,6 +438,19 @@ struct AgentChatView: View {
         for i in messages.indices {
             messages[i].attachedReminders.removeAll { $0.id == id }
         }
+    }
+
+    private func avatarUrl(for reminder: Reminder) -> String? {
+        if let cid = reminder.connectionId,
+           let connection = connections.connection(for: cid) {
+            return connection.ownerVisibleAvatarUrl
+        }
+        return profile.profile?.avatarUrl
+    }
+
+    private func connectionLabel(for reminder: Reminder) -> String? {
+        guard let cid = reminder.connectionId else { return nil }
+        return connections.connection(for: cid)?.displayLabel
     }
 }
 

@@ -19,7 +19,7 @@ class HomeViewModel: ObservableObject {
     /// Pending reminders — not completed, sorted by urgency (overdue first).
     var pendingReminders: [Reminder] {
         reminders.filter { $0.completedAt == nil }
-            .sorted { $0.daysRemaining < $1.daysRemaining }
+            .sorted { $0.localDaysRemaining < $1.localDaysRemaining }
     }
 
     var completedReminders: [Reminder] {
@@ -27,18 +27,18 @@ class HomeViewModel: ObservableObject {
     }
 
     var overdueRemindersCount: Int {
-        pendingReminders.filter { $0.daysRemaining < 0 }.count
+        pendingReminders.filter { $0.localDaysRemaining < 0 }.count
     }
     var dueTodayRemindersCount: Int {
-        pendingReminders.filter { $0.daysRemaining == 0 }.count
+        pendingReminders.filter { $0.localDaysRemaining == 0 }.count
     }
     var upcomingRemindersCount: Int {
-        pendingReminders.filter { $0.daysRemaining > 0 }.count
+        pendingReminders.filter { $0.localDaysRemaining > 0 }.count
     }
 
     /// Total reminders in scope for the Home ring (overdue + today + upcoming-this-week).
     var totalRemindersForToday: Int {
-        pendingReminders.filter { $0.daysRemaining <= 7 }.count
+        pendingReminders.filter { $0.localDaysRemaining <= 7 }.count
     }
     var doneRemindersForToday: Int {
         // Reminders completed within the last 7 days

@@ -103,14 +103,14 @@ enum SilentPushHandler {
 
             let summaries = reminders
                 .filter { $0.completedAt == nil }
-                .sorted { $0.daysRemaining < $1.daysRemaining }
+                .sorted { $0.localDaysRemaining < $1.localDaysRemaining }
                 .prefix(5)
                 .compactMap { r in
                     WidgetData.makeSummary(
                         id: r.id.uuidString,
                         label: r.label,
                         date: r.date,
-                        daysRemaining: r.daysRemaining,
+                        daysRemaining: r.localDaysRemaining,
                         connectionLabel: r.connectionId.flatMap { connectionsById[$0]?.displayLabel })
                 }
             WidgetData.upcomingReminders = Array(summaries)
