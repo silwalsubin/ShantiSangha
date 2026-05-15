@@ -2,10 +2,10 @@ import SwiftUI
 
 /// Single source of truth for avatar rendering across the app.
 ///
-/// Renders the user's photo via `AsyncImage` when an avatar URL is set;
-/// falls back to a gold-gradient circle with the default `person.fill`
-/// icon otherwise — matching the placeholder treatment used in the
-/// onboarding profile-picture gate. Used by FriendsTabView, UserSearchView,
+/// Renders the user's photo from `AvatarImageCache` when an avatar URL is
+/// set; falls back to a gold-gradient circle with the default `person.fill`
+/// icon otherwise — matching the placeholder treatment used in the onboarding
+/// profile-picture gate. Used by FriendsTabView, UserSearchView,
 /// UserProfilePreviewSheet, and any future surface that needs to display
 /// another user's avatar in a consistent visual style.
 ///
@@ -48,11 +48,9 @@ struct SacredAvatar: View {
         .frame(width: size, height: size)
         .clipShape(Circle())
         .overlay(Circle().stroke(Color.sacredGoldDark.opacity(0.18), lineWidth: 0.75))
-        // Re-fetch when the URL changes (presigned avatars rotate every
-        // refresh). Routed through AvatarImageCache so every SacredAvatar
-        // for the same URL on screen shares one fetched copy — fixes the
-        // bug where the 12pt read-receipt rendered while the 28pt gutter
-        // avatar fell into a failed AsyncImage state.
+        // Reload when the server points at a different avatar object.
+        // AvatarImageCache strips presigned query params, so normal URL
+        // rotations keep using the same local file.
         .task(id: avatarUrl) {
             guard let urlString = avatarUrl,
                   !urlString.isEmpty,

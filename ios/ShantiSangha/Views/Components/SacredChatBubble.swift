@@ -26,7 +26,18 @@ enum SacredChatSide {
 
 struct SacredChatBubblePill<Content: View>: View {
     let side: SacredChatSide
+    let hasTail: Bool
     @ViewBuilder var content: () -> Content
+
+    init(
+        side: SacredChatSide,
+        hasTail: Bool = true,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.side = side
+        self.hasTail = hasTail
+        self.content = content
+    }
 
     var body: some View {
         content()
@@ -35,7 +46,15 @@ struct SacredChatBubblePill<Content: View>: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(background)
-            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .clipShape(
+                UnevenRoundedRectangle(
+                    cornerRadii: .init(
+                        topLeading: 18,
+                        bottomLeading: side == .theirs && hasTail ? 6 : 18,
+                        bottomTrailing: side == .mine && hasTail ? 6 : 18,
+                        topTrailing: 18),
+                    style: .continuous)
+            )
     }
 
     @ViewBuilder
@@ -52,12 +71,23 @@ struct SacredChatBubblePill<Content: View>: View {
 /// the heavier composition (avatar gutter, reactions, reply preview).
 struct SacredChatBubbleRow<Content: View>: View {
     let side: SacredChatSide
+    let hasTail: Bool
     @ViewBuilder var content: () -> Content
+
+    init(
+        side: SacredChatSide,
+        hasTail: Bool = true,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.side = side
+        self.hasTail = hasTail
+        self.content = content
+    }
 
     var body: some View {
         HStack {
             if side == .mine { Spacer(minLength: 32) }
-            SacredChatBubblePill(side: side, content: content)
+            SacredChatBubblePill(side: side, hasTail: hasTail, content: content)
             if side == .theirs { Spacer(minLength: 32) }
         }
     }

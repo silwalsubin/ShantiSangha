@@ -207,6 +207,7 @@ struct FriendChatView: View {
     /// (otherwise the stack parks near the last-materialized row and
     /// leaves the newest bubble clipped).
     private static let bottomAnchorId = "chat-bottom-anchor"
+    private static let groupedMessageSpacing: CGFloat = 2
 
     /// Show the friend's avatar only on the first message of a
     /// consecutive run from them — repeating the same avatar on every
@@ -218,6 +219,19 @@ struct FriendChatView: View {
         if index == 0 { return true }
         let prev = vm.messages[index - 1]
         return prev.senderUserId != msg.senderUserId
+    }
+
+    private func spacingBeforeMessage(at index: Int) -> CGFloat {
+        guard index > 0 else { return 0 }
+        let msg = vm.messages[index]
+        let prev = vm.messages[index - 1]
+        return prev.senderUserId == msg.senderUserId ? Self.groupedMessageSpacing : SacredSpacing.s
+    }
+
+    private func spacingBeforePending(at index: Int) -> CGFloat {
+        guard index == 0 else { return Self.groupedMessageSpacing }
+        guard let last = vm.messages.last else { return 0 }
+        return vm.isFromFriend(last) ? SacredSpacing.s : Self.groupedMessageSpacing
     }
 
     private var messageList: some View {
@@ -330,7 +344,7 @@ struct FriendChatView: View {
             )
             .padding(.top, SacredSpacing.xl)
         } else {
-            LazyVStack(spacing: 6) {
+            LazyVStack(spacing: 0) {
                 if vm.loadingOlder {
                     ProgressView()
                         .padding(.vertical, SacredSpacing.s)
@@ -371,6 +385,7 @@ struct FriendChatView: View {
                             })
                     }
                     .id(msg.id.uuidString)
+                    .padding(.top, spacingBeforeMessage(at: idx))
                     .onLongPressGesture {
                         if !msg.isDeleted {
                             reactionPickerTarget = msg
@@ -386,11 +401,12 @@ struct FriendChatView: View {
                 // Pending sends — text-only for v1 — render after the
                 // real thread so they always appear at the bottom while
                 // in flight.
-                ForEach(vm.outbox) { pending in
+                ForEach(Array(vm.outbox.enumerated()), id: \.element.id) { idx, pending in
                     PendingBubble(
                         pending: pending,
                         onRetry: { Task { await vm.retryPending(pending.id) } },
                         onDelete: { vm.deletePending(pending.id) })
+                    .padding(.top, spacingBeforePending(at: idx))
                 }
 
                 // Sentinel row at the very bottom of the lazy stack.

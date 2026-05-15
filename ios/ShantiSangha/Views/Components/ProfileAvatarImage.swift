@@ -1,12 +1,10 @@
 import SwiftUI
 import UIKit
 
-/// Cached circular profile image with a calm icon fallback. `AsyncImage`
-/// briefly re-renders its placeholder when sheets reopen; this keeps avatars
-/// stable once the image has been fetched in the current app session.
+/// Cached circular profile image with a calm icon fallback. The bytes come
+/// from `AvatarImageCache`, which persists avatar images locally by stable
+/// object path so rotating presigned URLs do not cause refetches.
 struct ProfileAvatarImage: View {
-    private static let cache = NSCache<NSURL, UIImage>()
-
     let rawUrl: String?
     let size: CGFloat
     let borderOpacity: Double
@@ -28,10 +26,6 @@ struct ProfileAvatarImage: View {
         self.borderOpacity = borderOpacity
         self.borderWidth = borderWidth
         self.shadow = shadow
-
-        let cached = Self.cachedImage(for: rawUrl)
-        _image = State(initialValue: cached)
-        _loadedUrl = State(initialValue: cached == nil ? nil : rawUrl)
     }
 
     var body: some View {
@@ -68,14 +62,6 @@ struct ProfileAvatarImage: View {
             )
     }
 
-    private static func cachedImage(for rawUrl: String?) -> UIImage? {
-        guard let rawUrl,
-              let url = URL(string: rawUrl),
-              let key = stableCacheKey(for: url)
-        else { return nil }
-        return cache.object(forKey: key)
-    }
-
     private func loadImageIfNeeded() async {
         guard let rawUrl, loadedUrl != rawUrl, let url = URL(string: rawUrl) else {
             if rawUrl == nil {
@@ -85,33 +71,9 @@ struct ProfileAvatarImage: View {
             return
         }
 
-        // Strip the S3 presigned query — the backend regenerates
-        // X-Amz-Signature on every `/me` read, so the full URL changes
-        // even when the image hasn't. Caching by path keeps the avatar
-        // alive across reloads instead of forcing a refetch and a brief
-        // empty slot.
-        guard let cacheKey = Self.stableCacheKey(for: url) else { return }
-        if let cached = Self.cache.object(forKey: cacheKey) {
-            image = cached
-            loadedUrl = rawUrl
-            return
-        }
-
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            guard let loaded = UIImage(data: data) else { return }
-            Self.cache.setObject(loaded, forKey: cacheKey)
+        if let loaded = await AvatarImageCache.shared.image(for: url) {
             image = loaded
-            loadedUrl = rawUrl
-        } catch {
-            // Keep the icon fallback quiet; the profile remains editable.
         }
-    }
-
-    private static func stableCacheKey(for url: URL) -> NSURL? {
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        components?.query = nil
-        return components?.url as NSURL?
+        loadedUrl = rawUrl
     }
 }
-

@@ -290,12 +290,8 @@ struct AvatarPickerBody: View {
         }
 
         loadedAvatarUrl = rawUrl
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            guard sourceImage == nil, let image = UIImage(data: data) else { return }
+        if let image = await AvatarImageCache.shared.image(for: url), sourceImage == nil {
             setSourceImage(image)
-        } catch {
-            // Keep the icon fallback quiet; choosing a new photo still works.
         }
     }
 

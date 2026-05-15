@@ -18,17 +18,25 @@ struct AgentChatView: View {
     @State private var showClearConfirmation = false
     @State private var editTarget: ReminderEditTarget?
     @State private var activeSwipeId: String?
+    @State private var pinnedScrollID: String?
+    @State private var composerFocused = false
+    @State private var followNextMessage = false
+    private static let bottomAnchorId = "agent-chat-bottom-anchor"
+    private static let groupedMessageSpacing: CGFloat = 2
 
     var body: some View {
         ZStack {
             SacredBackground()
                 .ignoresSafeArea()
 
+            scrollArea
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
-                scrollArea
                 failedBanner
                 composer
             }
+            .background(Color.sacredBg)
         }
         .navigationTitle("Assistant")
         .navigationBarTitleDisplayMode(.inline)
@@ -93,7 +101,7 @@ struct AgentChatView: View {
     private var scrollArea: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: SacredSpacing.m) {
+                LazyVStack(alignment: .leading, spacing: 0) {
                     if loadingHistory {
                         ProgressView()
                             .frame(maxWidth: .infinity)
@@ -103,33 +111,48 @@ struct AgentChatView: View {
                             .padding(.top, 40)
                     }
 
-                    ForEach(messages) { msg in
-                        messageRow(msg)
+                    ForEach(Array(messages.enumerated()), id: \.element.id) { index, msg in
+                        messageRow(msg, at: index)
                     }
 
                     if showTypingIndicator {
                         typingIndicator
+                            .padding(.top, SacredSpacing.s)
                     }
 
                     Color.clear
                         .frame(height: 1)
-                        .id("bottom")
+                        .id(Self.bottomAnchorId)
                 }
-                .padding(SacredSpacing.m)
-                .padding(.bottom, 60)
+                .padding(.horizontal, SacredSpacing.m)
+                .padding(.vertical, SacredSpacing.m)
             }
             .scrollDismissesKeyboard(.interactively)
-            .onChange(of: messages.count) {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo("bottom") }
+            .defaultScrollAnchor(.bottom)
+            .scrollPosition(id: $pinnedScrollID, anchor: .bottom)
+            .task {
+                pinnedScrollID = Self.bottomAnchorId
+            }
+            .onChange(of: messages.last?.id) { _, newId in
+                guard newId != nil else { return }
+                let shouldFollow = followNextMessage || isAtBottom
+                guard shouldFollow else { return }
+                followNextMessage = false
+                pinnedScrollID = Self.bottomAnchorId
+                withAnimation(.easeOut(duration: 0.2)) {
+                    proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
                 }
             }
-            .onChange(of: messages.last?.content) {
-                proxy.scrollTo("bottom")
+            .onChange(of: composerFocused) { _, focused in
+                guard focused, isAtBottom else { return }
+                withAnimation(.easeOut(duration: 0.25)) {
+                    proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
+                }
             }
             .onChange(of: messages.last?.attachedReminders.count) {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo("bottom") }
+                guard isAtBottom else { return }
+                withAnimation(.easeOut(duration: 0.2)) {
+                    proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
                 }
             }
         }
@@ -163,11 +186,14 @@ struct AgentChatView: View {
     }
 
     @ViewBuilder
-    private func messageRow(_ msg: AgentMessage) -> some View {
+    private func messageRow(_ msg: AgentMessage, at index: Int) -> some View {
         if msg.role == .assistant && msg.content.isEmpty && msg.attachedReminders.isEmpty && sending {
             EmptyView()
         } else {
-            bubble(msg).id(msg.id)
+            bubble(msg, at: index)
+                .id(msg.id.uuidString)
+                .padding(.top, spacingBeforeMessage(at: index))
+                .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }
 
@@ -184,6 +210,11 @@ struct AgentChatView: View {
             Spacer()
         }
         .id("typing")
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+
+    private var isAtBottom: Bool {
+        pinnedScrollID == nil || pinnedScrollID == Self.bottomAnchorId
     }
 
     @ViewBuilder
@@ -218,6 +249,7 @@ struct AgentChatView: View {
             placeholder: "Ask about your reminders…",
             canSend: !inputText.trimmingCharacters(in: .whitespaces).isEmpty && !sending,
             onSend: { Task { await send() } },
+            onFocusChange: { composerFocused = $0 },
             accessories: { SacredVoiceInputButton(text: $inputText) },
             banner: { EmptyView() })
     }
@@ -255,11 +287,11 @@ struct AgentChatView: View {
     ]
 
     @ViewBuilder
-    private func bubble(_ msg: AgentMessage) -> some View {
+    private func bubble(_ msg: AgentMessage, at index: Int) -> some View {
         let side: SacredChatSide = msg.role == .user ? .mine : .theirs
-        VStack(alignment: msg.role == .user ? .trailing : .leading, spacing: SacredSpacing.s) {
+        VStack(alignment: msg.role == .user ? .trailing : .leading, spacing: SacredSpacing.xs) {
             if !msg.content.isEmpty {
-                SacredChatBubbleRow(side: side) {
+                SacredChatBubbleRow(side: side, hasTail: isLastInSenderRun(at: index)) {
                     Text(msg.content)
                 }
             }
@@ -267,6 +299,20 @@ struct AgentChatView: View {
                 reminderAttachments(msg.attachedReminders)
             }
         }
+    }
+
+    private func spacingBeforeMessage(at index: Int) -> CGFloat {
+        guard index > 0 else { return 0 }
+        let msg = messages[index]
+        let previous = messages[index - 1]
+        return msg.role == previous.role ? Self.groupedMessageSpacing : SacredSpacing.s
+    }
+
+    private func isLastInSenderRun(at index: Int) -> Bool {
+        guard messages.indices.contains(index) else { return true }
+        let nextIndex = index + 1
+        guard messages.indices.contains(nextIndex) else { return true }
+        return messages[index].role != messages[nextIndex].role
     }
 
     /// Interactive cards for reminders the assistant referenced this turn.
@@ -312,19 +358,31 @@ struct AgentChatView: View {
         failedSendText = nil
         inputText = ""
         sending = true
+        followNextMessage = true
 
-        messages.append(AgentMessage(role: .user, content: text))
         let assistantId = UUID()
-        messages.append(AgentMessage(id: assistantId, role: .assistant, content: ""))
+        withAnimation(.easeOut(duration: 0.2)) {
+            messages.append(AgentMessage(role: .user, content: text))
+            messages.append(AgentMessage(id: assistantId, role: .assistant, content: ""))
+        }
 
         do {
             for try await event in AgentChatService.shared.stream(message: text) {
                 guard let idx = messages.firstIndex(where: { $0.id == assistantId }) else { continue }
                 switch event {
                 case .text(let chunk):
-                    messages[idx].content += chunk
+                    let wasEmpty = messages[idx].content.isEmpty
+                    if wasEmpty {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            messages[idx].content += chunk
+                        }
+                    } else {
+                        messages[idx].content += chunk
+                    }
                 case .reminders(let items):
-                    messages[idx].attachedReminders = items
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        messages[idx].attachedReminders = items
+                    }
                 }
             }
         } catch {
@@ -334,7 +392,9 @@ struct AgentChatView: View {
                 if let idx = messages.firstIndex(where: { $0.id == assistantId }),
                    messages[idx].content.isEmpty,
                    messages[idx].attachedReminders.isEmpty {
-                    messages[idx].content = "Sorry, something went wrong. Please try again."
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        messages[idx].content = "Sorry, something went wrong. Please try again."
+                    }
                 }
             }
         }

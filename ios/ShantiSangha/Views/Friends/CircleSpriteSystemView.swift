@@ -428,21 +428,11 @@ final class CircleSpriteScene: SKScene {
             return
         }
 
-        // Cache by host+path, not the full URL — S3 regenerates the
-        // presigned query (X-Amz-Signature, X-Amz-Date, …) on every
-        // `/me` reload, which would otherwise miss the cache, refetch
-        // the same image, and blink the sun blank in the meantime.
         let key = Self.avatarCacheKey(for: url)
-        if let cached = PlanetSprite.avatarCache.object(forKey: key) {
-            applyMyTexture(cached)
-            return
-        }
-
-        URLSession.shared.dataTask(with: url) { [weak self] data, _, _ in
-            guard let self else { return }
-            guard let data, let image = UIImage(data: data) else { return }
-            PlanetSprite.avatarCache.setObject(image, forKey: key)
-            DispatchQueue.main.async {
+        Task { [weak self] in
+            guard let image = await AvatarImageCache.shared.image(for: url) else { return }
+            await MainActor.run {
+                guard let self else { return }
                 // Compare by stable key so a presigned-URL refresh
                 // mid-flight doesn't throw away a perfectly good image
                 // (the path is the same, only the signature rotated).
@@ -452,7 +442,7 @@ final class CircleSpriteScene: SKScene {
                 else { return }
                 self.applyMyTexture(image)
             }
-        }.resume()
+        }
     }
 
     /// Stable cache key for an avatar URL — strips the presigned query
@@ -794,8 +784,6 @@ final class PlanetSprite: SKNode {
     private var inAppBadge: SKShapeNode?
     private var trail: SKEmitterNode?
 
-    fileprivate static let avatarCache = NSCache<NSString, UIImage>()
-
     init(connection: Connection, ring: SacredRing) {
         self.connectionId = connection.id
         self.ring = ring
@@ -1009,22 +997,18 @@ final class PlanetSprite: SKNode {
             return
         }
 
-        // See `CircleSpriteScene.avatarCacheKey(for:)` — strip the S3
-        // presigned query so the same image survives `/me` reloads.
         let key = CircleSpriteScene.avatarCacheKey(for: parsed)
-        if let cached = Self.avatarCache.object(forKey: key) {
-            applyAvatar(cached)
-            return
-        }
-
-        URLSession.shared.dataTask(with: parsed) { [weak self] data, _, _ in
-            guard let self else { return }
-            guard let data, let image = UIImage(data: data) else { return }
-            Self.avatarCache.setObject(image, forKey: key)
-            DispatchQueue.main.async {
+        Task { [weak self] in
+            guard let image = await AvatarImageCache.shared.image(for: parsed) else { return }
+            await MainActor.run {
+                guard let self else { return }
+                guard let latest = self.lastConnection.ownerVisibleAvatarUrl,
+                      let latestURL = URL(string: latest),
+                      CircleSpriteScene.avatarCacheKey(for: latestURL) == key
+                else { return }
                 self.applyAvatar(image)
             }
-        }.resume()
+        }
     }
 
     private func applyAvatar(_ image: UIImage) {

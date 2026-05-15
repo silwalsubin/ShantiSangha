@@ -14,7 +14,12 @@ struct ChatView: View {
     @State private var sending = false
     @State private var failedSendText: String?
     @State private var openingPrompt = "You are here. What feels present today?"
+    @State private var pinnedScrollID: String?
+    @State private var composerFocused = false
+    @State private var followNextMessage = false
     private let api = ApiService.shared
+    private static let bottomAnchorId = "chat-bottom-anchor"
+    private static let groupedMessageSpacing: CGFloat = 2
 
     init(conversationId: String, title: String, initialText: String? = nil) {
         self.conversationId = conversationId
@@ -30,94 +35,14 @@ struct ChatView: View {
             SacredBackground()
                 .ignoresSafeArea()
 
+            messageList
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
-                // Messages
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: SacredSpacing.m) {
-                            if loading {
-                                ProgressView()
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.top, 80)
-                            } else if messages.isEmpty {
-                                SacredOpeningCard(
-                                    icon: "sparkle",
-                                    prompt: openingPrompt,
-                                    subtitle: initialText != nil
-                                        ? "Your note is ready below if you want to begin there."
-                                        : nil
-                                )
-                                .padding(.top, 40)
-                            }
-
-                            ForEach(Array(messages.enumerated()), id: \.element.id) { index, msg in
-                                if let label = dateDividerLabel(at: index) {
-                                    Text(label)
-                                        .font(.sacredSmallSemibold)
-                                        .foregroundColor(.sacredMuted)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, SacredSpacing.xxs)
-                                }
-
-                                // Hide empty assistant placeholder — typing indicator replaces it
-                                if !(msg.role == "assistant" && msg.content.isEmpty && sending) {
-                                    messageBubble(msg)
-                                        .id(msg.id)
-                                }
-                            }
-
-                            if sending, let last = messages.last, last.role == "assistant", last.content.isEmpty {
-                                typingIndicator
-                                    .id("typing")
-                            }
-
-                            Color.clear
-                                .frame(height: 1)
-                                .id("bottom")
-                        }
-                        .padding(SacredSpacing.m)
-                        .padding(.bottom, 60)
-                    }
-                    .scrollDismissesKeyboard(.interactively)
-                    .onChange(of: messages.count) {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo("bottom") }
-                        }
-                    }
-                    .onChange(of: messages.last?.content) {
-                        proxy.scrollTo("bottom")
-                    }
-                }
-
-                if let failedSendText {
-                    HStack(spacing: 10) {
-                        Text("Message did not send.")
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredMuted)
-                        Spacer()
-                        Button {
-                            Task { await retryMessage(failedSendText) }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: "arrow.clockwise")
-                                Text("Try again")
-                            }
-                            .font(.sacredSmallSemibold)
-                            .foregroundColor(.sacredGold)
-                            .frame(minHeight: 44)
-                        }
-                    }
-                    .padding(.horizontal, SacredSpacing.m)
-                    .padding(.top, SacredSpacing.xs)
-                    .background(Color.sacredBg)
-                }
-
-                SacredChatComposer(
-                    text: $inputText,
-                    placeholder: "Share what's on your mind...",
-                    canSend: !inputText.trimmingCharacters(in: .whitespaces).isEmpty && !sending,
-                    onSend: { Task { await sendMessage() } })
+                failedBanner
+                composer
             }
+            .background(Color.sacredBg)
         }
         .navigationTitle(displayTitle)
         .navigationBarTitleDisplayMode(.inline)
@@ -150,21 +75,130 @@ struct ChatView: View {
         }.joined(separator: "\n\n")
     }
 
+    // MARK: - Subviews
+
+    private var messageList: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    if loading {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 80)
+                    } else if messages.isEmpty {
+                        SacredOpeningCard(
+                            icon: "sparkle",
+                            prompt: openingPrompt,
+                            subtitle: initialText != nil
+                                ? "Your note is ready below if you want to begin there."
+                                : nil
+                        )
+                        .padding(.top, 40)
+                    }
+
+                    ForEach(Array(messages.enumerated()), id: \.element.id) { index, msg in
+                        if let label = dateDividerLabel(at: index) {
+                            Text(label)
+                                .font(.sacredSmallSemibold)
+                                .foregroundColor(.sacredMuted)
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, index == 0 ? 0 : SacredSpacing.m)
+                                .padding(.bottom, SacredSpacing.xs)
+                        }
+
+                        // Hide empty assistant placeholder — typing indicator replaces it.
+                        if !(msg.role == "assistant" && msg.content.isEmpty && sending) {
+                            messageBubble(msg, at: index)
+                                .id(msg.id)
+                                .padding(.top, spacingBeforeMessage(at: index))
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
+                    }
+
+                    if sending, let last = messages.last, last.role == "assistant", last.content.isEmpty {
+                        typingIndicator
+                            .id("typing")
+                            .padding(.top, SacredSpacing.s)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+
+                    Color.clear
+                        .frame(height: 1)
+                        .id(Self.bottomAnchorId)
+                }
+                .padding(.horizontal, SacredSpacing.m)
+                .padding(.vertical, SacredSpacing.m)
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .defaultScrollAnchor(.bottom)
+            .scrollPosition(id: $pinnedScrollID, anchor: .bottom)
+            .task {
+                pinnedScrollID = Self.bottomAnchorId
+            }
+            .onChange(of: messages.last?.id) { _, newId in
+                guard newId != nil else { return }
+                let shouldFollow = followNextMessage || isAtBottom
+                guard shouldFollow else { return }
+                followNextMessage = false
+                pinnedScrollID = Self.bottomAnchorId
+                withAnimation(.easeOut(duration: 0.2)) {
+                    proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
+                }
+            }
+            .onChange(of: composerFocused) { _, focused in
+                guard focused, isAtBottom else { return }
+                withAnimation(.easeOut(duration: 0.25)) {
+                    proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var failedBanner: some View {
+        if let failedSendText {
+            HStack(spacing: 10) {
+                Text("Message did not send.")
+                    .font(.sacredSmall)
+                    .foregroundColor(.sacredMuted)
+                Spacer()
+                Button {
+                    Task { await retryMessage(failedSendText) }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.clockwise")
+                        Text("Try again")
+                    }
+                    .font(.sacredSmallSemibold)
+                    .foregroundColor(.sacredGold)
+                    .frame(minHeight: 44)
+                }
+            }
+            .padding(.horizontal, SacredSpacing.m)
+            .padding(.top, SacredSpacing.xs)
+            .background(Color.sacredBg)
+        }
+    }
+
+    private var composer: some View {
+        SacredChatComposer(
+            text: $inputText,
+            placeholder: "Share what's on your mind...",
+            canSend: !inputText.trimmingCharacters(in: .whitespaces).isEmpty && !sending,
+            onSend: { Task { await sendMessage() } },
+            onFocusChange: { composerFocused = $0 })
+    }
+
+    private var isAtBottom: Bool {
+        pinnedScrollID == nil || pinnedScrollID == Self.bottomAnchorId
+    }
+
     // MARK: - Message bubble
 
-    private func messageBubble(_ msg: ChatMessage) -> some View {
+    private func messageBubble(_ msg: ChatMessage, at index: Int) -> some View {
         let side: SacredChatSide = msg.role == "user" ? .mine : .theirs
-        return VStack(alignment: msg.role == "user" ? .trailing : .leading, spacing: 4) {
-            SacredChatBubbleRow(side: side) {
-                Text(msg.content)
-            }
-
-            if let ts = msg.timestamp {
-                Text(formatTimestamp(ts))
-                    .font(.sacredMicro)
-                    .foregroundColor(.sacredMuted)
-                    .padding(.horizontal, 4)
-            }
+        return SacredChatBubbleRow(side: side, hasTail: isLastInSenderRun(at: index)) {
+            Text(msg.content)
         }
     }
 
@@ -196,9 +230,12 @@ struct ChatView: View {
             return dateLabelFor(date, calendar: calendar)
         }
 
-        // Show divider if the day changed
         if !calendar.isDate(date, inSameDayAs: prev) {
             return dateLabelFor(date, calendar: calendar)
+        }
+
+        if date.timeIntervalSince(prev) >= 30 * 60 {
+            return timeLabelFor(date)
         }
 
         return nil
@@ -220,21 +257,32 @@ struct ChatView: View {
         return f.string(from: date)
     }
 
-    // MARK: - Helpers
-
-    private func scrollToBottom(_ proxy: ScrollViewProxy) {
-        withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo("bottom") }
+    private func timeLabelFor(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "h:mm a"
+        return f.string(from: date)
     }
 
-    private func formatTimestamp(_ date: Date) -> String {
-        let f = DateFormatter()
-        let calendar = Calendar.current
-        if calendar.isDateInToday(date) {
-            f.dateFormat = "h:mm a"
-        } else {
-            f.dateFormat = "MMM d, h:mm a"
-        }
-        return f.string(from: date)
+    // MARK: - Helpers
+
+    private func spacingBeforeMessage(at index: Int) -> CGFloat {
+        guard index > 0 else { return 0 }
+        if dateDividerLabel(at: index) != nil { return 0 }
+
+        let msg = messages[index]
+        let previous = messages[index - 1]
+        return msg.role == previous.role ? Self.groupedMessageSpacing : SacredSpacing.s
+    }
+
+    private func isLastInSenderRun(at index: Int) -> Bool {
+        guard messages.indices.contains(index) else { return true }
+        let msg = messages[index]
+        let nextIndex = index + 1
+        guard messages.indices.contains(nextIndex) else { return true }
+
+        let next = messages[nextIndex]
+        if dateDividerLabel(at: nextIndex) != nil { return true }
+        return msg.role != next.role
     }
 
     // MARK: - Network
@@ -273,17 +321,19 @@ struct ChatView: View {
         failedSendText = nil
         inputText = ""
         sending = true
+        followNextMessage = true
 
         // Add user message immediately
         let userMsg = ChatMessage(id: UUID().uuidString, role: "user", content: text, timestamp: Date())
-        messages.append(userMsg)
 
         // Add placeholder for assistant (empty = shows typing indicator)
         let assistantId = UUID().uuidString
-        messages.append(ChatMessage(id: assistantId, role: "assistant", content: "", timestamp: nil))
+        withAnimation(.easeOut(duration: 0.2)) {
+            messages.append(userMsg)
+            messages.append(ChatMessage(id: assistantId, role: "assistant", content: "", timestamp: nil))
+        }
 
         // Stream response
-        let typingStart = Date()
         do {
             let token = try await Auth.auth().currentUser?.getIDToken()
             guard let url = URL(string: "https://shantisangha.com/api/conversations/\(conversationId)/messages") else { return }
@@ -298,7 +348,6 @@ struct ChatView: View {
 
             let (bytes, _) = try await URLSession.shared.bytes(for: request)
             var buffer = Data()
-            var firstToken = true
             let eventTerminator = Data("\n\n".utf8)
 
             for try await byte in bytes {
@@ -332,19 +381,20 @@ struct ChatView: View {
                         continue
                     }
 
-                    // Ensure typing indicator shows for at least 1 second
-                    if firstToken {
-                        let elapsed = Date().timeIntervalSince(typingStart)
-                        if elapsed < 1.0 {
-                            try? await Task.sleep(nanoseconds: UInt64((1.0 - elapsed) * 1_000_000_000))
-                        }
-                        firstToken = false
-                    }
-
                     if let idx = messages.firstIndex(where: { $0.id == assistantId }) {
-                        messages[idx].content += decoded
-                        if messages[idx].timestamp == nil {
-                            messages[idx].timestamp = Date()
+                        let wasEmpty = messages[idx].content.isEmpty
+                        let update = {
+                            messages[idx].content += decoded
+                            if messages[idx].timestamp == nil {
+                                messages[idx].timestamp = Date()
+                            }
+                        }
+                        if wasEmpty {
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                update()
+                            }
+                        } else {
+                            update()
                         }
                     }
                 }
@@ -355,10 +405,15 @@ struct ChatView: View {
                 AppLogger.shared.error("Chat", "Stream error: \(error)")
                 failedSendText = text
                 if let idx = messages.firstIndex(where: { $0.id == assistantId }) {
-                    if messages[idx].content.isEmpty {
-                        messages[idx].content = "Sorry, something went wrong. Please try again."
+                    let update = {
+                        if messages[idx].content.isEmpty {
+                            messages[idx].content = "Sorry, something went wrong. Please try again."
+                        }
+                        messages[idx].timestamp = Date()
                     }
-                    messages[idx].timestamp = Date()
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        update()
+                    }
                 }
             }
         }

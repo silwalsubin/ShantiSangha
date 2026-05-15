@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Sacred chat composer — the bottom input bar shared between the AI
 /// chat (`ChatView`) and friend chat (`FriendChatView`).
@@ -63,7 +64,10 @@ struct SacredChatComposer<Banner: View, Accessories: View>: View {
                     .background(RoundedRectangle(cornerRadius: 18).fill(Color.sacredBgCard))
                     .focused($focused)
 
-                Button(action: onSend) {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    onSend()
+                } label: {
                     Image(systemName: isEditing ? "checkmark.circle.fill" : "arrow.up.circle.fill")
                         .font(.system(size: 30))
                         .foregroundColor(canSend ? .sacredGold : .sacredMutedLight)
@@ -104,4 +108,3 @@ extension SacredChatComposer where Banner == EmptyView, Accessories == EmptyView
         self.banner = { EmptyView() }
     }
 }
-
