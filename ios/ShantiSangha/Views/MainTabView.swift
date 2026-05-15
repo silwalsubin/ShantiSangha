@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Main tab navigation — mirrors AppLayout.vue nav items
+/// Main tab navigation — primary app loop only: Home, Reflect, Circles.
 /// Custom sacred icons matching the web app's SacredIcons.vue
 struct MainTabView: View {
     @EnvironmentObject var auth: AuthService
@@ -75,15 +75,6 @@ struct MainTabView: View {
                 .tag(1)
 
                 NavigationStack {
-                    CalendarView()
-                }
-                .tabItem {
-                    Image(systemName: "calendar")
-                    Text("Calendar")
-                }
-                .tag(2)
-
-                NavigationStack {
                     FriendsTabView()
                 }
                 .tabItem {
@@ -91,13 +82,13 @@ struct MainTabView: View {
                     Text("Circles")
                 }
                 .badge(friendsBadge.count)
-                .tag(3)
+                .tag(2)
             }
             .tint(.sacredGold)
             .task { await friendsBadge.refresh() }
             .sheet(item: deepLinkBinding) { token in
                 AcceptInvitationView(token: token.value) { _ in
-                    selectedTab = 3
+                    selectedTab = 2
                 }
             }
 
@@ -118,7 +109,7 @@ struct MainTabView: View {
         // routing intent (FriendsTabView clears it once it resolves).
         .onChange(of: deepLinks.pendingChatFriendshipId) { _, newValue in
             if newValue != nil {
-                selectedTab = 3
+                selectedTab = 2
             }
         }
         .onAppear { MotionManager.shared.start() }

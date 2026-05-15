@@ -22,6 +22,7 @@ struct HomeView: View {
     @AppStorage("reminders.horizonDays") private var horizonDays = 30
     @State private var showProfileMenu = false
     @State private var showChatSheet = false
+    @State private var showCalendar = false
     @State private var promptHintIndex = 0
     @State private var chatPillBreathing = false
     /// Transcript captured by the Home pill's mic. Passed through to
@@ -45,7 +46,10 @@ struct HomeView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
-                    SacredHomeHeader(greeting: timeGreeting)
+                    SacredHomeHeader(greeting: timeGreeting) {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        showCalendar = true
+                    }
 
                     // Whole-day context strip — sleep, steps, weather. Only
                     // appears when the user has enabled Health / Weather in
@@ -114,6 +118,7 @@ struct HomeView: View {
                     Task { await notifications.refreshUnreadCount() }
                 }
             }
+            .onAppear(perform: normalizeHomeHorizon)
 
             chatAffordance
                 .padding(.horizontal, SacredSpacing.m)
@@ -121,6 +126,9 @@ struct HomeView: View {
         }
         .navigationDestination(isPresented: $showChatSheet) {
             AgentChatView(prefill: voicePrefill)
+        }
+        .navigationDestination(isPresented: $showCalendar) {
+            CalendarView(showsNavigationBar: true)
         }
         .onReceive(promptHintTimer) { _ in
             guard !showChatSheet else { return }
@@ -248,7 +256,7 @@ struct HomeView: View {
 
     // MARK: - Horizon picker
 
-    private static let horizonOptions = [7, 14, 30, 60, 90, 180]
+    private static let horizonOptions = [7, 14, 30]
 
     /// Right-aligned chip above the list that lets the user dial how far
     /// out Home reaches. Selection persists via @AppStorage so the next
@@ -262,7 +270,7 @@ struct HomeView: View {
                         horizonDays = days
                     } label: {
                         HStack {
-                            Text("\(days) days")
+                            Text("Next \(days) days")
                             if horizonDays == days {
                                 Image(systemName: "checkmark")
                             }
@@ -271,7 +279,7 @@ struct HomeView: View {
                 }
             } label: {
                 HStack(spacing: 6) {
-                    Text("Next \(horizonDays) days")
+                    Text("Upcoming")
                         .font(.sacredSmall)
                         .foregroundColor(.sacredGold.opacity(0.85))
                     Image(systemName: "chevron.down")
@@ -283,6 +291,11 @@ struct HomeView: View {
                 .contentShape(Rectangle())
             }
         }
+    }
+
+    private func normalizeHomeHorizon() {
+        guard !Self.horizonOptions.contains(horizonDays) else { return }
+        horizonDays = 30
     }
 
     // MARK: - Reminders list

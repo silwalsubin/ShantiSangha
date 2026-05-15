@@ -1,16 +1,15 @@
 import SwiftUI
 
-/// Calendar tab — month grid with a dot per reminder on each day, plus
-/// a detail pane for the currently selected date. Tap a date to focus
-/// it, tap a reminder to edit, tap "+ Add" to create one pre-filled
-/// with the selected date.
+/// Calendar screen — month grid with a dot per reminder on each day,
+/// plus a detail pane for the currently selected date. It is opened
+/// from Home, not kept as a primary tab.
 struct CalendarView: View {
     @StateObject private var reminderRepo = ReminderRepository.shared
     @StateObject private var connections = ConnectionsRepository.shared
     @EnvironmentObject var profile: ProfileService
 
-    @State private var displayedMonth = Date()
-    @State private var selectedDate = Date()
+    @State private var displayedMonth: Date
+    @State private var selectedDate: Date
     @State private var navTarget: ReminderEditTarget?
     @State private var activeSwipeId: String?
     /// Set when we push to the reminder editor so we know the next
@@ -18,7 +17,14 @@ struct CalendarView: View {
     /// should preserve the user's selection instead of snapping to today.
     @State private var returningFromEdit = false
 
+    private let showsNavigationBar: Bool
     private let calendar = Calendar.current
+
+    init(initialDate: Date = Date(), showsNavigationBar: Bool = false) {
+        self.showsNavigationBar = showsNavigationBar
+        _displayedMonth = State(initialValue: initialDate)
+        _selectedDate = State(initialValue: initialDate)
+    }
 
     var body: some View {
         ZStack {
@@ -44,7 +50,9 @@ struct CalendarView: View {
             }
             .background(Color.clear)
         }
-        .toolbar(.hidden, for: .navigationBar)
+        .navigationTitle("Calendar")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(showsNavigationBar ? .visible : .hidden, for: .navigationBar)
         .navigationDestination(item: $navTarget) { target in
             ReminderEditView(
                 target: target,
