@@ -291,8 +291,14 @@ struct AgentChatView: View {
         let side: SacredChatSide = msg.role == .user ? .mine : .theirs
         VStack(alignment: msg.role == .user ? .trailing : .leading, spacing: SacredSpacing.xs) {
             if !msg.content.isEmpty {
-                SacredChatBubbleRow(side: side, hasTail: isLastInSenderRun(at: index)) {
-                    Text(msg.content)
+                if msg.role == .user {
+                    SacredChatBubbleRow(side: side, hasTail: isLastInSenderRun(at: index)) {
+                        Text(msg.content)
+                    }
+                } else {
+                    SacredAssistantMessageRow {
+                        Text(msg.content)
+                    }
                 }
             }
             if !msg.attachedReminders.isEmpty {

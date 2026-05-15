@@ -195,10 +195,17 @@ struct ChatView: View {
 
     // MARK: - Message bubble
 
+    @ViewBuilder
     private func messageBubble(_ msg: ChatMessage, at index: Int) -> some View {
         let side: SacredChatSide = msg.role == "user" ? .mine : .theirs
-        return SacredChatBubbleRow(side: side, hasTail: isLastInSenderRun(at: index)) {
-            Text(msg.content)
+        if msg.role == "user" {
+            SacredChatBubbleRow(side: side, hasTail: isLastInSenderRun(at: index)) {
+                Text(msg.content)
+            }
+        } else {
+            SacredAssistantMessageRow {
+                Text(msg.content)
+            }
         }
     }
 

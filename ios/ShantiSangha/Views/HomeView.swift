@@ -22,12 +22,21 @@ struct HomeView: View {
     @AppStorage("reminders.horizonDays") private var horizonDays = 30
     @State private var showProfileMenu = false
     @State private var showChatSheet = false
+    @State private var promptHintIndex = 0
+    @State private var chatPillBreathing = false
     /// Transcript captured by the Home pill's mic. Passed through to
     /// AgentChatView when the sheet opens; cleared on dismiss so the
     /// next dictation starts from an empty slate.
     @State private var voicePrefill: String = ""
     @StateObject private var notifications = NotificationsViewModel()
     @Environment(\.scenePhase) private var scenePhase
+    private let promptHintTimer = Timer.publish(every: 3.4, on: .main, in: .common).autoconnect()
+    private static let promptHints = [
+        "Ask anything...",
+        "Reflect on today",
+        "What is on your mind?",
+        "Set an intention"
+    ]
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -113,6 +122,12 @@ struct HomeView: View {
         .navigationDestination(isPresented: $showChatSheet) {
             AgentChatView(prefill: voicePrefill)
         }
+        .onReceive(promptHintTimer) { _ in
+            guard !showChatSheet else { return }
+            withAnimation(.easeInOut(duration: 0.35)) {
+                promptHintIndex = (promptHintIndex + 1) % Self.promptHints.count
+            }
+        }
         .onChange(of: showChatSheet) { _, isShown in
             if !isShown { voicePrefill = "" }
         }
@@ -169,9 +184,11 @@ struct HomeView: View {
                 showChatSheet = true
             } label: {
                 HStack(spacing: 0) {
-                    Text("Ask anything…")
+                    Text(Self.promptHints[promptHintIndex])
+                        .id(promptHintIndex)
                         .font(.sacredText)
                         .foregroundColor(.sacredMuted)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                     Spacer(minLength: 0)
                 }
                 .contentShape(Rectangle())
@@ -195,10 +212,16 @@ struct HomeView: View {
                 .fill(Color.sacredBgCard)
                 .overlay(
                     RoundedRectangle(cornerRadius: 24)
-                        .stroke(Color.sacredGold.opacity(0.22), lineWidth: 1)
+                        .stroke(Color.sacredGold.opacity(chatPillBreathing ? 0.34 : 0.18), lineWidth: 1)
                 )
         )
-        .shadow(color: .sacredMuted.opacity(0.18), radius: 14, y: 6)
+        .shadow(color: .sacredGold.opacity(chatPillBreathing ? 0.22 : 0.08), radius: chatPillBreathing ? 22 : 10, y: 6)
+        .shadow(color: .sacredMuted.opacity(0.14), radius: 14, y: 6)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 3.2).repeatForever(autoreverses: true)) {
+                chatPillBreathing = true
+            }
+        }
     }
 
     // MARK: - Reminders section

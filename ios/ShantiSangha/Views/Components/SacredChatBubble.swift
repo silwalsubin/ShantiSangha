@@ -92,3 +92,49 @@ struct SacredChatBubbleRow<Content: View>: View {
         }
     }
 }
+
+/// Assistant-only conversational panel. It keeps the user's outgoing
+/// gold bubbles familiar while giving AI responses a calmer, more
+/// reflective surface with a small sacred identity mark.
+struct SacredAssistantMessageRow<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    init(@ViewBuilder content: @escaping () -> Content) {
+        self.content = content
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: SacredSpacing.xs) {
+            ZStack {
+                Circle()
+                    .fill(Color.sacredBgCard)
+                    .overlay(Circle().stroke(Color.sacredGold.opacity(0.18), lineWidth: 1))
+                SacredIconView(icon: .diya, size: 14)
+                    .foregroundColor(.sacredGold)
+            }
+            .frame(width: 28, height: 28)
+            .shadow(color: .sacredMuted.opacity(0.08), radius: 8, y: 3)
+            .padding(.top, 2)
+
+            content()
+                .font(.sacredText)
+                .lineSpacing(5)
+                .foregroundColor(.sacredText)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(Color.sacredBgCard.opacity(0.96))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .stroke(Color.sacredGold.opacity(0.13), lineWidth: 1)
+                        )
+                )
+                .shadow(color: .sacredMuted.opacity(0.1), radius: 14, y: 6)
+
+            Spacer(minLength: 28)
+        }
+    }
+}

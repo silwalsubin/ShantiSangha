@@ -24,7 +24,7 @@ struct SacredBackground: View {
 
             LinearGradient(
                 colors: [
-                    Color.sacredGoldShine.opacity(0.16),
+                    Color.sacredGoldShine.opacity(0.1),
                     Color.sacredBg.opacity(0.0)
                 ],
                 startPoint: .top,
@@ -33,7 +33,7 @@ struct SacredBackground: View {
 
             RadialGradient(
                 colors: [
-                    Color.sacredGold.opacity(0.11),
+                    Color.sacredGold.opacity(0.07),
                     Color.clear
                 ],
                 center: .topLeading,
@@ -43,7 +43,7 @@ struct SacredBackground: View {
 
             RadialGradient(
                 colors: [
-                    Color.sacredGoldDark.opacity(0.06),
+                    Color.sacredGoldDark.opacity(0.04),
                     Color.clear
                 ],
                 center: .bottomTrailing,
