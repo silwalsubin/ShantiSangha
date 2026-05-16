@@ -38,6 +38,10 @@ public class AgentOrchestrator(
         try { displayName = await profileQuery.GetDisplayNameAsync(user.Id, cancellationToken); }
         catch { /* best-effort */ }
 
+        string? timezone = null;
+        try { timezone = await profileQuery.GetTimezoneAsync(user.Id, cancellationToken); }
+        catch { /* best-effort */ }
+
         // Persist the user turn FIRST so it survives an LLM failure mid-stream.
         var trimmed = userMessage.Trim();
         db.AgentMessages.Add(new AgentMessage
@@ -58,7 +62,7 @@ public class AgentOrchestrator(
             services.GetRequiredService<CirclesTool>(),
             pluginName: "circles");
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = UserClock.TodayFor(timezone);
         var history = new ChatHistory(AgentSystemPrompt.Build(today, displayName));
 
         // Replay the last N turns (including the user message we just saved)

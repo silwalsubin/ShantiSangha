@@ -21,6 +21,14 @@ public class ProfileQueryService(
             .FirstOrDefaultAsync(ct);
     }
 
+    public async Task<string?> GetTimezoneAsync(Guid userId, CancellationToken ct = default)
+    {
+        return await db.Profiles
+            .Where(p => p.UserId == userId)
+            .Select(p => p.Timezone)
+            .FirstOrDefaultAsync(ct);
+    }
+
     public async Task<UserAvatarInfo> GetAvatarInfoAsync(Guid userId, CancellationToken ct = default)
     {
         var key = await db.Profiles

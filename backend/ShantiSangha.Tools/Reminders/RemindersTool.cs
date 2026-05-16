@@ -3,13 +3,18 @@ using Microsoft.SemanticKernel;
 using ModelContextProtocol.Server;
 using ShantiSangha.Reminders.Contracts;
 using ShantiSangha.Reminders.Services;
+using ShantiSangha.Shared;
 using ShantiSangha.Shared.Interfaces;
 using ShantiSangha.Tools.Internal;
 
 namespace ShantiSangha.Tools.Reminders;
 
 [McpServerToolType]
-public sealed class RemindersTool(IReminderService reminders, ICurrentUser currentUser, RemindersListSink listSink)
+public sealed class RemindersTool(
+    IReminderService reminders,
+    ICurrentUser currentUser,
+    IProfileQueryService profileQuery,
+    RemindersListSink listSink)
 {
     [McpServerTool(Name = "list_reminders")]
     [KernelFunction("list_reminders")]
@@ -29,7 +34,7 @@ public sealed class RemindersTool(IReminderService reminders, ICurrentUser curre
         var user = await RequireUserAsync();
         var all = await reminders.ListAsync(user.Id, connectionId: null, date: null, ct);
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = await GetTodayAsync(user.Id, ct);
         var fromDate = from is null ? (DateOnly?)null : DateParsing.Parse(from, today);
         var toDate = to is null ? (DateOnly?)null : DateParsing.Parse(to, today);
 
@@ -83,7 +88,7 @@ public sealed class RemindersTool(IReminderService reminders, ICurrentUser curre
         if (label.Length > 80)
             return Error("Label is too long. Keep it under 80 characters.");
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = await GetTodayAsync(user.Id, ct);
         var date = DateParsing.Parse(when, today);
         if (date is null)
             return Error($"I couldn't parse the date '{when}'. Try a format like 'June 10', 'next Monday', or 'yyyy-MM-dd'.");
@@ -135,7 +140,7 @@ public sealed class RemindersTool(IReminderService reminders, ICurrentUser curre
         if (lookup.Outcome == LookupOutcome.Ambiguous)
             return Ambiguous(lookup.Candidates);
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = await GetTodayAsync(user.Id, ct);
         var date = DateParsing.Parse(new_when, today);
         if (date is null)
             return Error($"I couldn't parse the date '{new_when}'.");
@@ -194,6 +199,14 @@ public sealed class RemindersTool(IReminderService reminders, ICurrentUser curre
     {
         var user = await currentUser.GetAsync();
         return user ?? throw new UnauthorizedAccessException("No authenticated user on this request.");
+    }
+
+    private async Task<DateOnly> GetTodayAsync(Guid userId, CancellationToken ct)
+    {
+        string? tz = null;
+        try { tz = await profileQuery.GetTimezoneAsync(userId, ct); }
+        catch { /* best-effort — fall through to UTC */ }
+        return UserClock.TodayFor(tz);
     }
 
     private static object Project(ReminderResponse r) => new

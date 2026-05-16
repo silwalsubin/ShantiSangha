@@ -21,6 +21,14 @@ public interface IProfileQueryService
     Task<string?> GetDisplayNameAsync(Guid userId, CancellationToken ct = default);
 
     /// <summary>
+    /// Returns the user's IANA timezone identifier (e.g. "America/New_York"),
+    /// or null if not yet set. Used by anything that needs to interpret
+    /// relative dates in the user's local time — the agent's system prompt,
+    /// the reminders MCP tools, etc.
+    /// </summary>
+    Task<string?> GetTimezoneAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>
     /// Returns the user's avatar key + a freshly-presigned download URL.
     /// Used by the Friends module to surface friend avatars without
     /// coupling to Identity's AvatarStorage directly. Both fields are
