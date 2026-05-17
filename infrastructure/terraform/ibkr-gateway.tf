@@ -212,7 +212,7 @@ resource "aws_security_group_rule" "ecs_gateway_from_alb" {
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.alb.id
   security_group_id        = aws_security_group.ecs.id
-  description              = "ALB → IBKR gateway sidecar"
+  description              = "ALB to IBKR gateway sidecar"
 }
 
 # ALB SG must accept inbound 443 traffic from the public internet.
