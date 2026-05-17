@@ -333,6 +333,16 @@ resource "aws_ecs_service" "api" {
     container_port   = 8080
   }
 
+  # Register the IBKR gateway sidecar in its own ALB target group so the
+  # gateway is reachable directly at https://gateway.shantisangha.com/
+  # (configured in ibkr-gateway.tf). Hosting the gateway at its own root
+  # avoids the path-prefix reverse-proxy issues with IBKR's SPA login UI.
+  load_balancer {
+    target_group_arn = aws_lb_target_group.ibkr_gateway.arn
+    container_name   = "ibkr-gateway"
+    container_port   = 5000
+  }
+
   # IBKR gateway has no clean way to share a session between two concurrent
   # tasks during a deploy — two gateways mounting the same EFS dir would
   # race on the session cookie. So we stop the old task before starting the
