@@ -404,10 +404,16 @@ try
     // Controllers from domain projects handle all /api/* routes
     app.MapControllers();
 
-    // IBKR Client Portal Gateway login proxy. Routes `/ibkr-gateway/*` to
-    // the sidecar container at localhost:5000. Requires Clerk auth so only
-    // the owner can complete the IBKR 2FA login flow.
-    app.MapReverseProxy().RequireAuthorization();
+    // IBKR Client Portal Gateway login proxy. Routes /api/ibkr-gateway/*
+    // to the sidecar container at localhost:5000 so the user can complete
+    // the daily IBKR 2FA login via a browser.
+    //
+    // TODO(auth): the proxy is publicly reachable. Defensible for a
+    // single-user app because the IBKR login itself is the real auth
+    // gate (no one without IBKR credentials can do anything), but in a
+    // multi-user world we'd want a launcher endpoint that converts the
+    // iOS Bearer token into a short-lived cookie before redirecting here.
+    app.MapReverseProxy();
 
     // Realtime chat WebSocket — auth + membership handled inside.
     app.MapChatRealtime();
