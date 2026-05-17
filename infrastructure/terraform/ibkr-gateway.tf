@@ -215,16 +215,8 @@ resource "aws_security_group_rule" "ecs_gateway_from_alb" {
   description              = "ALB to IBKR gateway sidecar"
 }
 
-# ALB SG must accept inbound 443 traffic from the public internet.
-resource "aws_security_group_rule" "alb_https_in" {
-  type              = "ingress"
-  from_port         = 443
-  to_port           = 443
-  protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.alb.id
-  description       = "Public HTTPS for gateway subdomain"
-}
+# Note: ALB SG already allows public 443 ingress (declared in network.tf
+# for the CloudFront origin path). No additional rule needed here.
 
 # ---------- Outputs ---------------------------------------------------------
 
