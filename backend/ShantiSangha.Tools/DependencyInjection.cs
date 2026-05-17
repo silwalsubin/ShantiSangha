@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using ShantiSangha.Tools.AgentFeedback;
 using ShantiSangha.Tools.Circles;
 using ShantiSangha.Tools.Reminders;
 
@@ -10,7 +11,9 @@ public static class DependencyInjection
     {
         services.AddScoped<RemindersTool>();
         services.AddScoped<CirclesTool>();
+        services.AddScoped<AgentFeedbackTool>();
         services.AddScoped<RemindersListSink>();
+        services.AddScoped<AgentTurnContext>();
         return services;
     }
 }

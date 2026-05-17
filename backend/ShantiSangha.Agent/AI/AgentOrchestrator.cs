@@ -10,6 +10,7 @@ using ShantiSangha.Reminders.Contracts;
 using ShantiSangha.Reminders.Services;
 using ShantiSangha.Shared;
 using ShantiSangha.Shared.Interfaces;
+using ShantiSangha.Tools.AgentFeedback;
 using ShantiSangha.Tools.Circles;
 using ShantiSangha.Tools.Reminders;
 
@@ -22,6 +23,7 @@ public class AgentOrchestrator(
     IProfileQueryService profileQuery,
     IReminderService reminderService,
     RemindersListSink remindersSink,
+    AgentTurnContext turnContext,
     AgentDbContext db)
 {
     private static readonly TimeSpan LoopTimeout = TimeSpan.FromSeconds(45);
@@ -44,15 +46,21 @@ public class AgentOrchestrator(
 
         // Persist the user turn FIRST so it survives an LLM failure mid-stream.
         var trimmed = userMessage.Trim();
+        var userTurnId = Guid.NewGuid();
         db.AgentMessages.Add(new AgentMessage
         {
-            Id = Guid.NewGuid(),
+            Id = userTurnId,
             UserId = user.Id,
             Role = AgentMessageRole.User,
             Content = trimmed,
             CreatedAt = DateTime.UtcNow,
         });
         await db.SaveChangesAsync(cancellationToken);
+
+        // Expose the user-turn id so AgentFeedbackTool can attribute any
+        // feedback the LLM records during this turn back to the exact
+        // message that triggered it.
+        turnContext.CurrentUserMessageId = userTurnId;
 
         var scopedKernel = kernel.Clone();
         scopedKernel.Plugins.AddFromObject(
@@ -61,6 +69,9 @@ public class AgentOrchestrator(
         scopedKernel.Plugins.AddFromObject(
             services.GetRequiredService<CirclesTool>(),
             pluginName: "circles");
+        scopedKernel.Plugins.AddFromObject(
+            services.GetRequiredService<AgentFeedbackTool>(),
+            pluginName: "agent_feedback");
 
         var today = UserClock.TodayFor(timezone);
         var history = new ChatHistory(AgentSystemPrompt.Build(today, displayName));

@@ -18,6 +18,7 @@ using ShantiSangha.Identity;
 using ShantiSangha.Journal;
 using ShantiSangha.Notifications;
 using ShantiSangha.Agent;
+using ShantiSangha.AgentFeedback;
 using ShantiSangha.Reminders;
 using ShantiSangha.Shared;
 using ShantiSangha.Trading;
@@ -106,6 +107,7 @@ try
     // Agent: the in-app GPT-4o chat that can call backend operations as tools.
     // Same tool catalog (ShantiSangha.Tools) is also exposed externally via MCP
     // at /mcp so Claude Desktop / Cursor can connect with a Firebase JWT.
+    builder.Services.AddAgentFeedbackModule(connStr);
     builder.Services.AddAgentModule(connStr);
     builder.Services.AddShantiSanghaMcp();
 
@@ -129,6 +131,7 @@ try
         .AddApplicationPart(typeof(ShantiSangha.Notifications.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Trading.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Agent.DependencyInjection).Assembly)
+        .AddApplicationPart(typeof(ShantiSangha.AgentFeedback.DependencyInjection).Assembly)
         .AddJsonOptions(opts =>
         {
             opts.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
@@ -261,6 +264,7 @@ try
         await sp.GetRequiredService<ShantiSangha.Friends.Data.FriendsDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Notifications.Data.NotificationsDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Agent.Data.AgentDbContext>().Database.MigrateAsync();
+        await sp.GetRequiredService<ShantiSangha.AgentFeedback.Data.AgentFeedbackDbContext>().Database.MigrateAsync();
         if (appConfig.WisecatEnabled)
         {
             await sp.GetRequiredService<ShantiSangha.Trading.Data.TradingDbContext>().Database.MigrateAsync();

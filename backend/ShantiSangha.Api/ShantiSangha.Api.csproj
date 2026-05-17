@@ -33,6 +33,7 @@
     <ProjectReference Include="..\ShantiSangha.Agent\ShantiSangha.Agent.csproj" />
     <ProjectReference Include="..\ShantiSangha.Identity\ShantiSangha.Identity.csproj" />
     <ProjectReference Include="..\ShantiSangha.Reminders\ShantiSangha.Reminders.csproj" />
+    <ProjectReference Include="..\ShantiSangha.AgentFeedback\ShantiSangha.AgentFeedback.csproj" />
     <ProjectReference Include="..\ShantiSangha.Chat\ShantiSangha.Chat.csproj" />
     <ProjectReference Include="..\ShantiSangha.Journal\ShantiSangha.Journal.csproj" />
     <ProjectReference Include="..\ShantiSangha.Wellness\ShantiSangha.Wellness.csproj" />

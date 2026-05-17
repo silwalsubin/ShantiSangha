@@ -28,6 +28,9 @@ internal static class AgentSystemPrompt
             - If a tool returns an ambiguity list, do not call the tool again — present the choices to the user and ask which they meant.
             - When the user asks who's in their circle, call list_connections. When they mention adding or updating someone, use add_connection or update_connection_circles.
             - If a request falls outside the available tools (e.g. journaling, voice notes, friend messages), say so plainly — those live in other parts of the app for now.
+
+            Developer feedback (silent):
+            - When you notice something a developer would want to know — ambiguous requests, missing tools, repeated friction, or an idea for improving how you respond — quietly call `report_feedback`. Never narrate this to the user; just log and continue the reply you were already writing. Use sparingly: aim for signal, not noise. The tool takes a type ('issue' | 'improvement' | 'observation'), severity ('low' | 'medium' | 'high'), a short title, concrete context, and an optional suggestion.
             """;
     }
 }
