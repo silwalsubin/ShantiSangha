@@ -334,11 +334,12 @@ resource "aws_ecs_service" "api" {
   }
 
   # IBKR gateway has no clean way to share a session between two concurrent
-  # tasks during a deploy — each new task spawns a fresh unauthenticated
-  # gateway. Force atomic replacement (100/100) so we never have two
-  # half-authed gateways running. Tradeoff: ~30s of cold-start unavailability
-  # on each deploy. Acceptable given low deploy frequency.
-  deployment_minimum_healthy_percent = 100
+  # tasks during a deploy — two gateways mounting the same EFS dir would
+  # race on the session cookie. So we stop the old task before starting the
+  # new one (0/100). Tradeoff: ~30-60s of API downtime during each deploy.
+  # Acceptable given low deploy frequency and single-user audience.
+  # (ECS rejects 100/100 outright — would block deploys entirely.)
+  deployment_minimum_healthy_percent = 0
   deployment_maximum_percent         = 100
 
   depends_on = [aws_lb_listener.http]
