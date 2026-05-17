@@ -111,6 +111,7 @@ enum SilentPushHandler {
                         label: r.label,
                         date: r.date,
                         daysRemaining: r.localDaysRemaining,
+                        recurrence: r.recurrence.rawValue,
                         connectionLabel: r.connectionId.flatMap { connectionsById[$0]?.displayLabel })
                 }
             WidgetData.upcomingReminders = Array(summaries)

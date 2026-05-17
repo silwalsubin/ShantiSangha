@@ -320,6 +320,9 @@ struct SettingsView: View {
                     badge: SyncStatus.shared.pendingCount > 0 ? "\(SyncStatus.shared.pendingCount)" : nil
                 )
             }
+            NavigationLink(destination: AgentFeedbackView()) {
+                debugRow(icon: "ellipsis.bubble", label: "Agent Feedback", badge: nil)
+            }
         }
     }
 

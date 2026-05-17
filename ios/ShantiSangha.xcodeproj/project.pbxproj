@@ -16,6 +16,7 @@
 		04546F7A2F8B19B30026D26F /* ShantiSanghaWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 04546F672F8B19B20026D26F /* ShantiSanghaWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		0456C3CF9D12840A26ECAA6C /* FeedbackServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95AD8709C353998FDE5BE52E /* FeedbackServiceTests.swift */; };
 		046FDCC62F8C0B11003AE52C /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 046FDCC52F8C0B11003AE52C /* FirebaseMessaging */; };
+		04803C9B2FB93C7700E03B05 /* ShantiSanghaShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 04803C912FB93C7700E03B05 /* ShantiSanghaShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		04F1A2B3C4D5E6F700000001 /* FriendChatViewModelOutboxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F1A2B3C4D5E6F700000002 /* FriendChatViewModelOutboxTests.swift */; };
 		04F1A2B3C4D5E6F700000003 /* FriendChatTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F1A2B3C4D5E6F700000004 /* FriendChatTestSupport.swift */; };
 		04F1A2B3C4D5E6F700000005 /* FriendChatViewModelEditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F1A2B3C4D5E6F700000006 /* FriendChatViewModelEditTests.swift */; };
@@ -32,6 +33,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 04546F662F8B19B20026D26F;
 			remoteInfo = ShantiSanghaWidgetExtension;
+		};
+		04803C992FB93C7700E03B05 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 04A24D8E2F7AFC1400775F13 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 04803C902FB93C7700E03B05;
+			remoteInfo = ShantiSanghaShare;
 		};
 		73DF12EFC99BBB3E3ADB394A /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -50,6 +58,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				04546F7A2F8B19B30026D26F /* ShantiSanghaWidgetExtension.appex in Embed Foundation Extensions */,
+				04803C9B2FB93C7700E03B05 /* ShantiSanghaShare.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -61,6 +70,7 @@
 		04546F682F8B19B20026D26F /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		04546F6A2F8B19B20026D26F /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		04546F802F8B19DC0026D26F /* ShantiSanghaWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ShantiSanghaWidgetExtension.entitlements; sourceTree = "<group>"; };
+		04803C912FB93C7700E03B05 /* ShantiSanghaShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShantiSanghaShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		04A24D962F7AFC1400775F13 /* ShantiSangha.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ShantiSangha.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		04F1A2B3C4D5E6F700000002 /* FriendChatViewModelOutboxTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FriendChatViewModelOutboxTests.swift; sourceTree = "<group>"; };
 		04F1A2B3C4D5E6F700000004 /* FriendChatTestSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FriendChatTestSupport.swift; sourceTree = "<group>"; };
@@ -88,10 +98,18 @@
 			);
 			target = 04546F662F8B19B20026D26F /* ShantiSanghaWidgetExtension */;
 		};
+		04803C9E2FB93C7700E03B05 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 04803C902FB93C7700E03B05 /* ShantiSanghaShare */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		04546F6C2F8B19B20026D26F /* ShantiSanghaWidget */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (04546F7B2F8B19B30026D26F /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = ShantiSanghaWidget; sourceTree = "<group>"; };
+		04803C922FB93C7700E03B05 /* ShantiSanghaShare */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (04803C9E2FB93C7700E03B05 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = ShantiSanghaShare; sourceTree = "<group>"; };
 		04A24D982F7AFC1400775F13 /* ShantiSangha */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (04546F862F8B26C40026D26F /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = ShantiSangha; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
@@ -102,6 +120,13 @@
 			files = (
 				04546F6B2F8B19B20026D26F /* SwiftUI.framework in Frameworks */,
 				04546F692F8B19B20026D26F /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		04803C8E2FB93C7700E03B05 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -144,6 +169,7 @@
 				04546F802F8B19DC0026D26F /* ShantiSanghaWidgetExtension.entitlements */,
 				04A24D982F7AFC1400775F13 /* ShantiSangha */,
 				04546F6C2F8B19B20026D26F /* ShantiSanghaWidget */,
+				04803C922FB93C7700E03B05 /* ShantiSanghaShare */,
 				045258F02F7B118100A03634 /* Frameworks */,
 				04A24D972F7AFC1400775F13 /* Products */,
 				AAD30E61CB8C3C0D28AE320A /* ShantiSanghaTests */,
@@ -156,6 +182,7 @@
 				04A24D962F7AFC1400775F13 /* ShantiSangha.app */,
 				EB354C813E86D53BA84588A6 /* ShantiSanghaTests.xctest */,
 				04546F672F8B19B20026D26F /* ShantiSanghaWidgetExtension.appex */,
+				04803C912FB93C7700E03B05 /* ShantiSanghaShare.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -225,6 +252,28 @@
 			productReference = 04546F672F8B19B20026D26F /* ShantiSanghaWidgetExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		04803C902FB93C7700E03B05 /* ShantiSanghaShare */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 04803C9F2FB93C7700E03B05 /* Build configuration list for PBXNativeTarget "ShantiSanghaShare" */;
+			buildPhases = (
+				04803C8D2FB93C7700E03B05 /* Sources */,
+				04803C8E2FB93C7700E03B05 /* Frameworks */,
+				04803C8F2FB93C7700E03B05 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				04803C922FB93C7700E03B05 /* ShantiSanghaShare */,
+			);
+			name = ShantiSanghaShare;
+			packageProductDependencies = (
+			);
+			productName = ShantiSanghaShare;
+			productReference = 04803C912FB93C7700E03B05 /* ShantiSanghaShare.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		04A24D952F7AFC1400775F13 /* ShantiSangha */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 04A24DA12F7AFC1600775F13 /* Build configuration list for PBXNativeTarget "ShantiSangha" */;
@@ -238,6 +287,7 @@
 			);
 			dependencies = (
 				04546F792F8B19B30026D26F /* PBXTargetDependency */,
+				04803C9A2FB93C7700E03B05 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				04A24D982F7AFC1400775F13 /* ShantiSangha */,
@@ -267,6 +317,9 @@
 					04546F662F8B19B20026D26F = {
 						CreatedOnToolsVersion = 26.4;
 					};
+					04803C902FB93C7700E03B05 = {
+						CreatedOnToolsVersion = 26.4;
+					};
 					04A24D952F7AFC1400775F13 = {
 						CreatedOnToolsVersion = 15.4;
 					};
@@ -293,12 +346,20 @@
 				04A24D952F7AFC1400775F13 /* ShantiSangha */,
 				036D118A165478DCC2E12937 /* ShantiSanghaTests */,
 				04546F662F8B19B20026D26F /* ShantiSanghaWidgetExtension */,
+				04803C902FB93C7700E03B05 /* ShantiSanghaShare */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		04546F652F8B19B20026D26F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		04803C8F2FB93C7700E03B05 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -323,6 +384,13 @@
 
 /* Begin PBXSourcesBuildPhase section */
 		04546F632F8B19B20026D26F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		04803C8D2FB93C7700E03B05 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -357,6 +425,11 @@
 			isa = PBXTargetDependency;
 			target = 04546F662F8B19B20026D26F /* ShantiSanghaWidgetExtension */;
 			targetProxy = 04546F782F8B19B30026D26F /* PBXContainerItemProxy */;
+		};
+		04803C9A2FB93C7700E03B05 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 04803C902FB93C7700E03B05 /* ShantiSanghaShare */;
+			targetProxy = 04803C992FB93C7700E03B05 /* PBXContainerItemProxy */;
 		};
 		5DD37EA92576EE2B44565BD1 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -420,6 +493,66 @@
 				);
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.shantisangha.app.ShantiSanghaWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		04803C9C2FB93C7700E03B05 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ShantiSanghaShare/ShantiSanghaShare.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BN6WSF9259;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ShantiSanghaShare/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ShantiSanghaShare;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.shantisangha.app.ShantiSanghaShare;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		04803C9D2FB93C7700E03B05 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ShantiSanghaShare/ShantiSanghaShare.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = BN6WSF9259;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ShantiSanghaShare/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ShantiSanghaShare;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.shantisangha.app.ShantiSanghaShare;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -670,6 +803,15 @@
 			buildConfigurations = (
 				04546F7D2F8B19B30026D26F /* Debug */,
 				04546F7E2F8B19B30026D26F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		04803C9F2FB93C7700E03B05 /* Build configuration list for PBXNativeTarget "ShantiSanghaShare" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				04803C9C2FB93C7700E03B05 /* Debug */,
+				04803C9D2FB93C7700E03B05 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

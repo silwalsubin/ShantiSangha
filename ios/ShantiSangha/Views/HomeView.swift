@@ -30,6 +30,7 @@ struct HomeView: View {
     /// next dictation starts from an empty slate.
     @State private var voicePrefill: String = ""
     @StateObject private var notifications = NotificationsViewModel()
+    @StateObject private var deepLinks = DeepLinkRouter.shared
     @Environment(\.scenePhase) private var scenePhase
     private let promptHintTimer = Timer.publish(every: 3.4, on: .main, in: .common).autoconnect()
     private static let promptHints = [
@@ -116,9 +117,21 @@ struct HomeView: View {
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
                     Task { await notifications.refreshUnreadCount() }
+                    // Cold-launch hand-off from the share extension can
+                    // land before `.onOpenURL` fires (or instead of it,
+                    // if iOS swallows the URL). Draining on every
+                    // foreground covers both paths.
+                    deepLinks.consumeSharedText()
                 }
             }
             .onAppear(perform: normalizeHomeHorizon)
+            .onAppear { deepLinks.consumeSharedText() }
+            .onChange(of: deepLinks.pendingSharedText) { _, text in
+                guard let text, !text.isEmpty else { return }
+                voicePrefill = text
+                showChatSheet = true
+                deepLinks.clearSharedText()
+            }
 
             chatAffordance
                 .padding(.horizontal, SacredSpacing.m)
@@ -394,6 +407,7 @@ struct HomeView: View {
                 label: r.label,
                 date: r.date,
                 daysRemaining: r.localDaysRemaining,
+                recurrence: r.recurrence.rawValue,
                 connectionLabel: connectionLabel(for: r))
         }
         WidgetData.update(
