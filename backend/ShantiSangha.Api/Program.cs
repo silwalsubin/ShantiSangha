@@ -164,7 +164,30 @@ try
                         DangerousAcceptAnyServerCertificate = true,
                     },
                 },
+            })
+        .AddTransforms(transformBuilderContext =>
+        {
+            // Rewrite the Location header on 3xx responses so the gateway's
+            // absolute redirects (e.g. `/sso/Login`) stay inside the proxy
+            // namespace (`/api/ibkr-gateway/sso/Login`). Without this the
+            // browser follows /sso/Login back to the frontend SPA and the
+            // IBKR login flow dies on the first redirect.
+            if (transformBuilderContext.Route.RouteId != "ibkr-gateway") return;
+            transformBuilderContext.AddResponseTransform(async ctx =>
+            {
+                await Task.CompletedTask;
+                var resp = ctx.ProxyResponse;
+                if (resp is null) return;
+                if (!resp.Headers.TryGetValues("Location", out var locValues)) return;
+                var loc = locValues.FirstOrDefault();
+                if (string.IsNullOrEmpty(loc)) return;
+                // Only rewrite same-origin absolute paths; full URLs (e.g.
+                // sso.interactivebrokers.com) pass through untouched.
+                if (!loc.StartsWith("/") || loc.StartsWith("//")) return;
+                if (loc.StartsWith("/api/ibkr-gateway")) return;
+                ctx.HttpContext.Response.Headers["Location"] = "/api/ibkr-gateway" + loc;
             });
+        });
 
     // ── Controller discovery from domain assemblies ─────────────────────
     builder.Services.AddControllers()
