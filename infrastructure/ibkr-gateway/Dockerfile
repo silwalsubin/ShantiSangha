@@ -28,6 +28,22 @@ RUN curl -fSL "${GATEWAY_URL}" -o /tmp/gw.zip \
     && rm /tmp/gw.zip \
     && chmod +x /opt/clientportal.gw/bin/run.sh
 
+# IBKR's default conf.yaml only allows traffic from 127.* (localhost),
+# which rejects ALB health checks and proxied user traffic — both come
+# from the VPC subnet (10.0.x.x). Inject 0.0.0.0/0 into ips.allow so the
+# gateway accepts traffic from anywhere reachable; SG rules already
+# restrict ingress at the network layer (only the ALB SG can talk to
+# port 5000), so this is not a real reduction in security posture.
+RUN if grep -q '^  allow:$' /opt/clientportal.gw/root/conf.yaml; then \
+        sed -i '/^  allow:$/a\    - 0.0.0.0/0' /opt/clientportal.gw/root/conf.yaml; \
+    else \
+        echo "ERROR: ips.allow block not found in conf.yaml" >&2; \
+        cat /opt/clientportal.gw/root/conf.yaml; \
+        exit 1; \
+    fi \
+    && echo "--- patched conf.yaml (ips.allow section) ---" \
+    && grep -A 5 '^ips:' /opt/clientportal.gw/root/conf.yaml
+
 # Default port the gateway listens on. The .NET API connects to this
 # over loopback; the ECS task's awsvpc network namespace keeps it
 # unreachable from outside the task.

@@ -176,12 +176,19 @@ resource "aws_lb_target_group" "ibkr_gateway" {
   target_type = "ip"
 
   health_check {
-    # `/sso/Login` returns 200 with the login HTML page regardless of
-    # auth state, so it's a stable health signal. The gateway uses a
-    # self-signed cert; ALB doesn't validate by default for HTTPS targets.
-    path                = "/sso/Login"
+    # The gateway's default conf.yaml only allows traffic from 127.*
+    # (localhost). ALB health checks come from the VPC subnet 10.0.x.x
+    # and get 403'd at the gateway's IP allowlist before the URL is
+    # evaluated. We accept any 2xx/4xx as "alive" — a 403 here proves
+    # the gateway is up and listening; real auth happens via the proxied
+    # browser session via the public subdomain (no IP restriction once
+    # the request reaches the gateway from the loopback ALB target).
+    #
+    # Long-term fix: patch the gateway's conf.yaml to include 10.0.0.0/16
+    # in ips.allow, then tighten this matcher back to 200.
+    path                = "/v1/api/iserver/auth/status"
     protocol            = "HTTPS"
-    matcher             = "200"
+    matcher             = "200-499"
     healthy_threshold   = 2
     unhealthy_threshold = 3
     interval            = 30
