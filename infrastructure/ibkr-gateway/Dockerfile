@@ -28,27 +28,18 @@ RUN curl -fSL "${GATEWAY_URL}" -o /tmp/gw.zip \
     && rm /tmp/gw.zip \
     && chmod +x /opt/clientportal.gw/bin/run.sh
 
-# IBKR's default conf.yaml only allows traffic from a fixed set of IP
-# ranges (192.*, 131.216.*, 127.0.0.1), which rejects ALB health checks
-# and proxied user traffic — both come from the VPC subnet (10.0.x.x).
-# Inject `- 0.0.0.0/0` into ips.allow so the gateway accepts traffic
-# from anywhere reachable; SG rules already restrict ingress at the
-# network layer (only the ALB SG can talk to port 5000), so this is
-# not a real reduction in security posture.
-#
-# The conf.yaml uses 6-space indent on `allow:` and 8-space on list
-# items (verified by inspecting the upstream zip's content). Hard-fail
-# if the marker isn't found so an upstream format change can't silently
-# produce an unreachable gateway.
-RUN if grep -qE '^[[:space:]]+allow:[[:space:]]*$' /opt/clientportal.gw/root/conf.yaml; then \
-        sed -i '/^[[:space:]]\+allow:[[:space:]]*$/a\        - 0.0.0.0/0' /opt/clientportal.gw/root/conf.yaml; \
-    else \
-        echo "ERROR: ips.allow marker not found in conf.yaml" >&2; \
-        cat /opt/clientportal.gw/root/conf.yaml; \
-        exit 1; \
-    fi \
-    && echo "--- patched conf.yaml ips section ---" \
-    && grep -A 6 -E '^[[:space:]]+ips:[[:space:]]*$' /opt/clientportal.gw/root/conf.yaml
+# Overwrite the gateway's conf.yaml with a vetted copy that adds the
+# VPC CIDR (10.*) to ips.allow. Sed-based patching turned out to be
+# fragile (subtle indent issues in the upstream file), and shipping our
+# own conf.yaml gives us a single auditable source of truth. If IBKR
+# ships a new config option in a future gateway release we'll need to
+# update this file manually — accepted tradeoff for stability.
+COPY conf.yaml /opt/clientportal.gw/root/conf.yaml
+
+# Log the ips section at build time so CI output makes the deployed
+# allowlist easy to verify.
+RUN echo "--- baked conf.yaml ips section ---" \
+    && grep -A 7 'ips:' /opt/clientportal.gw/root/conf.yaml
 
 # Default port the gateway listens on. The .NET API connects to this
 # over loopback; the ECS task's awsvpc network namespace keeps it
