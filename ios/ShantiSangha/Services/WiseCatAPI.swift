@@ -68,4 +68,22 @@ enum WiseCatAPI {
     static func runStrategyBacktest() async throws -> StrategyBacktestResult {
         try await ApiService.shared.post("/wisecat/strategy/backtest")
     }
+
+    // ---------- IBKR broker link -------------------------------------------
+
+    static func getIbkrStatus() async throws -> IbkrStatus {
+        try await ApiService.shared.get("/wisecat/ibkr/status")
+    }
+
+    static func linkIbkr() async throws -> IbkrSyncResult {
+        try await ApiService.shared.post("/wisecat/ibkr/link")
+    }
+
+    static func resyncIbkr() async throws -> IbkrSyncResult {
+        try await ApiService.shared.post("/wisecat/ibkr/resync")
+    }
+
+    static func unlinkIbkr() async throws {
+        try await ApiService.shared.delete("/wisecat/ibkr/unlink")
+    }
 }

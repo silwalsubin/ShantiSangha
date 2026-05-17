@@ -102,3 +102,34 @@ struct PortfolioPlan: Codable {
     let sectorBreakdown: [SectorAllocation]
     let actions: [PortfolioAction]
 }
+
+// MARK: - IBKR broker link
+
+/// Mirrors IbkrStatusDto on the .NET side. `status` is one of
+/// "Active", "NeedsReauth", "Disconnected", "Suspended". When Active,
+/// manual add/remove is blocked server-side and the iOS UI should hide
+/// those affordances. Cash + positions are sourced from the broker.
+struct IbkrStatus: Codable, Equatable {
+    let status: String
+    let ibkrAccountId: String?
+    let linkedAt: String?
+    let lastSyncAt: String?
+    let lastSuccessfulSyncAt: String?
+    let lastErrorMessage: String?
+    let baseCurrency: String
+    let cashBalance: Double
+    let cashBalanceAt: String?
+
+    var isLinked: Bool { status == "Active" }
+    var needsReauth: Bool { status == "NeedsReauth" }
+}
+
+struct IbkrSyncResult: Codable {
+    let success: Bool
+    let positionsImported: Int
+    let positionsSkipped: Int
+    let cashBalance: Double
+    let baseCurrency: String
+    let status: String
+    let errorMessage: String?
+}

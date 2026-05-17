@@ -10,8 +10,14 @@ public class PortfolioService(
     TradingDbContext db,
     IMarketDataClient marketData,
     IStrategySettingsService strategySettings,
+    IIbkrPortfolioSyncService ibkrSync,
     ILogger<PortfolioService> logger) : IPortfolioService
 {
+    // Lazy-refresh threshold for IBKR-synced portfolios when /portfolio/plan
+    // hits. Tighter than the scheduled job (15m) so that an iOS open right
+    // after a trade still sees the right shape, but loose enough that we
+    // don't hammer the Lambda on every refresh.
+    private static readonly TimeSpan IbkrPlanRefreshMaxAge = TimeSpan.FromMinutes(5);
     // ---------- Defaults — overridden per-user via UserStrategySettings --
     // (All thresholds now come from UserStrategySettings; constants kept
     // only as fallback for older callers.)
@@ -48,6 +54,7 @@ public class PortfolioService(
         IReadOnlyList<SavePortfolioPosition> positions,
         CancellationToken ct = default)
     {
+        await GuardManualEditAsync(userId, ct);
         // Validate first — reject the whole save on any bad row.
         var clean = new List<(string Ticker, decimal Shares, decimal CostBasis)>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -93,6 +100,7 @@ public class PortfolioService(
         SavePortfolioPosition position,
         CancellationToken ct = default)
     {
+        await GuardManualEditAsync(userId, ct);
         var ticker = (position.Ticker ?? string.Empty).Trim().ToUpperInvariant();
         if (string.IsNullOrEmpty(ticker) || ticker.Length > 16)
             throw new InvalidOperationException($"ticker must be 1-16 characters: '{position.Ticker}'");
@@ -128,6 +136,7 @@ public class PortfolioService(
         string ticker,
         CancellationToken ct = default)
     {
+        await GuardManualEditAsync(userId, ct);
         ticker = (ticker ?? string.Empty).Trim().ToUpperInvariant();
         var row = await db.UserPortfolioPositions
             .FirstOrDefaultAsync(p => p.UserId == userId && p.Ticker == ticker, ct);
@@ -180,6 +189,22 @@ public class PortfolioService(
         decimal? cashBalance,
         CancellationToken ct = default)
     {
+        // If this user has a linked-and-active IBKR account, opportunistically
+        // refresh positions + cash before computing the plan. Errors are
+        // swallowed inside the sync service — we never block plan rendering
+        // on broker availability.
+        await ibkrSync.RefreshIfStaleAsync(userId, IbkrPlanRefreshMaxAge, ct);
+
+        // When IBKR is linked, the broker-side cash balance overrides whatever
+        // the caller passed in the ?cash= query param. Manual-mode users keep
+        // the existing behavior.
+        var ibkrAccount = await db.IbkrAccounts
+            .FirstOrDefaultAsync(a => a.UserId == userId, ct);
+        if (ibkrAccount is { Status: IbkrAccountStatus.Active })
+        {
+            cashBalance = ibkrAccount.CashBalance;
+        }
+
         // Pull the user's tunable rule constants. First call seeds defaults
         // (Mode D active-trader profile: -7% stop, +10% TP, 1W p_buy ≥ 0.60).
         var settings = await strategySettings.GetOrCreateAsync(userId, ct);
@@ -785,6 +810,24 @@ public class PortfolioService(
             _ => ts.Horizon1M,
         };
         return (h.PBuy, h.PSell);
+    }
+
+    /// <summary>
+    /// Block manual portfolio mutations when the user has an Active IBKR
+    /// link. Broker positions are the source of truth; allowing manual
+    /// add/remove would let the local table drift before the next sync
+    /// overwrites it (and the user would think their edit "stuck").
+    /// </summary>
+    private async Task GuardManualEditAsync(Guid userId, CancellationToken ct)
+    {
+        var linked = await db.IbkrAccounts
+            .Where(a => a.UserId == userId && a.Status == IbkrAccountStatus.Active)
+            .AnyAsync(ct);
+        if (linked)
+        {
+            throw new InvalidOperationException(
+                "Portfolio is synced from IBKR — manual edits are disabled. Unlink the broker first to edit manually.");
+        }
     }
 
     private async Task BackfillAsync(string ticker, DateOnly fromDate, CancellationToken ct)

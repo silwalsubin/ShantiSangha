@@ -75,12 +75,14 @@ struct WiseCatView: View {
                         VStack(spacing: SacredSpacing.l) {
                             if let plan = vm.plan, plan.positionCount > 0 {
                                 summary(plan)
+                                ibkrSection
                                 holdingsSection(plan)
                             } else if vm.generatingPlan || vm.loading {
                                 ProgressView()
                                     .tint(.sacredGold)
                                     .frame(maxWidth: .infinity, minHeight: 200)
                             } else {
+                                ibkrSection
                                 emptyState
                             }
 
@@ -579,6 +581,122 @@ struct WiseCatView: View {
             }
             .padding(SacredSpacing.lux)
         }
+    }
+
+    /// Status row for the IBKR broker link. Shows last-sync time when
+    /// linked, a "Connect IBKR" CTA when not, and a "Re-link required"
+    /// banner when the OAuth session has expired. Tapped to resync /
+    /// link / unlink as appropriate.
+    @ViewBuilder
+    private var ibkrSection: some View {
+        if let status = vm.ibkrStatus {
+            if status.isLinked {
+                ibkrLinkedRow(status)
+            } else if status.needsReauth {
+                ibkrReauthRow(status)
+            } else {
+                ibkrConnectRow
+            }
+        } else {
+            ibkrConnectRow
+        }
+    }
+
+    private func ibkrLinkedRow(_ status: IbkrStatus) -> some View {
+        let synced = relativeSyncLabel(status.lastSuccessfulSyncAt)
+        return HStack(spacing: SacredSpacing.s) {
+            Image(systemName: "link.circle.fill")
+                .foregroundColor(.sacredGreen)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Synced from IBKR")
+                    .font(.sacredSmallSemibold)
+                    .foregroundColor(.sacredText)
+                Text(synced + " · " + (status.ibkrAccountId ?? ""))
+                    .font(.sacredCaption)
+                    .foregroundColor(.sacredTextSecondary)
+            }
+            Spacer()
+            if vm.ibkrSyncing {
+                ProgressView().tint(.sacredGold)
+            } else {
+                Button("Resync") {
+                    Task { await vm.resyncIbkr() }
+                }
+                .font(.sacredSmallSemibold)
+                .foregroundColor(.sacredGold)
+            }
+        }
+        .padding(.horizontal, SacredSpacing.m)
+        .padding(.vertical, SacredSpacing.s)
+        .background(Color.sacredCard)
+        .cornerRadius(12)
+    }
+
+    private func ibkrReauthRow(_ status: IbkrStatus) -> some View {
+        HStack(spacing: SacredSpacing.s) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.sacredRed)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("IBKR link expired")
+                    .font(.sacredSmallSemibold)
+                    .foregroundColor(.sacredText)
+                Text(status.lastErrorMessage ?? "Re-link to resume live sync")
+                    .font(.sacredCaption)
+                    .foregroundColor(.sacredTextSecondary)
+                    .lineLimit(2)
+            }
+            Spacer()
+            Button("Re-link") {
+                Task { await vm.linkIbkr() }
+            }
+            .font(.sacredSmallSemibold)
+            .foregroundColor(.sacredGold)
+        }
+        .padding(.horizontal, SacredSpacing.m)
+        .padding(.vertical, SacredSpacing.s)
+        .background(Color.sacredCard)
+        .cornerRadius(12)
+    }
+
+    private var ibkrConnectRow: some View {
+        Button {
+            Task { await vm.linkIbkr() }
+        } label: {
+            HStack(spacing: SacredSpacing.s) {
+                Image(systemName: "link")
+                    .foregroundColor(.sacredGold)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Connect Interactive Brokers")
+                        .font(.sacredSmallSemibold)
+                        .foregroundColor(.sacredText)
+                    Text("Pull live positions and cash directly from your account.")
+                        .font(.sacredCaption)
+                        .foregroundColor(.sacredTextSecondary)
+                        .lineLimit(2)
+                }
+                Spacer()
+                if vm.ibkrSyncing {
+                    ProgressView().tint(.sacredGold)
+                } else {
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(.sacredMuted)
+                }
+            }
+            .padding(.horizontal, SacredSpacing.m)
+            .padding(.vertical, SacredSpacing.s)
+            .background(Color.sacredCard)
+            .cornerRadius(12)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func relativeSyncLabel(_ iso: String?) -> String {
+        guard let iso, let date = ISO8601DateFormatter().date(from: iso) else {
+            return "Just now"
+        }
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .short
+        return f.localizedString(for: date, relativeTo: Date())
     }
 
     // MARK: - Helpers

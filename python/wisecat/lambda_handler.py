@@ -24,6 +24,15 @@ from .finnhub_client import (
     healthcheck,
     search_symbols,
 )
+from .ibkr_client import (
+    IbkrUnauthorized,
+    IbkrUnavailable,
+    get_accounts as ibkr_get_accounts,
+    get_auth_status as ibkr_get_auth_status,
+    get_ledger as ibkr_get_ledger,
+    get_positions as ibkr_get_positions,
+    resolve_contract as ibkr_resolve_contract,
+)
 from .scoring import score_ticker
 from .settings import settings
 from .yfinance_client import YFinanceUnavailable, get_full_history, get_intraday_history
@@ -51,8 +60,41 @@ def handler(event: dict, context: Any) -> dict:
         return _chart_history(event)
     if action == "tickerProfiles":
         return _ticker_profiles(event)
+    if action == "ibkrAuthStatus":
+        return _ibkr_safe(ibkr_get_auth_status)
+    if action == "ibkrAccounts":
+        return _ibkr_safe(ibkr_get_accounts)
+    if action == "ibkrPositions":
+        account_id = event.get("accountId")
+        if not account_id:
+            raise ValueError("'accountId' required for ibkrPositions")
+        return _ibkr_safe(lambda: ibkr_get_positions(account_id))
+    if action == "ibkrLedger":
+        account_id = event.get("accountId")
+        if not account_id:
+            raise ValueError("'accountId' required for ibkrLedger")
+        return _ibkr_safe(lambda: ibkr_get_ledger(account_id))
+    if action == "ibkrContractInfo":
+        conid = event.get("conid")
+        if conid is None:
+            raise ValueError("'conid' required for ibkrContractInfo")
+        return _ibkr_safe(lambda: ibkr_resolve_contract(int(conid)))
 
     raise ValueError(f"unknown action: {action}")
+
+
+def _ibkr_safe(fn):
+    """Wrap an IBKR call so OAuth-rejected requests surface as a structured
+    error body the .NET caller can detect (ibkr_unauthorized). Other failures
+    propagate as FunctionError so the .NET side keeps the existing status."""
+    try:
+        return fn()
+    except IbkrUnauthorized as e:
+        logger.warning("IBKR unauthorized: %s", e)
+        return {"error": "ibkr_unauthorized", "message": str(e)}
+    except IbkrUnavailable as e:
+        logger.warning("IBKR unavailable: %s", e)
+        raise
 
 
 def _healthz() -> dict:

@@ -22,9 +22,12 @@ public static class DependencyInjection
         services.AddScoped<IPortfolioService, PortfolioService>();
         services.AddScoped<IStrategySettingsService, StrategySettingsService>();
         services.AddScoped<IStrategyBacktestService, StrategyBacktestService>();
+        services.AddScoped<IIbkrClient, IbkrClient>();
+        services.AddScoped<IIbkrPortfolioSyncService, IbkrPortfolioSyncService>();
 
         services.AddScoped<RefreshMarketDataJob>();
         services.AddScoped<GenerateDailyTradingSignalsJob>();
+        services.AddScoped<IbkrPortfolioSyncJob>();
 
         // AWS Lambda client — uses the default credential chain, which on
         // ECS Fargate resolves to the task role automatically.

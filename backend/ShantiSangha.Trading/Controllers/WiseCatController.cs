@@ -1,7 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using ShantiSangha.Shared.Interfaces;
 using ShantiSangha.Trading.Contracts;
+using ShantiSangha.Trading.Data;
+using ShantiSangha.Trading.Models;
 using ShantiSangha.Trading.Services;
 
 namespace ShantiSangha.Trading.Controllers;
@@ -15,6 +18,8 @@ public class WiseCatController(
     IPortfolioService portfolio,
     IStrategySettingsService strategySettings,
     IStrategyBacktestService backtest,
+    IIbkrPortfolioSyncService ibkrSync,
+    TradingDbContext db,
     ICurrentUser currentUser) : ControllerBase
 {
     [HttpGet("signals")]
@@ -196,4 +201,84 @@ public class WiseCatController(
     private static StrategySettingsDto ToDto(ShantiSangha.Trading.Models.UserStrategySettings r) =>
         new(r.StopLossPct, r.TakeProfitPct, r.EntryThresholdPBuy, r.EntryHorizon,
             r.CooldownDays, r.PositionCapPct, r.MinSectors, r.SellSignalPSell, r.UpdatedAt);
+
+    // ---------- IBKR broker link (OAuth Web API) ---------------------------
+
+    [HttpGet("ibkr/status")]
+    public async Task<IActionResult> GetIbkrStatus(CancellationToken ct = default)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+
+        var account = await db.IbkrAccounts.FirstOrDefaultAsync(a => a.UserId == user.Id, ct);
+        if (account is null)
+        {
+            return Ok(new IbkrStatusDto(
+                Status: IbkrAccountStatus.Disconnected.ToString(),
+                IbkrAccountId: null,
+                LinkedAt: null,
+                LastSyncAt: null,
+                LastSuccessfulSyncAt: null,
+                LastErrorMessage: null,
+                BaseCurrency: "USD",
+                CashBalance: 0m,
+                CashBalanceAt: null));
+        }
+
+        return Ok(new IbkrStatusDto(
+            Status: account.Status.ToString(),
+            IbkrAccountId: account.IbkrAccountId,
+            LinkedAt: account.LinkedAt,
+            LastSyncAt: account.LastSyncAt,
+            LastSuccessfulSyncAt: account.LastSuccessfulSyncAt,
+            LastErrorMessage: account.LastErrorMessage,
+            BaseCurrency: account.BaseCurrency,
+            CashBalance: account.CashBalance,
+            CashBalanceAt: account.CashBalanceAt));
+    }
+
+    [HttpPost("ibkr/link")]
+    public async Task<IActionResult> LinkIbkr(CancellationToken ct = default)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+        try
+        {
+            var result = await ibkrSync.LinkAsync(user.Id, ct);
+            return Ok(ToDto(result));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpPost("ibkr/resync")]
+    public async Task<IActionResult> ResyncIbkr(CancellationToken ct = default)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+        try
+        {
+            var result = await ibkrSync.SyncAsync(user.Id, ct);
+            return Ok(ToDto(result));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    [HttpPost("ibkr/unlink")]
+    public async Task<IActionResult> UnlinkIbkr(CancellationToken ct = default)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+        await ibkrSync.UnlinkAsync(user.Id, ct);
+        return NoContent();
+    }
+
+    private static IbkrSyncResultDto ToDto(IbkrSyncResult r) =>
+        new(r.Success, r.PositionsImported, r.PositionsSkipped, r.CashBalance,
+            r.BaseCurrency, r.Status.ToString(), r.ErrorMessage);
 }

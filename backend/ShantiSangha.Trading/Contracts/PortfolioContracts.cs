@@ -153,3 +153,39 @@ public record StrategyBacktestResultDto(
     double SharpeApprox,            // mean / stdev of monthly returns × sqrt(12)
     string Notes                    // free-form caveats from the runner
 );
+
+// ---------- IBKR broker link -----------------------------------------------
+
+/// <summary>
+/// Shape returned by GET /api/wisecat/ibkr/status. When `Status` is
+/// Disconnected, the user has not linked an IBKR account yet — most of
+/// the fields are zero/null. When Active, positions in
+/// UserPortfolioPositions are broker-sourced and manual edits are blocked.
+/// </summary>
+public record IbkrStatusDto(
+    string Status,                   // Active | NeedsReauth | Disconnected | Suspended
+    string? IbkrAccountId,           // IBKR account number, e.g. "U1234567"
+    DateTime? LinkedAt,
+    DateTime? LastSyncAt,
+    DateTime? LastSuccessfulSyncAt,
+    string? LastErrorMessage,
+    string BaseCurrency,
+    decimal CashBalance,
+    DateTime? CashBalanceAt
+);
+
+/// <summary>
+/// Sync result envelope returned by POST /ibkr/link and /ibkr/resync.
+/// `Skipped` covers positions rejected by the v1 filters (non-STK, non-base
+/// currency, or short positions) — surfaced so the user can see the gap
+/// between IBKR app holdings and what WiseCat will trade against.
+/// </summary>
+public record IbkrSyncResultDto(
+    bool Success,
+    int PositionsImported,
+    int PositionsSkipped,
+    decimal CashBalance,
+    string BaseCurrency,
+    string Status,
+    string? ErrorMessage
+);

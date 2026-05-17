@@ -11,6 +11,7 @@ public class TradingDbContext(DbContextOptions<TradingDbContext> options) : DbCo
     public DbSet<TickerSector> TickerSectors => Set<TickerSector>();
     public DbSet<UserStrategySettings> UserStrategySettings => Set<UserStrategySettings>();
     public DbSet<StopOutLedger> StopOutLedgers => Set<StopOutLedger>();
+    public DbSet<IbkrAccount> IbkrAccounts => Set<IbkrAccount>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -45,6 +46,20 @@ public class TradingDbContext(DbContextOptions<TradingDbContext> options) : DbCo
             e.Property(p => p.Ticker).HasMaxLength(16).IsRequired();
             e.Property(p => p.Shares).HasPrecision(18, 6);
             e.Property(p => p.CostBasis).HasPrecision(18, 4);
+            e.Property(p => p.Source).HasConversion<string>().HasMaxLength(8).IsRequired();
+            e.Property(p => p.ExternalAccountId).HasMaxLength(32);
+            e.Property(p => p.ExternalPositionId).HasMaxLength(32);
+        });
+
+        modelBuilder.Entity<IbkrAccount>(e =>
+        {
+            e.HasKey(a => a.Id);
+            e.HasIndex(a => a.UserId).IsUnique();
+            e.Property(a => a.IbkrAccountId).HasMaxLength(32).IsRequired();
+            e.Property(a => a.Status).HasConversion<string>().HasMaxLength(16).IsRequired();
+            e.Property(a => a.BaseCurrency).HasMaxLength(8).IsRequired();
+            e.Property(a => a.CashBalance).HasPrecision(18, 4);
+            e.Property(a => a.LastErrorMessage).HasMaxLength(512);
         });
 
         modelBuilder.Entity<TickerSector>(e =>

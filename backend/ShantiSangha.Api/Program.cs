@@ -290,6 +290,16 @@ try
                 "wisecat-generate-signals",
                 job => job.RunAsync(),
                 "30 20 * * 1-5");
+
+            // IBKR portfolio refresh — every 15 minutes during US market
+            // hours (Mon–Fri 13:30–21:00 UTC ≈ 9:30am–5pm ET, slack on
+            // either side for pre/post). Skips automatically when no
+            // accounts are linked. OAuth tokens are long-lived so no
+            // separate keepalive job is needed.
+            recurring.AddOrUpdate<ShantiSangha.Trading.Jobs.IbkrPortfolioSyncJob>(
+                "wisecat-ibkr-portfolio-sync",
+                job => job.RunAsync(),
+                "*/15 13-21 * * 1-5");
         }
     }
 
