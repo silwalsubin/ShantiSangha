@@ -1,6 +1,7 @@
 import SwiftUI
 import FirebaseAuth
 import WidgetKit
+import Pow
 
 /// Home screen — daily dashboard with progress circles
 struct HomeView: View {
@@ -24,7 +25,21 @@ struct HomeView: View {
     @State private var showChatSheet = false
     @State private var showCalendar = false
     @State private var promptHintIndex = 0
-    @State private var chatPillBreathing = false
+    /// Subscribes to CoreMotion device tilt so the send button's
+    /// specular highlight orbits as the phone moves. Ref-counted by
+    /// MotionManager — safe to subscribe from multiple views.
+    @ObservedObject private var motion = MotionManager.shared
+
+    /// Synchronized capability hints — each tuple teaches one input
+    /// modality (icon + matching prompt text). The pair rotates as a
+    /// unit so the user learns "this icon means this verb." Single
+    /// source of truth — no separate icon index to keep in sync.
+    private static let capabilityHints: [(icon: String, prompt: String)] = [
+        ("mic.fill", "Speak your mind"),
+        ("pencil", "Write a thought"),
+        ("photo.fill", "Share a picture"),
+        ("square.and.arrow.up.on.square.fill", "Share from other apps"),
+    ]
     /// Transcript captured by the Home pill's mic. Passed through to
     /// AgentChatView when the sheet opens; cleared on dismiss so the
     /// next dictation starts from an empty slate.
@@ -33,12 +48,6 @@ struct HomeView: View {
     @StateObject private var deepLinks = DeepLinkRouter.shared
     @Environment(\.scenePhase) private var scenePhase
     private let promptHintTimer = Timer.publish(every: 3.4, on: .main, in: .common).autoconnect()
-    private static let promptHints = [
-        "Ask anything...",
-        "Reflect on today",
-        "What is on your mind?",
-        "Set an intention"
-    ]
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -133,9 +142,14 @@ struct HomeView: View {
                 deepLinks.clearSharedText()
             }
 
+            // Wider horizontal margins than the page content so the
+            // AI pill reads as visibly narrower than the full-width
+            // tab bar below it — distinct shapes, not stacked twins.
+            // Extra bottom padding gives the eye a clear gap from the
+            // tab bar's capsule.
             chatAffordance
-                .padding(.horizontal, SacredSpacing.m)
-                .padding(.bottom, SacredSpacing.s)
+                .padding(.horizontal, 28)
+                .padding(.bottom, 24)
         }
         .navigationDestination(isPresented: $showChatSheet) {
             AgentChatView(prefill: voicePrefill)
@@ -146,7 +160,7 @@ struct HomeView: View {
         .onReceive(promptHintTimer) { _ in
             guard !showChatSheet else { return }
             withAnimation(.easeInOut(duration: 0.35)) {
-                promptHintIndex = (promptHintIndex + 1) % Self.promptHints.count
+                promptHintIndex = (promptHintIndex + 1) % Self.capabilityHints.count
             }
         }
         .onChange(of: showChatSheet) { _, isShown in
@@ -188,61 +202,212 @@ struct HomeView: View {
     /// (press-and-hold) and on release opens the assistant sheet with
     /// the transcript pre-filled; tap anywhere else on the pill opens
     /// the sheet empty. The chat is a tool — Home is the landing.
+    ///
+    /// Motion layers:
+    /// - `TimelineView` drives a continuously-varying gold border + halo
+    ///   so the pill never reads as a static breathing loop — every
+    ///   pulse is on its own phase.
+    /// - Pow `.shine` sweeps across the pill every ~7s as ambient
+    ///   "alive" signal, plus an additional shine the moment voice text
+    ///   lands so the pill visibly *receives* what was said.
+    /// - The send button glows when voice text arrives (ready to send)
+    ///   and sprays saffron sparkles on tap (summon).
     private var chatAffordance: some View {
-        HStack(spacing: 12) {
-            SacredVoiceInputButton(
-                text: $voicePrefill,
-                size: 28,
-                onComplete: {
-                    if !voicePrefill.trimmingCharacters(in: .whitespaces).isEmpty {
-                        showChatSheet = true
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: false)) { timeline in
+            let t = timeline.date.timeIntervalSinceReferenceDate
+            let reduce = SacredMotion.prefersReducedMotion
+            // Two slightly out-of-phase breathing curves — border vs.
+            // halo — so the pill feels organically alive instead of
+            // pulsing as a single block.
+            let breath = reduce ? 0.5 : (sin(t * 0.55) + 1) * 0.5            // 0..1
+            let haloBreath = reduce ? 0.5 : (sin(t * 0.42 + 1.2) + 1) * 0.5  // 0..1, offset phase
+            let strokeOpacity = 0.18 + breath * 0.22
+            // Halo dialed back so the pill stops competing with the tab
+            // bar's gold accent. The radiance is felt, not seen —
+            // event moments (Pow .shine sweep, send-button glow) carry
+            // the "alive" signal instead.
+            let haloOpacity = 0.05 + haloBreath * 0.08
+            let haloRadius = 7 + haloBreath * 9
+
+            HStack(spacing: 12) {
+                // Capability hint (icon + text) — one big tap target.
+                // The icon teaches modality; the text matches it; both
+                // rotate together on the same index. Non-interactive
+                // mic dictation is intentionally gone — the actual
+                // input picker lives one screen deeper in the chat
+                // sheet, so the pill just promises possibility.
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    showChatSheet = true
+                } label: {
+                    HStack(spacing: 12) {
+                        capabilityIconChip
+                        Text(Self.capabilityHints[promptHintIndex].prompt)
+                            .id(promptHintIndex)
+                            .font(.sacredText)
+                            .foregroundColor(.sacredMuted)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                        Spacer(minLength: 0)
                     }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+
+                sendButton
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 24)
+                    .fill(Color.sacredBgCard)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 24)
+                            .stroke(Color.sacredGold.opacity(strokeOpacity), lineWidth: 1)
+                    )
             )
-
-            Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                showChatSheet = true
-            } label: {
-                HStack(spacing: 0) {
-                    Text(Self.promptHints[promptHintIndex])
-                        .id(promptHintIndex)
-                        .font(.sacredText)
-                        .foregroundColor(.sacredMuted)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                    Spacer(minLength: 0)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                showChatSheet = true
-            } label: {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.system(size: 28))
-                    .foregroundColor(.sacredGold)
-            }
-            .buttonStyle(.plain)
+            .shadow(color: .sacredGold.opacity(haloOpacity), radius: haloRadius, y: 6)
+            .shadow(color: .sacredMuted.opacity(0.14), radius: 14, y: 6)
+            // Ambient shine sweep across the pill every ~7s — only
+            // when the chat sheet isn't already open. Pairs with the
+            // orb's 6s shine on a different phase so the two affordances
+            // breathe together without lining up.
+            .conditionalEffect(
+                .repeat(
+                    .shine(angle: .degrees(25), duration: 1.8),
+                    every: 7.0
+                ),
+                condition: !showChatSheet
+            )
+            // The moment voice text drops in, sweep a brighter shine
+            // across the pill — visible "received" feedback so the
+            // user feels the system caught what they said.
+            .changeEffect(
+                .shine(angle: .degrees(120), duration: 0.8),
+                value: voicePrefill.isEmpty
+            )
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(Color.sacredBgCard)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24)
-                        .stroke(Color.sacredGold.opacity(chatPillBreathing ? 0.34 : 0.18), lineWidth: 1)
-                )
+    }
+
+    /// Small circular chip on the left of the pill — purely
+    /// decorative, rotates through capability icons in lockstep with
+    /// the prompt text. The whole pill is the tap target, so this
+    /// reads as a label, not a button.
+    private var capabilityIconChip: some View {
+        ZStack {
+            Circle()
+                .fill(Color.sacredMuted.opacity(0.20))
+                .frame(width: 32, height: 32)
+
+            Image(systemName: Self.capabilityHints[promptHintIndex].icon)
+                .id(promptHintIndex)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.sacredText.opacity(0.72))
+                .transition(.opacity.combined(with: .scale(scale: 0.7)))
+        }
+        .accessibilityHidden(true)
+    }
+
+    private var sendArmed: Bool {
+        !voicePrefill.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    /// Send button — a miniature sibling of the vajra orb. Same motion
+    /// vocabulary at 28pt: radial-gradient sphere for depth, a
+    /// specular highlight that orbits with device tilt, an "armed"
+    /// pose when voice text is staged (visibly ready to send), and
+    /// custom press physics so the tap lands on the button itself
+    /// before the chat sheet covers it.
+    private var sendButton: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            showChatSheet = true
+        } label: {
+            sendButtonBody
+        }
+        .buttonStyle(SendButtonPressStyle())
+        // Glow flares on voice arrival — the system caught what was said.
+        .changeEffect(
+            .glow(color: .sacredGold, radius: 14),
+            value: voicePrefill.isEmpty
         )
-        .shadow(color: .sacredGold.opacity(chatPillBreathing ? 0.22 : 0.08), radius: chatPillBreathing ? 22 : 10, y: 6)
-        .shadow(color: .sacredMuted.opacity(0.14), radius: 14, y: 6)
-        .onAppear {
-            withAnimation(.easeInOut(duration: 3.2).repeatForever(autoreverses: true)) {
-                chatPillBreathing = true
-            }
+        // Sparkles spray as the chat is summoned. Fires before the
+        // sheet covers it because Pow effects render above all content.
+        .changeEffect(
+            .spray(origin: UnitPoint.center) {
+                Image(systemName: "sparkle")
+                    .foregroundStyle(Color.sacredGold)
+            },
+            value: showChatSheet
+        )
+    }
+
+    private var sendButtonBody: some View {
+        ZStack {
+            // Sphere — radial gradient with the light source offset to
+            // upper-left, so the disc reads as a 3D ball with light
+            // from above. Saturation lifts in the armed state.
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: sendArmed
+                            ? [Color.sacredGoldShine, Color.sacredGold, Color.sacredGoldDark]
+                            : [Color.sacredGoldLight, Color.sacredGold, Color.sacredGoldDark],
+                        center: UnitPoint(x: 0.32, y: 0.28),
+                        startRadius: 1,
+                        endRadius: 18
+                    )
+                )
+
+            // Specular orbiter — a bright thin arc that rides around
+            // the circumference based on `MotionManager.shineAngle`.
+            // Tilt the phone, the highlight slides. Same trick the
+            // vajra orb uses, scaled down for a 28pt disc.
+            Circle()
+                .stroke(
+                    AngularGradient(
+                        stops: [
+                            .init(color: .clear, location: 0),
+                            .init(color: .clear, location: 0.43),
+                            .init(color: Color.sacredGoldShine.opacity(0.7), location: 0.48),
+                            .init(color: Color.white.opacity(0.85), location: 0.5),
+                            .init(color: Color.sacredGoldShine.opacity(0.7), location: 0.52),
+                            .init(color: .clear, location: 0.57),
+                            .init(color: .clear, location: 1)
+                        ],
+                        center: .center
+                    ),
+                    style: StrokeStyle(lineWidth: 1.4, lineCap: .round)
+                )
+                .padding(1)
+                .rotationEffect(specularAngle - .degrees(90))
+                .blur(radius: 0.4)
+
+            // Arrow — bone-cream against the gold disc. Lifts ~1pt
+            // when armed, like a small anticipatory tell that it's
+            // ready to launch.
+            Image(systemName: "arrow.up")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundColor(Color.sacredBg)
+                .offset(y: sendArmed ? -1 : 0)
         }
+        .frame(width: 28, height: 28)
+        .scaleEffect(sendArmed ? 1.06 : 1.0)
+        // Halo lifts when armed — the button feels brighter / more
+        // present without being loud about it.
+        .shadow(
+            color: Color.sacredGold.opacity(sendArmed ? 0.50 : 0.22),
+            radius: sendArmed ? 10 : 6
+        )
+        .animation(
+            SacredMotion.respecting(.spring(response: 0.4, dampingFraction: 0.7)),
+            value: sendArmed
+        )
+        .onAppear { motion.start() }
+        .onDisappear { motion.stop() }
+    }
+
+    private var specularAngle: Angle {
+        SacredMotion.prefersReducedMotion ? .degrees(35) : motion.shineAngle
     }
 
     // MARK: - Reminders section
@@ -772,5 +937,20 @@ private extension String {
     var nonEmpty: String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+/// Custom press style for the send button — tighter scale-down + a
+/// confident spring back. The default `.plain` style has no press
+/// feedback at all, which makes the button feel dead at the moment of
+/// tap (especially since the chat sheet covers it within ~100ms).
+private struct SendButtonPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.88 : 1.0)
+            .animation(
+                .spring(response: 0.28, dampingFraction: 0.55),
+                value: configuration.isPressed
+            )
     }
 }

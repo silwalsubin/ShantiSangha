@@ -1,4 +1,5 @@
 import SwiftUI
+import Pow
 
 /// Row for a single reminder. Tap to edit, swipe right to mark complete.
 /// The swipe-to-complete is reserved for the carried-over list — pass
@@ -138,15 +139,30 @@ struct ReminderRow: View {
 
             if isCompleted {
                 doneBadge
+                    // Poof in — the badge bursts into existence like a
+                    // small magical confirmation. Pairs with the
+                    // strikethrough that already reads as past-tense.
+                    .transition(.movingParts.poof)
             } else if !hideDateBadge && !showDateStamp {
                 Text(dueDateLabel)
                     .font(localDaysRemaining <= 0 ? .sacredSmallSemibold : .sacredSmall)
                     .foregroundColor(dateStatusColor)
+                    .transition(.opacity)
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .opacity(isCompleted ? 0.55 : 1)
+        // Drives the .poof transition above when isCompleted flips.
+        // Without this animation context the transition would snap.
+        .animation(SacredMotion.respecting(SacredMotion.morph), value: isCompleted)
+        // Whole-row gold glow at the moment of completion — like the
+        // entry quietly says "received." Restraint: glow only, no
+        // motion noise.
+        .changeEffect(
+            .glow(color: .sacredGold, radius: 18),
+            value: isCompleted
+        )
         .background(
             Group {
                 if swipeActive {

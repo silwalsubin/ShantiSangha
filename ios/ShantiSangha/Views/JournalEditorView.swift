@@ -1,4 +1,5 @@
 import SwiftUI
+import Pow
 
 /// Journal editor — write or edit a private reflection.
 struct JournalEditorView: View {
@@ -94,7 +95,9 @@ struct JournalEditorView: View {
                     .padding(16)
                 }
 
-                // Status bar
+                // Status bar — each successful save pulses a soft gold
+                // glow around the indicator. The entry feels held by
+                // the system, not just persisted to a database.
                 HStack {
                     if saving {
                         HStack(spacing: 6) {
@@ -107,6 +110,10 @@ struct JournalEditorView: View {
                     } else if let saved = lastSaved {
                         Text("Saved \(saved.formatted(.relative(presentation: .named)))")
                             .font(.sacredSmall).foregroundColor(.sacredMuted)
+                            .changeEffect(
+                                .glow(color: .sacredGold, radius: 12),
+                                value: saved
+                            )
                     }
                     Spacer()
                 }

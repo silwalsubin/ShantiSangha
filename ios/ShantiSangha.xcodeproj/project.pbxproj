@@ -17,6 +17,9 @@
 		0456C3CF9D12840A26ECAA6C /* FeedbackServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95AD8709C353998FDE5BE52E /* FeedbackServiceTests.swift */; };
 		046FDCC62F8C0B11003AE52C /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 046FDCC52F8C0B11003AE52C /* FirebaseMessaging */; };
 		04803C9B2FB93C7700E03B05 /* ShantiSanghaShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 04803C912FB93C7700E03B05 /* ShantiSanghaShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		04A0000000000000000000A3 /* Pow in Frameworks */ = {isa = PBXBuildFile; productRef = 04A0000000000000000000A2 /* Pow */; };
+		04B0000000000000000000B3 /* RiveRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = 04B0000000000000000000B2 /* RiveRuntime */; };
+		04C0000000000000000000C3 /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 04C0000000000000000000C2 /* Lottie */; };
 		04F1A2B3C4D5E6F700000001 /* FriendChatViewModelOutboxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F1A2B3C4D5E6F700000002 /* FriendChatViewModelOutboxTests.swift */; };
 		04F1A2B3C4D5E6F700000003 /* FriendChatTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F1A2B3C4D5E6F700000004 /* FriendChatTestSupport.swift */; };
 		04F1A2B3C4D5E6F700000005 /* FriendChatViewModelEditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 04F1A2B3C4D5E6F700000006 /* FriendChatViewModelEditTests.swift */; };
@@ -139,6 +142,9 @@
 				046FDCC62F8C0B11003AE52C /* FirebaseMessaging in Frameworks */,
 				045258F42F7B118900A03634 /* FirebaseCore in Frameworks */,
 				045258EF2F7B107400A03634 /* GoogleSignInSwift in Frameworks */,
+				04A0000000000000000000A3 /* Pow in Frameworks */,
+				04B0000000000000000000B3 /* RiveRuntime in Frameworks */,
+				04C0000000000000000000C3 /* Lottie in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -299,6 +305,9 @@
 				045258F12F7B118100A03634 /* FirebaseAuth */,
 				045258F32F7B118900A03634 /* FirebaseCore */,
 				046FDCC52F8C0B11003AE52C /* FirebaseMessaging */,
+				04A0000000000000000000A2 /* Pow */,
+				04B0000000000000000000B2 /* RiveRuntime */,
+				04C0000000000000000000C2 /* Lottie */,
 			);
 			productName = ShantiSangha;
 			productReference = 04A24D962F7AFC1400775F13 /* ShantiSangha.app */;
@@ -338,6 +347,9 @@
 			packageReferences = (
 				045258EA2F7B103200A03634 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				045258EB2F7B107400A03634 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+				04A0000000000000000000A1 /* XCRemoteSwiftPackageReference "Pow" */,
+				04B0000000000000000000B1 /* XCRemoteSwiftPackageReference "rive-ios" */,
+				04C0000000000000000000C1 /* XCRemoteSwiftPackageReference "lottie-spm" */,
 			);
 			productRefGroup = 04A24D972F7AFC1400775F13 /* Products */;
 			projectDirPath = "";
@@ -853,6 +865,30 @@
 				minimumVersion = 9.1.0;
 			};
 		};
+		04A0000000000000000000A1 /* XCRemoteSwiftPackageReference "Pow" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/movingparts-io/Pow";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
+		04B0000000000000000000B1 /* XCRemoteSwiftPackageReference "rive-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/rive-app/rive-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.0.0;
+			};
+		};
+		04C0000000000000000000C1 /* XCRemoteSwiftPackageReference "lottie-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/airbnb/lottie-spm";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 4.4.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -880,6 +916,21 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 045258EA2F7B103200A03634 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseMessaging;
+		};
+		04A0000000000000000000A2 /* Pow */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 04A0000000000000000000A1 /* XCRemoteSwiftPackageReference "Pow" */;
+			productName = Pow;
+		};
+		04B0000000000000000000B2 /* RiveRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 04B0000000000000000000B1 /* XCRemoteSwiftPackageReference "rive-ios" */;
+			productName = RiveRuntime;
+		};
+		04C0000000000000000000C2 /* Lottie */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 04C0000000000000000000C1 /* XCRemoteSwiftPackageReference "lottie-spm" */;
+			productName = Lottie;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
