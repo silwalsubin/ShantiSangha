@@ -121,9 +121,11 @@ try
     }
 
     // YARP reverse proxy — exposes the IBKR Client Portal Gateway sidecar
-    // at /ibkr-gateway/* so the user can complete the ~daily IBKR 2FA
-    // login via a browser. Without this the gateway is unreachable
-    // (localhost-only inside the ECS task).
+    // at /api/ibkr-gateway/* so the user can complete the ~daily IBKR 2FA
+    // login via a browser. The /api/* prefix matters: CloudFront routes
+    // /api/* to the ALB; anything else falls through to the S3 origin
+    // (the frontend SPA). Without /api/ the gateway URL would return
+    // index.html instead of being proxied to the sidecar.
     builder.Services
         .AddReverseProxy()
         .LoadFromMemory(
@@ -135,11 +137,11 @@ try
                     ClusterId = "ibkr-gateway-cluster",
                     Match = new Yarp.ReverseProxy.Configuration.RouteMatch
                     {
-                        Path = "/ibkr-gateway/{**catch-all}",
+                        Path = "/api/ibkr-gateway/{**catch-all}",
                     },
                     Transforms = new[]
                     {
-                        new Dictionary<string, string> { ["PathRemovePrefix"] = "/ibkr-gateway" },
+                        new Dictionary<string, string> { ["PathRemovePrefix"] = "/api/ibkr-gateway" },
                     },
                 },
             },
