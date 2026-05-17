@@ -168,12 +168,11 @@ try
             })
         .AddTransforms(transformBuilderContext =>
         {
-            // Rewrite the Location header on 3xx responses so the gateway's
-            // absolute redirects (e.g. `/sso/Login`) stay inside the proxy
-            // namespace (`/api/ibkr-gateway/sso/Login`). Without this the
-            // browser follows /sso/Login back to the frontend SPA and the
-            // IBKR login flow dies on the first redirect.
             if (transformBuilderContext.Route.RouteId != "ibkr-gateway") return;
+
+            // (1) Location header rewrite — same-origin redirects from the
+            // gateway (e.g. `/sso/Login`) get prefixed so the browser stays
+            // inside the proxy namespace.
             transformBuilderContext.AddResponseTransform(async ctx =>
             {
                 await Task.CompletedTask;
@@ -182,11 +181,42 @@ try
                 if (!resp.Headers.TryGetValues("Location", out var locValues)) return;
                 var loc = locValues.FirstOrDefault();
                 if (string.IsNullOrEmpty(loc)) return;
-                // Only rewrite same-origin absolute paths; full URLs (e.g.
-                // sso.interactivebrokers.com) pass through untouched.
                 if (!loc.StartsWith("/") || loc.StartsWith("//")) return;
                 if (loc.StartsWith("/api/ibkr-gateway")) return;
                 ctx.HttpContext.Response.Headers["Location"] = "/api/ibkr-gateway" + loc;
+            });
+
+            // (2) HTML body rewrite — IBKR's gateway emits asset URLs as
+            // absolute paths (`<script src="/static/js/...">`,
+            // `<link href="/css/...">`, `<form action="/sso/...">`). Without
+            // rewriting those, the browser fetches them from the parent
+            // origin (CloudFront → S3 → 404) and the login page renders as
+            // bare HTML with no JS or CSS — just the static footer.
+            //
+            // Approach: stream the HTML response, regex-replace
+            // attribute-value paths that start with `/` (but not `//` and
+            // not already-prefixed), write back. Only fires for
+            // text/html responses; other content types pass through.
+            transformBuilderContext.AddResponseTransform(async ctx =>
+            {
+                var resp = ctx.ProxyResponse;
+                if (resp is null) return;
+                var mediaType = resp.Content?.Headers?.ContentType?.MediaType;
+                if (mediaType != "text/html") return;
+
+                var raw = await resp.Content!.ReadAsByteArrayAsync(ctx.CancellationToken);
+                var html = System.Text.Encoding.UTF8.GetString(raw);
+
+                var rewritten = System.Text.RegularExpressions.Regex.Replace(
+                    html,
+                    "((?:href|src|action|formaction|data-url|data-src)=[\"'])/(?!/|api/ibkr-gateway/)",
+                    "$1/api/ibkr-gateway/",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                var modified = System.Text.Encoding.UTF8.GetBytes(rewritten);
+                ctx.SuppressResponseBody = true;
+                ctx.HttpContext.Response.ContentLength = modified.Length;
+                await ctx.HttpContext.Response.Body.WriteAsync(modified, ctx.CancellationToken);
             });
         });
 
