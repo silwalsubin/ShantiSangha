@@ -113,12 +113,56 @@ try
 
     if (appConfig.WisecatEnabled)
     {
-        builder.Services.AddTradingModule(connStr, appConfig.WisecatFunctionName!);
+        builder.Services.AddTradingModule(connStr, appConfig.WisecatFunctionName!, appConfig.IbkrGatewayBaseUrl);
     }
     else
     {
         Log.Warning("Wise Cat (Trading module) not registered: WISECAT_FUNCTION_NAME missing");
     }
+
+    // YARP reverse proxy — exposes the IBKR Client Portal Gateway sidecar
+    // at /ibkr-gateway/* so the user can complete the ~daily IBKR 2FA
+    // login via a browser. Without this the gateway is unreachable
+    // (localhost-only inside the ECS task).
+    builder.Services
+        .AddReverseProxy()
+        .LoadFromMemory(
+            new[]
+            {
+                new Yarp.ReverseProxy.Configuration.RouteConfig
+                {
+                    RouteId = "ibkr-gateway",
+                    ClusterId = "ibkr-gateway-cluster",
+                    Match = new Yarp.ReverseProxy.Configuration.RouteMatch
+                    {
+                        Path = "/ibkr-gateway/{**catch-all}",
+                    },
+                    Transforms = new[]
+                    {
+                        new Dictionary<string, string> { ["PathRemovePrefix"] = "/ibkr-gateway" },
+                    },
+                },
+            },
+            new[]
+            {
+                new Yarp.ReverseProxy.Configuration.ClusterConfig
+                {
+                    ClusterId = "ibkr-gateway-cluster",
+                    Destinations = new Dictionary<string, Yarp.ReverseProxy.Configuration.DestinationConfig>
+                    {
+                        ["primary"] = new()
+                        {
+                            Address = appConfig.IbkrGatewayBaseUrl,
+                        },
+                    },
+                    // The gateway terminates TLS with a self-signed cert.
+                    // Loopback inside the ECS task — fine to skip validation.
+                    HttpClient = new Yarp.ReverseProxy.Configuration.HttpClientConfig
+                    {
+                        DangerousAcceptAnyServerCertificate = true,
+                    },
+                },
+            });
 
     // ── Controller discovery from domain assemblies ─────────────────────
     builder.Services.AddControllers()
@@ -294,12 +338,21 @@ try
             // IBKR portfolio refresh — every 15 minutes during US market
             // hours (Mon–Fri 13:30–21:00 UTC ≈ 9:30am–5pm ET, slack on
             // either side for pre/post). Skips automatically when no
-            // accounts are linked. OAuth tokens are long-lived so no
-            // separate keepalive job is needed.
+            // accounts are linked.
             recurring.AddOrUpdate<ShantiSangha.Trading.Jobs.IbkrPortfolioSyncJob>(
                 "wisecat-ibkr-portfolio-sync",
                 job => job.RunAsync(),
                 "*/15 13-21 * * 1-5");
+
+            // IBKR session keepalive — pings /tickle every minute to keep
+            // the gateway's auth cookie warm. Also flips IbkrAccount.Status
+            // to NeedsReauth the moment IBKR's session expires (~daily),
+            // so the iOS app surfaces the "Re-link IBKR" banner without
+            // waiting for the next portfolio refresh to fail.
+            recurring.AddOrUpdate<ShantiSangha.Trading.Jobs.IbkrSessionKeepaliveJob>(
+                "wisecat-ibkr-keepalive",
+                job => job.RunAsync(),
+                "* * * * *");
         }
     }
 
@@ -348,6 +401,11 @@ try
 
     // Controllers from domain projects handle all /api/* routes
     app.MapControllers();
+
+    // IBKR Client Portal Gateway login proxy. Routes `/ibkr-gateway/*` to
+    // the sidecar container at localhost:5000. Requires Clerk auth so only
+    // the owner can complete the IBKR 2FA login flow.
+    app.MapReverseProxy().RequireAuthorization();
 
     // Realtime chat WebSocket — auth + membership handled inside.
     app.MapChatRealtime();

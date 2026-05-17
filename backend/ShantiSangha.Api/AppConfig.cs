@@ -24,6 +24,15 @@ public class AppConfig
     public string? WisecatFunctionName { get; init; }
     public bool WisecatEnabled => !string.IsNullOrEmpty(WisecatFunctionName);
 
+    /// <summary>
+    /// Base URL for the IBKR Client Portal Gateway sidecar. Defaults to
+    /// `https://localhost:5000` which is where the Java gateway listens
+    /// inside the ECS task. The .NET API talks to it over loopback; no
+    /// public network exposure. Override only when running locally for
+    /// dev or swapping in a custom port.
+    /// </summary>
+    public string IbkrGatewayBaseUrl { get; init; } = "https://localhost:5000";
+
     // When true, unhandled exceptions return full details in API responses
     public bool ExposeErrors { get; init; }
 
@@ -67,6 +76,7 @@ public class AppConfig
             LangfuseSecretKey = config["LANGFUSE_SECRET_KEY"],
             LangfuseBaseUrl = config["LANGFUSE_BASE_URL"] ?? "https://cloud.langfuse.com",
             WisecatFunctionName = config["WISECAT_FUNCTION_NAME"],
+            IbkrGatewayBaseUrl = config["IBKR_GATEWAY_BASE_URL"] ?? "https://localhost:5000",
             ExposeErrors = string.Equals(config["EXPOSE_ERRORS"], "true", StringComparison.OrdinalIgnoreCase)
         };
     }

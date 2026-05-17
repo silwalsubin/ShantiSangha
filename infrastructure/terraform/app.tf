@@ -95,6 +95,28 @@ resource "aws_iam_role" "ecs_task" {
   })
 }
 
+# EFS IAM auth — the IBKR gateway sidecar mounts the persistent session
+# volume via `iam = ENABLED`, which means the task role must hold
+# elasticfilesystem:Client* on the file system.
+
+resource "aws_iam_role_policy" "ecs_task_efs" {
+  name = "${var.app_name}-ecs-task-efs"
+  role = aws_iam_role.ecs_task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "elasticfilesystem:ClientMount",
+        "elasticfilesystem:ClientWrite",
+        "elasticfilesystem:ClientRootAccess",
+      ]
+      Resource = aws_efs_file_system.ibkr_gateway.arn
+    }]
+  })
+}
+
 # ECS Cluster
 
 resource "aws_ecs_cluster" "main" {
@@ -127,63 +149,130 @@ resource "aws_ecs_task_definition" "api" {
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
   task_role_arn            = aws_iam_role.ecs_task.arn
 
-  container_definitions = jsonencode([{
-    name      = "${var.app_name}-api"
-    image     = "${aws_ecr_repository.api.repository_url}:latest"
-    essential = true
-
-    portMappings = [{
-      containerPort = 8080
-      protocol      = "tcp"
-    }]
-
-    environment = [
-      { name = "REDIS_URL",              value = local.redis_url },
-      { name = "VOICE_BUCKET_NAME",      value = aws_s3_bucket.voice.bucket },
-      { name = "FRIENDS_MEDIA_BUCKET_NAME", value = aws_s3_bucket.friends_media.bucket },
-      { name = "AWS_REGION",             value = var.aws_region },
-      { name = "LANGFUSE_BASE_URL",      value = "https://cloud.langfuse.com" },
-      { name = "LANGFUSE_PUBLIC_KEY",    value = var.langfuse_public_key },
-      { name = "ASPNETCORE_ENVIRONMENT", value = "Production" },
-      { name = "EXPOSE_ERRORS",          value = "true" },
-      { name = "FIREBASE_PROJECT_ID",   value = "shantisangha-bc0f9" },
-      { name = "FRONTEND_ORIGIN",       value = "https://${var.domain_name},https://${aws_cloudfront_distribution.frontend.domain_name},http://localhost:5173" },
-      { name = "WISECAT_FUNCTION_NAME", value = aws_lambda_function.wisecat.function_name }
-    ]
-
-    secrets = concat([
-      {
-        name      = "DATABASE_URL"
-        valueFrom = aws_secretsmanager_secret.database_url.arn
-      },
-      {
-        name      = "OPENAI_API_KEY"
-        valueFrom = aws_secretsmanager_secret.app["openai_api_key"].arn
-      }
-    ], local.firebase_enabled ? [
-      {
-        name      = "FIREBASE_SERVICE_ACCOUNT_JSON"
-        valueFrom = aws_secretsmanager_secret.firebase[0].arn
-      }
-    ] : [])
-
-    logConfiguration = {
-      logDriver = "awslogs"
-      options = {
-        "awslogs-group"         = aws_cloudwatch_log_group.api.name
-        "awslogs-region"        = var.aws_region
-        "awslogs-stream-prefix" = "ecs"
+  # EFS volume backing the IBKR gateway sidecar's session cookie. Lives
+  # outside the container filesystem so deploys / OOM kills don't force
+  # the user to redo the ~daily IBKR 2FA login.
+  volume {
+    name = "ibkr-gateway-state"
+    efs_volume_configuration {
+      file_system_id     = aws_efs_file_system.ibkr_gateway.id
+      transit_encryption = "ENABLED"
+      authorization_config {
+        access_point_id = aws_efs_access_point.ibkr_gateway.id
+        iam             = "ENABLED"
       }
     }
+  }
 
-    healthCheck = {
-      command     = ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
-      interval    = 30
-      timeout     = 5
-      retries     = 3
-      startPeriod = 60
+  container_definitions = jsonencode([
+    {
+      name      = "${var.app_name}-api"
+      image     = "${aws_ecr_repository.api.repository_url}:latest"
+      essential = true
+
+      portMappings = [{
+        containerPort = 8080
+        protocol      = "tcp"
+      }]
+
+      environment = [
+        { name = "REDIS_URL",              value = local.redis_url },
+        { name = "VOICE_BUCKET_NAME",      value = aws_s3_bucket.voice.bucket },
+        { name = "FRIENDS_MEDIA_BUCKET_NAME", value = aws_s3_bucket.friends_media.bucket },
+        { name = "AWS_REGION",             value = var.aws_region },
+        { name = "LANGFUSE_BASE_URL",      value = "https://cloud.langfuse.com" },
+        { name = "LANGFUSE_PUBLIC_KEY",    value = var.langfuse_public_key },
+        { name = "ASPNETCORE_ENVIRONMENT", value = "Production" },
+        { name = "EXPOSE_ERRORS",          value = "true" },
+        { name = "FIREBASE_PROJECT_ID",   value = "shantisangha-bc0f9" },
+        { name = "FRONTEND_ORIGIN",       value = "https://${var.domain_name},https://${aws_cloudfront_distribution.frontend.domain_name},http://localhost:5173" },
+        { name = "WISECAT_FUNCTION_NAME", value = aws_lambda_function.wisecat.function_name },
+        # Loopback to the sidecar. HTTPS with self-signed cert; the .NET
+        # HttpClient skips cert validation (registered in DependencyInjection.cs).
+        { name = "IBKR_GATEWAY_BASE_URL", value = "https://localhost:5000" }
+      ]
+
+      secrets = concat([
+        {
+          name      = "DATABASE_URL"
+          valueFrom = aws_secretsmanager_secret.database_url.arn
+        },
+        {
+          name      = "OPENAI_API_KEY"
+          valueFrom = aws_secretsmanager_secret.app["openai_api_key"].arn
+        }
+      ], local.firebase_enabled ? [
+        {
+          name      = "FIREBASE_SERVICE_ACCOUNT_JSON"
+          valueFrom = aws_secretsmanager_secret.firebase[0].arn
+        }
+      ] : [])
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.api.name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "ecs"
+        }
+      }
+
+      healthCheck = {
+        command     = ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+        interval    = 30
+        timeout     = 5
+        retries     = 3
+        startPeriod = 60
+      }
+    },
+    {
+      # IBKR Client Portal Gateway sidecar. Listens on 5000 (HTTPS,
+      # self-signed cert). The .NET API talks to it over loopback; YARP
+      # proxies `/ibkr-gateway/*` so the user can complete the daily
+      # 2FA login via a browser. `essential = false` so a gateway crash
+      # doesn't kill the API task — the IBKR sync just flips to Disconnected
+      # status until ECS restarts the container.
+      name      = "ibkr-gateway"
+      image     = "${aws_ecr_repository.ibkr_gateway.repository_url}:latest"
+      essential = false
+
+      portMappings = [{
+        containerPort = 5000
+        protocol      = "tcp"
+      }]
+
+      mountPoints = [{
+        sourceVolume  = "ibkr-gateway-state"
+        containerPath = "/gateway-state"
+        readOnly      = false
+      }]
+
+      environment = [
+        # The Dockerfile mounts /gateway-state for cookies + IBKR-provided
+        # config overrides. Override here only if the image's default
+        # `bin/run.sh root/conf.yaml` invocation needs a different config
+        # path.
+        { name = "IBKR_GATEWAY_STATE_DIR", value = "/gateway-state" }
+      ]
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.api.name
+          "awslogs-region"        = var.aws_region
+          "awslogs-stream-prefix" = "ibkr-gateway"
+        }
+      }
+
+      healthCheck = {
+        command     = ["CMD-SHELL", "curl -fks https://localhost:5000/v1/api/iserver/auth/status || exit 1"]
+        interval    = 30
+        timeout     = 5
+        retries     = 3
+        startPeriod = 60
+      }
     }
-  }])
+  ])
 }
 
 # Application Load Balancer
@@ -244,8 +333,13 @@ resource "aws_ecs_service" "api" {
     container_port   = 8080
   }
 
-  deployment_minimum_healthy_percent = 50
-  deployment_maximum_percent         = 200
+  # IBKR gateway has no clean way to share a session between two concurrent
+  # tasks during a deploy — each new task spawns a fresh unauthenticated
+  # gateway. Force atomic replacement (100/100) so we never have two
+  # half-authed gateways running. Tradeoff: ~30s of cold-start unavailability
+  # on each deploy. Acceptable given low deploy frequency.
+  deployment_minimum_healthy_percent = 100
+  deployment_maximum_percent         = 100
 
   depends_on = [aws_lb_listener.http]
 

@@ -19,15 +19,15 @@ variable "app_name" {
 # --- Compute ---
 
 variable "task_cpu" {
-  description = "ECS Fargate task vCPU units (256, 512, 1024, 2048, 4096)"
+  description = "ECS Fargate task vCPU units (256, 512, 1024, 2048, 4096). Sized for the .NET API + IBKR gateway sidecar (JVM wants ~512MB heap)."
   type        = number
-  default     = 512
+  default     = 1024
 }
 
 variable "task_memory" {
-  description = "ECS Fargate task memory in MB"
+  description = "ECS Fargate task memory in MB. Sized for the .NET API + IBKR gateway sidecar."
   type        = number
-  default     = 1024
+  default     = 2048
 }
 
 variable "desired_count" {
@@ -98,13 +98,6 @@ variable "langfuse_secret_key" {
 
 variable "finnhub_api_key" {
   description = "Finnhub API key — used by the wisecat Python service for market data"
-  type        = string
-  sensitive   = true
-  default     = ""
-}
-
-variable "ibkr_oauth_credentials_json" {
-  description = "IBKR Web API OAuth credentials bundle (JSON with consumer_key, access_token, access_token_secret, signing_private_key_pem, encryption_private_key_pem, dh_prime_hex). Leave empty to disable the IBKR portfolio sync — the WiseCat broker endpoints will return errors when invoked, but the rest of the app is unaffected."
   type        = string
   sensitive   = true
   default     = ""

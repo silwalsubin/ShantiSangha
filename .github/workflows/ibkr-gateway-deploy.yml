@@ -1,0 +1,57 @@
+name: IBKR Gateway Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'infrastructure/ibkr-gateway/**'
+      - '.github/workflows/ibkr-gateway-deploy.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push IBKR gateway image
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: shantisangha-ibkr-gateway
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            -f infrastructure/ibkr-gateway/Dockerfile \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            infrastructure/ibkr-gateway
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      # The ECS task definition references `:latest`; bouncing the service
+      # forces ECS to pull the new image. Backend Deploy already handles
+      # the same thing for the API container — we piggy-back on its
+      # update-service call by triggering it. If you'd rather not bounce
+      # the API, run the AWS Console action "Force new deployment"
+      # manually instead.
+      - name: Force ECS service redeployment
+        run: |
+          aws ecs update-service \
+            --cluster shantisangha-cluster \
+            --service shantisangha-api \
+            --force-new-deployment \
+            --region us-east-1 >/dev/null
+          echo "ECS service redeployment triggered."

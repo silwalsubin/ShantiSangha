@@ -27,18 +27,3 @@ langfuse_secret_key = ""
 
 # Wise Cat — Finnhub API key (free tier covers daily candles + quotes).
 finnhub_api_key = ""
-
-# Wise Cat — IBKR Web API OAuth bundle (optional). Leave "" to disable
-# the IBKR portfolio sync. When populated, Terraform creates the secret
-# at `${app_name}/ibkr_oauth` and grants the wisecat Lambda read access.
-#
-# Shape (escape newlines in the PEM blocks; pasted verbatim to Secrets Manager):
-#   {
-#     "consumer_key": "...",
-#     "access_token": "...",
-#     "access_token_secret": "...",
-#     "signing_private_key_pem": "-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----\n",
-#     "encryption_private_key_pem": "-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----\n",
-#     "dh_prime_hex": "..."
-#   }
-ibkr_oauth_credentials_json = ""
