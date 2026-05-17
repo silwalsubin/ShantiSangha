@@ -67,9 +67,14 @@ resource "aws_iam_role_policy" "wisecat_lambda_secrets" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect   = "Allow"
-      Action   = ["secretsmanager:GetSecretValue"]
-      Resource = aws_secretsmanager_secret.finnhub_api_key.arn
+      Effect = "Allow"
+      Action = ["secretsmanager:GetSecretValue"]
+      # Both secrets the Lambda may read: Finnhub (always) + IBKR OAuth
+      # bundle (only when the credentials TF var is populated).
+      Resource = concat(
+        [aws_secretsmanager_secret.finnhub_api_key.arn],
+        local.ibkr_enabled ? [aws_secretsmanager_secret.ibkr_oauth[0].arn] : []
+      )
     }]
   })
 }
@@ -97,6 +102,10 @@ resource "aws_lambda_function" "wisecat" {
   environment {
     variables = {
       WISECAT_FINNHUB_SECRET_ID = aws_secretsmanager_secret.finnhub_api_key.name
+      # IBKR OAuth bundle secret id. Hardcoded to the conventional path so
+      # the Lambda boots even before the credentials are populated — the
+      # Python side fails only when an IBKR action is actually invoked.
+      WISECAT_IBKR_SECRET_ID    = "${var.app_name}/ibkr_oauth"
       LOG_LEVEL                 = "INFO"
     }
   }

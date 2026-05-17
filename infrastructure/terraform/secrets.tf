@@ -6,6 +6,7 @@ locals {
 
   # nonsensitive() is safe here: it only reveals whether the value is set, not the value itself
   langfuse_enabled = nonsensitive(var.langfuse_secret_key != "")
+  ibkr_enabled     = nonsensitive(var.ibkr_oauth_credentials_json != "")
 }
 
 # Auto-generated database password — no manual management needed
@@ -65,6 +66,22 @@ resource "aws_secretsmanager_secret" "finnhub_api_key" {
 resource "aws_secretsmanager_secret_version" "finnhub_api_key" {
   secret_id     = aws_secretsmanager_secret.finnhub_api_key.id
   secret_string = var.finnhub_api_key
+}
+
+# Wise Cat — IBKR Web API OAuth bundle. Single JSON blob so the consumer
+# key / access token / private keys / DH prime rotate atomically. Optional:
+# when the TF var is empty the secret isn't created and the IBKR endpoints
+# stay dormant. Lambda role's read permission is also gated on this flag
+# (see lambda-wisecat.tf).
+resource "aws_secretsmanager_secret" "ibkr_oauth" {
+  count = local.ibkr_enabled ? 1 : 0
+  name  = "${var.app_name}/ibkr_oauth"
+}
+
+resource "aws_secretsmanager_secret_version" "ibkr_oauth" {
+  count         = local.ibkr_enabled ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.ibkr_oauth[0].id
+  secret_string = var.ibkr_oauth_credentials_json
 }
 
 # Optional: Langfuse

@@ -102,3 +102,10 @@ variable "finnhub_api_key" {
   sensitive   = true
   default     = ""
 }
+
+variable "ibkr_oauth_credentials_json" {
+  description = "IBKR Web API OAuth credentials bundle (JSON with consumer_key, access_token, access_token_secret, signing_private_key_pem, encryption_private_key_pem, dh_prime_hex). Leave empty to disable the IBKR portfolio sync — the WiseCat broker endpoints will return errors when invoked, but the rest of the app is unaffected."
+  type        = string
+  sensitive   = true
+  default     = ""
+}

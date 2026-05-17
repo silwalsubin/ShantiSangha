@@ -628,7 +628,7 @@ struct WiseCatView: View {
         }
         .padding(.horizontal, SacredSpacing.m)
         .padding(.vertical, SacredSpacing.s)
-        .background(Color.sacredCard)
+        .background(Color.sacredBgCard)
         .cornerRadius(12)
     }
 
@@ -654,7 +654,7 @@ struct WiseCatView: View {
         }
         .padding(.horizontal, SacredSpacing.m)
         .padding(.vertical, SacredSpacing.s)
-        .background(Color.sacredCard)
+        .background(Color.sacredBgCard)
         .cornerRadius(12)
     }
 
@@ -684,7 +684,7 @@ struct WiseCatView: View {
             }
             .padding(.horizontal, SacredSpacing.m)
             .padding(.vertical, SacredSpacing.s)
-            .background(Color.sacredCard)
+            .background(Color.sacredBgCard)
             .cornerRadius(12)
         }
         .buttonStyle(.plain)
