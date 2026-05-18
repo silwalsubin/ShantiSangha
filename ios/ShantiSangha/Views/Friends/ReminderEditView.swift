@@ -273,38 +273,19 @@ struct ReminderEditView: View {
         VStack(alignment: .leading, spacing: SacredSpacing.xs) {
             sectionLabel("REPEATS")
             SacredListCard {
-                VStack(spacing: 0) {
-                    recurrenceRow(title: "Every year", value: .yearly)
-                    Divider().padding(.leading, 16)
-                    recurrenceRow(title: "One-time", value: .none)
+                Toggle(isOn: Binding(
+                    get: { recurrenceDraft == .yearly },
+                    set: { recurrenceDraft = $0 ? .yearly : .none }
+                )) {
+                    Text("Every year")
+                        .font(.sacredText)
+                        .foregroundColor(.sacredText)
                 }
+                .tint(.sacredGold)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
             }
         }
-    }
-
-    private func recurrenceRow(
-        title: String,
-        value: ReminderRecurrence
-    ) -> some View {
-        Button {
-            recurrenceDraft = value
-        } label: {
-            HStack(spacing: 12) {
-                Text(title)
-                    .font(.sacredText)
-                    .foregroundColor(.sacredText)
-                Spacer(minLength: 0)
-                if recurrenceDraft == value {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.sacredGold)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 
     /// Owner-only collaborator manager. The header doubles as a preview:
