@@ -482,27 +482,23 @@ struct FriendChatView: View {
 
         // Action row sits on the opposite side of the bubble from the
         // pill so the bubble itself stays visually anchored between
-        // the two affordances.
+        // the two affordances. If the preferred side is off-screen,
+        // stack on the pill's side past the pill. `@ViewBuilder`
+        // refuses bare if/else with deferred-let assignment, so this
+        // is collapsed into a single ternary.
         let actionHeight = ReactionActionRow.height
         let actionGap: CGFloat = 10
         let actionAboveY = bubbleRect.minY - actionGap - actionHeight / 2
         let actionBelowY = bubbleRect.maxY + actionGap + actionHeight / 2
         let actionOnBottom = (bubbleRect.maxY + actionGap + actionHeight) <= (canvas.height - bottomSafe)
-        // If the pill is above, action row goes below (and vice versa).
-        // If the preferred side is off-screen, stack on the pill's side
-        // by pushing the action row past the pill.
-        let actionY: CGFloat
-        if pillOnTop {
-            // Pill above → action row below if room, else above the pill.
-            actionY = actionOnBottom
+        let actionOnTop = (bubbleRect.minY - actionGap - actionHeight) >= topSafe
+        let actionY: CGFloat = pillOnTop
+            ? (actionOnBottom
                 ? actionBelowY
-                : (pillY - pillSize.height / 2 - actionGap - actionHeight / 2)
-        } else {
-            // Pill below → action row above if room, else below the pill.
-            actionY = (bubbleRect.minY - actionGap - actionHeight) >= topSafe
+                : (pillY - pillSize.height / 2 - actionGap - actionHeight / 2))
+            : (actionOnTop
                 ? actionAboveY
-                : (pillY + pillSize.height / 2 + actionGap + actionHeight / 2)
-        }
+                : (pillY + pillSize.height / 2 + actionGap + actionHeight / 2))
 
         ZStack {
             // Tap-anywhere dismiss. A subtle dark veil — enough to push
