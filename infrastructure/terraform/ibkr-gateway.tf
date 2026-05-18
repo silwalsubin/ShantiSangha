@@ -324,11 +324,17 @@ resource "aws_ecs_task_definition" "ibkr_gateway" {
     }
 
     healthCheck = {
-      command     = ["CMD-SHELL", "curl -fks https://localhost:5000/v1/api/iserver/auth/status -o /dev/null || exit 1"]
+      # Accept any HTTP response code as "alive" — the gateway returns 401
+      # for /v1/api/iserver/auth/status when no IBKR session is established
+      # (the common pre-login state) and `curl -f` would treat that as
+      # failure. Without `-f`, curl exits 0 on any response and we keep
+      # the container alive. ECS-level health is separate from IBKR-level
+      # auth state.
+      command     = ["CMD-SHELL", "curl -ks --max-time 5 https://localhost:5000/v1/api/iserver/auth/status -o /dev/null || exit 1"]
       interval    = 30
-      timeout     = 5
+      timeout     = 10
       retries     = 3
-      startPeriod = 60
+      startPeriod = 90
     }
   }])
 }
