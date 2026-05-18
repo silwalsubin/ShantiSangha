@@ -35,15 +35,21 @@ public static class DependencyInjection
         services.AddSingleton<IAmazonLambda>(_ => new AmazonLambdaClient());
         services.AddSingleton(new WisecatLambdaConfig(wisecatFunctionName));
 
-        // IBKR Client Portal Gateway lives in the same ECS task as a
-        // sidecar container, exposed on localhost. The gateway terminates
-        // TLS itself with a self-signed certificate — fine because traffic
-        // never leaves the task's network namespace, but the .NET HTTP
-        // client has to opt out of certificate validation.
+        // IBKR Client Portal Gateway lives in its own ECS service. We hit it
+        // through the public ALB URL (https://gateway.shantisangha.com) so the
+        // request takes the same path the browser login does — direct Cloud
+        // Map → gateway returns 403 Access Denied for reasons we never fully
+        // tracked down, while the ALB path works.
+        //
+        // The gateway proxies to api.ibkr.com behind Akamai. Akamai's edge
+        // rejects requests with an empty User-Agent header as "Access Denied"
+        // (HTTP 403). .NET HttpClient sends no User-Agent by default, so we
+        // have to add one explicitly or every call gets 403'd.
         services.AddHttpClient<IIbkrClient, IbkrClient>(c =>
         {
             c.BaseAddress = new Uri(ibkrGatewayBaseUrl);
             c.Timeout = TimeSpan.FromSeconds(30);
+            c.DefaultRequestHeaders.UserAgent.ParseAdd("ShantiSangha/1.0");
         })
         .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
         {
