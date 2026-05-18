@@ -346,6 +346,12 @@ resource "aws_ecs_service" "ibkr_gateway" {
   desired_count   = 1
   launch_type     = "FARGATE"
 
+  # The IBKR gateway is a JVM that needs ~60s to fully bind port 5000.
+  # Without a grace period the ALB health-checks immediately, sees
+  # connection-refused or non-200 response, and kills the task before
+  # it ever boots. Two minutes covers the JVM cold start with margin.
+  health_check_grace_period_seconds = 120
+
   network_configuration {
     subnets          = aws_subnet.public[*].id
     security_groups  = [aws_security_group.ecs.id]
