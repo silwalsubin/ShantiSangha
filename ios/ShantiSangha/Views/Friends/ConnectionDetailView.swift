@@ -111,12 +111,15 @@ struct ConnectionDetailView: View {
                 onDelete: target.isEditing
                     ? { await deleteDate(target: target) }
                     : nil,
-                onCollaboratorsChanged: {
+                onLivePatch: {
                     if case .edit(let entry) = target {
-                        return { ids in
+                        return { patch in
                             try? await ReminderRepository.shared.update(
                                 id: entry.id,
-                                collaboratorUserIds: ids)
+                                label: patch.label,
+                                date: patch.date,
+                                recurrence: patch.recurrence,
+                                collaboratorUserIds: patch.collaboratorUserIds)
                         }
                     }
                     return nil

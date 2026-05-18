@@ -122,7 +122,7 @@ struct FriendChatView: View {
                     }
                 },
                 onDelete: nil,
-                onCollaboratorsChanged: nil)
+                onLivePatch: nil)
         }
         .sheet(item: $reactionPickerTarget) { target in
             ReactionPickerSheet(

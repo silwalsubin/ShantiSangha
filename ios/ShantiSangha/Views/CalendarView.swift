@@ -101,12 +101,15 @@ struct CalendarView: View {
                     }
                     return nil
                 }(),
-                onCollaboratorsChanged: {
+                onLivePatch: {
                     if case .edit(let r) = target {
-                        return { ids in
+                        return { patch in
                             try? await reminderRepo.update(
                                 id: r.id,
-                                collaboratorUserIds: ids)
+                                label: patch.label,
+                                date: patch.date,
+                                recurrence: patch.recurrence,
+                                collaboratorUserIds: patch.collaboratorUserIds)
                         }
                     }
                     return nil

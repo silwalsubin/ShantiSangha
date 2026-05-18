@@ -1,5 +1,17 @@
 import SwiftUI
 
+/// Partial update sent from `ReminderEditView` to its parent for live
+/// (auto-save) field changes — anything that shouldn't wait for the
+/// top-right Save button. Each field is independently optional; nil
+/// means "don't touch." The callsite turns this into the equivalent
+/// `ReminderRepository.update(...)` call and returns the result.
+struct ReminderLivePatch {
+    var label: String? = nil
+    var date: String? = nil      // yyyy-MM-dd
+    var recurrence: ReminderRecurrence? = nil
+    var collaboratorUserIds: [UUID]? = nil
+}
+
 /// Full-page add / edit reminder. Pushed onto the parent's NavigationStack
 /// from Home (tap a row) and ConnectionDetailView (Important Dates).
 ///
@@ -18,14 +30,13 @@ struct ReminderEditView: View {
                  _ recurrence: ReminderRecurrence,
                  _ collaboratorUserIds: [UUID]?) async -> Void
     let onDelete: (() async -> Void)?
-    /// Auto-save hook for collaborator changes in edit mode. Non-nil
-    /// only when the reminder already exists on the server (so we can
-    /// PATCH it). The picker and per-row remove call this immediately
-    /// instead of waiting for the user to tap Save — collaboration
-    /// changes are high-stakes (people see / lose access, push fires)
-    /// so they commit atomically. Returns the updated reminder so the
-    /// view can refresh its local copy with the server-resolved names.
-    let onCollaboratorsChanged: ((_ collaboratorUserIds: [UUID]) async -> Reminder?)?
+    /// Auto-save hook for live-edit fields (date, recurrence,
+    /// collaborators). Non-nil only when the reminder already exists
+    /// on the server (so we can PATCH it). Called immediately on each
+    /// field change so the user doesn't have to tap Save. Returns the
+    /// updated reminder so the view can refresh its local copies (e.g.
+    /// server-resolved collaborator display names) and stay in sync.
+    let onLivePatch: ((ReminderLivePatch) async -> Reminder?)?
 
     @Environment(\.dismiss) private var dismiss
 
@@ -38,6 +49,16 @@ struct ReminderEditView: View {
     @State private var collaboratorsDraft: [ReminderCollaboratorSummary] = []
     @State private var collaboratorsDirty = false
     @State private var collaboratorsSaving = false
+    /// Last value we know is persisted server-side. Drives auto-save:
+    /// only PATCH when `dateDraft` / `recurrenceDraft` differs from
+    /// these, so the seed-time assignment doesn't trigger a spurious
+    /// network call. On save failure we revert the draft to these.
+    @State private var lastSavedDate: Date? = nil
+    @State private var lastSavedRecurrence: ReminderRecurrence? = nil
+    @State private var scheduleSaving = false
+    @State private var lastSavedLabel: String? = nil
+    @State private var labelSaving = false
+    @State private var showLabelSheet = false
     @State private var showSharePicker = false
     @State private var friends: [FriendSummary] = []
     @State private var friendsLoading = false
@@ -100,17 +121,35 @@ struct ReminderEditView: View {
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button(target.isEditing ? "Save" : "Add") {
-                    Task { await save() }
+            // Edit mode is fully auto-save now — every field commits
+            // on change. The new-reminder flow still needs one commit
+            // moment since the row doesn't exist server-side yet.
+            if !target.isEditing {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Add") {
+                        Task { await save() }
+                    }
+                    .foregroundColor(canSave ? .sacredGold : .sacredMutedLight)
+                    .disabled(!canSave || saving || deleting)
                 }
-                .foregroundColor(canSave ? .sacredGold : .sacredMutedLight)
-                .disabled(!canSave || saving || deleting)
             }
         }
         .onAppear {
             seed()
             if viewerIsOwner { Task { await loadFriendsIfNeeded() } }
+        }
+        .onChange(of: dateDraft) { _, newValue in
+            // Auto-save only after seed has run and only when the value
+            // actually moved off the server-known value — keeps a
+            // re-seed (or a no-op tap) from firing a network call.
+            guard let last = lastSavedDate,
+                  !Calendar.current.isDate(newValue, inSameDayAs: last)
+            else { return }
+            Task { await autoSaveSchedule() }
+        }
+        .onChange(of: recurrenceDraft) { _, newValue in
+            guard let last = lastSavedRecurrence, newValue != last else { return }
+            Task { await autoSaveSchedule() }
         }
         .confirmationDialog(
             sharedConfirmCopy,
@@ -132,19 +171,53 @@ struct ReminderEditView: View {
                 },
                 onCancel: { showSharePicker = false })
         }
+        .sheet(isPresented: $showLabelSheet) {
+            ReminderLabelEditSheet(
+                initialLabel: labelDraft,
+                onCancel: { showLabelSheet = false },
+                onSave: { newLabel in
+                    let trimmed = newLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmed.isEmpty else { return }
+                    let previous = labelDraft
+                    labelDraft = trimmed
+                    showLabelSheet = false
+                    Task { await autoSaveLabel(previous: previous) }
+                })
+        }
     }
 
     private var labelSection: some View {
         VStack(alignment: .leading, spacing: SacredSpacing.xs) {
             sectionLabel("LABEL")
             SacredListCard {
-                TextField("Birthday, anniversary…", text: $labelDraft)
-                    .font(.sacredText)
-                    .foregroundColor(.sacredText)
+                Button {
+                    showLabelSheet = true
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                } label: {
+                    HStack(spacing: 12) {
+                        Text(labelDraft.isEmpty ? "Add label" : labelDraft)
+                            .font(.sacredText)
+                            .foregroundColor(labelDraft.isEmpty ? .sacredMuted : .sacredText)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+
+                        Spacer()
+
+                        if labelSaving {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(.sacredMuted)
+                        } else {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.sacredMuted.opacity(0.55))
+                        }
+                    }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 14)
-                    .submitLabel(.done)
-                    .textInputAutocapitalization(.sentences)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -398,6 +471,9 @@ struct ReminderEditView: View {
             dateDraft = parseISODate(reminder.date) ?? Date()
             recurrenceDraft = reminder.recurrence
             collaboratorsDraft = reminder.collaborators
+            lastSavedLabel = reminder.label
+            lastSavedDate = dateDraft
+            lastSavedRecurrence = recurrenceDraft
         }
         // Open the picker on the seeded date's month so the user sees
         // their saved date without having to navigate to it first.
@@ -442,11 +518,11 @@ struct ReminderEditView: View {
     /// returns). On failure we revert and leave `Save` as the fallback
     /// path so the user can still recover.
     private func autoSaveCollaborators(previous: [ReminderCollaboratorSummary]) async {
-        guard let onCollaboratorsChanged else { return }
+        guard let onLivePatch else { return }
         collaboratorsSaving = true
         defer { collaboratorsSaving = false }
         let ids = collaboratorsDraft.map(\.userId)
-        if let updated = await onCollaboratorsChanged(ids) {
+        if let updated = await onLivePatch(ReminderLivePatch(collaboratorUserIds: ids)) {
             collaboratorsDraft = updated.collaborators
             // Server is now the source of truth — Save no longer needs
             // to re-send the collaborator field.
@@ -454,6 +530,46 @@ struct ReminderEditView: View {
         } else {
             collaboratorsDraft = previous
             AppLogger.shared.error("ReminderEdit", "Auto-save collaborators failed; reverted local set")
+        }
+    }
+
+    /// Commits the current label draft to the server (edit mode only).
+    /// The new-reminder flow stages locally and commits on `Add`. On
+    /// failure we revert `labelDraft` to `previous` so the user can
+    /// see what didn't take.
+    private func autoSaveLabel(previous: String) async {
+        guard let onLivePatch else { return }
+        let trimmed = labelDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let last = lastSavedLabel, trimmed == last { return }
+        labelSaving = true
+        defer { labelSaving = false }
+        if let updated = await onLivePatch(ReminderLivePatch(label: trimmed)) {
+            lastSavedLabel = updated.label
+            labelDraft = updated.label
+        } else {
+            labelDraft = previous
+            AppLogger.shared.error("ReminderEdit", "Auto-save label failed; reverted draft")
+        }
+    }
+
+    /// Commits the current date + recurrence drafts to the server.
+    /// Schedule fields go together since they're both "when does this
+    /// happen?" semantics and the underlying PATCH is one round-trip
+    /// either way. On failure we revert both drafts and log.
+    private func autoSaveSchedule() async {
+        guard let onLivePatch else { return }
+        scheduleSaving = true
+        defer { scheduleSaving = false }
+        let dateStr = formatISODate(dateDraft)
+        let rec = recurrenceDraft
+        let patch = ReminderLivePatch(date: dateStr, recurrence: rec)
+        if let updated = await onLivePatch(patch) {
+            lastSavedDate = parseISODate(updated.date) ?? dateDraft
+            lastSavedRecurrence = updated.recurrence
+        } else {
+            if let prev = lastSavedDate { dateDraft = prev }
+            if let prev = lastSavedRecurrence { recurrenceDraft = prev }
+            AppLogger.shared.error("ReminderEdit", "Auto-save schedule failed; reverted drafts")
         }
     }
 
@@ -509,6 +625,58 @@ struct ReminderEditView: View {
         f.calendar = Calendar(identifier: .gregorian)
         f.locale = Locale(identifier: "en_US_POSIX")
         return f.string(from: d)
+    }
+}
+
+/// One-field sheet for editing a reminder's label. Mirrors the chrome
+/// (NavigationStack + inline title + Cancel) used by the DisplayName /
+/// Location gates so every "edit one thing" surface looks alike. The
+/// parent owns commit logic — Save just hands back the trimmed string.
+private struct ReminderLabelEditSheet: View {
+    let initialLabel: String
+    let onCancel: () -> Void
+    let onSave: (String) -> Void
+
+    @State private var draft: String = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        SacredFormSheet(
+            title: "Label",
+            detent: .height(260),
+            onCancel: onCancel
+        ) {
+            VStack(spacing: SacredSpacing.m) {
+                TextField("Birthday, anniversary…", text: $draft)
+                    .font(.sacredBody)
+                    .foregroundColor(.sacredText)
+                    .textInputAutocapitalization(.sentences)
+                    .submitLabel(.done)
+                    .focused($focused)
+                    .padding(.horizontal, SacredSpacing.m)
+                    .padding(.vertical, 14)
+                    .luxCardChrome()
+                    .onSubmit { onSave(draft) }
+
+                SacredPrimaryButton(
+                    "Save",
+                    style: .commit,
+                    isDisabled: trimmed.isEmpty
+                ) {
+                    onSave(draft)
+                }
+            }
+        }
+        .onAppear {
+            draft = initialLabel
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                focused = true
+            }
+        }
+    }
+
+    private var trimmed: String {
+        draft.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 

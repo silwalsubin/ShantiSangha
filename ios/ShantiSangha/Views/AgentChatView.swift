@@ -105,12 +105,15 @@ struct AgentChatView: View {
                     }
                     return nil
                 }(),
-                onCollaboratorsChanged: {
+                onLivePatch: {
                     if case .edit(let reminder) = target {
-                        return { ids in
+                        return { patch in
                             let updated = try? await ReminderRepository.shared.update(
                                 id: reminder.id,
-                                collaboratorUserIds: ids)
+                                label: patch.label,
+                                date: patch.date,
+                                recurrence: patch.recurrence,
+                                collaboratorUserIds: patch.collaboratorUserIds)
                             if let updated { patchAttachedReminder(updated) }
                             return updated
                         }
