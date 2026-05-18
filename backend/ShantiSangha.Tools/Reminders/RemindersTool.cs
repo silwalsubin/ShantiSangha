@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using Microsoft.SemanticKernel;
 using ModelContextProtocol.Server;
+using ShantiSangha.Friends.Contracts;
+using ShantiSangha.Friends.Services;
 using ShantiSangha.Reminders.Contracts;
 using ShantiSangha.Reminders.Services;
 using ShantiSangha.Shared;
@@ -12,6 +14,7 @@ namespace ShantiSangha.Tools.Reminders;
 [McpServerToolType]
 public sealed class RemindersTool(
     IReminderService reminders,
+    IConnectionsService connections,
     ICurrentUser currentUser,
     IProfileQueryService profileQuery,
     RemindersListSink listSink)
@@ -195,6 +198,160 @@ public sealed class RemindersTool(
             : Error("That reminder no longer exists.");
     }
 
+    [McpServerTool(Name = "share_reminder")]
+    [KernelFunction("share_reminder")]
+    [Description(
+        "Add a friend as a collaborator on an existing reminder. The collaborator gets full peer access — they can view, edit, complete, and delete the reminder, and completion is shared across everyone. " +
+        "A push notification is delivered to the friend immediately. " +
+        "Only the reminder's owner can change who it's shared with. " +
+        "Find the reminder by label (fuzzy match) and the friend by name (fuzzy match against people in the user's circle who are also accepted ShantiSangha friends — local contacts cannot collaborate). " +
+        "Before calling, confirm in your reply which reminder and which friend; restate so the user can correct you. If either is ambiguous, the tool returns a disambiguation list and makes no change.")]
+    public async Task<object> ShareReminder(
+        [Description("Label or partial label of the reminder to share.")]
+        string label,
+        [Description("Name or partial name of the friend to add as a collaborator. Must be an accepted ShantiSangha friend.")]
+        string friend_name,
+        CancellationToken ct = default)
+    {
+        var user = await RequireUserAsync();
+
+        var allReminders = await reminders.ListAsync(user.Id, connectionId: null, date: null, ct);
+        var reminderLookup = LabeledLookup.FindByLabel(allReminders, r => r.Label, label);
+        if (reminderLookup.Outcome == LookupOutcome.None)
+            return Error($"No reminder matches '{label}'.");
+        if (reminderLookup.Outcome == LookupOutcome.Ambiguous)
+            return Ambiguous(reminderLookup.Candidates);
+
+        var reminder = reminderLookup.Match!;
+        if (reminder.IsSharedWithMe)
+            return Error($"Only the owner can change who this reminder is shared with — it belongs to {reminder.OwnerDisplayName ?? "someone else"}.");
+
+        var friendLookup = await FindFriendByNameAsync(user.Id, friend_name, ct);
+        if (friendLookup.Outcome == LookupOutcome.None)
+            return Error($"No accepted friend in your circle matches '{friend_name}'. (Local contacts who aren't on ShantiSangha can't collaborate.)");
+        if (friendLookup.Outcome == LookupOutcome.Ambiguous)
+            return AmbiguousFriends(friendLookup.Candidates);
+
+        var friend = friendLookup.Match!;
+        var friendUserId = friend.Person.UserId!.Value;
+
+        var currentIds = reminder.Collaborators.Select(c => c.UserId).ToHashSet();
+        if (currentIds.Contains(friendUserId))
+            return Error($"{friend.Person.DisplayName} is already a collaborator on this reminder.");
+
+        currentIds.Add(friendUserId);
+        var nextIds = currentIds.ToArray();
+
+        try
+        {
+            var updated = await reminders.UpdateAsync(
+                reminder.Id, user.Id,
+                new UpdateReminderRequest(CollaboratorUserIds: nextIds),
+                ct);
+            return updated is null
+                ? Error("That reminder no longer exists.")
+                : new { shared = Project(updated) };
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Error(ex.Message);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Error(ex.Message);
+        }
+    }
+
+    [McpServerTool(Name = "unshare_reminder")]
+    [KernelFunction("unshare_reminder")]
+    [Description(
+        "Remove a friend from an existing reminder's collaborator list. They lose access immediately — the reminder disappears from their list. " +
+        "Only the reminder's owner can change who it's shared with. " +
+        "Find the reminder by label and the friend by name; both support fuzzy matching. " +
+        "Confirm with the user in conversation before calling, since the friend won't be notified — the row just quietly disappears for them.")]
+    public async Task<object> UnshareReminder(
+        [Description("Label or partial label of the reminder.")]
+        string label,
+        [Description("Name or partial name of the friend to remove from the collaborator list.")]
+        string friend_name,
+        CancellationToken ct = default)
+    {
+        var user = await RequireUserAsync();
+
+        var allReminders = await reminders.ListAsync(user.Id, connectionId: null, date: null, ct);
+        var reminderLookup = LabeledLookup.FindByLabel(allReminders, r => r.Label, label);
+        if (reminderLookup.Outcome == LookupOutcome.None)
+            return Error($"No reminder matches '{label}'.");
+        if (reminderLookup.Outcome == LookupOutcome.Ambiguous)
+            return Ambiguous(reminderLookup.Candidates);
+
+        var reminder = reminderLookup.Match!;
+        if (reminder.IsSharedWithMe)
+            return Error($"Only the owner can change who this reminder is shared with — it belongs to {reminder.OwnerDisplayName ?? "someone else"}.");
+
+        if (reminder.Collaborators.Length == 0)
+            return Error("That reminder isn't shared with anyone.");
+
+        // Match against the current collaborator list directly (not all
+        // friends) — the agent might say "remove Alex" when Alex isn't
+        // even on this reminder, and that's worth surfacing.
+        var collabsAsLookupable = reminder.Collaborators
+            .Select(c => new { c.UserId, c.DisplayName })
+            .ToList();
+        var collabLookup = LabeledLookup.FindByLabel(collabsAsLookupable, c => c.DisplayName, friend_name);
+        if (collabLookup.Outcome == LookupOutcome.None)
+            return Error($"'{friend_name}' isn't a collaborator on '{reminder.Label}'.");
+        if (collabLookup.Outcome == LookupOutcome.Ambiguous)
+            return new
+            {
+                ambiguous = true,
+                message = "More than one collaborator matches that name. Ask the user which they meant.",
+                candidates = collabLookup.Candidates.Select(c => c.DisplayName).ToArray(),
+            };
+
+        var dropId = collabLookup.Match!.UserId;
+        var dropName = collabLookup.Match!.DisplayName;
+        var nextIds = reminder.Collaborators
+            .Select(c => c.UserId)
+            .Where(uid => uid != dropId)
+            .ToArray();
+
+        try
+        {
+            var updated = await reminders.UpdateAsync(
+                reminder.Id, user.Id,
+                new UpdateReminderRequest(CollaboratorUserIds: nextIds),
+                ct);
+            return updated is null
+                ? Error("That reminder no longer exists.")
+                : new { unshared = new { removed = dropName, reminder = Project(updated) } };
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Error(ex.Message);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Error(ex.Message);
+        }
+    }
+
+    /// Friend-name → ConnectionResponse lookup, restricted to people in
+    /// the user's circle who are also accepted ShantiSangha friends
+    /// (FriendshipId + Person.UserId both set). Local contacts can't
+    /// collaborate so they're filtered out before the fuzzy match —
+    /// otherwise the agent might "pick" a contact and we'd fail later
+    /// with a more cryptic error.
+    private async Task<LookupResult<ConnectionResponse>> FindFriendByNameAsync(
+        Guid userId, string name, CancellationToken ct)
+    {
+        var all = await connections.ListAsync(userId, ct);
+        var friends = all
+            .Where(c => c.FriendshipId != null && c.Person.UserId != null)
+            .ToList();
+        return LabeledLookup.FindByLabel(friends, c => c.Person.DisplayName, name);
+    }
+
     private async Task<CurrentUserInfo> RequireUserAsync()
     {
         var user = await currentUser.GetAsync();
@@ -216,6 +373,20 @@ public sealed class RemindersTool(
         date = r.Date.ToString("yyyy-MM-dd"),
         recurrence = r.Recurrence,
         days_remaining = r.DaysRemaining,
+        // Sharing context — surfaced so the agent can disclose when a
+        // reminder is shared and confirm before mutating it.
+        // - is_shared: true when at least one collaborator exists OR
+        //   the caller is a recipient (not the owner).
+        // - shared_by: owner's display name on a recipient's view, null
+        //   when the caller is the owner.
+        // - shared_with: array of collaborator names on the owner's
+        //   view (empty if private), null on a recipient's view since
+        //   recipients don't manage the share set.
+        is_shared = r.IsSharedWithMe || r.Collaborators.Length > 0,
+        shared_by = r.OwnerDisplayName,
+        shared_with = r.IsSharedWithMe
+            ? null
+            : (object)r.Collaborators.Select(c => c.DisplayName).ToArray(),
     };
 
     private static object Error(string message) => new { error = message };
@@ -225,5 +396,17 @@ public sealed class RemindersTool(
         ambiguous = true,
         message = "More than one reminder matches that label. Ask the user which they meant.",
         candidates = candidates.Select(Project).ToList(),
+    };
+
+    private static object AmbiguousFriends(IReadOnlyList<ConnectionResponse> candidates) => new
+    {
+        ambiguous = true,
+        message = "More than one friend matches that name. Ask the user which they meant.",
+        candidates = candidates.Select(c => new
+        {
+            name = c.Person.DisplayName,
+            nickname = c.Nickname,
+            circles = c.Circles,
+        }).ToList(),
     };
 }
