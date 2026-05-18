@@ -178,10 +178,13 @@ resource "aws_ecs_task_definition" "api" {
         { name = "FIREBASE_PROJECT_ID",   value = "shantisangha-bc0f9" },
         { name = "FRONTEND_ORIGIN",       value = "https://${var.domain_name},https://${aws_cloudfront_distribution.frontend.domain_name},http://localhost:5173" },
         { name = "WISECAT_FUNCTION_NAME", value = aws_lambda_function.wisecat.function_name },
-        # Cloud Map DNS for the gateway service. Both tasks live in the
-        # same VPC + SG; ECS SG self-ingress on 5000 lets this resolve
-        # to whatever IP the gateway task currently has.
-        { name = "IBKR_GATEWAY_BASE_URL", value = "https://ibkr-gateway.${aws_service_discovery_private_dns_namespace.main.name}:5000" }
+        # Route through the public ALB URL rather than Cloud Map direct
+        # because the gateway's HTTP layer rejects requests coming from
+        # the VPC subnet directly (returns 403 Access Denied even though
+        # the source IP is in `ips.allow`). The ALB path works because
+        # of how ALB forwards (probably proxy-style headers / Host
+        # rewriting). Extra ALB hop is negligible at our scale.
+        { name = "IBKR_GATEWAY_BASE_URL", value = "https://gateway.${var.domain_name}" }
       ]
 
       secrets = concat([
