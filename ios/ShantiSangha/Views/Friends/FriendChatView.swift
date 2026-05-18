@@ -377,9 +377,6 @@ struct FriendChatView: View {
                     }
                     .id(msg.id.uuidString)
                     .padding(.top, spacingBeforeMessage(at: idx))
-                    .anchorPreference(key: BubbleBoundsKey.self, value: .bounds) { anchor in
-                        [msg.id: anchor]
-                    }
                     .onLongPressGesture {
                         if !msg.isDeleted {
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -843,6 +840,9 @@ private struct MessageBubble: View {
                     replyPreview(reply)
                 }
                 content
+                    .anchorPreference(key: BubbleBoundsKey.self, value: .bounds) { anchor in
+                        [message.id: anchor]
+                    }
                     .overlay(alignment: .bottomTrailing) {
                         reactionRow
                             .offset(x: 14, y: 10)
