@@ -89,7 +89,7 @@ struct FriendsTabView: View {
                 didLoadFail: didLoadFail)
 
             VStack(spacing: 0) {
-                topOverlay(totalCount: totalCount, shownCount: displayed.count)
+                topOverlay(totalCount: totalCount)
 
                 Spacer()
 
@@ -143,7 +143,7 @@ struct FriendsTabView: View {
     // MARK: - Overlays
 
     @ViewBuilder
-    private func topOverlay(totalCount: Int, shownCount: Int) -> some View {
+    private func topOverlay(totalCount: Int) -> some View {
         VStack(spacing: SacredSpacing.s) {
             if totalCount > 0 || hasActiveCircleScope {
                 circleSearchField
@@ -152,10 +152,6 @@ struct FriendsTabView: View {
 
             if hasPendingActivity {
                 requestsChip
-            }
-
-            if hasActiveCircleScope {
-                solarScopePill(shownCount: shownCount, totalCount: totalCount)
             }
         }
         .padding(.horizontal, SacredSpacing.m)
@@ -417,51 +413,6 @@ struct FriendsTabView: View {
 
     private var hasActiveCircleScope: Bool {
         selectedFilter != .all || !trimmedCircleSearch.isEmpty
-    }
-
-    private var solarScopeLabel: String {
-        var parts: [String] = []
-        if selectedFilter != .all { parts.append(selectedFilter.label) }
-        if !trimmedCircleSearch.isEmpty { parts.append(trimmedCircleSearch) }
-        return parts.joined(separator: " · ")
-    }
-
-    private func solarScopePill(shownCount: Int, totalCount: Int) -> some View {
-        HStack(spacing: SacredSpacing.s) {
-            Text("\(shownCount.formatted()) of \(totalCount.formatted()) shown")
-                .font(.sacredSmallSemibold)
-                .foregroundColor(.sacredText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-
-            Text(solarScopeLabel)
-                .font(.sacredMicroBold)
-                .foregroundColor(.sacredGold)
-                .lineLimit(1)
-                .truncationMode(.tail)
-
-            Spacer(minLength: SacredSpacing.xs)
-
-            Button {
-                withAnimation(.easeOut(duration: 0.2)) {
-                    selectedFilter = .all
-                    circleSearchText = ""
-                    circleSearchFocused = false
-                }
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            } label: {
-                Text("Clear")
-                    .font(.sacredSmallSemibold)
-                    .foregroundColor(.sacredGold)
-                    .frame(minHeight: 44)
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.leading, 14)
-        .padding(.trailing, 10)
-        .frame(minHeight: 48)
-        .background(Capsule().fill(Color.sacredBgCard.opacity(0.72)))
-        .overlay(Capsule().stroke(Color.sacredGold.opacity(0.12), lineWidth: 1))
     }
 
     private var circleSearchField: some View {
