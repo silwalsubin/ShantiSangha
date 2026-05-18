@@ -124,27 +124,16 @@ struct FriendChatView: View {
                 onDelete: nil,
                 onLivePatch: nil)
         }
-        .sheet(item: $reactionPickerTarget) { target in
-            ReactionPickerSheet(
-                canEdit: vm.canEdit(target),
-                canDelete: vm.canDelete(target),
-                onPick: { emoji in
-                    reactionPickerTarget = nil
-                    if let me = profile.currentUserId {
-                        Task { await vm.toggleReaction(emoji, on: target.id, currentUserId: me) }
-                    }
-                },
-                onEdit: {
-                    reactionPickerTarget = nil
-                    vm.beginEdit(target)
-                    draft = target.body ?? ""
-                },
-                onDelete: {
-                    reactionPickerTarget = nil
-                    Task { await vm.deleteMessage(target) }
-                })
-                .presentationDetents([.height(vm.canEdit(target) || vm.canDelete(target) ? 200 : 140)])
-                .presentationDragIndicator(.visible)
+        .overlayPreferenceValue(BubbleBoundsKey.self) { anchors in
+            GeometryReader { proxy in
+                if let target = reactionPickerTarget,
+                   let anchor = anchors[target.id] {
+                    reactionContextOverlay(
+                        target: target,
+                        bubbleRect: proxy[anchor],
+                        canvas: proxy.size)
+                }
+            }
         }
         .task {
             await vm.refresh()
@@ -388,8 +377,12 @@ struct FriendChatView: View {
                     }
                     .id(msg.id.uuidString)
                     .padding(.top, spacingBeforeMessage(at: idx))
+                    .anchorPreference(key: BubbleBoundsKey.self, value: .bounds) { anchor in
+                        [msg.id: anchor]
+                    }
                     .onLongPressGesture {
                         if !msg.isDeleted {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                             reactionPickerTarget = msg
                         }
                     }
@@ -449,6 +442,106 @@ struct FriendChatView: View {
                 }
             }
         }
+    }
+
+    /// Contextual reaction overlay rendered above the long-pressed
+    /// bubble — iMessage / Messenger pattern. Dim everything, pin a
+    /// floating emoji pill just above (or below, if near the top edge)
+    /// the bubble, plus an Edit / Delete capsule below for the user's
+    /// own messages. Tap the dim, an emoji, or an action dismisses.
+    @ViewBuilder
+    private func reactionContextOverlay(
+        target: FriendMessage,
+        bubbleRect: CGRect,
+        canvas: CGSize
+    ) -> some View {
+        let isMine = !vm.isFromFriend(target)
+        let canEdit = vm.canEdit(target)
+        let canDelete = vm.canDelete(target)
+        let showActions = canEdit || canDelete
+
+        let pillSize = ReactionPickerBar.size
+        let pillGap: CGFloat = 10
+        let topSafe: CGFloat = 8
+        let bottomSafe: CGFloat = 8
+
+        // Default: pill above bubble. Flip below if it would clip the
+        // top edge (happens when long-pressing the very first message).
+        let pillAboveY = bubbleRect.minY - pillGap - pillSize.height / 2
+        let pillBelowY = bubbleRect.maxY + pillGap + pillSize.height / 2
+        let pillOnTop = (bubbleRect.minY - pillGap - pillSize.height) >= topSafe
+        let pillY = pillOnTop ? pillAboveY : pillBelowY
+
+        // Pill horizontal anchor: hug the bubble's side, clamped to
+        // screen edges so it never runs off.
+        let pillHalf = pillSize.width / 2
+        let edgePadding: CGFloat = 12
+        let proposedX = isMine ? bubbleRect.maxX - pillHalf : bubbleRect.minX + pillHalf
+        let pillX = min(canvas.width - edgePadding - pillHalf,
+                        max(edgePadding + pillHalf, proposedX))
+
+        // Action row sits on the opposite side of the bubble from the
+        // pill so the bubble itself stays visually anchored between
+        // the two affordances.
+        let actionHeight = ReactionActionRow.height
+        let actionGap: CGFloat = 10
+        let actionAboveY = bubbleRect.minY - actionGap - actionHeight / 2
+        let actionBelowY = bubbleRect.maxY + actionGap + actionHeight / 2
+        let actionOnBottom = (bubbleRect.maxY + actionGap + actionHeight) <= (canvas.height - bottomSafe)
+        // If the pill is above, action row goes below (and vice versa).
+        // If the preferred side is off-screen, stack on the pill's side
+        // by pushing the action row past the pill.
+        let actionY: CGFloat
+        if pillOnTop {
+            // Pill above → action row below if room, else above the pill.
+            actionY = actionOnBottom
+                ? actionBelowY
+                : (pillY - pillSize.height / 2 - actionGap - actionHeight / 2)
+        } else {
+            // Pill below → action row above if room, else below the pill.
+            actionY = (bubbleRect.minY - actionGap - actionHeight) >= topSafe
+                ? actionAboveY
+                : (pillY + pillSize.height / 2 + actionGap + actionHeight / 2)
+        }
+
+        ZStack {
+            // Tap-anywhere dismiss. A subtle dark veil — enough to push
+            // the rest of the thread back without losing the warm tone.
+            Color.black.opacity(0.45)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture { reactionPickerTarget = nil }
+                .transition(.opacity)
+
+            ReactionPickerBar { emoji in
+                reactionPickerTarget = nil
+                if let me = profile.currentUserId {
+                    Task { await vm.toggleReaction(emoji, on: target.id, currentUserId: me) }
+                }
+            }
+            .position(x: pillX, y: pillY)
+            .transition(.scale(scale: 0.85).combined(with: .opacity))
+
+            if showActions {
+                ReactionActionRow(
+                    canEdit: canEdit,
+                    canDelete: canDelete,
+                    onEdit: {
+                        reactionPickerTarget = nil
+                        vm.beginEdit(target)
+                        draft = target.body ?? ""
+                    },
+                    onDelete: {
+                        reactionPickerTarget = nil
+                        Task { await vm.deleteMessage(target) }
+                    })
+                    .position(x: min(canvas.width - edgePadding - 80,
+                                     max(edgePadding + 80, bubbleRect.midX)),
+                              y: actionY)
+                    .transition(.scale(scale: 0.85).combined(with: .opacity))
+            }
+        }
+        .animation(.easeOut(duration: 0.18), value: reactionPickerTarget?.id)
     }
 
     @ViewBuilder
@@ -929,66 +1022,99 @@ private struct MessageBubble: View {
     }
 }
 
-/// Quick-emoji picker shown by long-press on a message. Six fixed
-/// emojis cover the common acknowledgement set — fancy full-emoji
-/// pickers can come later if anyone asks. For the user's own messages
-/// the sheet also surfaces Edit / Delete below the emoji row.
-private struct ReactionPickerSheet: View {
+/// PreferenceKey that gathers each message row's bounds anchor so the
+/// reaction overlay can position itself relative to the long-pressed
+/// bubble. Anchors are lightweight references (resolved to a CGRect
+/// only when the overlay reads them) so leaving them on every row is
+/// cheap.
+private struct BubbleBoundsKey: PreferenceKey {
+    typealias Value = [UUID: Anchor<CGRect>]
+    static var defaultValue: Value = [:]
+    static func reduce(value: inout Value, nextValue: () -> Value) {
+        value.merge(nextValue(), uniquingKeysWith: { _, b in b })
+    }
+}
+
+/// Floating reaction pill — six emojis in a capsule, the iMessage /
+/// Messenger pattern. Sized at ~280pt wide × 56pt tall so we can
+/// pre-compute placement without measuring the actual view.
+private struct ReactionPickerBar: View {
+    let onPick: (String) -> Void
+    private let emojis = ["❤️", "👍", "😂", "🙏", "😢", "🔥"]
+
+    static let size = CGSize(width: 296, height: 56)
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(emojis, id: \.self) { emoji in
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    onPick(emoji)
+                } label: {
+                    Text(emoji)
+                        .font(.system(size: 28))
+                        .frame(width: 40, height: 40)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(width: Self.size.width, height: Self.size.height)
+        .background(
+            Capsule()
+                .fill(.ultraThinMaterial)
+                .overlay(Capsule().stroke(Color.sacredGold.opacity(0.18), lineWidth: 1))
+                .shadow(color: .black.opacity(0.25), radius: 14, y: 6)
+        )
+    }
+}
+
+/// Compact Edit / Delete capsule shown under the bubble when the user
+/// long-pressed their own message. Separate from the reaction pill so
+/// destructive actions don't sit inches from the emoji a slip of the
+/// thumb would reach for.
+private struct ReactionActionRow: View {
     let canEdit: Bool
     let canDelete: Bool
-    let onPick: (String) -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
 
-    private let emojis = ["❤️", "👍", "😂", "🙏", "😢", "🔥"]
+    static let height: CGFloat = 44
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 14) {
-                ForEach(emojis, id: \.self) { emoji in
-                    Button { onPick(emoji) } label: {
-                        Text(emoji)
-                            .font(.system(size: 32))
-                            .frame(width: 44, height: 44)
-                            .background(Circle().fill(Color.sacredBgCard))
-                    }
-                    .buttonStyle(.plain)
+        HStack(spacing: 0) {
+            if canEdit {
+                Button(action: onEdit) {
+                    Label("Edit", systemImage: "pencil")
+                        .font(.sacredSmallSemibold)
+                        .foregroundColor(.sacredGold)
+                        .padding(.horizontal, 16)
+                        .frame(height: Self.height)
                 }
+                .buttonStyle(.plain)
             }
-            .padding(.top, 24)
-            .padding(.horizontal, SacredSpacing.m)
-
-            if canEdit || canDelete {
+            if canEdit && canDelete {
                 Divider()
-                    .background(Color.sacredGold.opacity(0.15))
-                    .padding(.top, 18)
-                    .padding(.horizontal, SacredSpacing.m)
-
-                HStack(spacing: 24) {
-                    if canEdit {
-                        Button(action: onEdit) {
-                            Label("Edit", systemImage: "pencil")
-                                .font(.sacredText)
-                                .foregroundColor(.sacredGold)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    if canDelete {
-                        Button(action: onDelete) {
-                            Label("Delete", systemImage: "trash")
-                                .font(.sacredText)
-                                .foregroundColor(.sacredRed)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.top, 14)
+                    .frame(width: 1, height: 22)
+                    .background(Color.sacredGold.opacity(0.18))
             }
-
-            Spacer(minLength: 0)
+            if canDelete {
+                Button(action: onDelete) {
+                    Label("Delete", systemImage: "trash")
+                        .font(.sacredSmallSemibold)
+                        .foregroundColor(.sacredRed)
+                        .padding(.horizontal, 16)
+                        .frame(height: Self.height)
+                }
+                .buttonStyle(.plain)
+            }
         }
-        .frame(maxWidth: .infinity)
-        .background(Color.sacredBg.ignoresSafeArea())
+        .background(
+            Capsule()
+                .fill(.ultraThinMaterial)
+                .overlay(Capsule().stroke(Color.sacredGold.opacity(0.14), lineWidth: 1))
+                .shadow(color: .black.opacity(0.22), radius: 12, y: 5)
+        )
     }
 }
 
