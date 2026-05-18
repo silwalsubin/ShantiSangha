@@ -52,6 +52,12 @@ struct ReminderRow: View {
             }
 
             content
+                // Without an explicit hit shape, SwiftUI only registers
+                // taps on opaque sub-views — Spacer() and other empty
+                // regions of the row swallow the tap. Forcing the
+                // content's hit area to the full rectangle makes any
+                // point on the row open the editor.
+                .contentShape(Rectangle())
                 .onTapGesture {
                     if !activeSwipe { onTap() }
                 }
