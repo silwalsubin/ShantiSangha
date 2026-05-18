@@ -142,10 +142,6 @@ struct ReminderRow: View {
 
             Spacer()
 
-            if !reminder.collaborators.isEmpty {
-                collaboratorAvatarStack
-            }
-
             if isCompleted {
                 doneBadge
                     // Poof in — the badge bursts into existence like a
@@ -161,6 +157,18 @@ struct ReminderRow: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        .overlay(alignment: .topTrailing) {
+            // Discreet sharing cue: small overlapping avatars in the
+            // corner so the row's primary rhythm (date stamp, label,
+            // due) stays clean. Hidden when the row is in its completed
+            // state — the green checkmark should own the right side at
+            // that moment.
+            if !reminder.collaborators.isEmpty && !isCompleted {
+                collaboratorAvatarStack
+                    .padding(.top, 6)
+                    .padding(.trailing, 10)
+            }
+        }
         .opacity(isCompleted ? 0.55 : 1)
         // Drives the .poof transition above when isCompleted flips.
         // Without this animation context the transition would snap.
@@ -199,29 +207,27 @@ struct ReminderRow: View {
         return nil
     }
 
-    /// Up to two stacked avatars + a "+N" pill when the share list is
-    /// bigger. Sits where the date label normally lives, so we let the
-    /// caller pick: shared rows trade the date chip for the avatar
-    /// stack (it already telegraphs urgency via the date stamp on the
-    /// left for Home-style rows).
+    /// Compact top-right pip: up to two 16pt avatars overlapped, plus a
+    /// "+N" gold dot when the share list is bigger. Intentionally small
+    /// and tucked into the corner so the row's primary content
+    /// (label / due) stays the focus.
     @ViewBuilder
     private var collaboratorAvatarStack: some View {
         let visible = Array(reminder.collaborators.prefix(2))
         let overflow = reminder.collaborators.count - visible.count
-        HStack(spacing: -8) {
+        HStack(spacing: -6) {
             ForEach(visible, id: \.userId) { c in
-                ProfileAvatarImage(rawUrl: c.avatarUrl, size: 22, borderWidth: 1.5)
+                ProfileAvatarImage(rawUrl: c.avatarUrl, size: 16, borderWidth: 1)
             }
             if overflow > 0 {
                 Text("+\(overflow)")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 9, weight: .semibold))
                     .foregroundColor(.sacredText)
-                    .frame(width: 22, height: 22)
-                    .background(Circle().fill(Color.sacredGold.opacity(0.18)))
-                    .overlay(Circle().stroke(Color.sacredBgCard, lineWidth: 1.5))
+                    .frame(width: 16, height: 16)
+                    .background(Circle().fill(Color.sacredGold.opacity(0.20)))
+                    .overlay(Circle().stroke(Color.sacredBgCard, lineWidth: 1))
             }
         }
-        .padding(.trailing, 4)
     }
 
     @ViewBuilder
