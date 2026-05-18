@@ -196,11 +196,16 @@ public class PortfolioService(
         await ibkrSync.RefreshIfStaleAsync(userId, IbkrPlanRefreshMaxAge, ct);
 
         // When IBKR is linked, the broker-side cash balance overrides whatever
-        // the caller passed in the ?cash= query param. Manual-mode users keep
-        // the existing behavior.
+        // the caller passed in the ?cash= query param. We keep using the last
+        // successful sync's CashBalance even when Status is NeedsReauth or
+        // Disconnected — IBKR's 1-session-per-user rule means our session
+        // gets kicked any time the user opens the IBKR mobile app, and we
+        // shouldn't pretend the user's cash dropped to $0 just because the
+        // session lapsed. The iOS app surfaces "IBKR link expired" so the
+        // user knows the number is stale.
         var ibkrAccount = await db.IbkrAccounts
             .FirstOrDefaultAsync(a => a.UserId == userId, ct);
-        if (ibkrAccount is { Status: IbkrAccountStatus.Active })
+        if (ibkrAccount is not null && ibkrAccount.LastSuccessfulSyncAt is not null)
         {
             cashBalance = ibkrAccount.CashBalance;
         }
