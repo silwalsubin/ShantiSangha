@@ -74,17 +74,27 @@ struct WiseCatView: View {
                 } else {
                     ScrollView {
                         VStack(spacing: SacredSpacing.l) {
-                            if let plan = vm.plan, plan.positionCount > 0 {
+                            if let plan = vm.plan {
                                 summary(plan)
                                 ibkrSection
-                                holdingsSection(plan)
+                                if plan.positionCount > 0 {
+                                    holdingsSection(plan)
+                                } else if !vm.isIbkrLinked {
+                                    // Manual mode + no positions yet — coach
+                                    // the user to add their first one. IBKR
+                                    // mode with zero positions is a valid
+                                    // cash-only portfolio; no CTA needed.
+                                    emptyState
+                                }
                             } else if vm.generatingPlan || vm.loading {
                                 ProgressView()
                                     .tint(.sacredGold)
                                     .frame(maxWidth: .infinity, minHeight: 200)
                             } else {
                                 ibkrSection
-                                emptyState
+                                if !vm.isIbkrLinked {
+                                    emptyState
+                                }
                             }
 
                             if let err = vm.error {
