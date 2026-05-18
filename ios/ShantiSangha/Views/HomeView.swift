@@ -16,7 +16,6 @@ struct HomeView: View {
     /// `ConnectionsRepository` above is only used for avatar/label lookup.
     @StateObject private var circleVM = CircleViewModel()
     @State private var navTarget: ReminderEditTarget?
-    @State private var profileTarget: ProfileNavTarget?
     /// How many days into the future to show on Home. Anything beyond
     /// this is quietly held back until it enters the window. Overdue
     /// items always show regardless. User adjusts in Settings.
@@ -192,9 +191,6 @@ struct HomeView: View {
                     return nil
                 }()
             )
-        }
-        .navigationDestination(item: $profileTarget) { target in
-            ConnectionDetailView(connectionId: target.connectionId, vm: circleVM)
         }
     }
 
@@ -490,13 +486,10 @@ struct HomeView: View {
                     reminder: reminder,
                     allowSwipeToComplete: true,
                     showDateStamp: true,
-                    avatarUrl: avatarUrl(for: reminder),
                     connectionLabel: connectionLabel(for: reminder),
+                    currentUserId: profile.currentUserId,
                     onTap: { navTarget = .edit(reminder) },
                     onComplete: { Task { await vm.completeReminder(id: reminder.id) } },
-                    onAvatarTap: reminder.connectionId.map { cid in
-                        { profileTarget = ProfileNavTarget(connectionId: cid) }
-                    },
                     activeSwipeId: Binding(
                         get: { vm.activeSwipeId },
                         set: { vm.activeSwipeId = $0 }
@@ -505,23 +498,12 @@ struct HomeView: View {
 
                 if idx < items.count - 1 {
                     Divider()
-                        .padding(.leading, 104)
+                        .padding(.leading, 72)
                         .padding(.trailing, 16)
                 }
             }
         }
         .animation(.easeOut(duration: 0.3), value: items.map(\.id))
-    }
-
-    /// Connection's avatar when the reminder belongs to someone in the
-    /// user's circle; otherwise the viewer's own avatar. Keeps every row
-    /// visually balanced — a face next to every label.
-    private func avatarUrl(for reminder: Reminder) -> String? {
-        if let cid = reminder.connectionId,
-           let connection = connections.connection(for: cid) {
-            return connection.ownerVisibleAvatarUrl
-        }
-        return profile.profile?.avatarUrl
     }
 
     /// Nickname (or display name) of the connection a reminder belongs
@@ -657,11 +639,6 @@ struct HomeView: View {
         return "Good evening\(name)"
     }
 
-}
-
-private struct ProfileNavTarget: Identifiable, Hashable {
-    let connectionId: UUID
-    var id: UUID { connectionId }
 }
 
 // MARK: - Profile menu sheet

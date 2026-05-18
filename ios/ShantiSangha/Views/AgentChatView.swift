@@ -346,8 +346,8 @@ struct AgentChatView: View {
                     reminder: reminder,
                     allowSwipeToComplete: true,
                     showDateStamp: true,
-                    avatarUrl: avatarUrl(for: reminder),
                     connectionLabel: connectionLabel(for: reminder),
+                    currentUserId: profile.currentUserId,
                     onTap: { editTarget = .edit(reminder) },
                     onComplete: {
                         Task {
@@ -361,7 +361,7 @@ struct AgentChatView: View {
 
                 if idx < reminders.count - 1 {
                     Divider()
-                        .padding(.leading, 104)
+                        .padding(.leading, 72)
                         .padding(.trailing, 16)
                 }
             }
@@ -450,14 +450,6 @@ struct AgentChatView: View {
         for i in messages.indices {
             messages[i].attachedReminders.removeAll { $0.id == id }
         }
-    }
-
-    private func avatarUrl(for reminder: Reminder) -> String? {
-        if let cid = reminder.connectionId,
-           let connection = connections.connection(for: cid) {
-            return connection.ownerVisibleAvatarUrl
-        }
-        return profile.profile?.avatarUrl
     }
 
     private func connectionLabel(for reminder: Reminder) -> String? {

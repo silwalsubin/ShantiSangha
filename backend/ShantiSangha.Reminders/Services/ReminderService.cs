@@ -465,8 +465,12 @@ public class ReminderService(
 
         var isSharedWithMe = r.UserId != viewerUserId;
         string? ownerDisplayName = null;
+        string? ownerAvatarUrl = null;
         if (isSharedWithMe && profileCache.TryGetValue(r.UserId, out var owner))
+        {
             ownerDisplayName = owner.DisplayName;
+            ownerAvatarUrl = owner.AvatarUrl;
+        }
 
         return new ReminderResponse(
             r.Id,
@@ -480,7 +484,8 @@ public class ReminderService(
             daysRemaining,
             collaborators,
             isSharedWithMe,
-            ownerDisplayName);
+            ownerDisplayName,
+            ownerAvatarUrl);
     }
 
     private async Task<Dictionary<Guid, (string DisplayName, string? AvatarUrl)>> BuildProfileCacheAsync(

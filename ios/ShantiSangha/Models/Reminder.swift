@@ -45,6 +45,10 @@ struct Reminder: Codable, Identifiable, Equatable, Hashable {
     /// Display name of the reminder's owner — only present when
     /// `isSharedWithMe` is true. Used for the "Shared by …" line.
     let ownerDisplayName: String?
+    /// Owner's avatar URL — companion to `ownerDisplayName`. Used by
+    /// the recipient's row so the participant pip can include the
+    /// owner, not just the other recipients.
+    let ownerAvatarUrl: String?
 
     /// Device-local interpretation of the backend's DateOnly string.
     /// The API's `daysRemaining` can drift around UTC/local midnight;
@@ -91,7 +95,7 @@ struct Reminder: Codable, Identifiable, Equatable, Hashable {
     enum CodingKeys: String, CodingKey {
         case id, label, date, recurrence, remindersEnabled, connectionId
         case completedAt, createdAt, daysRemaining, collaborators
-        case isSharedWithMe, ownerDisplayName
+        case isSharedWithMe, ownerDisplayName, ownerAvatarUrl
     }
 
     init(from decoder: Decoder) throws {
@@ -108,6 +112,7 @@ struct Reminder: Codable, Identifiable, Equatable, Hashable {
         collaborators = try c.decodeIfPresent([ReminderCollaboratorSummary].self, forKey: .collaborators) ?? []
         isSharedWithMe = try c.decodeIfPresent(Bool.self, forKey: .isSharedWithMe) ?? false
         ownerDisplayName = try c.decodeIfPresent(String.self, forKey: .ownerDisplayName)
+        ownerAvatarUrl = try c.decodeIfPresent(String.self, forKey: .ownerAvatarUrl)
     }
 }
 

@@ -41,4 +41,8 @@ public record ReminderResponse(
     /// Owner display name. Surfaced on collaborator views so they know
     /// who shared the reminder. Null on the owner's own rows (they
     /// already know it's theirs).
-    string? OwnerDisplayName);
+    string? OwnerDisplayName,
+    /// Owner avatar URL. Companion to OwnerDisplayName — used by the
+    /// recipient's row to render the owner in the participant pip.
+    /// Null on the owner's own rows.
+    string? OwnerAvatarUrl);

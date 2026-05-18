@@ -19,6 +19,7 @@ public class LabeledLookupTests
             daysOut,
             Array.Empty<ReminderCollaboratorDto>(),
             false,
+            null,
             null);
 
     private static LookupResult<ReminderResponse> Find(IReadOnlyList<ReminderResponse> items, string label)

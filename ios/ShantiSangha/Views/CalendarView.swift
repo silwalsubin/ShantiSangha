@@ -209,8 +209,8 @@ struct CalendarView: View {
                 ReminderRow(
                     reminder: r,
                     showDateStamp: true,
-                    avatarUrl: avatarUrl(for: r),
                     connectionLabel: connectionLabel(for: r),
+                    currentUserId: profile.currentUserId,
                     onTap: { navTarget = .edit(r) },
                     activeSwipeId: Binding(
                         get: { activeSwipeId },
@@ -219,7 +219,7 @@ struct CalendarView: View {
                 )
                 if idx < items.count - 1 {
                     Divider()
-                        .padding(.leading, 104)
+                        .padding(.leading, 72)
                         .padding(.trailing, 16)
                 }
             }
@@ -255,14 +255,6 @@ struct CalendarView: View {
                 return r.date == dateStr
             }
         }
-    }
-
-    private func avatarUrl(for reminder: Reminder) -> String? {
-        if let cid = reminder.connectionId,
-           let c = connections.connection(for: cid) {
-            return c.ownerVisibleAvatarUrl
-        }
-        return profile.profile?.avatarUrl
     }
 
     private func connectionLabel(for reminder: Reminder) -> String? {

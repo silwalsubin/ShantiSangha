@@ -9,10 +9,6 @@ struct ReminderRow: View {
     var allowSwipeToComplete: Bool = false
     var hideDateBadge: Bool = false
     var showDateStamp: Bool = false
-    /// Avatar shown between the date stamp and the label. When set, every
-    /// row gets the same balanced silhouette — connection rows show the
-    /// other person, own-reminder rows show the viewer's own avatar.
-    var avatarUrl: String? = nil
     /// Person prefix prepended to the label when the reminder belongs to
     /// a connection — e.g. "Didi · Birthday". Caller passes the
     /// connection's nickname (or display name) when scoping the row to a
@@ -21,13 +17,13 @@ struct ReminderRow: View {
     /// surfaces (the profile's Important Dates list) where the name is
     /// already in the header.
     var connectionLabel: String? = nil
+    /// Viewer's user ID. The row uses it to subtract the viewer from the
+    /// collaborator pip so people see "who else is on this" rather than
+    /// their own face. Optional so previews / unauthenticated surfaces
+    /// can render the row without a session.
+    var currentUserId: UUID? = nil
     let onTap: () -> Void
     var onComplete: (() -> Void)? = nil
-    /// When set on a connection-scoped row, tapping the avatar opens the
-    /// connection's profile instead of the reminder editor. Lets shared
-    /// surfaces (Home, Calendar) double as a launch point into a friend's
-    /// detail view without an extra row chevron.
-    var onAvatarTap: (() -> Void)? = nil
     var activeSwipeId: Binding<String?>?
 
     @State private var offset: CGFloat = 0
@@ -109,18 +105,6 @@ struct ReminderRow: View {
         HStack(spacing: 12) {
             leadingSlot
 
-            if avatarUrl != nil {
-                if let onAvatarTap {
-                    Button(action: onAvatarTap) {
-                        ProfileAvatarImage(rawUrl: avatarUrl, size: 28, borderWidth: 1)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Open profile")
-                } else {
-                    ProfileAvatarImage(rawUrl: avatarUrl, size: 28, borderWidth: 1)
-                }
-            }
-
             VStack(alignment: .leading, spacing: 2) {
                 labelText
                     .font(.sacredTextMedium)
@@ -159,11 +143,10 @@ struct ReminderRow: View {
         .padding(.vertical, 12)
         .overlay(alignment: .topTrailing) {
             // Discreet sharing cue: small overlapping avatars in the
-            // corner so the row's primary rhythm (date stamp, label,
-            // due) stays clean. Hidden when the row is in its completed
-            // state — the green checkmark should own the right side at
-            // that moment.
-            if !reminder.collaborators.isEmpty && !isCompleted {
+            // corner showing the OTHER people on this task — never
+            // including the viewer themselves. Hidden when the row is
+            // completed so the green checkmark owns that corner.
+            if !othersOnReminder.isEmpty && !isCompleted {
                 collaboratorAvatarStack
                     .padding(.top, 6)
                     .padding(.trailing, 10)
@@ -207,14 +190,40 @@ struct ReminderRow: View {
         return nil
     }
 
+    /// The other people on this reminder. Built as
+    /// `[owner if I'm a recipient] + [collaborators except me]`, so
+    /// every shared row surfaces "who else is on this with you" — the
+    /// viewer is treated as a participant by default and doesn't need
+    /// their own avatar reflected back at them.
+    private var othersOnReminder: [ReminderCollaboratorSummary] {
+        var others: [ReminderCollaboratorSummary] = []
+        if reminder.isSharedWithMe,
+           let name = reminder.ownerDisplayName,
+           !name.isEmpty {
+            // The owner isn't in `collaborators` (they're the UserId
+            // owner). Surface them as a synthetic participant row so
+            // the recipient's pip isn't empty.
+            others.append(ReminderCollaboratorSummary(
+                userId: UUID(),
+                displayName: name,
+                avatarUrl: reminder.ownerAvatarUrl))
+        }
+        let me = currentUserId
+        for c in reminder.collaborators where c.userId != me {
+            others.append(c)
+        }
+        return others
+    }
+
     /// Compact top-right pip: up to two 16pt avatars overlapped, plus a
     /// "+N" gold dot when the share list is bigger. Intentionally small
     /// and tucked into the corner so the row's primary content
     /// (label / due) stays the focus.
     @ViewBuilder
     private var collaboratorAvatarStack: some View {
-        let visible = Array(reminder.collaborators.prefix(2))
-        let overflow = reminder.collaborators.count - visible.count
+        let others = othersOnReminder
+        let visible = Array(others.prefix(2))
+        let overflow = others.count - visible.count
         HStack(spacing: -6) {
             ForEach(visible, id: \.userId) { c in
                 ProfileAvatarImage(rawUrl: c.avatarUrl, size: 16, borderWidth: 1)
