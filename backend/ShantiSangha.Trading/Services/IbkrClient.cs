@@ -135,9 +135,16 @@ public class IbkrClient(HttpClient http, ILogger<IbkrClient> logger) : IIbkrClie
 
     private async Task<T?> HandleResponseAsync<T>(HttpResponseMessage resp, string verb, string path, CancellationToken ct)
     {
-        if (resp.StatusCode == HttpStatusCode.Unauthorized)
+        // The gateway returns 401 when its own session has expired (rare —
+        // requires the gateway to assert that itself) and 403 when there's
+        // no IBKR session at all (the common pre-login state). Both should
+        // surface as IbkrUnauthorizedException so the sync service flips
+        // status to NeedsReauth and the controller returns a friendly 400
+        // instead of an unhandled 500.
+        if (resp.StatusCode == HttpStatusCode.Unauthorized || resp.StatusCode == HttpStatusCode.Forbidden)
         {
-            throw new IbkrUnauthorizedException($"IBKR {verb} {path} returned 401 — session likely expired");
+            throw new IbkrUnauthorizedException(
+                $"IBKR {verb} {path} returned {(int)resp.StatusCode} — no IBKR session (complete the browser login first)");
         }
         if (!resp.IsSuccessStatusCode)
         {
