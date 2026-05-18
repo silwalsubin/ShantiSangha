@@ -34,12 +34,10 @@
     # answers the ALB at all.
     ips:
       allow:
-        # Broad allow — gateway lives in a private SG, only the API task
-        # SG + ALB SG can reach port 5000, so the IP allowlist is
-        # belt-and-suspenders. Wildcards because `10.*` alone wasn't
-        # matching reliably (the .NET keepalive from another task in the
-        # same VPC kept getting 403 Access Denied).
-        - "*"
+        # 10.* covers the VPC CIDR (10.0.0.0/16) which is where the ALB +
+        # other ECS tasks live. Broader wildcards like bare `*` confuse
+        # the gateway's parser and result in 500s on every request.
+        # Network-level ingress is already restricted by the SG.
         - 10.*
         - 192.*
         - 131.216.*
