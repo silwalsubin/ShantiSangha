@@ -41,17 +41,16 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
-      # The ECS task definition references `:latest`; bouncing the service
-      # forces ECS to pull the new image. Backend Deploy already handles
-      # the same thing for the API container — we piggy-back on its
-      # update-service call by triggering it. If you'd rather not bounce
-      # the API, run the AWS Console action "Force new deployment"
-      # manually instead.
-      - name: Force ECS service redeployment
+      # Gateway has its own ECS service now. The task definition
+      # references :latest, so force-deploying the gateway service is
+      # what pulls the freshly-pushed image. The API service is
+      # untouched — its rolling deploys handle backend code changes
+      # independently.
+      - name: Force ECS gateway service redeployment
         run: |
           aws ecs update-service \
             --cluster shantisangha-cluster \
-            --service shantisangha-api \
+            --service shantisangha-ibkr-gateway \
             --force-new-deployment \
             --region us-east-1 >/dev/null
-          echo "ECS service redeployment triggered."
+          echo "ECS gateway redeployment triggered."
