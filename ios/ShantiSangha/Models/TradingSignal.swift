@@ -101,37 +101,6 @@ struct StrategyContribution: Codable, Hashable {
     let weight: Double
 }
 
-struct SymbolMatch: Codable, Identifiable, Hashable {
-    let symbol: String
-    let description: String
-    let type: String
-    /// Populated by /symbols/search/enriched; null on the legacy
-    /// /symbols/search endpoint and on manual fallback rows.
-    let sector: String?
-    let pBuy: Double?
-    let pSell: Double?
-    let horizon: String?
-
-    var id: String { symbol }
-
-    init(symbol: String,
-         description: String,
-         type: String,
-         sector: String? = nil,
-         pBuy: Double? = nil,
-         pSell: Double? = nil,
-         horizon: String? = nil)
-    {
-        self.symbol = symbol
-        self.description = description
-        self.type = type
-        self.sector = sector
-        self.pBuy = pBuy
-        self.pSell = pSell
-        self.horizon = horizon
-    }
-}
-
 enum WiseCatAction: String {
     case buy = "Buy"
     case sell = "Sell"

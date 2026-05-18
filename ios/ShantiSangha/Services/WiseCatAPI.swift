@@ -10,19 +10,6 @@ enum WiseCatAPI {
         try await ApiService.shared.get("/wisecat/signals/\(ticker)")
     }
 
-    static func searchSymbols(_ query: String, limit: Int = 10) async throws -> [SymbolMatch] {
-        let escaped = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-        return try await ApiService.shared.get("/wisecat/symbols/search?q=\(escaped)&limit=\(limit)")
-    }
-
-    /// Enriched search — same shape as `searchSymbols` but each row may
-    /// carry `sector` + `pBuy` + `pSell` + `horizon`. Used by the in-app
-    /// search bar to render filter chips and signal badges.
-    static func searchSymbolsEnriched(_ query: String, limit: Int = 12) async throws -> [SymbolMatch] {
-        let escaped = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-        return try await ApiService.shared.get("/wisecat/symbols/search/enriched?q=\(escaped)&limit=\(limit)")
-    }
-
     static func getChart(_ ticker: String, range: ChartRange) async throws -> ChartHistory {
         try await ApiService.shared.get("/wisecat/chart/\(ticker)?period=\(range.rawValue)")
     }
@@ -33,24 +20,11 @@ enum WiseCatAPI {
         try await ApiService.shared.get("/wisecat/portfolio")
     }
 
-    static func savePortfolio(_ positions: [SavePortfolioPosition], cashBalance: Double? = nil) async throws -> [PortfolioPosition] {
-        let body = SavePortfolioRequest(positions: positions, cashBalance: cashBalance)
-        return try await ApiService.shared.post("/wisecat/portfolio", body: body)
-    }
-
     static func getPortfolioPlan(cashBalance: Double? = nil) async throws -> PortfolioPlan {
         if let cashBalance {
             return try await ApiService.shared.get("/wisecat/portfolio/plan?cash=\(cashBalance)")
         }
         return try await ApiService.shared.get("/wisecat/portfolio/plan")
-    }
-
-    static func addPortfolioPosition(_ position: SavePortfolioPosition) async throws -> PortfolioPosition {
-        try await ApiService.shared.post("/wisecat/portfolio/position", body: position)
-    }
-
-    static func removePortfolioPosition(_ ticker: String) async throws {
-        try await ApiService.shared.delete("/wisecat/portfolio/position/\(ticker)")
     }
 
     // ---------- Strategy settings (Rule constants per user) ----------------

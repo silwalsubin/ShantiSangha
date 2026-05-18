@@ -12,18 +12,6 @@ struct PortfolioPosition: Codable, Identifiable, Hashable {
     var id: String { ticker }
 }
 
-/// Body shape for POST /api/wisecat/portfolio — full replacement.
-struct SavePortfolioPosition: Codable, Hashable {
-    let ticker: String
-    let shares: Double
-    let costBasis: Double
-}
-
-struct SavePortfolioRequest: Codable {
-    let positions: [SavePortfolioPosition]
-    let cashBalance: Double?
-}
-
 /// Action kinds mirror PortfolioActionKind enum on the server. The API
 /// project registers `JsonStringEnumConverter`, so enums come across the
 /// wire as their literal C# names ("Sell", "Trim", "Buy", "Hold") — not
