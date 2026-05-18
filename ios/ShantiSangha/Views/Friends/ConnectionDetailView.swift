@@ -110,7 +110,17 @@ struct ConnectionDetailView: View {
                 },
                 onDelete: target.isEditing
                     ? { await deleteDate(target: target) }
-                    : nil)
+                    : nil,
+                onCollaboratorsChanged: {
+                    if case .edit(let entry) = target {
+                        return { ids in
+                            try? await ReminderRepository.shared.update(
+                                id: entry.id,
+                                collaboratorUserIds: ids)
+                        }
+                    }
+                    return nil
+                }())
         }
         .task(id: connectionId) { await loadDates() }
         .sheet(isPresented: $showAvatarPickerSheet) {

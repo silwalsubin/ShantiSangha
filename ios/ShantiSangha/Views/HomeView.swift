@@ -189,6 +189,16 @@ struct HomeView: View {
                         return { await vm.deleteReminder(id: reminder.id) }
                     }
                     return nil
+                }(),
+                onCollaboratorsChanged: {
+                    if case .edit(let reminder) = target {
+                        return { ids in
+                            try? await ReminderRepository.shared.update(
+                                id: reminder.id,
+                                collaboratorUserIds: ids)
+                        }
+                    }
+                    return nil
                 }()
             )
         }

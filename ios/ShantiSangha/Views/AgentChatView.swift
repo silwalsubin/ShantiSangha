@@ -104,6 +104,18 @@ struct AgentChatView: View {
                         }
                     }
                     return nil
+                }(),
+                onCollaboratorsChanged: {
+                    if case .edit(let reminder) = target {
+                        return { ids in
+                            let updated = try? await ReminderRepository.shared.update(
+                                id: reminder.id,
+                                collaboratorUserIds: ids)
+                            if let updated { patchAttachedReminder(updated) }
+                            return updated
+                        }
+                    }
+                    return nil
                 }()
             )
         }

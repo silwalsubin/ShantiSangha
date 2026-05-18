@@ -18,6 +18,14 @@ struct ReminderEditView: View {
                  _ recurrence: ReminderRecurrence,
                  _ collaboratorUserIds: [UUID]?) async -> Void
     let onDelete: (() async -> Void)?
+    /// Auto-save hook for collaborator changes in edit mode. Non-nil
+    /// only when the reminder already exists on the server (so we can
+    /// PATCH it). The picker and per-row remove call this immediately
+    /// instead of waiting for the user to tap Save — collaboration
+    /// changes are high-stakes (people see / lose access, push fires)
+    /// so they commit atomically. Returns the updated reminder so the
+    /// view can refresh its local copy with the server-resolved names.
+    let onCollaboratorsChanged: ((_ collaboratorUserIds: [UUID]) async -> Reminder?)?
 
     @Environment(\.dismiss) private var dismiss
 
@@ -29,6 +37,7 @@ struct ReminderEditView: View {
     /// when the user taps the toolbar action.
     @State private var collaboratorsDraft: [ReminderCollaboratorSummary] = []
     @State private var collaboratorsDirty = false
+    @State private var collaboratorsSaving = false
     @State private var showSharePicker = false
     @State private var friends: [FriendSummary] = []
     @State private var friendsLoading = false
@@ -225,12 +234,15 @@ struct ReminderEditView: View {
         .buttonStyle(.plain)
     }
 
-    /// Owner-only collaborator manager. Tap the row to open the friends
-    /// multi-select; rows show chosen collaborators with a remove (✕)
-    /// affordance for one-tap removal without re-opening the sheet.
+    /// Owner-only collaborator manager. The header doubles as a preview:
+    /// it shows the current collaborators' avatars overlapped (or an
+    /// "Add collaborators" affordance when empty) with a chevron to
+    /// open the multi-select sheet. Each picked person also gets a row
+    /// below with an ✕ for one-tap removal. Add and remove both
+    /// auto-save in edit mode so the user doesn't have to tap Save.
     private var sharedWithSection: some View {
         VStack(alignment: .leading, spacing: SacredSpacing.xs) {
-            sectionLabel("SHARED WITH")
+            sectionLabel("COLLABORATORS")
             SacredListCard {
                 VStack(spacing: 0) {
                     Button {
@@ -238,21 +250,23 @@ struct ReminderEditView: View {
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
                         HStack(spacing: 12) {
-                            Image(systemName: "person.2.fill")
-                                .font(.sacredSmall)
-                                .foregroundColor(.sacredGold)
-                                .frame(width: 28, height: 28)
-                                .background(Circle().fill(Color.sacredGold.opacity(0.12)))
+                            if collaboratorsDraft.isEmpty {
+                                Image(systemName: "person.2.fill")
+                                    .font(.sacredSmall)
+                                    .foregroundColor(.sacredGold)
+                                    .frame(width: 28, height: 28)
+                                    .background(Circle().fill(Color.sacredGold.opacity(0.12)))
 
-                            Text(collaboratorsDraft.isEmpty
-                                 ? "Add friends"
-                                 : "Edit who can see this")
-                                .font(.sacredText)
-                                .foregroundColor(.sacredText)
+                                Text("Add collaborators")
+                                    .font(.sacredText)
+                                    .foregroundColor(.sacredText)
+                            } else {
+                                collaboratorHeaderStack
+                            }
 
                             Spacer()
 
-                            if friendsLoading {
+                            if friendsLoading || collaboratorsSaving {
                                 ProgressView()
                                     .controlSize(.small)
                                     .tint(.sacredMuted)
@@ -290,6 +304,28 @@ struct ReminderEditView: View {
         }
     }
 
+    /// Overlapping-avatar preview used inside the section header. Same
+    /// visual idiom as the row's pip — up to three 24pt avatars plus a
+    /// "+N" dot when there are more.
+    @ViewBuilder
+    private var collaboratorHeaderStack: some View {
+        let visible = Array(collaboratorsDraft.prefix(3))
+        let overflow = collaboratorsDraft.count - visible.count
+        HStack(spacing: -10) {
+            ForEach(visible, id: \.userId) { c in
+                ProfileAvatarImage(rawUrl: c.avatarUrl, size: 24, borderWidth: 1.5)
+            }
+            if overflow > 0 {
+                Text("+\(overflow)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.sacredText)
+                    .frame(width: 24, height: 24)
+                    .background(Circle().fill(Color.sacredGold.opacity(0.20)))
+                    .overlay(Circle().stroke(Color.sacredBgCard, lineWidth: 1.5))
+            }
+        }
+    }
+
     @ViewBuilder
     private func collaboratorRow(_ c: ReminderCollaboratorSummary) -> some View {
         HStack(spacing: 12) {
@@ -300,11 +336,13 @@ struct ReminderEditView: View {
                 .lineLimit(1)
             Spacer()
             Button {
+                let before = collaboratorsDraft
                 if let i = collaboratorsDraft.firstIndex(where: { $0.userId == c.userId }) {
                     collaboratorsDraft.remove(at: i)
                     collaboratorsDirty = true
                 }
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                Task { await autoSaveCollaborators(previous: before) }
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 18, weight: .regular))
@@ -312,6 +350,7 @@ struct ReminderEditView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Remove \(c.displayName)")
+            .disabled(collaboratorsSaving)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
@@ -412,6 +451,7 @@ struct ReminderEditView: View {
     /// land with a placeholder display name (real name comes back from
     /// the server on save).
     private func applySelection(_ selected: Set<UUID>) {
+        let before = collaboratorsDraft
         let kept = collaboratorsDraft.filter { selected.contains($0.userId) }
         let existingIds = Set(kept.map { $0.userId })
         let added: [ReminderCollaboratorSummary] = selected
@@ -426,10 +466,37 @@ struct ReminderEditView: View {
                 return nil
             }
         let next = (kept + added).sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
-        if next.map(\.userId) != collaboratorsDraft.map(\.userId) {
+        let changed = next.map(\.userId) != collaboratorsDraft.map(\.userId)
+        if changed {
             collaboratorsDirty = true
         }
         collaboratorsDraft = next
+        if changed {
+            Task { await autoSaveCollaborators(previous: before) }
+        }
+    }
+
+    /// Commits the current collaborator draft to the server immediately
+    /// (edit mode only — the `.new` path keeps staging until Save). On
+    /// success we re-seed the local list from the server response so
+    /// freshly-added rows pick up the authoritative display name /
+    /// avatar (the picker only knows what `FriendsAPI.listFriends`
+    /// returns). On failure we revert and leave `Save` as the fallback
+    /// path so the user can still recover.
+    private func autoSaveCollaborators(previous: [ReminderCollaboratorSummary]) async {
+        guard let onCollaboratorsChanged else { return }
+        collaboratorsSaving = true
+        defer { collaboratorsSaving = false }
+        let ids = collaboratorsDraft.map(\.userId)
+        if let updated = await onCollaboratorsChanged(ids) {
+            collaboratorsDraft = updated.collaborators
+            // Server is now the source of truth — Save no longer needs
+            // to re-send the collaborator field.
+            collaboratorsDirty = false
+        } else {
+            collaboratorsDraft = previous
+            AppLogger.shared.error("ReminderEdit", "Auto-save collaborators failed; reverted local set")
+        }
     }
 
     private func loadFriendsIfNeeded() async {

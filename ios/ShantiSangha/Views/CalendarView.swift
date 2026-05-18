@@ -100,6 +100,16 @@ struct CalendarView: View {
                         }
                     }
                     return nil
+                }(),
+                onCollaboratorsChanged: {
+                    if case .edit(let r) = target {
+                        return { ids in
+                            try? await reminderRepo.update(
+                                id: r.id,
+                                collaboratorUserIds: ids)
+                        }
+                    }
+                    return nil
                 }()
             )
         }
