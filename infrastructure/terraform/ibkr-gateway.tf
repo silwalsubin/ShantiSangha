@@ -186,13 +186,15 @@ resource "aws_lb_target_group" "ibkr_gateway" {
     #
     # Long-term fix: patch the gateway's conf.yaml to include 10.0.0.0/16
     # in ips.allow, then tighten this matcher back to 200.
-    path                = "/v1/api/iserver/auth/status"
+    # `/sso/Login` is a static HTML page that returns 200 regardless of
+    # auth state and doesn't depend on the gateway's IBKR session.
+    # `/v1/api/iserver/auth/status` intermittently returns 5xx during
+    # transient JVM states (GC pauses, session refresh) which would put
+    # the ALB into a kill-and-reschedule loop since ALB matchers max
+    # out at 499 (200-599 is rejected by the API).
+    path                = "/sso/Login"
     protocol            = "HTTPS"
-    # Accept any response (including 5xx) so transient JVM hiccups during
-    # GC pauses or session re-establishment don't put the ALB into a
-    # kill-and-reschedule loop. Real container crashes are still caught
-    # by the container-level healthCheck on the task definition.
-    matcher             = "200-599"
+    matcher             = "200-499"
     healthy_threshold   = 2
     unhealthy_threshold = 3
     interval            = 30
