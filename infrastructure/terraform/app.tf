@@ -149,20 +149,11 @@ resource "aws_ecs_task_definition" "api" {
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
   task_role_arn            = aws_iam_role.ecs_task.arn
 
-  # EFS volume backing the IBKR gateway sidecar's session cookie. Lives
-  # outside the container filesystem so deploys / OOM kills don't force
-  # the user to redo the ~daily IBKR 2FA login.
-  volume {
-    name = "ibkr-gateway-state"
-    efs_volume_configuration {
-      file_system_id     = aws_efs_file_system.ibkr_gateway.id
-      transit_encryption = "ENABLED"
-      authorization_config {
-        access_point_id = aws_efs_access_point.ibkr_gateway.id
-        iam             = "ENABLED"
-      }
-    }
-  }
+  # The IBKR gateway sidecar used to live in this task. It's now its own
+  # service (see ibkr-gateway.tf) so the API can roll deploys at 50/200
+  # without dragging the gateway's EFS-bound session through every
+  # backend push. API → gateway calls go via Cloud Map:
+  # https://ibkr-gateway.shantisangha.local:5000
 
   container_definitions = jsonencode([
     {
@@ -187,12 +178,10 @@ resource "aws_ecs_task_definition" "api" {
         { name = "FIREBASE_PROJECT_ID",   value = "shantisangha-bc0f9" },
         { name = "FRONTEND_ORIGIN",       value = "https://${var.domain_name},https://${aws_cloudfront_distribution.frontend.domain_name},http://localhost:5173" },
         { name = "WISECAT_FUNCTION_NAME", value = aws_lambda_function.wisecat.function_name },
-        # Loopback to the sidecar. Forcing IPv4 (127.0.0.1) because the
-        # gateway's ips.allow list whitelists 127.0.0.1 specifically — if
-        # `localhost` resolved to ::1 (IPv6) the gateway would reject the
-        # request as a non-allowlisted source. HTTPS with self-signed cert;
-        # the .NET HttpClient skips cert validation.
-        { name = "IBKR_GATEWAY_BASE_URL", value = "https://127.0.0.1:5000" }
+        # Cloud Map DNS for the gateway service. Both tasks live in the
+        # same VPC + SG; ECS SG self-ingress on 5000 lets this resolve
+        # to whatever IP the gateway task currently has.
+        { name = "IBKR_GATEWAY_BASE_URL", value = "https://ibkr-gateway.${aws_service_discovery_private_dns_namespace.main.name}:5000" }
       ]
 
       secrets = concat([
@@ -222,53 +211,6 @@ resource "aws_ecs_task_definition" "api" {
 
       healthCheck = {
         command     = ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
-        interval    = 30
-        timeout     = 5
-        retries     = 3
-        startPeriod = 60
-      }
-    },
-    {
-      # IBKR Client Portal Gateway sidecar. Listens on 5000 (HTTPS,
-      # self-signed cert). The .NET API talks to it over loopback; YARP
-      # proxies `/ibkr-gateway/*` so the user can complete the daily
-      # 2FA login via a browser. `essential = false` so a gateway crash
-      # doesn't kill the API task — the IBKR sync just flips to Disconnected
-      # status until ECS restarts the container.
-      name      = "ibkr-gateway"
-      image     = "${aws_ecr_repository.ibkr_gateway.repository_url}:latest"
-      essential = false
-
-      portMappings = [{
-        containerPort = 5000
-        protocol      = "tcp"
-      }]
-
-      mountPoints = [{
-        sourceVolume  = "ibkr-gateway-state"
-        containerPath = "/gateway-state"
-        readOnly      = false
-      }]
-
-      environment = [
-        # The Dockerfile mounts /gateway-state for cookies + IBKR-provided
-        # config overrides. Override here only if the image's default
-        # `bin/run.sh root/conf.yaml` invocation needs a different config
-        # path.
-        { name = "IBKR_GATEWAY_STATE_DIR", value = "/gateway-state" }
-      ]
-
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          "awslogs-group"         = aws_cloudwatch_log_group.api.name
-          "awslogs-region"        = var.aws_region
-          "awslogs-stream-prefix" = "ibkr-gateway"
-        }
-      }
-
-      healthCheck = {
-        command     = ["CMD-SHELL", "curl -fks https://localhost:5000/v1/api/iserver/auth/status || exit 1"]
         interval    = 30
         timeout     = 5
         retries     = 3
@@ -336,24 +278,10 @@ resource "aws_ecs_service" "api" {
     container_port   = 8080
   }
 
-  # Register the IBKR gateway sidecar in its own ALB target group so the
-  # gateway is reachable directly at https://gateway.shantisangha.com/
-  # (configured in ibkr-gateway.tf). Hosting the gateway at its own root
-  # avoids the path-prefix reverse-proxy issues with IBKR's SPA login UI.
-  load_balancer {
-    target_group_arn = aws_lb_target_group.ibkr_gateway.arn
-    container_name   = "ibkr-gateway"
-    container_port   = 5000
-  }
-
-  # IBKR gateway has no clean way to share a session between two concurrent
-  # tasks during a deploy — two gateways mounting the same EFS dir would
-  # race on the session cookie. So we stop the old task before starting the
-  # new one (0/100). Tradeoff: ~30-60s of API downtime during each deploy.
-  # Acceptable given low deploy frequency and single-user audience.
-  # (ECS rejects 100/100 outright — would block deploys entirely.)
-  deployment_minimum_healthy_percent = 0
-  deployment_maximum_percent         = 100
+  # Rolling deploys — gateway is its own service now so the API doesn't
+  # need to coordinate with EFS-backed session state during a deploy.
+  deployment_minimum_healthy_percent = 50
+  deployment_maximum_percent         = 200
 
   depends_on = [aws_lb_listener.http]
 

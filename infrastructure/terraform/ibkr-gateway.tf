@@ -222,8 +222,154 @@ resource "aws_security_group_rule" "ecs_gateway_from_alb" {
   description              = "ALB to IBKR gateway sidecar"
 }
 
+# Allow the API task to reach the gateway task on port 5000 (both share
+# the ecs SG). Without this rule the API would resolve the Cloud Map DNS
+# but the TCP connection to the gateway's ENI would be refused.
+resource "aws_security_group_rule" "ecs_gateway_from_ecs" {
+  type                     = "ingress"
+  from_port                = 5000
+  to_port                  = 5000
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.ecs.id
+  security_group_id        = aws_security_group.ecs.id
+  description              = "API ECS task to IBKR gateway task on 5000"
+}
+
 # Note: ALB SG already allows public 443 ingress (declared in network.tf
 # for the CloudFront origin path). No additional rule needed here.
+
+# ---------- Service discovery: ibkr-gateway.shantisangha.local --------------
+
+resource "aws_service_discovery_service" "ibkr_gateway" {
+  name = "ibkr-gateway"
+
+  dns_config {
+    namespace_id = aws_service_discovery_private_dns_namespace.main.id
+    dns_records {
+      ttl  = 10
+      type = "A"
+    }
+    routing_policy = "MULTIVALUE"
+  }
+
+  health_check_custom_config {
+    failure_threshold = 1
+  }
+}
+
+# ---------- Dedicated ECS task def + service for the gateway ---------------
+#
+# Hosting the gateway in its own service (instead of as a sidecar in the
+# API task) lets the API service roll deploys with 50/200 (near-zero
+# downtime) while the gateway stays at 0/100 — necessary because its
+# EFS-backed session cookie can't tolerate two replicas writing the
+# same file during an overlap deploy window.
+#
+# API → gateway communication goes through Cloud Map DNS:
+# https://ibkr-gateway.shantisangha.local:5000
+
+resource "aws_cloudwatch_log_group" "ibkr_gateway" {
+  name              = "/ecs/${var.app_name}-ibkr-gateway"
+  retention_in_days = 30
+}
+
+resource "aws_ecs_task_definition" "ibkr_gateway" {
+  family                   = "${var.app_name}-ibkr-gateway"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = 512
+  memory                   = 1024
+  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
+  task_role_arn            = aws_iam_role.ecs_task.arn
+
+  volume {
+    name = "ibkr-gateway-state"
+    efs_volume_configuration {
+      file_system_id     = aws_efs_file_system.ibkr_gateway.id
+      transit_encryption = "ENABLED"
+      authorization_config {
+        access_point_id = aws_efs_access_point.ibkr_gateway.id
+        iam             = "ENABLED"
+      }
+    }
+  }
+
+  container_definitions = jsonencode([{
+    name      = "ibkr-gateway"
+    image     = "${aws_ecr_repository.ibkr_gateway.repository_url}:latest"
+    essential = true
+
+    portMappings = [{
+      containerPort = 5000
+      protocol      = "tcp"
+    }]
+
+    mountPoints = [{
+      sourceVolume  = "ibkr-gateway-state"
+      containerPath = "/gateway-state"
+      readOnly      = false
+    }]
+
+    environment = [
+      { name = "IBKR_GATEWAY_STATE_DIR", value = "/gateway-state" }
+    ]
+
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        "awslogs-group"         = aws_cloudwatch_log_group.ibkr_gateway.name
+        "awslogs-region"        = var.aws_region
+        "awslogs-stream-prefix" = "ibkr-gateway"
+      }
+    }
+
+    healthCheck = {
+      command     = ["CMD-SHELL", "curl -fks https://localhost:5000/v1/api/iserver/auth/status -o /dev/null || exit 1"]
+      interval    = 30
+      timeout     = 5
+      retries     = 3
+      startPeriod = 60
+    }
+  }])
+}
+
+resource "aws_ecs_service" "ibkr_gateway" {
+  name            = "${var.app_name}-ibkr-gateway"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.ibkr_gateway.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets          = aws_subnet.public[*].id
+    security_groups  = [aws_security_group.ecs.id]
+    assign_public_ip = true
+  }
+
+  # Public-facing target group serving gateway.shantisangha.com for the
+  # browser login. Same TG as before, just now exclusively owned by this
+  # service (used to be a second registration on the API service).
+  load_balancer {
+    target_group_arn = aws_lb_target_group.ibkr_gateway.arn
+    container_name   = "ibkr-gateway"
+    container_port   = 5000
+  }
+
+  # Cloud Map registration: the .NET API resolves the gateway by name.
+  service_registries {
+    registry_arn = aws_service_discovery_service.ibkr_gateway.arn
+  }
+
+  # The EFS session cookie can't survive two concurrent gateways. Stop the
+  # old one before starting the new one — ~30-60s of gateway-only downtime
+  # per deploy. The API service stays up independently.
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 100
+
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
+}
 
 # ---------- Outputs ---------------------------------------------------------
 
