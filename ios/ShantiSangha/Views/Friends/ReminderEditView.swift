@@ -281,18 +281,6 @@ struct ReminderEditView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-
-                    if !collaboratorsDraft.isEmpty {
-                        Divider().padding(.leading, 16)
-                        VStack(spacing: 0) {
-                            ForEach(Array(collaboratorsDraft.enumerated()), id: \.element.userId) { idx, c in
-                                collaboratorRow(c)
-                                if idx < collaboratorsDraft.count - 1 {
-                                    Divider().padding(.leading, 56)
-                                }
-                            }
-                        }
-                    }
                 }
             }
             Text(collaboratorsDraft.isEmpty
@@ -324,36 +312,6 @@ struct ReminderEditView: View {
                     .overlay(Circle().stroke(Color.sacredBgCard, lineWidth: 1.5))
             }
         }
-    }
-
-    @ViewBuilder
-    private func collaboratorRow(_ c: ReminderCollaboratorSummary) -> some View {
-        HStack(spacing: 12) {
-            ProfileAvatarImage(rawUrl: c.avatarUrl, size: 28, borderWidth: 1)
-            Text(c.displayName)
-                .font(.sacredText)
-                .foregroundColor(.sacredText)
-                .lineLimit(1)
-            Spacer()
-            Button {
-                let before = collaboratorsDraft
-                if let i = collaboratorsDraft.firstIndex(where: { $0.userId == c.userId }) {
-                    collaboratorsDraft.remove(at: i)
-                    collaboratorsDirty = true
-                }
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                Task { await autoSaveCollaborators(previous: before) }
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 18, weight: .regular))
-                    .foregroundColor(.sacredMuted.opacity(0.6))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Remove \(c.displayName)")
-            .disabled(collaboratorsSaving)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
     }
 
     /// "Shared by Alice" banner shown on the recipient's view of a
