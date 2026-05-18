@@ -143,8 +143,14 @@ public class IbkrClient(HttpClient http, ILogger<IbkrClient> logger) : IIbkrClie
         // instead of an unhandled 500.
         if (resp.StatusCode == HttpStatusCode.Unauthorized || resp.StatusCode == HttpStatusCode.Forbidden)
         {
+            // Log the response body too — sometimes the gateway returns a
+            // detailed reason in the body that's invaluable for debugging
+            // (e.g. "Access Denied" vs cookie-required vs trusted-client-
+            // rejected). Body capture is best-effort.
+            var body = await SafeReadBodyAsync(resp, ct);
+            logger.LogWarning("IBKR {Verb} {Path} returned {Status}. Body: {Body}", verb, path, (int)resp.StatusCode, body);
             throw new IbkrUnauthorizedException(
-                $"IBKR {verb} {path} returned {(int)resp.StatusCode} — no IBKR session (complete the browser login first)");
+                $"IBKR {verb} {path} returned {(int)resp.StatusCode} — no IBKR session (complete the browser login first). Body: {body}");
         }
         if (!resp.IsSuccessStatusCode)
         {

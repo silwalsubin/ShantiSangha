@@ -187,9 +187,12 @@ resource "aws_ecs_task_definition" "api" {
         { name = "FIREBASE_PROJECT_ID",   value = "shantisangha-bc0f9" },
         { name = "FRONTEND_ORIGIN",       value = "https://${var.domain_name},https://${aws_cloudfront_distribution.frontend.domain_name},http://localhost:5173" },
         { name = "WISECAT_FUNCTION_NAME", value = aws_lambda_function.wisecat.function_name },
-        # Loopback to the sidecar. HTTPS with self-signed cert; the .NET
-        # HttpClient skips cert validation (registered in DependencyInjection.cs).
-        { name = "IBKR_GATEWAY_BASE_URL", value = "https://localhost:5000" }
+        # Loopback to the sidecar. Forcing IPv4 (127.0.0.1) because the
+        # gateway's ips.allow list whitelists 127.0.0.1 specifically — if
+        # `localhost` resolved to ::1 (IPv6) the gateway would reject the
+        # request as a non-allowlisted source. HTTPS with self-signed cert;
+        # the .NET HttpClient skips cert validation.
+        { name = "IBKR_GATEWAY_BASE_URL", value = "https://127.0.0.1:5000" }
       ]
 
       secrets = concat([
