@@ -58,7 +58,6 @@ struct FriendsTabView: View {
     var body: some View {
         let orbs = displayedOrbs
         let displayed = orbs.connections
-        let groupTokens = orbs.groupTokens
         let totalCount = circleVM.connections.count
         let isInitialLoading = (circleVM.loading || vm.loading) && totalCount == 0
             && !hasPendingActivity
@@ -79,7 +78,7 @@ struct FriendsTabView: View {
                 myDisplayName: profile.profile?.displayName,
                 groupDecorations: orbs.groupDecorations,
                 resetTrigger: solarResetTrigger,
-                onTap: { id in handleOrbTap(id: id, groupTokens: groupTokens) })
+                onTap: { id in handleOrbTap(id: id) })
                 .ignoresSafeArea()
 
             centeredStatusOverlay(
@@ -379,8 +378,16 @@ struct FriendsTabView: View {
             bytes[12], bytes[13], bytes[14], bytes[15]))
     }
 
-    private func handleOrbTap(id: UUID, groupTokens: [UUID: GroupTarget]) {
-        if let target = groupTokens[id] {
+    private func handleOrbTap(id: UUID) {
+        // Resolve fresh from current state instead of a captured map.
+        // The SpriteKit scene stores its `onTap` callback once (on
+        // first appear) so a closure capturing `groupTokens` from
+        // an earlier body — most likely the first render before the
+        // API call completed and `circleVM.connections` was still
+        // empty — would carry a stale empty map; group taps would
+        // silently fall through to a detail-nav with the synthetic
+        // group UUID, which goes nowhere.
+        if let target = displayedOrbs.groupTokens[id] {
             withAnimation(.easeOut(duration: 0.2)) {
                 switch target {
                 case .untagged: selectedFilter = .untagged
