@@ -9,6 +9,7 @@ struct WiseCatView: View {
     @StateObject private var vm = PortfolioViewModel()
     @Environment(\.scenePhase) private var scenePhase
     @State private var showRules = false
+    @State private var showLinkIbkr = false
     @State private var pendingDelete: String?
     @State private var lastFetchAt: Date?
 
@@ -131,6 +132,14 @@ struct WiseCatView: View {
             Task { await vm.generatePlan() }
         }) {
             StrategyRulesView()
+        }
+        .sheet(isPresented: $showLinkIbkr) {
+            LinkIbkrView {
+                // User tapped Done (or our auto-detect fired). Trigger the
+                // backend link — by now the gateway should have an IBKR
+                // session, so /ibkr/link will succeed instead of 401/403.
+                Task { await vm.linkIbkr() }
+            }
         }
         .confirmationDialog("Remove this position?",
                             isPresented: Binding(
@@ -647,7 +656,8 @@ struct WiseCatView: View {
             }
             Spacer()
             Button("Re-link") {
-                Task { await vm.linkIbkr() }
+                // Re-auth uses the same WebView flow as initial link.
+                showLinkIbkr = true
             }
             .font(.sacredSmallSemibold)
             .foregroundColor(.sacredGold)
@@ -660,7 +670,11 @@ struct WiseCatView: View {
 
     private var ibkrConnectRow: some View {
         Button {
-            Task { await vm.linkIbkr() }
+            // Open the in-app IBKR login WebView. Once the user completes
+            // 2FA and taps Done, LinkIbkrView's onCompleted closure fires
+            // PortfolioViewModel.linkIbkr() which does the actual backend
+            // link + first sync.
+            showLinkIbkr = true
         } label: {
             HStack(spacing: SacredSpacing.s) {
                 Image(systemName: "link")
