@@ -133,7 +133,7 @@ struct WiseCatView: View {
         }) {
             StrategyRulesView()
         }
-        .sheet(isPresented: $showLinkIbkr) {
+        .fullScreenCover(isPresented: $showLinkIbkr) {
             LinkIbkrView {
                 // User tapped Done (or our auto-detect fired). Trigger the
                 // backend link — by now the gateway should have an IBKR
