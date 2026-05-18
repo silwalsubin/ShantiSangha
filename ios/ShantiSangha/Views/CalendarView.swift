@@ -56,7 +56,7 @@ struct CalendarView: View {
         .navigationDestination(item: $navTarget) { target in
             ReminderEditView(
                 target: target,
-                onSave: { label, date, recurrence in
+                onSave: { label, date, recurrence, collaboratorIds in
                     switch target {
                     case .new(_, _, let connId):
                         do {
@@ -65,7 +65,8 @@ struct CalendarView: View {
                                 date: date,
                                 recurrence: recurrence,
                                 remindersEnabled: true,
-                                connectionId: connId)
+                                connectionId: connId,
+                                collaboratorUserIds: collaboratorIds)
                         } catch {
                             if !error.isCancellation {
                                 AppLogger.shared.error("Calendar", "Create failed: \(error)")
@@ -77,7 +78,8 @@ struct CalendarView: View {
                                 id: reminder.id,
                                 label: label,
                                 date: date,
-                                recurrence: recurrence)
+                                recurrence: recurrence,
+                                collaboratorUserIds: collaboratorIds)
                         } catch {
                             if !error.isCancellation {
                                 AppLogger.shared.error("Calendar", "Update failed: \(error)")

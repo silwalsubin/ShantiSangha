@@ -169,18 +169,20 @@ struct HomeView: View {
         .navigationDestination(item: $navTarget) { target in
             ReminderEditView(
                 target: target,
-                onSave: { label, date, recurrence in
+                onSave: { label, date, recurrence, collaboratorIds in
                     switch target {
                     case .new(_, _, let connId):
                         await vm.createReminder(
                             label: label, date: date,
                             recurrence: recurrence,
-                            connectionId: connId)
+                            connectionId: connId,
+                            collaboratorUserIds: collaboratorIds)
                     case .edit(let reminder):
                         await vm.updateReminder(
                             id: reminder.id,
                             label: label, date: date,
-                            recurrence: recurrence)
+                            recurrence: recurrence,
+                            collaboratorUserIds: collaboratorIds)
                     }
                 },
                 onDelete: {

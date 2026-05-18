@@ -27,6 +27,10 @@ public class RemindersController(IReminderService service, ICurrentUser currentU
         {
             return BadRequest(new { error = ex.Message });
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(403, new { error = ex.Message });
+        }
     }
 
     [HttpGet]
@@ -66,6 +70,11 @@ public class RemindersController(IReminderService service, ICurrentUser currentU
         catch (InvalidOperationException ex)
         {
             return BadRequest(new { error = ex.Message });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            // Peer collaborators trying to change the collaborator set.
+            return StatusCode(403, new { error = ex.Message });
         }
     }
 

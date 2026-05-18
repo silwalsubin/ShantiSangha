@@ -127,7 +127,12 @@ struct ReminderRow: View {
                     .foregroundColor(isCompleted ? .sacredMuted : .sacredText)
                     .lineLimit(1)
 
-                if showDateStamp, let status = relativeDateLabel {
+                if let sharedLabel = sharedSubtitle {
+                    Text(sharedLabel)
+                        .font(.sacredMicro)
+                        .foregroundColor(.sacredGold.opacity(0.85))
+                        .lineLimit(1)
+                } else if showDateStamp, let status = relativeDateLabel {
                     Text(status)
                         .font(localDaysRemaining <= 0 ? .sacredSmallSemibold : .sacredSmall)
                         .foregroundColor(dateStatusColor)
@@ -136,6 +141,10 @@ struct ReminderRow: View {
             }
 
             Spacer()
+
+            if !reminder.collaborators.isEmpty {
+                collaboratorAvatarStack
+            }
 
             if isCompleted {
                 doneBadge
@@ -175,6 +184,44 @@ struct ReminderRow: View {
                 }
             }
         )
+    }
+
+    /// "Shared by Alice" line for collaborator views. Returns nil on
+    /// owner-side rows so the existing date-stamp line keeps its place;
+    /// the collaborator stack on the right already cues sharing for the
+    /// owner.
+    private var sharedSubtitle: String? {
+        if reminder.isSharedWithMe,
+           let name = reminder.ownerDisplayName?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !name.isEmpty {
+            return "Shared by \(name)"
+        }
+        return nil
+    }
+
+    /// Up to two stacked avatars + a "+N" pill when the share list is
+    /// bigger. Sits where the date label normally lives, so we let the
+    /// caller pick: shared rows trade the date chip for the avatar
+    /// stack (it already telegraphs urgency via the date stamp on the
+    /// left for Home-style rows).
+    @ViewBuilder
+    private var collaboratorAvatarStack: some View {
+        let visible = Array(reminder.collaborators.prefix(2))
+        let overflow = reminder.collaborators.count - visible.count
+        HStack(spacing: -8) {
+            ForEach(visible, id: \.userId) { c in
+                ProfileAvatarImage(rawUrl: c.avatarUrl, size: 22, borderWidth: 1.5)
+            }
+            if overflow > 0 {
+                Text("+\(overflow)")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.sacredText)
+                    .frame(width: 22, height: 22)
+                    .background(Circle().fill(Color.sacredGold.opacity(0.18)))
+                    .overlay(Circle().stroke(Color.sacredBgCard, lineWidth: 1.5))
+            }
+        }
+        .padding(.trailing, 4)
     }
 
     @ViewBuilder

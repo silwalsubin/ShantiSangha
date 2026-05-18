@@ -105,13 +105,14 @@ struct FriendChatView: View {
                 target: .new(initialLabel: target.label,
                              initialDate: SuggestionScheduleTarget.parse(target.date),
                              connectionId: target.connectionId),
-                onSave: { label, dateString, savedRecurrence in
+                onSave: { label, dateString, savedRecurrence, collaboratorIds in
                     do {
                         let created = try await ReminderRepository.shared.create(
                             label: label,
                             date: dateString,
                             recurrence: savedRecurrence,
-                            connectionId: target.connectionId)
+                            connectionId: target.connectionId,
+                            collaboratorUserIds: collaboratorIds)
                         await vm.acceptSuggestion(
                             messageId: target.messageId, reminderId: created.id)
                     } catch {

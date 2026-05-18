@@ -92,14 +92,16 @@ class HomeViewModel: ObservableObject {
                         date: String,
                         recurrence: ReminderRecurrence = .none,
                         remindersEnabled: Bool = true,
-                        connectionId: UUID? = nil) async {
+                        connectionId: UUID? = nil,
+                        collaboratorUserIds: [UUID]? = nil) async {
         do {
             _ = try await reminderRepo.create(
                 label: label,
                 date: date,
                 recurrence: recurrence,
                 remindersEnabled: remindersEnabled,
-                connectionId: connectionId)
+                connectionId: connectionId,
+                collaboratorUserIds: collaboratorUserIds)
         } catch {
             if !error.isCancellation {
                 AppLogger.shared.error("Home", "Failed to create reminder: \(error)")
@@ -112,12 +114,14 @@ class HomeViewModel: ObservableObject {
                         date: String? = nil,
                         recurrence: ReminderRecurrence? = nil,
                         remindersEnabled: Bool? = nil,
-                        completed: Bool? = nil) async {
+                        completed: Bool? = nil,
+                        collaboratorUserIds: [UUID]? = nil) async {
         do {
             _ = try await reminderRepo.update(
                 id: id, label: label, date: date,
                 recurrence: recurrence, remindersEnabled: remindersEnabled,
-                completed: completed)
+                completed: completed,
+                collaboratorUserIds: collaboratorUserIds)
         } catch {
             if !error.isCancellation {
                 AppLogger.shared.error("Home", "Failed to update reminder: \(error)")

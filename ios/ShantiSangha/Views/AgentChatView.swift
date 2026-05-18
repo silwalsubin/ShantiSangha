@@ -83,13 +83,14 @@ struct AgentChatView: View {
         .navigationDestination(item: $editTarget) { target in
             ReminderEditView(
                 target: target,
-                onSave: { label, date, recurrence in
+                onSave: { label, date, recurrence, collaboratorIds in
                     if case .edit(let original) = target {
                         if let updated = try? await ReminderRepository.shared.update(
                             id: original.id,
                             label: label,
                             date: date,
-                            recurrence: recurrence)
+                            recurrence: recurrence,
+                            collaboratorUserIds: collaboratorIds)
                         {
                             patchAttachedReminder(updated)
                         }

@@ -9,7 +9,14 @@ import SwiftUI
 /// dismiss the page (pop) when they succeed.
 struct ReminderEditView: View {
     let target: ReminderEditTarget
-    let onSave: (_ label: String, _ date: String, _ recurrence: ReminderRecurrence) async -> Void
+    /// Save callback. `collaboratorUserIds` is the full desired set of
+    /// friend user IDs the owner wants on this reminder — pass nil from
+    /// callsites that don't surface the sharing UI to leave it
+    /// untouched. The picker sends an empty set to clear all sharing.
+    let onSave: (_ label: String,
+                 _ date: String,
+                 _ recurrence: ReminderRecurrence,
+                 _ collaboratorUserIds: [UUID]?) async -> Void
     let onDelete: (() async -> Void)?
 
     @Environment(\.dismiss) private var dismiss
@@ -18,6 +25,13 @@ struct ReminderEditView: View {
     @State private var dateDraft: Date = Date()
     @State private var displayedMonth: Date = Date()
     @State private var recurrenceDraft: ReminderRecurrence = .yearly
+    /// Sharing draft. Lives only on this screen — committed via `onSave`
+    /// when the user taps the toolbar action.
+    @State private var collaboratorsDraft: [ReminderCollaboratorSummary] = []
+    @State private var collaboratorsDirty = false
+    @State private var showSharePicker = false
+    @State private var friends: [FriendSummary] = []
+    @State private var friendsLoading = false
     @State private var saving = false
     @State private var deleting = false
     @State private var didSeed = false
@@ -31,12 +45,40 @@ struct ReminderEditView: View {
         !labelDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    /// Is this reminder editable by the viewer as the owner? Collaborators
+    /// can edit the label / date / recurrence but can't manage the
+    /// collaborator set itself.
+    private var viewerIsOwner: Bool {
+        switch target {
+        case .new: return true
+        case .edit(let reminder): return !reminder.isSharedWithMe
+        }
+    }
+
+    /// Display name to show in the "Shared by …" header on a recipient's
+    /// view. Nil for owner-side views and for the add flow.
+    private var sharedByLabel: String? {
+        if case .edit(let reminder) = target,
+           reminder.isSharedWithMe,
+           let name = reminder.ownerDisplayName?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !name.isEmpty {
+            return name
+        }
+        return nil
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: SacredSpacing.l) {
+                if let sharedByLabel {
+                    sharedByBanner(name: sharedByLabel)
+                }
                 labelSection
                 dateSection
                 recurrenceSection
+                if viewerIsOwner {
+                    sharedWithSection
+                }
                 if onDelete != nil {
                     deleteSection
                 }
@@ -57,9 +99,12 @@ struct ReminderEditView: View {
                 .disabled(!canSave || saving || deleting)
             }
         }
-        .onAppear { seed() }
+        .onAppear {
+            seed()
+            if viewerIsOwner { Task { await loadFriendsIfNeeded() } }
+        }
         .confirmationDialog(
-            "Delete this reminder?",
+            sharedConfirmCopy,
             isPresented: $showDeleteConfirm,
             titleVisibility: .visible
         ) {
@@ -67,6 +112,16 @@ struct ReminderEditView: View {
                 Task { await delete() }
             }
             Button("Cancel", role: .cancel) {}
+        }
+        .sheet(isPresented: $showSharePicker) {
+            CollaboratorPickerSheet(
+                friends: friends,
+                initialSelection: Set(collaboratorsDraft.map { $0.userId }),
+                onDone: { selected in
+                    applySelection(selected)
+                    showSharePicker = false
+                },
+                onCancel: { showSharePicker = false })
         }
     }
 
@@ -170,6 +225,120 @@ struct ReminderEditView: View {
         .buttonStyle(.plain)
     }
 
+    /// Owner-only collaborator manager. Tap the row to open the friends
+    /// multi-select; rows show chosen collaborators with a remove (✕)
+    /// affordance for one-tap removal without re-opening the sheet.
+    private var sharedWithSection: some View {
+        VStack(alignment: .leading, spacing: SacredSpacing.xs) {
+            sectionLabel("SHARED WITH")
+            SacredListCard {
+                VStack(spacing: 0) {
+                    Button {
+                        showSharePicker = true
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "person.2.fill")
+                                .font(.sacredSmall)
+                                .foregroundColor(.sacredGold)
+                                .frame(width: 28, height: 28)
+                                .background(Circle().fill(Color.sacredGold.opacity(0.12)))
+
+                            Text(collaboratorsDraft.isEmpty
+                                 ? "Add friends"
+                                 : "Edit who can see this")
+                                .font(.sacredText)
+                                .foregroundColor(.sacredText)
+
+                            Spacer()
+
+                            if friendsLoading {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .tint(.sacredMuted)
+                            } else {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(.sacredMuted.opacity(0.55))
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    if !collaboratorsDraft.isEmpty {
+                        Divider().padding(.leading, 16)
+                        VStack(spacing: 0) {
+                            ForEach(Array(collaboratorsDraft.enumerated()), id: \.element.userId) { idx, c in
+                                collaboratorRow(c)
+                                if idx < collaboratorsDraft.count - 1 {
+                                    Divider().padding(.leading, 56)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Text(collaboratorsDraft.isEmpty
+                 ? "Private to you. Add a friend to share it."
+                 : "They can view, edit, complete, and delete this reminder.")
+                .font(.sacredMicro)
+                .foregroundColor(.sacredMuted)
+                .padding(.horizontal, 4)
+        }
+    }
+
+    @ViewBuilder
+    private func collaboratorRow(_ c: ReminderCollaboratorSummary) -> some View {
+        HStack(spacing: 12) {
+            ProfileAvatarImage(rawUrl: c.avatarUrl, size: 28, borderWidth: 1)
+            Text(c.displayName)
+                .font(.sacredText)
+                .foregroundColor(.sacredText)
+                .lineLimit(1)
+            Spacer()
+            Button {
+                if let i = collaboratorsDraft.firstIndex(where: { $0.userId == c.userId }) {
+                    collaboratorsDraft.remove(at: i)
+                    collaboratorsDirty = true
+                }
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 18, weight: .regular))
+                    .foregroundColor(.sacredMuted.opacity(0.6))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Remove \(c.displayName)")
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
+
+    /// "Shared by Alice" banner shown on the recipient's view of a
+    /// reminder. Communicates that this isn't your own private row.
+    private func sharedByBanner(name: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "person.2.fill")
+                .font(.sacredSmall)
+                .foregroundColor(.sacredGold)
+            Text("Shared by \(name)")
+                .font(.sacredSmallSemibold)
+                .foregroundColor(.sacredText)
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.sacredGold.opacity(0.08))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.sacredGold.opacity(0.25), lineWidth: 1)))
+    }
+
     private var deleteSection: some View {
         Button(role: .destructive) {
             showDeleteConfirm = true
@@ -195,6 +364,20 @@ struct ReminderEditView: View {
         .padding(.top, SacredSpacing.l)
     }
 
+    /// Either "Delete this reminder?" or, when shared, an explicit copy
+    /// that telegraphs cascade — the row goes away for the people it's
+    /// shared with too.
+    private var sharedConfirmCopy: String {
+        let shared: Bool = {
+            if !collaboratorsDraft.isEmpty { return true }
+            if case .edit(let reminder) = target, reminder.isSharedWithMe { return true }
+            return false
+        }()
+        return shared
+            ? "Delete for everyone it's shared with?"
+            : "Delete this reminder?"
+    }
+
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
             .font(.sacredSectionLabel)
@@ -217,10 +400,49 @@ struct ReminderEditView: View {
             labelDraft = reminder.label
             dateDraft = parseISODate(reminder.date) ?? Date()
             recurrenceDraft = reminder.recurrence
+            collaboratorsDraft = reminder.collaborators
         }
         // Open the picker on the seeded date's month so the user sees
         // their saved date without having to navigate to it first.
         displayedMonth = dateDraft
+    }
+
+    /// Diff the picker's returned ID set against the current draft and
+    /// rebuild `collaboratorsDraft` so removed rows drop and added rows
+    /// land with a placeholder display name (real name comes back from
+    /// the server on save).
+    private func applySelection(_ selected: Set<UUID>) {
+        let kept = collaboratorsDraft.filter { selected.contains($0.userId) }
+        let existingIds = Set(kept.map { $0.userId })
+        let added: [ReminderCollaboratorSummary] = selected
+            .subtracting(existingIds)
+            .compactMap { id in
+                if let friend = friends.first(where: { $0.friendUserId == id }) {
+                    return ReminderCollaboratorSummary(
+                        userId: id,
+                        displayName: friend.displayLabel,
+                        avatarUrl: friend.avatarUrl)
+                }
+                return nil
+            }
+        let next = (kept + added).sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+        if next.map(\.userId) != collaboratorsDraft.map(\.userId) {
+            collaboratorsDirty = true
+        }
+        collaboratorsDraft = next
+    }
+
+    private func loadFriendsIfNeeded() async {
+        guard friends.isEmpty, !friendsLoading else { return }
+        friendsLoading = true
+        defer { friendsLoading = false }
+        do {
+            friends = try await FriendsAPI.listFriends()
+        } catch {
+            if !error.isCancellation {
+                AppLogger.shared.error("ReminderEdit", "Failed to load friends: \(error)")
+            }
+        }
     }
 
     private func save() async {
@@ -228,7 +450,13 @@ struct ReminderEditView: View {
         guard !trimmed.isEmpty else { return }
         saving = true
         defer { saving = false }
-        await onSave(trimmed, formatISODate(dateDraft), recurrenceDraft)
+        // Only forward collaborators when the viewer is the owner AND
+        // they actually touched the set. Non-owners must never send
+        // this field — the server returns 403 if they do.
+        let collaboratorIds: [UUID]? = (viewerIsOwner && collaboratorsDirty)
+            ? collaboratorsDraft.map(\.userId)
+            : nil
+        await onSave(trimmed, formatISODate(dateDraft), recurrenceDraft, collaboratorIds)
         dismiss()
     }
 

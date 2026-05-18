@@ -100,12 +100,13 @@ struct ConnectionDetailView: View {
         .navigationDestination(item: $dateEditTarget) { target in
             ReminderEditView(
                 target: target,
-                onSave: { label, date, recurrence in
+                onSave: { label, date, recurrence, collaboratorIds in
                     await saveDate(
                         target: target,
                         label: label,
                         date: date,
-                        recurrence: recurrence)
+                        recurrence: recurrence,
+                        collaboratorUserIds: collaboratorIds)
                 },
                 onDelete: target.isEditing
                     ? { await deleteDate(target: target) }
@@ -821,7 +822,8 @@ struct ConnectionDetailView: View {
         target: ReminderEditTarget,
         label: String,
         date: String,
-        recurrence: ReminderRecurrence
+        recurrence: ReminderRecurrence,
+        collaboratorUserIds: [UUID]?
     ) async {
         guard let c = connection else { return }
         do {
@@ -832,13 +834,15 @@ struct ConnectionDetailView: View {
                     date: date,
                     recurrence: recurrence,
                     remindersEnabled: true,
-                    connectionId: c.id)
+                    connectionId: c.id,
+                    collaboratorUserIds: collaboratorUserIds)
             case .edit(let entry):
                 _ = try await ReminderRepository.shared.update(
                     id: entry.id,
                     label: label,
                     date: date,
-                    recurrence: recurrence)
+                    recurrence: recurrence,
+                    collaboratorUserIds: collaboratorUserIds)
             }
             saveError = nil
             await loadDates()

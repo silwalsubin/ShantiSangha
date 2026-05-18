@@ -13,4 +13,7 @@ public class Reminder
     public Guid? ConnectionId { get; set; }
     public DateTime? CompletedAt { get; set; }
     public DateTime CreatedAt { get; set; }
+
+    public ICollection<ReminderCollaborator> Collaborators { get; set; }
+        = new List<ReminderCollaborator>();
 }

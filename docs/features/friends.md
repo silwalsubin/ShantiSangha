@@ -18,8 +18,11 @@ Connect with people you trust and message them inside the app — text, images, 
 - Either side can end the friendship at any time — the message thread and all media are hard-deleted on both sides
 
 ## What friends see / never see
-- **See**: Display Name, messages sent to/from each other in the chat thread
-- **Never see**: journal entries, AI chat history, voice notes (solo), reminders, calendar history
+- **See**: Display Name, messages sent to/from each other in the chat thread, and any reminders explicitly shared with them
+- **Never see**: journal entries, AI chat history, voice notes (solo), unshared reminders, calendar history
+
+### Shared reminders — the one carve-out
+Reminders are private by default. The owner may explicitly add one or more friends as collaborators on a single reminder. Collaborators get full peer access to that reminder only — they can view it on their Home screen, edit the label/date/recurrence, mark it complete, and delete it. Completion is shared: when anyone marks it done, it's done for everyone. Deletes cascade for everyone the reminder was shared with. Only the owner can change the collaborator set; collaborators cannot re-share onward. Nothing else about a friend's reminders is exposed.
 
 ## Privacy guarantees
 - Friend messages are NEVER sent to OpenAI / Anthropic / any model provider
