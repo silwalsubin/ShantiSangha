@@ -21,6 +21,19 @@ import UIKit
 ///   • Pinch   — zoom in/out
 ///   • Tap     — invokes onTap with the planet's connection id
 ///   • Double  — springs camera back to default
+/// Tells the sprite scene a planet is actually a group orb — render it
+/// with a member-avatar collage instead of an initial, a name + count
+/// label below the orb, and a wider gold ring chrome so it reads as
+/// "a group of people" rather than just one more person.
+struct GroupDecoration: Equatable {
+    let name: String
+    let memberCount: Int
+    /// Up to 3 owner-visible avatar URLs. Members without an avatar
+    /// are skipped; if the array ends up empty the orb falls back to
+    /// rendering the group's initial in the existing label slot.
+    let memberAvatarUrls: [String]
+}
+
 struct CircleSpriteSystemView: View {
     let connections: [Connection]
     /// User's profile pic — rendered at the center as the "sun." The
@@ -28,6 +41,9 @@ struct CircleSpriteSystemView: View {
     /// as the heart of the system, not just another planet.
     let myAvatarUrl: String?
     let myDisplayName: String?
+    /// Keyed by synthetic connection id. Non-nil entries mark which
+    /// planets are group orbs and carry the data used to dress them up.
+    var groupDecorations: [UUID: GroupDecoration] = [:]
     /// Bumping this UUID from the parent triggers a camera reset
     /// (rotation + zoom + pan back to defaults). The parent owns the
     /// state so a toolbar button can fire it without reaching into
@@ -47,10 +63,13 @@ struct CircleSpriteSystemView: View {
             holder.scene.onTap = onTap
             holder.scene.reduceMotion = reduceMotion
             holder.scene.setMe(avatarUrl: myAvatarUrl, displayName: myDisplayName)
-            holder.scene.update(connections: connections)
+            holder.scene.update(connections: connections, groupDecorations: groupDecorations)
         }
         .onChange(of: connections) { _, new in
-            holder.scene.update(connections: new)
+            holder.scene.update(connections: new, groupDecorations: groupDecorations)
+        }
+        .onChange(of: groupDecorations) { _, new in
+            holder.scene.update(connections: connections, groupDecorations: new)
         }
         .onChange(of: reduceMotion) { _, new in
             holder.scene.reduceMotion = new
@@ -153,6 +172,7 @@ final class CircleSpriteScene: SKScene {
     // MARK: State
 
     private var planetSprites: [UUID: PlanetSprite] = [:]
+    private var groupDecorations: [UUID: GroupDecoration] = [:]
     private var didBuild = false
     private var installedRecognizers: [UIGestureRecognizer] = []
 
@@ -492,7 +512,9 @@ final class CircleSpriteScene: SKScene {
 
     // MARK: - Update: connections
 
-    func update(connections: [Connection]) {
+    func update(connections: [Connection], groupDecorations: [UUID: GroupDecoration] = [:]) {
+        self.groupDecorations = groupDecorations
+
         let buckets = RingAssignment.bucket(connections)
         var seen = Set<UUID>()
 
@@ -516,9 +538,19 @@ final class CircleSpriteScene: SKScene {
             for conn in sorted { seen.insert(conn.id) }
         }
 
-        // Drop sprites whose connection went away.
+        // "Explode" sprites whose connection went away — scale up
+        // while fading out — so the group → members drill-in reads
+        // as the group orb bursting into pieces. Same animation for
+        // every removed sprite (we don't track which one the user
+        // tapped), but in practice only the one being drilled into
+        // is on screen during the transition.
         for (id, sprite) in planetSprites where !seen.contains(id) {
-            sprite.removeFromParent()
+            let explode = SKAction.group([
+                .fadeOut(withDuration: 0.22),
+                .scale(to: 1.55, duration: 0.22)
+            ])
+            explode.timingMode = .easeOut
+            sprite.run(.sequence([explode, .removeFromParent()]))
             planetSprites.removeValue(forKey: id)
         }
     }
@@ -541,10 +573,13 @@ final class CircleSpriteScene: SKScene {
         for (index, conn) in connections.enumerated() {
             let angle = phase + step * CGFloat(index)
             let pos = CGPoint(x: radius * cos(angle), y: radius * sin(angle))
+            let decoration = groupDecorations[conn.id]
 
             let sprite: PlanetSprite
+            let isNew: Bool
             if let existing = planetSprites[conn.id] {
                 sprite = existing
+                isNew = false
                 if sprite.parent !== orbit {
                     sprite.removeFromParent()
                     orbit.addChild(sprite)
@@ -553,9 +588,30 @@ final class CircleSpriteScene: SKScene {
                 sprite = PlanetSprite(connection: conn, ring: ring)
                 orbit.addChild(sprite)
                 planetSprites[conn.id] = sprite
+                isNew = true
             }
-            sprite.position = pos
-            sprite.update(connection: conn)
+            sprite.update(connection: conn, decoration: decoration)
+
+            if isNew {
+                // Scatter-in: spawn the new planet at the orbit's
+                // center (= the sun) and fly it outward to its
+                // assigned position, fading + scaling up at the
+                // same time. Together with the "explode" exit on
+                // the orb the user just tapped, a group → members
+                // drill-in reads as the group bursting open.
+                sprite.position = .zero
+                sprite.alpha = 0
+                sprite.setScale(0.2)
+                let move = SKAction.move(to: pos, duration: 0.5)
+                move.timingMode = .easeOut
+                sprite.run(.group([
+                    .fadeIn(withDuration: 0.4),
+                    SKAction.scale(to: 1.0, duration: 0.5),
+                    move
+                ]))
+            } else {
+                sprite.position = pos
+            }
         }
     }
 
@@ -776,6 +832,7 @@ final class PlanetSprite: SKNode {
     let connectionId: UUID
     private var ring: SacredRing
     private var lastConnection: Connection
+    private var lastDecoration: GroupDecoration?
 
     private let halo: SKShapeNode
     private let avatarDisc: SKSpriteNode
@@ -783,6 +840,11 @@ final class PlanetSprite: SKNode {
     private var unreadBadge: SKShapeNode?
     private var inAppBadge: SKShapeNode?
     private var trail: SKEmitterNode?
+
+    // Lazily-built group chrome — only present on synthetic group orbs.
+    private var groupOuterRing: SKShapeNode?
+    private var groupNameLabel: SKLabelNode?
+    private var collageNodes: [(crop: SKCropNode, sprite: SKSpriteNode, fallback: SKLabelNode, url: String)] = []
 
     init(connection: Connection, ring: SacredRing) {
         self.connectionId = connection.id
@@ -862,18 +924,211 @@ final class PlanetSprite: SKNode {
 
     // MARK: - Update
 
-    func update(connection: Connection) {
+    func update(connection: Connection, decoration: GroupDecoration? = nil) {
+        lastConnection = connection
+        lastDecoration = decoration
+
+        if let decoration {
+            applyGroupDecoration(decoration, connection: connection)
+            return
+        }
+
+        clearGroupDecoration()
+
         let initials = Self.initials(from: connection.displayLabel)
         if initialsLabel.text != initials {
             initialsLabel.text = initials
         }
+        initialsLabel.alpha = 1.0
 
         applyRecency(connection: connection)
         applyUnread(connection: connection)
         applyInAppBadge(connection: connection)
         loadAvatarIfNeeded(url: connection.ownerVisibleAvatarUrl)
+    }
 
-        lastConnection = connection
+    // MARK: - Group decoration
+
+    private func applyGroupDecoration(_ deco: GroupDecoration, connection: Connection) {
+        let radius = Self.diameter(for: ring) / 2
+
+        // Suppress the single-avatar treatment + chat-flavored badges
+        // (a group has no unread count or in-app status).
+        avatarDisc.texture = nil
+        avatarDisc.color = UIColor.sacredCosmicBg.withAlphaComponent(0.55)
+        unreadBadge?.removeFromParent(); unreadBadge = nil
+        inAppBadge?.removeFromParent(); inAppBadge = nil
+        removeCometTrail()
+        halo.removeAction(forKey: "halo-pulse")
+        halo.removeAction(forKey: "haloFade")
+        halo.setScale(1.0)
+        halo.alpha = (ring == .inner) ? 0.06 : 0.03
+
+        rebuildCollage(deco: deco, radius: radius)
+        ensureGroupOuterRing(radius: radius)
+        ensureGroupNameLabel(deco: deco, radius: radius)
+    }
+
+    private func clearGroupDecoration() {
+        guard !collageNodes.isEmpty || groupOuterRing != nil || groupNameLabel != nil else { return }
+        for tile in collageNodes { tile.crop.removeFromParent() }
+        collageNodes.removeAll()
+        groupOuterRing?.removeFromParent(); groupOuterRing = nil
+        groupNameLabel?.removeFromParent(); groupNameLabel = nil
+    }
+
+    /// Builds (or reuses) up to three tiny circular avatar tiles
+    /// arranged in a triangle inside the orb. Members without an
+    /// avatar URL show their initial in the tile instead.
+    private func rebuildCollage(deco: GroupDecoration, radius: CGFloat) {
+        // Pad the avatar list out with empty slots so the triangle
+        // layout always renders a sensible number of tiles. We cap
+        // at 3 for legibility — beyond that the tiles get too small.
+        let urls = Array(deco.memberAvatarUrls.prefix(3))
+        let initialFallbacks = Self.initialLetters(for: deco.name, count: max(1, urls.count))
+        let count = max(1, urls.count)
+
+        let positions: [CGPoint] = {
+            switch count {
+            case 1:
+                return [CGPoint(x: 0, y: 0)]
+            case 2:
+                return [
+                    CGPoint(x: -radius * 0.32, y: 0),
+                    CGPoint(x:  radius * 0.32, y: 0)
+                ]
+            default:
+                return [
+                    CGPoint(x: 0, y:  radius * 0.30),
+                    CGPoint(x: -radius * 0.30, y: -radius * 0.20),
+                    CGPoint(x:  radius * 0.30, y: -radius * 0.20)
+                ]
+            }
+        }()
+        let tileRadius = count == 1 ? radius * 0.62 : radius * 0.46
+
+        // Tear down + rebuild — keeps the code simple and the cost is
+        // trivial (at most 3 nodes). The avatar URL list rarely changes
+        // for the same group so churn here is rare anyway.
+        for tile in collageNodes { tile.crop.removeFromParent() }
+        collageNodes.removeAll()
+
+        for (idx, pos) in positions.enumerated() {
+            let url = idx < urls.count ? urls[idx] : ""
+            let fallback = idx < initialFallbacks.count ? initialFallbacks[idx] : "·"
+            let tile = makeCollageTile(radius: tileRadius, fallback: fallback)
+            tile.crop.position = pos
+            tile.crop.zPosition = 2
+            addChild(tile.crop)
+            collageNodes.append((tile.crop, tile.sprite, tile.fallback, url))
+
+            if !url.isEmpty, let parsed = URL(string: url) {
+                let key = CircleSpriteScene.avatarCacheKey(for: parsed)
+                let connId = connectionId
+                Task { [weak self] in
+                    guard let image = await AvatarImageCache.shared.image(for: parsed) else { return }
+                    await MainActor.run {
+                        guard let self else { return }
+                        guard let stillDeco = self.lastDecoration,
+                              self.connectionId == connId,
+                              stillDeco.memberAvatarUrls.count > idx,
+                              CircleSpriteScene.avatarCacheKey(for: URL(string: stillDeco.memberAvatarUrls[idx]) ?? parsed) == key
+                        else { return }
+                        guard idx < self.collageNodes.count else { return }
+                        let tile = self.collageNodes[idx]
+                        tile.sprite.texture = SKTexture(image: image)
+                        tile.sprite.color = .white
+                        tile.sprite.colorBlendFactor = 0
+                        tile.fallback.alpha = 0
+                    }
+                }
+            }
+        }
+
+        // Hide the original single initial — the collage is the
+        // expressive piece now.
+        initialsLabel.alpha = 0
+    }
+
+    private func makeCollageTile(radius: CGFloat, fallback: String) -> (crop: SKCropNode, sprite: SKSpriteNode, fallback: SKLabelNode) {
+        let crop = SKCropNode()
+        let mask = SKShapeNode(circleOfRadius: radius)
+        mask.fillColor = .white
+        mask.strokeColor = .clear
+        crop.maskNode = mask
+
+        let sprite = SKSpriteNode(
+            color: UIColor.sacredCosmicBgCard,
+            size: CGSize(width: radius * 2, height: radius * 2))
+        sprite.zPosition = 0
+        crop.addChild(sprite)
+
+        let label = SKLabelNode(text: fallback)
+        label.fontName = Self.preferredSerifFontName
+        label.fontSize = radius * 0.95
+        label.fontColor = UIColor.sacredGoldShine
+        label.verticalAlignmentMode = .center
+        label.horizontalAlignmentMode = .center
+        label.zPosition = 1
+        crop.addChild(label)
+
+        let rim = SKShapeNode(circleOfRadius: radius)
+        rim.strokeColor = UIColor.sacredGoldShine.withAlphaComponent(0.45)
+        rim.fillColor = .clear
+        rim.lineWidth = 0.8
+        rim.zPosition = 2
+        crop.addChild(rim)
+
+        return (crop, sprite, label)
+    }
+
+    private func ensureGroupOuterRing(radius: CGFloat) {
+        if groupOuterRing != nil { return }
+        // A second concentric ring at 1.35× the avatar radius, dimmer
+        // than the inner rim. Reads as a halo orbit around the group
+        // without lighting up the cosmos.
+        let ring = SKShapeNode(circleOfRadius: radius * 1.35)
+        ring.strokeColor = UIColor.sacredGoldShine.withAlphaComponent(0.55)
+        ring.fillColor = .clear
+        ring.lineWidth = 1.0
+        ring.zPosition = 4
+        addChild(ring)
+        groupOuterRing = ring
+    }
+
+    private func ensureGroupNameLabel(deco: GroupDecoration, radius: CGFloat) {
+        let text = "\(deco.name) · \(deco.memberCount)"
+        if let existing = groupNameLabel {
+            if existing.text != text { existing.text = text }
+            return
+        }
+        let label = SKLabelNode(text: text)
+        label.fontName = Self.preferredSerifFontName
+        label.fontSize = 11
+        label.fontColor = UIColor.sacredGoldShine
+        label.verticalAlignmentMode = .top
+        label.horizontalAlignmentMode = .center
+        label.position = CGPoint(x: 0, y: -radius - 6)
+        label.zPosition = 5
+        addChild(label)
+        groupNameLabel = label
+    }
+
+    /// First letters for up to N members of a circle group — used to
+    /// fill collage tiles before async avatar loads land (and stays
+    /// when a member has no avatar URL at all).
+    private static func initialLetters(for groupName: String, count: Int) -> [String] {
+        // The group name itself isn't ideal as a per-tile fallback —
+        // every tile would show the same letter. Without member-name
+        // data passed in, we draw on the group's letter for tile 0
+        // and a soft middot for the rest. The async avatar load will
+        // overwrite as soon as it lands.
+        let base = initials(from: groupName)
+        var out: [String] = []
+        for i in 0..<count {
+            out.append(i == 0 ? base : "·")
+        }
+        return out
     }
 
     private func applyRecency(connection: Connection) {

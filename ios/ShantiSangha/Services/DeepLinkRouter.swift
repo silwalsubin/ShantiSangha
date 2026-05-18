@@ -59,7 +59,7 @@ final class DeepLinkRouter: ObservableObject {
 
     /// Called from the notification tap handler when the payload's
     /// `type` is `friend_message`. Stores a routing intent that
-    /// FriendsTabView observes to push the matching chat thread.
+    /// ChatsTabView observes to push the matching chat thread.
     func handleChatNotification(friendshipId: UUID) {
         pendingChatFriendshipId = friendshipId
     }

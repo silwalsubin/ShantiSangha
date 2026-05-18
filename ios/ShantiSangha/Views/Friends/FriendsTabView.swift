@@ -1,209 +1,114 @@
 import SwiftUI
 
-/// Root of the Friends tab. Lists existing friendships, surfaces pending
-/// invites, and offers the "invite a friend" flow.
+/// Root of the Circles tab. Solar/mandala visualization of the user's
+/// circle — central sun (the user) with planet orbs (connections).
+/// Search + filter chips float at the top of the cosmos; an Invite +
+/// Add row sits at the bottom. Pending requests and invites surface
+/// via a chip near the top that opens a sheet. Tapping a planet
+/// routes to `ConnectionDetailView`; chats live in `ChatsTabView`.
 struct FriendsTabView: View {
     @EnvironmentObject private var profile: ProfileService
     /// Pending invites + incoming/outgoing requests still live here.
     /// The main connection list moved to `circleVM`.
     @StateObject private var vm = FriendsViewModel()
     @StateObject private var circleVM = CircleViewModel()
-    @StateObject private var deepLinks = DeepLinkRouter.shared
     @State private var showShare = false
     @State private var shareItems: [Any] = []
     @State private var showAddLocal = false
+    @State private var showRequestsSheet = false
     @State private var navTarget: FriendNavRoute?
     @State private var circleSearchText = ""
     @State private var selectedFilter: CircleFilter = .all
     @State private var solarResetTrigger = UUID()
     @FocusState private var circleSearchFocused: Bool
-    /// String-backed because @AppStorage with custom enums needs a
-    /// `RawRepresentable<String>` plus default-handling boilerplate;
-    /// a tiny string compare is cheaper to read at the call site.
-    @AppStorage("circle_view_mode") private var viewModeRaw: String = CircleViewMode.list.rawValue
 
-    private var viewMode: CircleViewMode {
-        if let mode = CircleViewMode(rawValue: viewModeRaw) { return mode }
-        // Migrate the previous mandala raw value to its successor so
-        // anyone who had the visualization mode picked doesn't drop
-        // back to the list on upgrade.
-        if viewModeRaw == "mandala" { return .solar }
-        return .list
-    }
-
-    /// Programmatic navigation target — both the row body and the avatar
-    /// are tappable but route to different destinations, so we need a
-    /// single source of truth that `.navigationDestination(item:)` can
-    /// drive instead of stacking two NavigationLinks per row.
+    /// Single nav destination. Chats split off to their own tab in
+    /// `ChatsTabView`; this tab is now purely about who is in the
+    /// circle, so every tap on a row routes to the detail view.
     enum FriendNavRoute: Hashable {
-        case chat(UUID)        // connection id
         case detail(UUID)      // connection id
     }
 
-    enum CircleViewMode: String {
-        case list, solar
+    /// Cosmos contents for one render — connections to plot plus the
+    /// map identifying any synthetic group orbs in that list (used at
+    /// tap time to disambiguate group orb from real connection) and
+    /// the decorations the cosmos uses to dress group orbs differently.
+    struct DisplayedOrbs {
+        let connections: [Connection]
+        let groupTokens: [UUID: GroupTarget]
+        let groupDecorations: [UUID: GroupDecoration]
+    }
+
+    /// What a group orb resolves to when tapped — either a named
+    /// circle filter or the untagged catch-all.
+    enum GroupTarget: Hashable {
+        case circle(String)
+        case untagged
+    }
+
+    /// Counted summary of one circle group used to render a synthetic
+    /// orb. `isUntagged == true` is the catch-all bucket for
+    /// connections with no circle tag at all.
+    struct GroupSummary {
+        let name: String
+        let count: Int
+        let isUntagged: Bool
     }
 
     var body: some View {
-        let displayedConnections = filteredConnections
+        let orbs = displayedOrbs
+        let displayed = orbs.connections
+        let groupTokens = orbs.groupTokens
+        let totalCount = circleVM.connections.count
+        let isInitialLoading = (circleVM.loading || vm.loading) && totalCount == 0
+            && !hasPendingActivity
+        let didLoadFail = totalCount == 0 && !circleVM.loading && !vm.loading
+            && !hasPendingActivity
+            && (circleVM.errorMessage != nil || vm.errorMessage != nil)
 
         ZStack {
             SacredBackground()
                 .ignoresSafeArea()
 
-            // Solar with at least one connection goes full-bleed —
-            // the SpriteView fills the viewport edge-to-edge, scope
-            // pill overlays at the top, requests/invites are reachable
-            // by toggling back to list. Everything else (loading,
-            // empty, error, list mode, list-mode-with-no-connections)
-            // routes through the existing scroll view.
-            if viewMode == .solar && !circleVM.connections.isEmpty {
-                fullBleedSolar(
-                    connections: displayedConnections,
-                    totalCount: circleVM.connections.count)
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: SacredSpacing.l) {
-                        if (circleVM.loading || vm.loading) && circleVM.connections.isEmpty
-                            && vm.pendingInvitations.isEmpty
-                            && vm.outgoingRequests.isEmpty && vm.incomingRequests.isEmpty {
-                            // LazyVStack shrinks to its sole child's
-                            // intrinsic width when nothing else
-                            // stretches it — without the explicit
-                            // max-width the spinner ends up pinned to
-                            // the leading edge instead of centered.
-                            ProgressView()
-                                .frame(maxWidth: .infinity)
-                                .padding(.top, SacredSpacing.xl * 2)
-                        } else if circleVM.connections.isEmpty && vm.pendingInvitations.isEmpty
-                                    && vm.outgoingRequests.isEmpty && vm.incomingRequests.isEmpty
-                                    && (circleVM.errorMessage != nil || vm.errorMessage != nil) {
-                            // Refresh failed and we have nothing to
-                            // show. Tell the user the truth instead of
-                            // "Walking solo for now" — that lie made a
-                            // transient API/auth failure look like an
-                            // empty circle.
-                            loadFailureState
-                                .padding(.horizontal, SacredSpacing.m)
-                                .padding(.top, SacredSpacing.xl)
-                        } else if circleVM.connections.isEmpty && vm.pendingInvitations.isEmpty
-                                    && vm.outgoingRequests.isEmpty && vm.incomingRequests.isEmpty {
-                            emptyState
-                                .padding(.horizontal, SacredSpacing.m)
-                                .padding(.top, SacredSpacing.xl)
-                        } else {
-                            if !circleVM.connections.isEmpty {
-                                // Solar branch handled above; this
-                                // path is list-only when reached.
-                                circleControls
-                                    .padding(.horizontal, SacredSpacing.m)
-                                    .padding(.top, SacredSpacing.m)
+            // Cosmos — sun always visible. Planets are either real
+            // connections (filtered view) or synthetic group orbs
+            // (default "All" view); the tap handler disambiguates.
+            CircleSpriteSystemView(
+                connections: displayed,
+                myAvatarUrl: profile.profile?.avatarUrl,
+                myDisplayName: profile.profile?.displayName,
+                groupDecorations: orbs.groupDecorations,
+                resetTrigger: solarResetTrigger,
+                onTap: { id in handleOrbTap(id: id, groupTokens: groupTokens) })
+                .ignoresSafeArea()
 
-                                circleDirectory(connections: displayedConnections)
-                            }
+            centeredStatusOverlay(
+                displayed: displayed,
+                totalCount: totalCount,
+                isInitialLoading: isInitialLoading,
+                didLoadFail: didLoadFail)
 
-                            if !vm.incomingRequests.isEmpty {
-                                SacredCard("REQUESTS RECEIVED") {
-                                    VStack(spacing: SacredSpacing.s) {
-                                        ForEach(vm.incomingRequests) { req in
-                                            IncomingRequestRow(
-                                                request: req,
-                                                onAccept: { Task { await vm.acceptIncomingRequest(req.id) } },
-                                                onDecline: { Task { await vm.declineIncomingRequest(req.id) } })
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal, SacredSpacing.m)
-                            }
+            VStack(spacing: 0) {
+                topOverlay(totalCount: totalCount, shownCount: displayed.count)
 
-                            if !vm.outgoingRequests.isEmpty {
-                                SacredCard("AWAITING REPLY") {
-                                    VStack(spacing: SacredSpacing.s) {
-                                        ForEach(vm.outgoingRequests) { req in
-                                            OutgoingRequestRow(
-                                                request: req,
-                                                onCancel: { Task { await vm.cancelOutgoingRequest(req.id) } })
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal, SacredSpacing.m)
-                            }
+                Spacer()
 
-                            if !vm.pendingInvitations.isEmpty {
-                                SacredCard("PENDING INVITES") {
-                                    VStack(spacing: SacredSpacing.s) {
-                                        ForEach(vm.pendingInvitations) { invite in
-                                            PendingInviteRow(
-                                                invite: invite,
-                                                onShare: { share(invite) },
-                                                onRevoke: { Task { await vm.revoke(invite.invitationId) } })
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal, SacredSpacing.m)
-                            }
-                        }
-
-                        if let err = inlineErrorMessage, !shouldHideError {
-                            Text(err)
-                                .font(.sacredMicro)
-                                .foregroundColor(.sacredMuted)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, SacredSpacing.m)
-                        }
-                    }
-                    .padding(.bottom, SacredSpacing.tabBarSafe)
+                if !didLoadFail {
+                    solarActionRow
+                        .padding(.horizontal, SacredSpacing.m)
+                        .padding(.bottom, SacredSpacing.m)
                 }
             }
         }
         .navigationTitle("Circles")
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
-        // Solar is meant to feel like an immersive sky — hide the main
-        // tab bar so the bottom row of solar action buttons can sit
-        // where the tab items used to. The "list" button returns the
-        // user to list mode, which restores the tab bar. Use
-        // `.automatic` (not `.visible`) for the non-solar case so
-        // pushed children like FriendChatView and ConnectionDetailView
-        // can still set their own `.hidden`.
-        .toolbar(
-            (viewMode == .solar && !circleVM.connections.isEmpty) ? .hidden : .automatic,
-            for: .tabBar)
         .toolbar {
-            // List mode → atom toggle (top trailing) to enter solar.
-            // Solar mode → back chevron (top leading) to return to list.
-            if !circleVM.connections.isEmpty && viewMode == .list {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            viewModeRaw = CircleViewMode.solar.rawValue
-                        }
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    } label: {
-                        Image(systemName: "atom")
-                            .foregroundColor(.sacredGold)
-                    }
-                    .accessibilityLabel("Show solar")
-                }
-            }
-
-            if viewMode == .solar && !circleVM.connections.isEmpty {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            viewModeRaw = CircleViewMode.list.rawValue
-                        }
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .foregroundColor(.sacredGold)
-                    }
-                    .accessibilityLabel("Back to list")
-                }
-
+            if totalCount > 0 {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         solarResetTrigger = UUID()
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     } label: {
                         Image(systemName: "arrow.counterclockwise")
                             .foregroundColor(.sacredGold)
@@ -215,144 +120,285 @@ struct FriendsTabView: View {
         .task {
             await vm.refresh()
             await circleVM.refresh()
-            resolvePendingChat()
         }
         .refreshable {
             await vm.refresh()
             await circleVM.refresh()
         }
-        // Two triggers because the routing intent and the connection
-        // list arrive in either order: a warm-launch tap sets the
-        // friendship id while connections are already loaded; a
-        // cold-launch tap sets it before the first refresh completes.
-        .onChange(of: deepLinks.pendingChatFriendshipId) { _, _ in resolvePendingChat() }
-        .onChange(of: circleVM.connections) { _, _ in resolvePendingChat() }
         .sheet(isPresented: $showShare) { ShareSheet(items: shareItems) }
         .sheet(isPresented: $showAddLocal) {
             AddConnectionView(vm: circleVM)
         }
+        .sheet(isPresented: $showRequestsSheet) {
+            requestsAndInvitesSheet
+        }
         .navigationDestination(item: $navTarget) { route in
             switch route {
-            case .chat(let id):
-                if let conn = circleVM.connections.first(where: { $0.id == id }), conn.messageable {
-                    FriendChatView(connection: conn, circleVM: circleVM)
-                }
             case .detail(let id):
                 ConnectionDetailView(connectionId: id, vm: circleVM)
             }
         }
     }
 
-    // MARK: - Notification deep link
+    // MARK: - Overlays
 
-    /// Resolves a "new message" notification tap into a chat push.
-    /// No-ops until the matching Connection is in `circleVM.connections`
-    /// — the `.onChange(of: circleVM.connections)` retry covers the
-    /// cold-launch case where connections load after the tap fires.
-    private func resolvePendingChat() {
-        guard let friendshipId = deepLinks.pendingChatFriendshipId else { return }
-        guard let conn = circleVM.connections.first(where: { $0.friendshipId == friendshipId }),
-              conn.messageable else {
-            return
+    @ViewBuilder
+    private func topOverlay(totalCount: Int, shownCount: Int) -> some View {
+        VStack(spacing: SacredSpacing.s) {
+            if totalCount > 0 || hasActiveCircleScope {
+                circleSearchField
+                filterChips
+            }
+
+            if hasPendingActivity {
+                requestsChip
+            }
+
+            if hasActiveCircleScope {
+                solarScopePill(shownCount: shownCount, totalCount: totalCount)
+            }
         }
-        deepLinks.clearChat()
-        navTarget = .chat(conn.id)
+        .padding(.horizontal, SacredSpacing.m)
+        .padding(.top, SacredSpacing.xs)
     }
 
-    // MARK: - Circle directory
+    @ViewBuilder
+    private func centeredStatusOverlay(
+        displayed: [Connection],
+        totalCount: Int,
+        isInitialLoading: Bool,
+        didLoadFail: Bool
+    ) -> some View {
+        if isInitialLoading {
+            ProgressView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if didLoadFail {
+            VStack {
+                Spacer()
+                loadFailureState
+                    .padding(.horizontal, SacredSpacing.m)
+                Spacer()
+                Spacer()
+            }
+        } else if totalCount == 0 {
+            walkingSoloOverlay
+        } else if displayed.isEmpty {
+            VStack(spacing: SacredSpacing.s) {
+                Spacer()
+                noMatchesState
+                    .padding(.horizontal, SacredSpacing.m)
+                findOnAppPrompt
+                    .padding(.horizontal, SacredSpacing.m)
+                Spacer()
+                Spacer()
+            }
+        }
+    }
+
+    private var walkingSoloOverlay: some View {
+        VStack(spacing: SacredSpacing.s) {
+            Spacer()
+            Spacer()
+            VStack(spacing: 6) {
+                Text("Walking solo for now.")
+                    .font(.sacredText)
+                    .foregroundColor(.sacredTextSecondary)
+                Text("Invite someone you trust to share this space.")
+                    .font(.sacredSmall)
+                    .foregroundColor(.sacredMuted)
+                    .multilineTextAlignment(.center)
+            }
+
+            NavigationLink(destination: UserSearchView()) {
+                Text("Or find someone on ShantiSangha")
+                    .font(.sacredSmallSemibold)
+                    .foregroundColor(.sacredGold)
+                    .frame(minHeight: 44)
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+        }
+        .padding(.horizontal, SacredSpacing.m)
+    }
+
+    // MARK: - Cosmos contents
 
     private var trimmedCircleSearch: String {
         circleSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var filteredConnections: [Connection] {
+    /// What the cosmos renders. The `.all` chip in member view would
+    /// produce a wall of avatars, so when nothing else is narrowing the
+    /// scope we collapse the people into their groups (Family, Friend,
+    /// circle names…). Group orbs are synthetic `Connection` values —
+    /// the cosmos only cares about the shape — and the `groupTokens`
+    /// map identifies them at tap time so we can switch the filter
+    /// instead of pushing a detail view.
+    private var displayedOrbs: DisplayedOrbs {
         let query = trimmedCircleSearch
-        let entries = circleVM.connections.compactMap { conn -> CircleDirectoryEntry? in
-            guard selectedFilter.includes(conn) else { return nil }
-            guard query.isEmpty || conn.matchesCircleSearch(query) else { return nil }
-            return CircleDirectoryEntry(
-                connection: conn,
-                lastMessageDate: FriendsDates.parse(conn.lastMessageAt))
+
+        if selectedFilter == .all && query.isEmpty && !circleVM.connections.isEmpty {
+            return groupedOrbs()
         }
 
-        return entries
+        let connections = circleVM.connections
+            .filter { selectedFilter.includes($0) }
+            .filter { query.isEmpty || $0.matchesCircleSearch(query) }
             .sorted(by: sortDirectoryEntries)
-            .map(\.connection)
+        return DisplayedOrbs(connections: connections, groupTokens: [:], groupDecorations: [:])
     }
 
-    private func sortDirectoryEntries(_ lhs: CircleDirectoryEntry, _ rhs: CircleDirectoryEntry) -> Bool {
-        if lhs.connection.unreadCount != rhs.connection.unreadCount {
-            return lhs.connection.unreadCount > rhs.connection.unreadCount
-        }
-
-        switch (lhs.lastMessageDate, rhs.lastMessageDate) {
-        case let (l?, r?) where l != r:
-            return l > r
-        case (.some, .none):
-            return true
-        case (.none, .some):
-            return false
-        default:
-            let nameCompare = lhs.connection.displayLabel
-                .localizedCaseInsensitiveCompare(rhs.connection.displayLabel)
-            if nameCompare != .orderedSame { return nameCompare == .orderedAscending }
-            return lhs.connection.id.uuidString < rhs.connection.id.uuidString
-        }
-    }
-
-    private var circleControls: some View {
-        VStack(spacing: SacredSpacing.s) {
-            circleSearchField
-            filterChips
-        }
-    }
-
-    /// Solar mode, full-bleed: SpriteView fills the entire viewport
-    /// (ignoring safe areas top + bottom so the cosmic feel runs into
-    /// nav and tab bars), with the scope pill floating on top when
-    /// the user has narrowed the circle by filter or search.
-    @ViewBuilder
-    private func fullBleedSolar(connections: [Connection], totalCount: Int) -> some View {
-        ZStack(alignment: .top) {
-            if connections.isEmpty {
-                // Filter active but nothing matches.
-                VStack {
-                    Spacer()
-                    noMatchesState
-                        .padding(.horizontal, SacredSpacing.m)
-                    Spacer()
-                }
+    private func groupedOrbs() -> DisplayedOrbs {
+        var byCircle: [String: Int] = [:]
+        var untaggedCount = 0
+        for conn in circleVM.connections {
+            let tags = conn.circles
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+            if tags.isEmpty {
+                untaggedCount += 1
             } else {
-                CircleSpriteSystemView(
-                    connections: connections,
-                    myAvatarUrl: profile.profile?.avatarUrl,
-                    myDisplayName: profile.profile?.displayName,
-                    resetTrigger: solarResetTrigger,
-                    onTap: { id in
-                        navTarget = .detail(id)
-                    })
-                    .ignoresSafeArea()
+                for tag in tags { byCircle[tag, default: 0] += 1 }
+            }
+        }
+
+        var summaries: [GroupSummary] = byCircle
+            .map { GroupSummary(name: $0.key, count: $0.value, isUntagged: false) }
+            .sorted { lhs, rhs in
+                if lhs.count != rhs.count { return lhs.count > rhs.count }
+                return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
             }
 
-            VStack(spacing: SacredSpacing.s) {
-                if hasActiveCircleScope {
-                    solarScopePill(shownCount: connections.count, totalCount: totalCount)
-                        .padding(.top, SacredSpacing.xs)
+        if untaggedCount > 0 {
+            summaries.append(GroupSummary(name: "Untagged", count: untaggedCount, isUntagged: true))
+        }
+
+        var tokens: [UUID: GroupTarget] = [:]
+        var decorations: [UUID: GroupDecoration] = [:]
+        let orbs = summaries.map { summary -> Connection in
+            let orb = Self.syntheticConnection(for: summary)
+            tokens[orb.id] = summary.isUntagged ? .untagged : .circle(summary.name)
+            decorations[orb.id] = GroupDecoration(
+                name: summary.isUntagged ? "Untagged" : summary.name,
+                memberCount: summary.count,
+                memberAvatarUrls: collageAvatars(for: summary))
+            return orb
+        }
+        return DisplayedOrbs(connections: orbs, groupTokens: tokens, groupDecorations: decorations)
+    }
+
+    /// Pick up to three avatars to populate the group orb's collage —
+    /// recent activity first (so the freshest faces lead), then locals
+    /// or anyone left over. Members without an avatar URL are skipped,
+    /// not represented by a placeholder, so the collage never includes
+    /// blank tiles.
+    private func collageAvatars(for group: GroupSummary) -> [String] {
+        let members = circleVM.connections.filter { conn -> Bool in
+            if group.isUntagged {
+                return conn.circles.allSatisfy { $0.trimmingCharacters(in: .whitespaces).isEmpty }
+            }
+            return conn.circles.contains { $0.caseInsensitiveCompare(group.name) == .orderedSame }
+        }
+        let ranked = members.sorted { lhs, rhs in
+            let l = FriendsDates.parse(lhs.lastMessageAt)
+            let r = FriendsDates.parse(rhs.lastMessageAt)
+            if let l, let r, l != r { return l > r }
+            if (l != nil) != (r != nil) { return l != nil }
+            return lhs.displayLabel.localizedCaseInsensitiveCompare(rhs.displayLabel) == .orderedAscending
+        }
+        return ranked.compactMap { $0.ownerVisibleAvatarUrl }.prefix(3).map { $0 }
+    }
+
+    /// Alphabetical by display name. Chat recency lives in Chats tab;
+    /// the Circles directory is a stable, scannable address book.
+    private func sortDirectoryEntries(_ lhs: Connection, _ rhs: Connection) -> Bool {
+        let nameCompare = lhs.displayLabel
+            .localizedCaseInsensitiveCompare(rhs.displayLabel)
+        if nameCompare != .orderedSame { return nameCompare == .orderedAscending }
+        return lhs.id.uuidString < rhs.id.uuidString
+    }
+
+    /// Builds a Connection-shaped stand-in for a circle group so the
+    /// existing SpriteKit scene can render it as just another planet.
+    /// The UUID is derived from the group name so SpriteKit doesn't
+    /// re-add the node every render. `circles` is set to the group's
+    /// name (or empty for Untagged) which drops the orb on the correct
+    /// ring via `RingAssignment` — Family lands on the inner orbit,
+    /// Friend on the middle, anything else on the outer.
+    private static func syntheticConnection(for group: GroupSummary) -> Connection {
+        let label = group.isUntagged ? "Untagged" : group.name
+        let token = stableUUID(seed: "circle-group::\(label)")
+        let person = Person(
+            id: stableUUID(seed: "circle-group-person::\(label)"),
+            userId: nil,
+            displayName: label,
+            phoneNumber: nil,
+            email: nil,
+            country: nil,
+            state: nil,
+            city: nil,
+            address: nil,
+            avatarKey: nil,
+            avatarUrl: nil)
+        return Connection(
+            id: token,
+            ownerUserId: token,
+            personId: person.id,
+            circles: group.isUntagged ? [] : [group.name],
+            nickname: nil,
+            privateNotes: nil,
+            friendshipId: nil,
+            messageable: false,
+            createdAt: "",
+            updatedAt: "",
+            person: person,
+            lastMessagePreview: nil,
+            lastMessageAt: nil,
+            unreadCount: 0,
+            privateAvatarUrl: nil)
+    }
+
+    /// Deterministic UUID from a seed string. UUID v4 layout (random)
+    /// with version + variant bits patched so the sprite scene's UUID
+    /// keying stays stable across renders for the same group.
+    private static func stableUUID(seed: String) -> UUID {
+        var bytes = [UInt8](repeating: 0, count: 16)
+        let seedBytes = Array(seed.utf8)
+        for i in 0..<16 {
+            // Simple FNV-ish fold so different prefixes diverge even
+            // when seeds share leading bytes.
+            var acc: UInt8 = 0
+            for j in stride(from: i, to: seedBytes.count, by: 16) {
+                acc = acc &+ seedBytes[j] &+ UInt8(j & 0xFF)
+            }
+            bytes[i] = acc
+        }
+        bytes[6] = (bytes[6] & 0x0F) | 0x40 // v4
+        bytes[8] = (bytes[8] & 0x3F) | 0x80 // RFC 4122 variant
+        return UUID(uuid: (
+            bytes[0], bytes[1], bytes[2], bytes[3],
+            bytes[4], bytes[5], bytes[6], bytes[7],
+            bytes[8], bytes[9], bytes[10], bytes[11],
+            bytes[12], bytes[13], bytes[14], bytes[15]))
+    }
+
+    private func handleOrbTap(id: UUID, groupTokens: [UUID: GroupTarget]) {
+        if let target = groupTokens[id] {
+            withAnimation(.easeOut(duration: 0.2)) {
+                switch target {
+                case .untagged: selectedFilter = .untagged
+                case .circle(let name): selectedFilter = .circle(name)
                 }
-
-                Spacer()
-
-                solarActionRow
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.horizontal, SacredSpacing.m)
-            .padding(.bottom, SacredSpacing.m)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        } else {
+            navTarget = .detail(id)
         }
     }
 
-    /// Bottom action row in solar mode — invite and add. Returning to
-    /// list mode happens via the standard back chevron in the top-leading
-    /// toolbar slot.
+    /// Bottom action row — invite + add local. Always pinned above
+    /// the tab bar (cosmos is the only Circles view now).
     private var solarActionRow: some View {
         HStack(spacing: SacredSpacing.s) {
             Spacer()
@@ -453,83 +499,68 @@ struct FriendsTabView: View {
     }
 
     /// Static chips first, then the user's circles ranked by usage.
-    /// Capped at 6 dynamic chips so the row stays scrollable but doesn't
-    /// fan out into a wall of tags for someone with dozens of circles.
+    /// Capped at 6 dynamic circle chips so the row stays scrollable but
+    /// doesn't fan out into a wall of tags. `.untagged` only shows up
+    /// when there are connections with no circle tag — otherwise the
+    /// chip would look like a dead end.
     private var availableFilters: [CircleFilter] {
-        var filters: [CircleFilter] = [.all, .unread, .onApp, .local]
+        var filters: [CircleFilter] = [.all, .onApp, .local]
+        if circleVM.connections.contains(where: { $0.circles.allSatisfy { $0.trimmingCharacters(in: .whitespaces).isEmpty } }) {
+            filters.append(.untagged)
+        }
         let topCircles = circleVM.circleCatalog.prefix(6).map { CircleFilter.circle($0.name) }
         filters.append(contentsOf: topCircles)
         return filters
     }
 
     private var filterChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: SacredSpacing.xs) {
-                ForEach(availableFilters, id: \.self) { filter in
-                    Button {
-                        withAnimation(.easeOut(duration: 0.2)) {
-                            selectedFilter = filter
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: SacredSpacing.xs) {
+                    ForEach(availableFilters, id: \.self) { filter in
+                        Button {
+                            withAnimation(.easeOut(duration: 0.2)) {
+                                selectedFilter = filter
+                            }
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        } label: {
+                            Text(filter.label)
+                                .font(.sacredMicroBold)
+                                .foregroundColor(selectedFilter == filter ? .white : .sacredTextSecondary)
+                                .lineLimit(1)
+                                .padding(.horizontal, 12)
+                                .frame(minHeight: 30)
+                                .background(
+                                    Capsule()
+                                        .fill(selectedFilter == filter
+                                              ? Color.sacredGold
+                                              : Color.sacredBgCard.opacity(0.72))
+                                )
+                                .overlay(
+                                    Capsule()
+                                        .stroke(Color.sacredGold.opacity(selectedFilter == filter ? 0 : 0.14),
+                                                lineWidth: 1)
+                                )
+                                .contentShape(Capsule())
                         }
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    } label: {
-                        Text(filter.label)
-                            .font(.sacredMicroBold)
-                            .foregroundColor(selectedFilter == filter ? .white : .sacredTextSecondary)
-                            .lineLimit(1)
-                            .padding(.horizontal, 12)
-                            .frame(minHeight: 30)
-                            .background(
-                                Capsule()
-                                    .fill(selectedFilter == filter
-                                          ? Color.sacredGold
-                                          : Color.sacredBgCard.opacity(0.72))
-                            )
-                            .overlay(
-                                Capsule()
-                                    .stroke(Color.sacredGold.opacity(selectedFilter == filter ? 0 : 0.14),
-                                            lineWidth: 1)
-                            )
-                            .contentShape(Capsule())
+                        .buttonStyle(.plain)
+                        .id(filter)
                     }
-                    .buttonStyle(.plain)
+                }
+                .padding(.vertical, 1)
+            }
+            .onChange(of: selectedFilter) { _, new in
+                // Tapping a group orb (or any chip off-screen) flips
+                // the filter; scroll the matching chip into view so
+                // the user always sees what they've drilled into.
+                withAnimation(.easeOut(duration: 0.25)) {
+                    proxy.scrollTo(new, anchor: .center)
                 }
             }
-            .padding(.vertical, 1)
         }
     }
 
     @ViewBuilder
-    private func circleDirectory(connections: [Connection]) -> some View {
-        VStack(spacing: SacredSpacing.s) {
-            if !connections.isEmpty {
-                SacredListCard {
-                    LazyVStack(spacing: 0) {
-                        ForEach(connections) { conn in
-                            ConnectionRow(
-                                connection: conn,
-                                onTapAvatar: { navTarget = .detail(conn.id) },
-                                onTapBody: {
-                                    navTarget = conn.messageable
-                                        ? .chat(conn.id)
-                                        : .detail(conn.id)
-                                })
-
-                            Divider()
-                                .padding(.leading, 68)
-                        }
-                    }
-                }
-            } else if trimmedCircleSearch.isEmpty {
-                // Filter chip narrowed to nothing — no query to pivot,
-                // so the find-on-app row would have nothing to search.
-                noMatchesState
-            }
-
-            findOnAppPrompt
-        }
-        .padding(.horizontal, SacredSpacing.m)
-    }
-
     private var noMatchesState: some View {
         SacredCard {
             SacredEmptyState(
@@ -574,32 +605,9 @@ struct FriendsTabView: View {
         }
     }
 
-    private var emptyState: some View {
-        VStack(spacing: SacredSpacing.s) {
-            SacredCard {
-                SacredEmptyState(
-                    icon: "person.2",
-                    title: "Walking solo for now.",
-                    subtitle: "Invite someone you trust to message inside this private space.",
-                    actionLabel: "Invite someone"
-                ) { Task { await onInvite() } }
-            }
-
-            // Secondary discovery affordance — without the Find tile,
-            // first-time users with an empty circle would have no path
-            // to the app-wide search.
-            NavigationLink(destination: UserSearchView()) {
-                Text("Or find someone on ShantiSangha")
-                    .font(.sacredSmallSemibold)
-                    .foregroundColor(.sacredGold)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-            }
-            .buttonStyle(.plain)
-        }
-    }
-
-    /// Shown when refresh failed and there's nothing in the lists. The
-    /// emptyState would otherwise lie that the user has no circle.
+    /// Shown when refresh failed and there's nothing in the lists.
+    /// `walkingSoloOverlay` would otherwise lie that the user has no
+    /// circle when really we just failed to fetch it.
     private var loadFailureState: some View {
         SacredCard {
             SacredEmptyState(
@@ -616,16 +624,127 @@ struct FriendsTabView: View {
         }
     }
 
-    /// Hide a one-off decode/network error when we have nothing to show — the
-    /// empty state is the message at that point. Surface errors only when the
-    /// user is mid-action or has loaded data and a follow-up call failed.
-    private var shouldHideError: Bool {
-        circleVM.connections.isEmpty && vm.pendingInvitations.isEmpty
-            && vm.outgoingRequests.isEmpty && vm.incomingRequests.isEmpty
-    }
-
     private var inlineErrorMessage: String? {
         circleVM.errorMessage ?? vm.errorMessage
+    }
+
+    // MARK: - Requests & invites
+
+    private var hasPendingActivity: Bool {
+        !vm.incomingRequests.isEmpty
+            || !vm.pendingInvitations.isEmpty
+            || !vm.outgoingRequests.isEmpty
+    }
+
+    /// Short summary so the chip reads as a status, not a count badge:
+    /// "2 requests · 1 invite" beats "3 pending."
+    private var pendingActivityLabel: String {
+        var parts: [String] = []
+        if !vm.incomingRequests.isEmpty {
+            let n = vm.incomingRequests.count
+            parts.append("\(n) request\(n == 1 ? "" : "s")")
+        }
+        if !vm.pendingInvitations.isEmpty {
+            let n = vm.pendingInvitations.count
+            parts.append("\(n) invite\(n == 1 ? "" : "s")")
+        }
+        if !vm.outgoingRequests.isEmpty && parts.isEmpty {
+            let n = vm.outgoingRequests.count
+            parts.append("\(n) awaiting reply")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private var requestsChip: some View {
+        Button {
+            showRequestsSheet = true
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        } label: {
+            HStack(spacing: SacredSpacing.xs) {
+                Image(systemName: "person.crop.circle.badge.plus")
+                    .font(.sacredSmallSemibold)
+                Text(pendingActivityLabel)
+                    .font(.sacredSmallSemibold)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                Spacer(minLength: SacredSpacing.xs)
+                Image(systemName: "chevron.right")
+                    .font(.sacredMicro)
+                    .opacity(0.7)
+            }
+            .foregroundColor(.sacredGold)
+            .padding(.leading, 14)
+            .padding(.trailing, 12)
+            .frame(minHeight: 44)
+            .background(Capsule().fill(Color.sacredBgCard.opacity(0.72)))
+            .overlay(Capsule().stroke(Color.sacredGold.opacity(0.18), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(pendingActivityLabel)
+    }
+
+    private var requestsAndInvitesSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: SacredSpacing.l) {
+                    if !vm.incomingRequests.isEmpty {
+                        SacredCard("REQUESTS RECEIVED") {
+                            VStack(spacing: SacredSpacing.s) {
+                                ForEach(vm.incomingRequests) { req in
+                                    IncomingRequestRow(
+                                        request: req,
+                                        onAccept: { Task { await vm.acceptIncomingRequest(req.id) } },
+                                        onDecline: { Task { await vm.declineIncomingRequest(req.id) } })
+                                }
+                            }
+                        }
+                    }
+
+                    if !vm.outgoingRequests.isEmpty {
+                        SacredCard("AWAITING REPLY") {
+                            VStack(spacing: SacredSpacing.s) {
+                                ForEach(vm.outgoingRequests) { req in
+                                    OutgoingRequestRow(
+                                        request: req,
+                                        onCancel: { Task { await vm.cancelOutgoingRequest(req.id) } })
+                                }
+                            }
+                        }
+                    }
+
+                    if !vm.pendingInvitations.isEmpty {
+                        SacredCard("PENDING INVITES") {
+                            VStack(spacing: SacredSpacing.s) {
+                                ForEach(vm.pendingInvitations) { invite in
+                                    PendingInviteRow(
+                                        invite: invite,
+                                        onShare: { share(invite) },
+                                        onRevoke: { Task { await vm.revoke(invite.invitationId) } })
+                                }
+                            }
+                        }
+                    }
+
+                    if !hasPendingActivity {
+                        SacredEmptyState(
+                            icon: "tray",
+                            title: "Nothing pending.",
+                            subtitle: "Friend requests and invites will show up here.")
+                            .padding(.top, SacredSpacing.xl)
+                    }
+                }
+                .padding(SacredSpacing.m)
+            }
+            .background(SacredBackground().ignoresSafeArea())
+            .navigationTitle("Pending")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { showRequestsSheet = false }
+                        .foregroundColor(.sacredGold)
+                }
+            }
+        }
     }
 
     private func onInvite() async {
@@ -654,28 +773,23 @@ private struct ShareLink {
     init(_ invite: PendingInvitation) { self.url = invite.shareUrl }
 }
 
-private struct CircleDirectoryEntry {
-    let connection: Connection
-    let lastMessageDate: Date?
-}
-
-/// Circle directory filter chips. The four `static` cases are always
+/// Circle directory filter chips. The three `static` cases are always
 /// present; `.circle(name)` cases are auto-derived per session from the
 /// user's actual circle tags so the chip row reflects how *they*
 /// organize their people, not a hardcoded taxonomy.
 private enum CircleFilter: Hashable {
     case all
-    case unread
     case onApp
     case local
+    case untagged
     case circle(String)
 
     var label: String {
         switch self {
         case .all: return "All"
-        case .unread: return "Unread"
         case .onApp: return "On app"
         case .local: return "Local"
+        case .untagged: return "Untagged"
         case .circle(let name): return name
         }
     }
@@ -684,160 +798,16 @@ private enum CircleFilter: Hashable {
         switch self {
         case .all:
             return true
-        case .unread:
-            return connection.unreadCount > 0
         case .onApp:
             return connection.messageable
         case .local:
             return connection.person.userId == nil
+        case .untagged:
+            return connection.circles.allSatisfy { $0.trimmingCharacters(in: .whitespaces).isEmpty }
         case .circle(let name):
             return connection.circles.contains {
                 $0.caseInsensitiveCompare(name) == .orderedSame
             }
-        }
-    }
-}
-
-private struct ConnectionRow: View {
-    let connection: Connection
-    let onTapAvatar: () -> Void
-    let onTapBody: () -> Void
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            // Avatar gets its own tap target → profile. Body tap
-            // (name + preview) → chat (when paired) or profile
-            // (when local). Both funnel through the parent's
-            // nav-target state.
-            Button(action: onTapAvatar) {
-                SacredAvatar(
-                    displayName: connection.displayLabel,
-                    avatarUrl: connection.ownerVisibleAvatarUrl,
-                    size: 40)
-                    .frame(width: 44, height: 44)
-            }
-            .buttonStyle(.plain)
-
-            Button(action: onTapBody) {
-                HStack(alignment: .top, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(connection.displayLabel)
-                            .font(.sacredTextSemibold)
-                            .foregroundColor(.sacredText)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                        subtitleLine
-                    }
-
-                    Spacer(minLength: 4)
-
-                    VStack(alignment: .trailing, spacing: 6) {
-                        if let timestamp = formattedTimestamp {
-                            Text(timestamp)
-                                .font(.sacredMicro)
-                                .foregroundColor(hasUnread ? .sacredGold : .sacredMuted)
-                                .lineLimit(1)
-                        }
-                        if hasUnread {
-                            Circle()
-                                .fill(Color.sacredGold)
-                                .frame(width: 8, height: 8)
-                                .accessibilityLabel("\(connection.unreadCount) unread")
-                        }
-                    }
-                    .fixedSize(horizontal: true, vertical: false)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private var hasUnread: Bool {
-        connection.messageable && connection.unreadCount > 0
-    }
-
-    private var formattedTimestamp: String? {
-        guard let date = FriendsDates.parse(connection.lastMessageAt) else { return nil }
-        return ConnectionRow.relativeLabel(for: date, now: Date())
-    }
-
-    /// iMessage-style relative timestamp:
-    /// - today → "8:51 PM"
-    /// - yesterday → "Yesterday"
-    /// - within the last 6 days → short weekday ("Mon")
-    /// - same calendar year → "MMM d"
-    /// - older → "M/d/yy"
-    static func relativeLabel(for date: Date, now: Date) -> String {
-        let cal = Calendar.current
-        if cal.isDateInToday(date) {
-            return timeFormatter.string(from: date)
-        }
-        if cal.isDateInYesterday(date) {
-            return "Yesterday"
-        }
-        let days = cal.dateComponents(
-            [.day],
-            from: cal.startOfDay(for: date),
-            to: cal.startOfDay(for: now)
-        ).day ?? 0
-        if days < 7 {
-            return weekdayFormatter.string(from: date)
-        }
-        return cal.component(.year, from: date) == cal.component(.year, from: now)
-            ? monthDayFormatter.string(from: date)
-            : shortDateFormatter.string(from: date)
-    }
-
-    private static let timeFormatter: DateFormatter = {
-        let df = DateFormatter()
-        df.dateFormat = "h:mm a"
-        return df
-    }()
-
-    private static let weekdayFormatter: DateFormatter = {
-        let df = DateFormatter()
-        df.dateFormat = "EEE"
-        return df
-    }()
-
-    private static let monthDayFormatter: DateFormatter = {
-        let df = DateFormatter()
-        df.dateFormat = "MMM d"
-        return df
-    }()
-
-    private static let shortDateFormatter: DateFormatter = {
-        let df = DateFormatter()
-        df.dateFormat = "M/d/yy"
-        return df
-    }()
-
-    @ViewBuilder
-    private var subtitleLine: some View {
-        if connection.messageable, let preview = connection.lastMessagePreview {
-            Text(preview)
-                .font(hasUnread ? .sacredSmallSemibold : .sacredSmall)
-                .foregroundColor(hasUnread ? .sacredText : .sacredTextSecondary)
-                .lineLimit(2)
-        } else if let location = connection.person.locationString {
-            Text(location)
-                .font(.sacredSmall)
-                .foregroundColor(.sacredMuted)
-                .lineLimit(1)
-        } else if connection.messageable {
-            Text("Say hello.")
-                .font(.sacredSmall)
-                .foregroundColor(.sacredMutedLight)
-        } else {
-            Text("Local — they'll be messageable when they join.")
-                .font(.sacredSmall)
-                .foregroundColor(.sacredMuted)
-                .lineLimit(2)
         }
     }
 }

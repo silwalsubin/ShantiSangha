@@ -1,6 +1,9 @@
 import SwiftUI
 
-/// Main tab navigation — primary app loop only: Home, Reflect, Circles.
+/// Main tab navigation: Home, Reflect, Chats, Circles. Chats and
+/// Circles split off from a single Friends tab — Circles holds who is
+/// in your circle (mandala + directory + invites/requests), Chats
+/// holds active conversations.
 /// Custom sacred icons matching the web app's SacredIcons.vue
 struct MainTabView: View {
     @EnvironmentObject var auth: AuthService
@@ -75,20 +78,30 @@ struct MainTabView: View {
                 .tag(1)
 
                 NavigationStack {
+                    ChatsTabView()
+                }
+                .tabItem {
+                    Image("tab.chat")
+                    Text("Chats")
+                }
+                .badge(friendsBadge.unreadMessagesCount)
+                .tag(2)
+
+                NavigationStack {
                     FriendsTabView()
                 }
                 .tabItem {
                     Image(systemName: "atom")
                     Text("Circles")
                 }
-                .badge(friendsBadge.count)
-                .tag(2)
+                .badge(friendsBadge.requestsCount)
+                .tag(3)
             }
             .tint(.sacredGold)
             .task { await friendsBadge.refresh() }
             .sheet(item: deepLinkBinding) { token in
                 AcceptInvitationView(token: token.value) { _ in
-                    selectedTab = 2
+                    selectedTab = 3
                 }
             }
 
@@ -103,10 +116,10 @@ struct MainTabView: View {
         .onChange(of: selectedTab) { _, _ in
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
-        // Tap on a "new message" notification → jump to Circles so the
+        // Tap on a "new message" notification → jump to Chats so the
         // tab's own router can resolve the friendship id and push the
         // chat thread. We only switch tabs here; we don't clear the
-        // routing intent (FriendsTabView clears it once it resolves).
+        // routing intent (ChatsTabView clears it once it resolves).
         .onChange(of: deepLinks.pendingChatFriendshipId) { _, newValue in
             if newValue != nil {
                 selectedTab = 2

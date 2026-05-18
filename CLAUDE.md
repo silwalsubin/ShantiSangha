@@ -12,7 +12,7 @@ See `docs/features/` for detailed feature documentation (purpose, value, how it 
 
 ## Design Principles
 Every UI decision must honor these principles. See `docs/design-principles/` for details:
-- [Simplicity](docs/design-principles/simplicity.md) — ONE experience, not modules. 3 tabs only. No bells and whistles.
+- [Simplicity](docs/design-principles/simplicity.md) — ONE experience, not modules. 4 tabs only (Home, Reflect, Chats, Circles). No bells and whistles.
 - [Privacy](docs/design-principles/privacy.md) — user data is never shared. This is their sacred private space.
 - [Sacred Aesthetic](docs/design-principles/sacred-aesthetic.md) — saffron/gold/parchment, no emojis, no cold colors.
 - [Mobile First](docs/design-principles/mobile-first.md) — 375px minimum, 44px touch targets, design for phones.

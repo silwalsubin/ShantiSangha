@@ -1,0 +1,5 @@
+<svg width="25" height="25" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Two speech bubbles in conversation — upper-left bubble (back) and lower-right (front). Pure stroke so template-rendering tints both outlines uniformly. -->
+  <path d="M3 5.5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v3.5a2 2 0 0 1-2 2H7l-3 3v-3a2 2 0 0 1-1-1.75z" stroke="black" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M21 12.5a2 2 0 0 0-2-2h-6a2 2 0 0 0-2 2V16a2 2 0 0 0 2 2h5l3 3v-3a2 2 0 0 0 1-1.75z" stroke="black" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>
