@@ -48,6 +48,7 @@ final class PortfolioViewModel: ObservableObject {
                 self.cashBalance = cash
             }
             self.error = nil
+            await generatePlan()
             return true
         } catch {
             self.error = "Could not link IBKR: \(error.localizedDescription)"
@@ -67,6 +68,7 @@ final class PortfolioViewModel: ObservableObject {
                 self.cashBalance = cash
             }
             self.error = nil
+            await generatePlan()
             return true
         } catch {
             self.error = "Could not resync IBKR: \(error.localizedDescription)"
