@@ -188,7 +188,11 @@ resource "aws_lb_target_group" "ibkr_gateway" {
     # in ips.allow, then tighten this matcher back to 200.
     path                = "/v1/api/iserver/auth/status"
     protocol            = "HTTPS"
-    matcher             = "200-499"
+    # Accept any response (including 5xx) so transient JVM hiccups during
+    # GC pauses or session re-establishment don't put the ALB into a
+    # kill-and-reschedule loop. Real container crashes are still caught
+    # by the container-level healthCheck on the task definition.
+    matcher             = "200-599"
     healthy_threshold   = 2
     unhealthy_threshold = 3
     interval            = 30
