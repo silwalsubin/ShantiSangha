@@ -54,6 +54,20 @@ enum SilentPushHandler {
                 NotificationCenter.default.post(name: .notificationsRefreshNeeded, object: nil)
                 NotificationCenter.default.post(name: .friendsUpdated, object: nil)
             }
+        case "reminder_shared":
+            // The user was just added as a collaborator on someone else's
+            // reminder. Refresh the bell inbox so the new row appears,
+            // and let the always-on reminders refresh below pull the
+            // shared row onto Home.
+            await MainActor.run {
+                NotificationCenter.default.post(name: .notificationsRefreshNeeded, object: nil)
+            }
+        case "reminder_changed":
+            // A shared reminder this user has access to was edited,
+            // completed, or deleted by another participant. The always-on
+            // reminders refresh below picks up the change (or its absence
+            // on delete) — no additional dispatch needed.
+            break
         case "trading_signal":
             // Strong-conviction Wise Cat call. Posts a local notification
             // any view can observe; currently unwired on the receiver

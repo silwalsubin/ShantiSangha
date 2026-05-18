@@ -272,7 +272,11 @@ try
         }
         else
         {
-            Log.Warning("Firebase Admin: no FIREBASE_SERVICE_ACCOUNT_JSON found, falling back to default credentials");
+            // Falling back to default credentials means FCM sends will fail
+            // silently in prod (ECS task identity has no FCM permissions).
+            // Log loudly so the failure mode is grep-able instead of being
+            // mistaken for an iOS-side token problem.
+            Log.Error("Firebase Admin: FIREBASE_SERVICE_ACCOUNT_JSON is missing — push notifications WILL NOT be delivered. Set firebase_service_account_json in terraform.tfvars.");
             FirebaseApp.Create(new AppOptions { ProjectId = appConfig.FirebaseProjectId });
         }
     }

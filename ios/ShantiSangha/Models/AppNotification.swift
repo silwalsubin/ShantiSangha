@@ -33,6 +33,17 @@ struct FriendRequestAcceptedPayload: Codable {
     let byAvatarUrl: String?
 }
 
+/// Payload of `type == "reminder_shared"`. Lands in the bell inbox when
+/// the reminder's owner adds the viewer as a collaborator. Tap routes
+/// the user to Home where the new shared row is now visible.
+struct ReminderSharedPayload: Codable {
+    let reminderId: UUID
+    let reminderLabel: String
+    let byUserId: UUID
+    let byDisplayName: String
+    let byAvatarUrl: String?
+}
+
 /// Mirror of the backend `FriendRequestResponse` — used by the inbox
 /// when it needs to refresh a request's state (e.g., after accept) or by
 /// outgoing-request screens.

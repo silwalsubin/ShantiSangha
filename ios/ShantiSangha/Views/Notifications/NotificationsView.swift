@@ -69,6 +69,12 @@ private struct NotificationRow: View {
             } else {
                 fallbackRow
             }
+        case "reminder_shared":
+            if let payload = decode(ReminderSharedPayload.self) {
+                ReminderSharedRow(notification: notification, payload: payload)
+            } else {
+                fallbackRow
+            }
         default:
             fallbackRow
         }
@@ -101,6 +107,39 @@ private struct NotificationRow: View {
     private func decode<T: Decodable>(_ type: T.Type) -> T? {
         guard let data = notification.payload.data(using: .utf8) else { return nil }
         return try? JSONDecoder().decode(T.self, from: data)
+    }
+}
+
+private struct ReminderSharedRow: View {
+    let notification: AppNotification
+    let payload: ReminderSharedPayload
+
+    var body: some View {
+        HStack(spacing: SacredSpacing.s) {
+            SacredAvatar(
+                displayName: payload.byDisplayName,
+                avatarUrl: payload.byAvatarUrl,
+                size: 40)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(payload.byDisplayName) shared a reminder")
+                    .font(.sacredTextSemibold)
+                    .foregroundColor(.sacredText)
+                    .lineLimit(1)
+                Text(payload.reminderLabel)
+                    .font(.sacredSmall)
+                    .foregroundColor(.sacredMuted)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            Text(relativeTime(from: notification.createdAt))
+                .font(.sacredMicro)
+                .foregroundColor(.sacredMuted)
+        }
+        .padding(SacredSpacing.s)
+        .luxCardChrome()
     }
 }
 

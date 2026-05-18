@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using ShantiSangha.Reminders.Contracts;
 using ShantiSangha.Reminders.Data;
 using ShantiSangha.Reminders.Models;
@@ -9,7 +10,10 @@ namespace ShantiSangha.Reminders.Services;
 public class ReminderService(
     RemindersDbContext db,
     IFriendsQueryService friendsQuery,
-    IProfileQueryService profiles) : IReminderService
+    IProfileQueryService profiles,
+    INotificationService notifications,
+    IPushNotificationService push,
+    ILogger<ReminderService> logger) : IReminderService
 {
     public async Task<ReminderResponse> CreateAsync(
         Guid userId, CreateReminderRequest body, CancellationToken ct = default)
@@ -35,12 +39,17 @@ public class ReminderService(
 
         db.Reminders.Add(reminder);
 
+        var addedCollaboratorIds = new List<Guid>();
         if (body.CollaboratorUserIds is { Length: > 0 })
         {
-            await ApplyCollaboratorsAsync(reminder, userId, body.CollaboratorUserIds, ct);
+            addedCollaboratorIds = await ApplyCollaboratorsAsync(
+                reminder, userId, body.CollaboratorUserIds, ct);
         }
 
         await db.SaveChangesAsync(ct);
+
+        // Fire-and-forget notifications for the newly-shared-with friends.
+        await NotifyCollaboratorsAddedAsync(reminder, userId, addedCollaboratorIds, ct);
 
         return await ToResponseAsync(reminder, userId, DateOnly.FromDateTime(DateTime.UtcNow), ct);
     }
@@ -101,11 +110,14 @@ public class ReminderService(
                     || r.Collaborators.Any(c => c.UserId == userId)), ct);
         if (reminder is null) return null;
 
+        var contentChanged = false;
+
         if (body.Label is not null)
         {
             if (string.IsNullOrWhiteSpace(body.Label))
                 throw new InvalidOperationException("Label cannot be empty.");
             reminder.Label = body.Label.Trim();
+            contentChanged = true;
         }
 
         if (body.Date is not null)
@@ -113,19 +125,33 @@ public class ReminderService(
             if (!DateOnly.TryParse(body.Date, out var parsedDate))
                 throw new InvalidOperationException("Invalid date format. Use yyyy-MM-dd.");
             reminder.Date = parsedDate;
+            contentChanged = true;
         }
 
         if (body.Recurrence is not null)
+        {
             reminder.Recurrence = ParseRecurrence(body.Recurrence);
+            contentChanged = true;
+        }
 
         if (body.RemindersEnabled is not null)
+        {
             reminder.RemindersEnabled = body.RemindersEnabled.Value;
+            contentChanged = true;
+        }
 
         if (body.Completed is true)
+        {
             reminder.CompletedAt = DateTime.UtcNow;
+            contentChanged = true;
+        }
         else if (body.Completed is false)
+        {
             reminder.CompletedAt = null;
+            contentChanged = true;
+        }
 
+        var addedCollaboratorIds = new List<Guid>();
         if (body.CollaboratorUserIds is not null)
         {
             // Only the owner may change the collaborator set. A peer
@@ -135,10 +161,25 @@ public class ReminderService(
                 throw new UnauthorizedAccessException(
                     "Only the reminder owner can change collaborators.");
 
-            await ApplyCollaboratorsAsync(reminder, userId, body.CollaboratorUserIds, ct);
+            addedCollaboratorIds = await ApplyCollaboratorsAsync(
+                reminder, userId, body.CollaboratorUserIds, ct);
         }
 
         await db.SaveChangesAsync(ct);
+
+        // Newly-added collaborators get the bell-inbox row + alert push.
+        await NotifyCollaboratorsAddedAsync(reminder, userId, addedCollaboratorIds, ct);
+
+        // Everyone else with access (owner + existing collaborators minus
+        // the actor) gets a silent push so their open client refreshes.
+        // Skip when only the collaborator set was edited and no actual
+        // reminder content changed — the new-collaborator path above
+        // already covers the people who care.
+        if (contentChanged)
+        {
+            await NotifyReminderChangedAsync(reminder, actorUserId: userId, ct);
+        }
+
         return await ToResponseAsync(reminder, userId, DateOnly.FromDateTime(DateTime.UtcNow), ct);
     }
 
@@ -148,13 +189,21 @@ public class ReminderService(
         // product decision. Cascade on Reminders.Id wipes the collaborator
         // join rows automatically.
         var reminder = await db.Reminders
+            .Include(r => r.Collaborators)
             .FirstOrDefaultAsync(r => r.Id == id
                 && (r.UserId == userId
                     || r.Collaborators.Any(c => c.UserId == userId)), ct);
         if (reminder is null) return false;
 
+        // Snapshot participants BEFORE delete — cascade removes collaborator
+        // rows, and we still want to ping everyone else's clients so the
+        // row disappears from their Home on next refresh.
+        var participantIds = ParticipantIds(reminder).Where(uid => uid != userId).ToList();
+
         db.Reminders.Remove(reminder);
         await db.SaveChangesAsync(ct);
+
+        await NotifyReminderDeletedAsync(reminder.Id, participantIds, ct);
         return true;
     }
 
@@ -164,7 +213,9 @@ public class ReminderService(
     /// of the owner, then diffs against the current set and inserts /
     /// removes rows. Mutates `reminder.Collaborators` so the caller's
     /// follow-up `SaveChangesAsync` persists everything atomically.
-    private async Task ApplyCollaboratorsAsync(
+    /// Returns the list of newly-added user IDs so the caller can fire
+    /// notifications post-commit.
+    private async Task<List<Guid>> ApplyCollaboratorsAsync(
         Reminder reminder,
         Guid ownerUserId,
         Guid[] requestedIds,
@@ -196,7 +247,8 @@ public class ReminderService(
             }
         }
 
-        // Add rows for any newly-requested IDs.
+        // Add rows for any newly-requested IDs and track them for notify.
+        var added = new List<Guid>();
         foreach (var addId in requested)
         {
             if (existing.ContainsKey(addId)) continue;
@@ -209,7 +261,153 @@ public class ReminderService(
             };
             db.ReminderCollaborators.Add(row);
             reminder.Collaborators.Add(row);
+            added.Add(addId);
         }
+        return added;
+    }
+
+    // ── Notification fanouts ─────────────────────────────────────────
+
+    /// Bell-inbox row + alert push for friends who were just added as
+    /// collaborators. Mirrors the friend_request_accepted pattern in
+    /// FriendRequestsService — try/catch every external call so a
+    /// notification failure never breaks the write.
+    private async Task NotifyCollaboratorsAddedAsync(
+        Reminder reminder,
+        Guid actorUserId,
+        IReadOnlyList<Guid> addedUserIds,
+        CancellationToken ct)
+    {
+        if (addedUserIds.Count == 0) return;
+
+        var actorName = await profiles.GetDisplayNameAsync(actorUserId, ct) ?? "Someone";
+        var actorAvatar = await profiles.GetAvatarInfoAsync(actorUserId, ct);
+
+        foreach (var recipientId in addedUserIds)
+        {
+            try
+            {
+                await notifications.EnqueueAsync(
+                    recipientUserId: recipientId,
+                    type: "reminder_shared",
+                    payload: new
+                    {
+                        reminderId = reminder.Id,
+                        reminderLabel = reminder.Label,
+                        byUserId = actorUserId,
+                        byDisplayName = actorName,
+                        byAvatarUrl = actorAvatar.AvatarUrl
+                    },
+                    ct: ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex,
+                    "Failed to enqueue reminder_shared inbox row for reminder {ReminderId} → user {UserId}",
+                    reminder.Id, recipientId);
+            }
+
+            // Badge = the recipient's full unread inbox count, queried
+            // AFTER the enqueue so the new row is included. Matches the
+            // pattern used for friend_request_accepted.
+            int badge;
+            try { badge = await notifications.GetUnreadCountAsync(recipientId, ct); }
+            catch { badge = 1; }
+
+            try
+            {
+                await push.SendAlertPushAsync(
+                    userId: recipientId,
+                    title: $"{actorName} shared a reminder",
+                    body: reminder.Label,
+                    data: new Dictionary<string, string>
+                    {
+                        ["type"] = "reminder_shared",
+                        ["reminderId"] = reminder.Id.ToString()
+                    },
+                    badge: badge,
+                    ct: ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex,
+                    "Failed to send reminder_shared alert push for reminder {ReminderId} → user {UserId}",
+                    reminder.Id, recipientId);
+            }
+        }
+    }
+
+    /// Silent push to every other participant when a shared reminder's
+    /// content changes (label, date, recurrence, completion). The
+    /// existing iOS `SilentPushHandler` already refreshes the reminder
+    /// list on any silent push, so we only need a stable `type` for
+    /// telemetry — no payload data required by the client.
+    private async Task NotifyReminderChangedAsync(
+        Reminder reminder, Guid actorUserId, CancellationToken ct)
+    {
+        var participants = ParticipantIds(reminder).Where(uid => uid != actorUserId).ToList();
+        // Private reminder with no collaborators → nothing to fan out.
+        if (participants.Count == 0) return;
+
+        foreach (var uid in participants)
+        {
+            try
+            {
+                await push.SendSilentPushAsync(
+                    userId: uid,
+                    data: new Dictionary<string, string>
+                    {
+                        ["type"] = "reminder_changed",
+                        ["reminderId"] = reminder.Id.ToString()
+                    },
+                    ct: ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex,
+                    "Failed to send reminder_changed silent push for reminder {ReminderId} → user {UserId}",
+                    reminder.Id, uid);
+            }
+        }
+    }
+
+    /// Mirror of NotifyReminderChangedAsync, but for the delete path —
+    /// participants snapshot is taken BEFORE the cascade so we can still
+    /// reach everyone who lost access.
+    private async Task NotifyReminderDeletedAsync(
+        Guid reminderId, IReadOnlyList<Guid> participantIds, CancellationToken ct)
+    {
+        if (participantIds.Count == 0) return;
+        foreach (var uid in participantIds)
+        {
+            try
+            {
+                await push.SendSilentPushAsync(
+                    userId: uid,
+                    data: new Dictionary<string, string>
+                    {
+                        ["type"] = "reminder_changed",
+                        ["reminderId"] = reminderId.ToString(),
+                        ["deleted"] = "true"
+                    },
+                    ct: ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex,
+                    "Failed to send reminder_changed (deleted) silent push for reminder {ReminderId} → user {UserId}",
+                    reminderId, uid);
+            }
+        }
+    }
+
+    /// Everyone with access to the reminder: owner + every collaborator.
+    /// De-duped to a HashSet so callers can subtract the actor with `.Where`.
+    private static HashSet<Guid> ParticipantIds(Reminder reminder)
+    {
+        var set = new HashSet<Guid> { reminder.UserId };
+        foreach (var c in reminder.Collaborators) set.Add(c.UserId);
+        return set;
     }
 
     // ── Response mapping ─────────────────────────────────────────────
