@@ -22,16 +22,21 @@ public sealed class RemindersTool(
     [McpServerTool(Name = "list_reminders")]
     [KernelFunction("list_reminders")]
     [Description(
-        "Return the user's reminders, optionally filtered to a date range. " +
+        "Return the user's reminders, optionally filtered to a date range and / or only the shared ones. " +
         "Use this when the user asks what's coming up, what they have scheduled, what reminders exist, " +
-        "or before referring to a specific reminder by name. " +
-        "Each result includes the reminder's label, date, recurrence, and days_remaining. " +
+        "WHO a reminder is shared with, WHO owns it, or before referring to a specific reminder by name. " +
+        "Each result includes: label, date, recurrence, days_remaining, is_shared (bool), shared_by " +
+        "(owner's display name when a friend shared this reminder with the caller; null when the caller owns it), " +
+        "and shared_with (array of collaborator display names on the caller's own reminders; null on reminders shared with the caller). " +
+        "When the user asks specifically about shared / collaborative reminders, set shared_only: true so only those rows are returned and rendered as cards. " +
         "The `id` field is opaque — never read it aloud to the user.")]
     public async Task<object> ListReminders(
         [Description("Optional lower bound as a natural-language date ('today', 'next Monday', 'June 1', 'in 7 days', 'yyyy-MM-dd').")]
         string? from = null,
         [Description("Optional upper bound as a natural-language date.")]
         string? to = null,
+        [Description("Optional. When true, return only reminders that are shared — either the caller owns it and added collaborators, OR a friend shared it with the caller. Use when the user asks about shared / collaborative reminders.")]
+        bool shared_only = false,
         CancellationToken ct = default)
     {
         var user = await RequireUserAsync();
@@ -53,6 +58,10 @@ public sealed class RemindersTool(
             // future state queries so the assistant only surfaces pending
             // work.
             if (r.CompletedAt is not null) return false;
+            // shared_only narrows the result to rows where there's actual
+            // collaboration — either the caller has shared it out, or
+            // someone else has shared it with the caller.
+            if (shared_only && !r.IsSharedWithMe && r.Collaborators.Length == 0) return false;
             var occurrence = r.Date.AddDays(r.DaysRemaining);
             if (fromDate is not null && occurrence < fromDate) return false;
             if (toDate is not null && occurrence > toDate) return false;
