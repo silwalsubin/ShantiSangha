@@ -34,6 +34,12 @@
     # answers the ALB at all.
     ips:
       allow:
+        # Broad allow — gateway lives in a private SG, only the API task
+        # SG + ALB SG can reach port 5000, so the IP allowlist is
+        # belt-and-suspenders. Wildcards because `10.*` alone wasn't
+        # matching reliably (the .NET keepalive from another task in the
+        # same VPC kept getting 403 Access Denied).
+        - "*"
         - 10.*
         - 192.*
         - 131.216.*
