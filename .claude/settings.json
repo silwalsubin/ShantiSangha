@@ -196,7 +196,31 @@
       "Skill(app-health-check:*)",
       "Bash(grep -E \"\\\\.cs$\")",
       "Skill(sacred-ui)",
-      "Skill(sacred-ui:*)"
+      "Skill(sacred-ui:*)",
+      "Bash(ls -la ~/Library/Logs/Claude/ 2>&1 | head -40; echo \"---\"; ls -la ~/Library/Caches/claude-cli-nodejs/ 2>&1 | head -40; echo \"---\"; ls -la ~/.claude/ 2>&1 | head -40; echo \"---\"; ls -la \"/Users/subinsilwal/Library/Application Support/Claude/\" 2>&1 | head -20)",
+      "Read(//Users/subinsilwal/Library/Logs/**)",
+      "Read(//Users/subinsilwal/Library/Caches/claude-cli-nodejs/**)",
+      "Read(//Users/subinsilwal/Library/Application Support/**)",
+      "Bash(mkdir -p ~/.claude/skills/mcp-issues/scripts && ls -la ~/.claude/skills/mcp-issues/)",
+      "Edit(~/.claude/skills/mcp-issues/**)",
+      "Bash(chmod +x ~/.claude/skills/mcp-issues/scripts/scan_mcp_logs.py)",
+      "Bash(python3 ~/.claude/skills/mcp-issues/scripts/scan_mcp_logs.py --format markdown --since 30d)",
+      "Bash(mkdir -p ~/.claude/skills/mcp-issues-workspace/iteration-1)",
+      "Bash(mkdir -p eval-0-broad-health/with_skill/outputs eval-0-broad-health/without_skill/outputs eval-1-auth-symptom/with_skill/outputs eval-1-auth-symptom/without_skill/outputs eval-2-vscode-error-paste/with_skill/outputs eval-2-vscode-error-paste/without_skill/outputs eval-3-global-scan/with_skill/outputs eval-3-global-scan/without_skill/outputs)",
+      "Edit(~/.claude/skills/mcp-issues-workspace/**)",
+      "Bash(claude mcp *)",
+      "Bash(which claude *)",
+      "Read(//Applications/**)",
+      "Read(//Users/subinsilwal/Applications/**)",
+      "Read(//Users/subinsilwal/.bun/**)",
+      "Read(//Users/subinsilwal/.local/**)",
+      "Bash(rm -rf ~/.claude/skills/mcp-issues ~/.claude/skills/mcp-issues-workspace && ls ~/.claude/skills/)",
+      "Bash(xargs ls -la)",
+      "Read(//Users/subinsilwal/**)",
+      "Bash(awk '/aws_ecs_service \"api\"/,/^}$/' infrastructure/terraform/app.tf)",
+      "Edit(/.claude/skills/agent-reports/**)",
+      "Bash(chmod +x /Users/subinsilwal/Desktop/code/maiself/.claude/skills/agent-reports/scripts/digest.sh)",
+      "Bash(bash /Users/subinsilwal/Desktop/code/maiself/.claude/skills/agent-reports/scripts/digest.sh --since 30d --format markdown)"
     ],
     "additionalDirectories": [
       "/Users/subinsilwal/Desktop/code/maiself/.claude",
@@ -205,7 +229,8 @@
       "/Users/subinsilwal/Downloads",
       "/Users/subinsilwal/Desktop/code/maiself/ios",
       "/Users/subinsilwal/Desktop/code/maiself/.claude/skills",
-      "/Users/subinsilwal/Desktop/code/maiself/.claude/skills/wisecat-tune"
+      "/Users/subinsilwal/Desktop/code/maiself/.claude/skills/wisecat-tune",
+      "/Users/subinsilwal/.claude/skills/mcp-issues"
     ]
   }
 }

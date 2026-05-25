@@ -1,11 +1,14 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using ShantiSangha.AgentFeedback.Contracts;
 using ShantiSangha.AgentFeedback.Data;
 using ShantiSangha.AgentFeedback.Models;
 
 namespace ShantiSangha.AgentFeedback.Services;
 
-public class AgentFeedbackService(AgentFeedbackDbContext db) : IAgentFeedbackService
+public class AgentFeedbackService(
+    AgentFeedbackDbContext db,
+    ILogger<AgentFeedbackService> logger) : IAgentFeedbackService
 {
     public async Task<AgentFeedbackResponse> CreateAsync(
         Guid userId,
@@ -38,6 +41,14 @@ public class AgentFeedbackService(AgentFeedbackDbContext db) : IAgentFeedbackSer
 
         db.Entries.Add(entry);
         await db.SaveChangesAsync(ct);
+
+        logger.LogInformation(
+            "AgentFeedback recorded: type={AgentFeedbackType} severity={AgentFeedbackSeverity} title={AgentFeedbackTitle} userId={AgentFeedbackUserId} id={AgentFeedbackId}",
+            entry.Type.ToString().ToLowerInvariant(),
+            entry.Severity.ToString().ToLowerInvariant(),
+            entry.Title,
+            userId,
+            entry.Id);
 
         return ToResponse(entry);
     }
