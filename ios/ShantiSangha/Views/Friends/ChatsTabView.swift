@@ -482,14 +482,11 @@ private struct ChatRow: View {
     @ViewBuilder
     private var subtitleLine: some View {
         if let imageUrl = connection.lastMessageImageUrl, !imageUrl.isEmpty {
-            // Last message was a photo — show a small thumbnail + label,
-            // the iMessage/Telegram pattern, instead of a "(photo)" string.
-            HStack(spacing: 6) {
-                MessageThumbnail(urlString: imageUrl, size: 28)
-                Text("Photo")
-                    .font(hasUnread ? .sacredSmallSemibold : .sacredSmall)
-                    .foregroundColor(hasUnread ? .sacredText : .sacredTextSecondary)
-            }
+            // Last message was a photo — the thumbnail itself is the
+            // preview (iMessage pattern), so no redundant "Photo" label.
+            // Keep it as an accessibility label for VoiceOver.
+            MessageThumbnail(urlString: imageUrl, size: 32)
+                .accessibilityLabel("Photo")
         } else if let preview = connection.lastMessagePreview, !preview.isEmpty {
             Text(preview)
                 .font(hasUnread ? .sacredSmallSemibold : .sacredSmall)

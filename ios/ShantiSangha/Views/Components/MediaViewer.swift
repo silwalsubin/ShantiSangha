@@ -1,5 +1,6 @@
 import SwiftUI
 import AVKit
+import UIKit
 
 /// Apple-Photos-style fullscreen media viewer used everywhere a user
 /// opens a photo or video in this app — owner-private keepsakes,
@@ -206,26 +207,21 @@ struct MediaViewer: View {
                     .background(Capsule().fill(Color.black.opacity(0.45)))
                     .padding(.horizontal, SacredSpacing.l)
             }
-            HStack {
+            // Buttons sit as a centered cluster regardless of how many
+            // are present — even spacing between them, centered as a
+            // group rather than spread to the edges.
+            HStack(spacing: SacredSpacing.xl) {
                 actionButton(systemName: "square.and.arrow.up") {
                     Task { await prepareShare() }
                 }
                 if let onCaption {
-                    Spacer()
                     actionButton(systemName: "text.bubble") { onCaption(current) }
                 }
                 if let onDelete {
-                    Spacer()
                     actionButton(systemName: "trash", tint: .sacredRed) { onDelete(current) }
                 }
-                if onCaption == nil && onDelete == nil {
-                    // Push the share button to the leading edge so the
-                    // bottom bar stays visually balanced when only
-                    // share is available.
-                    Spacer()
-                }
             }
-            .padding(.horizontal, 48)
+            .frame(maxWidth: .infinity)
             .padding(.bottom, SacredSpacing.l)
         }
     }
@@ -273,123 +269,195 @@ struct MediaViewer: View {
     }
 }
 
-/// One swipeable page in the `MediaViewer` carousel. Owns its own
-/// zoom/pan state so swiping to a new page resets back to fit-to-screen.
-/// The pan gesture is only attached when zoomed in — otherwise it would
-/// swallow the horizontal drag the parent TabView needs to flip pages.
+/// One swipeable page in the `MediaViewer` carousel.
+///
+/// Photos use a `UIScrollView`-backed zoom view (`ZoomableImage`) so the
+/// pinch, pan, momentum, bounds rubber-banding, and double-tap-to-point
+/// all feel like the native Photos viewer — the hand-rolled SwiftUI
+/// `MagnificationGesture` version fought the parent `.page` TabView and
+/// snapped between zoom levels instead of scaling continuously.
 struct MediaViewerPage: View {
     let item: MediaViewerItem
     let localUrlResolver: ((MediaViewerItem) async -> URL?)?
 
-    @State private var resolvedURL: URL?
-    @State private var resolving = true
-    @State private var imageZoom: CGFloat = 1.0
-    @State private var imageZoomBase: CGFloat = 1.0
-    @State private var imageOffset: CGSize = .zero
-    @State private var imageOffsetBase: CGSize = .zero
+    private enum Phase {
+        case loading
+        case image(UIImage)
+        case video(URL)
+        case failed
+    }
+
+    @State private var phase: Phase = .loading
 
     var body: some View {
         Group {
-            if resolving {
+            switch phase {
+            case .loading:
                 ProgressView().tint(.white)
-            } else if let url = resolvedURL {
-                if item.contentType.hasPrefix("video/") {
-                    // Lift the AVPlayer out so SwiftUI rebuilds (e.g.
-                    // dismissal animation) don't restart playback. Stays
-                    // inside the parent's safe area so the chrome bars
-                    // don't overlap the video frame (matches photos).
-                    MediaViewerVideoHost(url: url)
-                } else {
-                    AsyncImage(url: url) { phase in
-                        switch phase {
-                        case .success(let image):
-                            zoomable(image)
-                        case .failure:
-                            Image(systemName: "exclamationmark.triangle")
-                                .font(.system(size: 36))
-                                .foregroundColor(.white.opacity(0.6))
-                        default:
-                            ProgressView().tint(.white)
-                        }
-                    }
-                }
-            } else {
+            case .image(let img):
+                ZoomableImage(image: img)
+            case .video(let url):
+                // Lift the AVPlayer out so SwiftUI rebuilds (e.g. the
+                // dismissal animation) don't restart playback.
+                MediaViewerVideoHost(url: url)
+            case .failed:
                 Image(systemName: "exclamationmark.triangle")
                     .font(.system(size: 36))
                     .foregroundColor(.white.opacity(0.6))
             }
         }
         .task(id: item.id) {
-            await resolve()
+            await load()
         }
     }
 
-    private func resolve() async {
-        resolving = true
-        defer { resolving = false }
+    private func load() async {
+        phase = .loading
+
+        var url: URL?
         if let resolver = localUrlResolver, let local = await resolver(item) {
-            resolvedURL = local
+            url = local
+        } else {
+            url = URL(string: item.remoteUrl)
+        }
+        guard let url else { phase = .failed; return }
+
+        if item.contentType.hasPrefix("video/") {
+            phase = .video(url)
             return
         }
-        resolvedURL = URL(string: item.remoteUrl)
-    }
 
-    @ViewBuilder
-    private func zoomable(_ image: Image) -> some View {
-        let base = image
-            .resizable()
-            .scaledToFit()
-            .scaleEffect(imageZoom)
-            .offset(imageOffset)
-            .gesture(magnificationGesture)
-            .onTapGesture(count: 2) { handleDoubleTap() }
-
-        if imageZoom > 1.0 {
-            base.simultaneousGesture(panGesture)
+        if let image = await Self.loadImage(url) {
+            phase = .image(image)
         } else {
-            base
+            phase = .failed
         }
     }
 
-    private var magnificationGesture: some Gesture {
-        MagnificationGesture()
-            .onChanged { value in
-                imageZoom = max(1.0, min(4.0, imageZoomBase * value))
-            }
-            .onEnded { _ in
-                imageZoomBase = imageZoom
-                if imageZoom <= 1.0 {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        imageOffset = .zero
-                        imageOffsetBase = .zero
-                    }
-                }
-            }
+    /// Local files load straight off disk; remote (presigned) URLs go
+    /// through the shared image cache, which strips the rotating query
+    /// params and keeps the full-resolution bytes on disk.
+    private static func loadImage(_ url: URL) async -> UIImage? {
+        if url.isFileURL {
+            return UIImage(contentsOfFile: url.path)
+        }
+        return await AvatarImageCache.shared.image(for: url)
+    }
+}
+
+// MARK: - Native zoom (UIScrollView-backed)
+
+/// Wraps a `UIScrollView` + `UIImageView` so pinch-zoom anchors at the
+/// fingers, panning has momentum and bounds rubber-banding, and
+/// double-tap zooms toward the tapped point — the native Photos feel
+/// that pure-SwiftUI gestures can't match.
+private struct ZoomableImage: UIViewRepresentable {
+    let image: UIImage
+
+    func makeUIView(context: Context) -> ZoomImageScrollView {
+        let view = ZoomImageScrollView()
+        view.setImage(image)
+        return view
     }
 
-    private var panGesture: some Gesture {
-        DragGesture()
-            .onChanged { value in
-                imageOffset = CGSize(
-                    width: imageOffsetBase.width + value.translation.width,
-                    height: imageOffsetBase.height + value.translation.height)
-            }
-            .onEnded { _ in
-                imageOffsetBase = imageOffset
-            }
+    func updateUIView(_ uiView: ZoomImageScrollView, context: Context) {
+        uiView.setImage(image)
+    }
+}
+
+/// Self-contained zoomable image scroll view. Starts with scrolling
+/// disabled so horizontal swipes fall through to the parent `.page`
+/// TabView; once zoomed in, scrolling turns on so the user can pan the
+/// enlarged image. Pinch-to-zoom is always live (it rides a separate
+/// gesture recognizer), which is what lets the pager and the zoom
+/// coexist without fighting.
+final class ZoomImageScrollView: UIScrollView, UIScrollViewDelegate {
+    private let imageView = UIImageView()
+    private var lastBoundsSize: CGSize = .zero
+
+    init() {
+        super.init(frame: .zero)
+        delegate = self
+        minimumZoomScale = 1.0
+        maximumZoomScale = 5.0
+        showsHorizontalScrollIndicator = false
+        showsVerticalScrollIndicator = false
+        bouncesZoom = true
+        decelerationRate = .fast
+        backgroundColor = .clear
+        contentInsetAdjustmentBehavior = .never
+        // Off at fit-scale so the parent pager owns horizontal swipes;
+        // flipped on once the user zooms in (see didEndZooming).
+        isScrollEnabled = false
+
+        imageView.contentMode = .scaleAspectFit
+        imageView.isUserInteractionEnabled = true
+        addSubview(imageView)
+
+        let doubleTap = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap(_:)))
+        doubleTap.numberOfTapsRequired = 2
+        addGestureRecognizer(doubleTap)
     }
 
-    private func handleDoubleTap() {
-        withAnimation(.easeInOut(duration: 0.25)) {
-            if imageZoom > 1.0 {
-                imageZoom = 1.0
-                imageZoomBase = 1.0
-                imageOffset = .zero
-                imageOffsetBase = .zero
-            } else {
-                imageZoom = 2.5
-                imageZoomBase = 2.5
-            }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    func setImage(_ image: UIImage) {
+        // Identity check so SwiftUI re-renders don't reset the zoom mid-
+        // gesture; only a genuinely new image re-lays-out.
+        guard imageView.image !== image else { return }
+        imageView.image = image
+        setZoomScale(minimumZoomScale, animated: false)
+        isScrollEnabled = false
+        lastBoundsSize = .zero
+        setNeedsLayout()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        if bounds.size != lastBoundsSize {
+            lastBoundsSize = bounds.size
+            zoomScale = minimumZoomScale
+            imageView.frame = CGRect(origin: .zero, size: bounds.size)
+            contentSize = bounds.size
+        }
+        centerImage()
+    }
+
+    /// Keep the image centered while it's smaller than the viewport
+    /// (at fit-scale, and on every zoom step) via symmetric content inset.
+    private func centerImage() {
+        let viewport = bounds.size
+        let content = imageView.frame.size
+        let insetX = max(0, (viewport.width - content.width) / 2)
+        let insetY = max(0, (viewport.height - content.height) / 2)
+        contentInset = UIEdgeInsets(top: insetY, left: insetX, bottom: insetY, right: insetX)
+    }
+
+    // MARK: UIScrollViewDelegate
+
+    func viewForZooming(in scrollView: UIScrollView) -> UIView? { imageView }
+
+    func scrollViewDidZoom(_ scrollView: UIScrollView) { centerImage() }
+
+    func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
+        // Pan only matters once we're zoomed past fit; otherwise hand
+        // horizontal drags back to the pager.
+        isScrollEnabled = scale > minimumZoomScale
+    }
+
+    @objc private func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
+        if zoomScale > minimumZoomScale {
+            setZoomScale(minimumZoomScale, animated: true)
+        } else {
+            let point = gesture.location(in: imageView)
+            let targetScale = min(maximumZoomScale, 2.5)
+            let width = bounds.width / targetScale
+            let height = bounds.height / targetScale
+            zoom(to: CGRect(x: point.x - width / 2,
+                            y: point.y - height / 2,
+                            width: width,
+                            height: height),
+                 animated: true)
         }
     }
 }
