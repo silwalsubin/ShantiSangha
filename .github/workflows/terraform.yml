@@ -32,7 +32,6 @@ env:
   TF_VAR_openai_api_key:       ${{ secrets.TF_VAR_OPENAI_API_KEY }}
   TF_VAR_langfuse_secret_key:  ${{ secrets.TF_VAR_LANGFUSE_SECRET_KEY }}
   TF_VAR_firebase_service_account_json: ${{ secrets.TF_VAR_FIREBASE_SERVICE_ACCOUNT_JSON }}
-  TF_VAR_finnhub_api_key:      ${{ secrets.TF_VAR_FINNHUB_API_KEY }}
 
 jobs:
   terraform:

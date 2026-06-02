@@ -95,28 +95,6 @@ resource "aws_iam_role" "ecs_task" {
   })
 }
 
-# EFS IAM auth — the IBKR gateway sidecar mounts the persistent session
-# volume via `iam = ENABLED`, which means the task role must hold
-# elasticfilesystem:Client* on the file system.
-
-resource "aws_iam_role_policy" "ecs_task_efs" {
-  name = "${var.app_name}-ecs-task-efs"
-  role = aws_iam_role.ecs_task.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = [
-        "elasticfilesystem:ClientMount",
-        "elasticfilesystem:ClientWrite",
-        "elasticfilesystem:ClientRootAccess",
-      ]
-      Resource = aws_efs_file_system.ibkr_gateway.arn
-    }]
-  })
-}
-
 # ECS Cluster
 
 resource "aws_ecs_cluster" "main" {
@@ -149,12 +127,6 @@ resource "aws_ecs_task_definition" "api" {
   execution_role_arn       = aws_iam_role.ecs_task_execution.arn
   task_role_arn            = aws_iam_role.ecs_task.arn
 
-  # The IBKR gateway sidecar used to live in this task. It's now its own
-  # service (see ibkr-gateway.tf) so the API can roll deploys at 50/200
-  # without dragging the gateway's EFS-bound session through every
-  # backend push. API → gateway calls go via Cloud Map:
-  # https://ibkr-gateway.shantisangha.local:5000
-
   container_definitions = jsonencode([
     {
       name      = "${var.app_name}-api"
@@ -176,15 +148,7 @@ resource "aws_ecs_task_definition" "api" {
         { name = "ASPNETCORE_ENVIRONMENT", value = "Production" },
         { name = "EXPOSE_ERRORS",          value = "true" },
         { name = "FIREBASE_PROJECT_ID",   value = "shantisangha-bc0f9" },
-        { name = "FRONTEND_ORIGIN",       value = "https://${var.domain_name},https://${aws_cloudfront_distribution.frontend.domain_name},http://localhost:5173" },
-        { name = "WISECAT_FUNCTION_NAME", value = aws_lambda_function.wisecat.function_name },
-        # Route through the public ALB URL rather than Cloud Map direct
-        # because the gateway's HTTP layer rejects requests coming from
-        # the VPC subnet directly (returns 403 Access Denied even though
-        # the source IP is in `ips.allow`). The ALB path works because
-        # of how ALB forwards (probably proxy-style headers / Host
-        # rewriting). Extra ALB hop is negligible at our scale.
-        { name = "IBKR_GATEWAY_BASE_URL", value = "https://gateway.${var.domain_name}" }
+        { name = "FRONTEND_ORIGIN",       value = "https://${var.domain_name},https://${aws_cloudfront_distribution.frontend.domain_name},http://localhost:5173" }
       ]
 
       secrets = concat([
@@ -281,8 +245,7 @@ resource "aws_ecs_service" "api" {
     container_port   = 8080
   }
 
-  # Rolling deploys — gateway is its own service now so the API doesn't
-  # need to coordinate with EFS-backed session state during a deploy.
+  # Rolling deploys
   deployment_minimum_healthy_percent = 50
   deployment_maximum_percent         = 200
 

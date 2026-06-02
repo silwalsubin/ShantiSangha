@@ -55,18 +55,6 @@ resource "aws_secretsmanager_secret_version" "firebase" {
   secret_string = var.firebase_service_account_json
 }
 
-# Wise Cat — Finnhub API key (provided via TF var; rotate via tfvars).
-# IAM (lambda:InvokeFunction on the ECS task role) is the auth boundary
-# between the .NET API and the wisecat Lambda; no shared bearer token needed.
-resource "aws_secretsmanager_secret" "finnhub_api_key" {
-  name = "${var.app_name}/finnhub_api_key"
-}
-
-resource "aws_secretsmanager_secret_version" "finnhub_api_key" {
-  secret_id     = aws_secretsmanager_secret.finnhub_api_key.id
-  secret_string = var.finnhub_api_key
-}
-
 # Optional: Langfuse
 
 resource "aws_secretsmanager_secret" "langfuse" {

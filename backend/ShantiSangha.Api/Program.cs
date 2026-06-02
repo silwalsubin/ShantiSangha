@@ -21,9 +21,7 @@ using ShantiSangha.Agent;
 using ShantiSangha.AgentFeedback;
 using ShantiSangha.Reminders;
 using ShantiSangha.Shared;
-using ShantiSangha.Trading;
 using ShantiSangha.Shared.Interfaces;
-using Yarp.ReverseProxy.Transforms;
 using ShantiSangha.Wellness;
 using System.Net.Http.Headers;
 using System.Text.Json.Serialization;
@@ -112,114 +110,6 @@ try
     builder.Services.AddAgentModule(connStr);
     builder.Services.AddShantiSanghaMcp();
 
-    if (appConfig.WisecatEnabled)
-    {
-        builder.Services.AddTradingModule(connStr, appConfig.WisecatFunctionName!, appConfig.IbkrGatewayBaseUrl);
-    }
-    else
-    {
-        Log.Warning("Wise Cat (Trading module) not registered: WISECAT_FUNCTION_NAME missing");
-    }
-
-    // YARP reverse proxy — exposes the IBKR Client Portal Gateway sidecar
-    // at /api/ibkr-gateway/* so the user can complete the ~daily IBKR 2FA
-    // login via a browser. The /api/* prefix matters: CloudFront routes
-    // /api/* to the ALB; anything else falls through to the S3 origin
-    // (the frontend SPA). Without /api/ the gateway URL would return
-    // index.html instead of being proxied to the sidecar.
-    builder.Services
-        .AddReverseProxy()
-        .LoadFromMemory(
-            new[]
-            {
-                new Yarp.ReverseProxy.Configuration.RouteConfig
-                {
-                    RouteId = "ibkr-gateway",
-                    ClusterId = "ibkr-gateway-cluster",
-                    Match = new Yarp.ReverseProxy.Configuration.RouteMatch
-                    {
-                        Path = "/api/ibkr-gateway/{**catch-all}",
-                    },
-                    Transforms = new[]
-                    {
-                        new Dictionary<string, string> { ["PathRemovePrefix"] = "/api/ibkr-gateway" },
-                    },
-                },
-            },
-            new[]
-            {
-                new Yarp.ReverseProxy.Configuration.ClusterConfig
-                {
-                    ClusterId = "ibkr-gateway-cluster",
-                    Destinations = new Dictionary<string, Yarp.ReverseProxy.Configuration.DestinationConfig>
-                    {
-                        ["primary"] = new()
-                        {
-                            Address = appConfig.IbkrGatewayBaseUrl,
-                        },
-                    },
-                    // The gateway terminates TLS with a self-signed cert.
-                    // Loopback inside the ECS task — fine to skip validation.
-                    HttpClient = new Yarp.ReverseProxy.Configuration.HttpClientConfig
-                    {
-                        DangerousAcceptAnyServerCertificate = true,
-                    },
-                },
-            })
-        .AddTransforms(transformBuilderContext =>
-        {
-            if (transformBuilderContext.Route.RouteId != "ibkr-gateway") return;
-
-            // (1) Location header rewrite — same-origin redirects from the
-            // gateway (e.g. `/sso/Login`) get prefixed so the browser stays
-            // inside the proxy namespace.
-            transformBuilderContext.AddResponseTransform(async ctx =>
-            {
-                await Task.CompletedTask;
-                var resp = ctx.ProxyResponse;
-                if (resp is null) return;
-                if (!resp.Headers.TryGetValues("Location", out var locValues)) return;
-                var loc = locValues.FirstOrDefault();
-                if (string.IsNullOrEmpty(loc)) return;
-                if (!loc.StartsWith("/") || loc.StartsWith("//")) return;
-                if (loc.StartsWith("/api/ibkr-gateway")) return;
-                ctx.HttpContext.Response.Headers["Location"] = "/api/ibkr-gateway" + loc;
-            });
-
-            // (2) HTML body rewrite — IBKR's gateway emits asset URLs as
-            // absolute paths (`<script src="/static/js/...">`,
-            // `<link href="/css/...">`, `<form action="/sso/...">`). Without
-            // rewriting those, the browser fetches them from the parent
-            // origin (CloudFront → S3 → 404) and the login page renders as
-            // bare HTML with no JS or CSS — just the static footer.
-            //
-            // Approach: stream the HTML response, regex-replace
-            // attribute-value paths that start with `/` (but not `//` and
-            // not already-prefixed), write back. Only fires for
-            // text/html responses; other content types pass through.
-            transformBuilderContext.AddResponseTransform(async ctx =>
-            {
-                var resp = ctx.ProxyResponse;
-                if (resp is null) return;
-                var mediaType = resp.Content?.Headers?.ContentType?.MediaType;
-                if (mediaType != "text/html") return;
-
-                var raw = await resp.Content!.ReadAsByteArrayAsync(ctx.CancellationToken);
-                var html = System.Text.Encoding.UTF8.GetString(raw);
-
-                var rewritten = System.Text.RegularExpressions.Regex.Replace(
-                    html,
-                    "((?:href|src|action|formaction|data-url|data-src)=[\"'])/(?!/|api/ibkr-gateway/)",
-                    "$1/api/ibkr-gateway/",
-                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-
-                var modified = System.Text.Encoding.UTF8.GetBytes(rewritten);
-                ctx.SuppressResponseBody = true;
-                ctx.HttpContext.Response.ContentLength = modified.Length;
-                await ctx.HttpContext.Response.Body.WriteAsync(modified, ctx.CancellationToken);
-            });
-        });
-
     // ── Controller discovery from domain assemblies ─────────────────────
     builder.Services.AddControllers()
         .AddApplicationPart(typeof(ShantiSangha.Identity.DependencyInjection).Assembly)
@@ -229,7 +119,6 @@ try
         .AddApplicationPart(typeof(ShantiSangha.Wellness.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Friends.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Notifications.DependencyInjection).Assembly)
-        .AddApplicationPart(typeof(ShantiSangha.Trading.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Agent.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.AgentFeedback.DependencyInjection).Assembly)
         .AddJsonOptions(opts =>
@@ -369,51 +258,6 @@ try
         await sp.GetRequiredService<ShantiSangha.Notifications.Data.NotificationsDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Agent.Data.AgentDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.AgentFeedback.Data.AgentFeedbackDbContext>().Database.MigrateAsync();
-        if (appConfig.WisecatEnabled)
-        {
-            await sp.GetRequiredService<ShantiSangha.Trading.Data.TradingDbContext>().Database.MigrateAsync();
-        }
-    }
-
-    // Recurring jobs — use the DI-resolved manager since static JobStorage.Current
-    // may not be initialized at app startup with some Hangfire configurations.
-    using (var scope = app.Services.CreateScope())
-    {
-        var recurring = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
-
-        if (appConfig.WisecatEnabled)
-        {
-            // Wise Cat — pulls only the bars we don't already have, then
-            // generates per-user astro-aware signals. Runs after US close.
-            recurring.AddOrUpdate<ShantiSangha.Trading.Jobs.RefreshMarketDataJob>(
-                "wisecat-refresh-market-data",
-                job => job.RunAsync(),
-                "15 20 * * 1-5");
-
-            recurring.AddOrUpdate<ShantiSangha.Trading.Jobs.GenerateDailyTradingSignalsJob>(
-                "wisecat-generate-signals",
-                job => job.RunAsync(),
-                "30 20 * * 1-5");
-
-            // IBKR portfolio refresh — every 15 minutes during US market
-            // hours (Mon–Fri 13:30–21:00 UTC ≈ 9:30am–5pm ET, slack on
-            // either side for pre/post). Skips automatically when no
-            // accounts are linked.
-            recurring.AddOrUpdate<ShantiSangha.Trading.Jobs.IbkrPortfolioSyncJob>(
-                "wisecat-ibkr-portfolio-sync",
-                job => job.RunAsync(),
-                "*/15 13-21 * * 1-5");
-
-            // IBKR session keepalive — pings /tickle every minute to keep
-            // the gateway's auth cookie warm. Also flips IbkrAccount.Status
-            // to NeedsReauth the moment IBKR's session expires (~daily),
-            // so the iOS app surfaces the "Re-link IBKR" banner without
-            // waiting for the next portfolio refresh to fail.
-            recurring.AddOrUpdate<ShantiSangha.Trading.Jobs.IbkrSessionKeepaliveJob>(
-                "wisecat-ibkr-keepalive",
-                job => job.RunAsync(),
-                "* * * * *");
-        }
     }
 
     // Global error handler — returns full error details when EXPOSE_ERRORS=true
@@ -461,17 +305,6 @@ try
 
     // Controllers from domain projects handle all /api/* routes
     app.MapControllers();
-
-    // IBKR Client Portal Gateway login proxy. Routes /api/ibkr-gateway/*
-    // to the sidecar container at localhost:5000 so the user can complete
-    // the daily IBKR 2FA login via a browser.
-    //
-    // TODO(auth): the proxy is publicly reachable. Defensible for a
-    // single-user app because the IBKR login itself is the real auth
-    // gate (no one without IBKR credentials can do anything), but in a
-    // multi-user world we'd want a launcher endpoint that converts the
-    // iOS Bearer token into a short-lived cookie before redirecting here.
-    app.MapReverseProxy();
 
     // Realtime chat WebSocket — auth + membership handled inside.
     app.MapChatRealtime();
@@ -562,18 +395,6 @@ try
             recentFailed = failedJobs,
             processing = processingJobs
         });
-    }).RequireAuthorization();
-
-    // Debug: Force-regenerate today's trading signals for every held
-    // ticker across every user. Useful right after a Lambda model upgrade —
-    // the existing Hangfire schedule only fires Mon–Fri 20:15 UTC, so a
-    // model deployed on a Friday won't reach holdings until Monday
-    // evening unless this is triggered manually.
-    app.MapPost("/api/debug/hangfire/regenerate-trading-signals",
-        (IBackgroundJobClient jobs) =>
-    {
-        jobs.Enqueue<ShantiSangha.Trading.Jobs.GenerateDailyTradingSignalsJob>(j => j.RunAsync());
-        return Results.Ok(new { triggered = "GenerateDailyTradingSignalsJob" });
     }).RequireAuthorization();
 
     // Health check at root (no /api prefix)

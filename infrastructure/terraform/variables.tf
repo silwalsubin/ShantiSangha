@@ -19,13 +19,13 @@ variable "app_name" {
 # --- Compute ---
 
 variable "task_cpu" {
-  description = "ECS Fargate task vCPU units (256, 512, 1024, 2048, 4096). Sized for the .NET API + IBKR gateway sidecar (JVM wants ~512MB heap)."
+  description = "ECS Fargate task vCPU units (256, 512, 1024, 2048, 4096)."
   type        = number
   default     = 1024
 }
 
 variable "task_memory" {
-  description = "ECS Fargate task memory in MB. Sized for the .NET API + IBKR gateway sidecar."
+  description = "ECS Fargate task memory in MB."
   type        = number
   default     = 2048
 }
@@ -96,9 +96,3 @@ variable "langfuse_secret_key" {
   default     = ""
 }
 
-variable "finnhub_api_key" {
-  description = "Finnhub API key — used by the wisecat Python service for market data"
-  type        = string
-  sensitive   = true
-  default     = ""
-}

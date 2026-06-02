@@ -821,25 +821,8 @@ struct ProfileMenuSheet: View {
                 menuRow(icon: "gearshape", label: "Settings", subtitle: "Preferences")
             }
             .buttonStyle(.plain)
-
-            if isStocksAllowed(email: auth.user?.email) {
-                Divider().padding(.leading, 52)
-
-                NavigationLink(destination: WiseCatView()) {
-                    menuRow(icon: "chart.line.uptrend.xyaxis", label: "Wise Cat", subtitle: "Trading signals")
-                }
-                .buttonStyle(.plain)
-            }
         }
         .luxCardChrome()
-    }
-
-    /// Stocks (Wise Cat) is gated to a single email while in private use.
-    /// Returns true only for that account; everyone else gets a clean
-    /// profile menu without the stocks entry.
-    private func isStocksAllowed(email: String?) -> Bool {
-        guard let email else { return false }
-        return email.lowercased() == "subinho09@gmail.com"
     }
 
     private func menuRow(icon: String, label: String, subtitle: String, showsChevron: Bool = true) -> some View {
