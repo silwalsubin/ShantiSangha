@@ -10,12 +10,20 @@ shipping.
 |---|---|
 | `GoldenSets/chart_chat_topic_routing.json` | 12 representative chart-chat questions; each declares the signature families that MUST appear in the top-K after `ChartTopicRouter.Rerank` runs. |
 | `ChartChatTopicRoutingTests.cs` | Deterministic test harness. Runs each case against a synthetic (planet × house) passage pool and asserts the rerank hits the expected signatures. **No DB, no LLM, CI-safe.** |
+| `Agent/QuickActionSuggesterEvalTests.cs` | Behavioral eval for the assistant's quick-action chips. Asserts trivial replies yield ZERO chips (sparseness) and actionable replies yield 1–3 well-formed chips (helpfulness). **Live — hits gpt-4o-mini, gated behind `AI_EVAL_LIVE=1`.** |
 
-Run:
+Run (deterministic, CI-safe — live evals show as skipped):
 
 ```bash
 cd backend
 dotnet test ShantiSangha.AiEval.Tests/
+```
+
+Run the live lane (spends OpenAI tokens):
+
+```bash
+cd backend
+AI_EVAL_LIVE=1 OPENAI_API_KEY=sk-... dotnet test ShantiSangha.AiEval.Tests/
 ```
 
 ## Adding a case
@@ -46,4 +54,5 @@ dotnet test ShantiSangha.AiEval.Tests/
 
 The point of this scaffold is to make the cheap, deterministic tests
 cheap AND pass in CI today. LLM-judge tests require live API keys, so
-they belong in a separate gated lane. Build those next.
+they belong in a separate gated lane (now established by the
+`AI_EVAL_LIVE=1` gate the quick-action eval uses). Build the rest next.
