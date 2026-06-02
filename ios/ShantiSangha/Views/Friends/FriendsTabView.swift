@@ -102,20 +102,6 @@ struct FriendsTabView: View {
         .navigationTitle("Circles")
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.interactively)
-        .toolbar {
-            if totalCount > 0 {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        solarResetTrigger = UUID()
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    } label: {
-                        Image(systemName: "arrow.counterclockwise")
-                            .foregroundColor(.sacredGold)
-                    }
-                    .accessibilityLabel("Reset view")
-                }
-            }
-        }
         .task {
             await vm.refresh()
             await circleVM.refresh()
@@ -413,6 +399,15 @@ struct FriendsTabView: View {
 
             SolarActionButton(icon: "plus", label: "Add local") {
                 showAddLocal = true
+            }
+
+            // Re-centers / re-lays-out the cosmos. Lives here with the other
+            // actions rather than in the toolbar, which the hub's vajra owns.
+            if !circleVM.connections.isEmpty {
+                SolarActionButton(icon: "arrow.counterclockwise", label: "Reset") {
+                    solarResetTrigger = UUID()
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                }
             }
 
             Spacer()
