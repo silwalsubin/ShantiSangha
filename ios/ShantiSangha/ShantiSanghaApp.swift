@@ -206,6 +206,7 @@ struct ShantiSanghaApp: App {
                         .environmentObject(auth)
                         .environmentObject(profile)
                         .environmentObject(network)
+                        .dailyBlessing()
                 }
             }
             .animation(.easeInOut(duration: 0.25), value: auth.isAuthenticated)
