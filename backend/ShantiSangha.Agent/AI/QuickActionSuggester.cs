@@ -51,6 +51,16 @@ public sealed class QuickActionSuggester(Kernel kernel, ILogger<QuickActionSugge
               step. This is common and expected — most replies need none. Do NOT
               invent actions just to fill the list, and never suggest things the
               assistant can't do (journaling, voice notes, messaging friends).
+            - If the assistant's reply is an OPEN-ENDED question asking the user
+              to supply a specific detail or free-form text (e.g. "what would you
+              like to be reminded about?", "what should I call it?"), return
+              {"actions": []} — the user should type their answer, and no fixed
+              button can capture it. Only offer chips for a question when the
+              answers are a small fixed set (e.g. "morning or evening?").
+            - Never offer an action the user has just taken or that is already
+              underway. If the assistant is mid-way through setting a reminder
+              and is asking for the missing detail, do NOT offer "Set reminder"
+              again — that step is already happening.
             """;
 
         var history = new ChatHistory(systemPrompt);

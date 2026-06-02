@@ -39,6 +39,9 @@ public sealed class QuickActionSuggesterEvalTests(ITestOutputHelper output)
         ["thanks!", "You're welcome, Subin. Take care."],
         ["ok sounds good", "Glad I could help. Talk soon."],
         ["that waterfall photo is just for fun", "It looks beautiful and peaceful — a lovely place to pause."],
+        // Open-ended clarifying question mid-flow: the user must type the
+        // detail, and re-offering "Set reminder" would be redundant.
+        ["Remind me about something on January 24, 2027.", "What would you like to be reminded about on January 24, 2027? Let me know the details so I can set it up for you."],
     ];
 
     /// Turns with an obvious next step the user is likely to want.
