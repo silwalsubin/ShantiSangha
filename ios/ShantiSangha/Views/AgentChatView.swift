@@ -353,20 +353,9 @@ struct AgentChatView: View {
                 .tracking(2)
 
             ForEach(Self.starterPrompts, id: \.self) { prompt in
-                Button {
+                suggestionChip(prompt) {
                     inputText = prompt
-                } label: {
-                    Text(prompt)
-                        .font(.sacredText)
-                        .foregroundColor(.sacredText)
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 10)
-                        .padding(.horizontal, 14)
-                        .background(Color.sacredBgCard)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
                 }
-                .buttonStyle(.plain)
             }
         }
     }
@@ -423,22 +412,30 @@ struct AgentChatView: View {
     private func quickActionChips(_ actions: [AgentChatService.QuickAction]) -> some View {
         WrapLayout(spacing: SacredSpacing.xs, lineSpacing: SacredSpacing.xs) {
             ForEach(actions, id: \.self) { action in
-                Button {
+                suggestionChip(action.label) {
                     Task { await sendSuggestion(action.prompt) }
-                } label: {
-                    Text(action.label)
-                        .font(.sacredTextSemibold)
-                        .foregroundColor(.sacredGold)
-                        .padding(.horizontal, SacredSpacing.m)
-                        .padding(.vertical, 10)
-                        .frame(minHeight: 44)
-                        .background(Capsule().fill(Color.sacredBgCard))
-                        .overlay(Capsule().strokeBorder(Color.sacredGold.opacity(0.35), lineWidth: 1))
                 }
-                .buttonStyle(.plain)
             }
         }
         .padding(.top, SacredSpacing.xs)
+    }
+
+    /// A saffron-outlined pill on the card surface — the shared "chip" used by
+    /// both the empty-state starter prompts and the post-reply quick actions,
+    /// so the two read as one component. Hugs its text; wraps long labels.
+    private func suggestionChip(_ label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.sacredTextSemibold)
+                .foregroundColor(.sacredGold)
+                .multilineTextAlignment(.leading)
+                .padding(.horizontal, SacredSpacing.m)
+                .padding(.vertical, 10)
+                .frame(minHeight: 44)
+                .background(Capsule().fill(Color.sacredBgCard))
+                .overlay(Capsule().strokeBorder(Color.sacredGold.opacity(0.35), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
     private func spacingBeforeMessage(at index: Int) -> CGFloat {
