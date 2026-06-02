@@ -38,17 +38,17 @@ struct ReminderRow: View {
         ZStack {
             if offset > 0 {
                 HStack {
-                    Image(systemName: "checkmark")
+                    Image(systemName: swipeActionIcon)
                         .font(.sacredTextSemibold)
                         .foregroundColor(.white)
-                    Text("Done")
+                    Text(swipeActionLabel)
                         .font(.sacredSmallSemibold)
                         .foregroundColor(.white)
                     Spacer()
                 }
                 .padding(.leading, 20)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(RoundedRectangle(cornerRadius: 16).fill(Color.sacredGreen))
+                .background(RoundedRectangle(cornerRadius: 16).fill(swipeActionColor))
             }
 
             content
@@ -70,8 +70,49 @@ struct ReminderRow: View {
         allowSwipeToComplete && onComplete != nil && reminder.completedAt == nil
     }
 
+    /// Swipe-reveal label. Tasks resolve as "Done" (the existing behavior);
+    /// event rows surface as "Dismiss" — semantically closer to "I've seen
+    /// this," with the yearly recurrence rolling the row forward to next
+    /// year's date once today's anniversary passes.
+    private var swipeActionLabel: String { isEvent ? "Dismiss" : "Done" }
+
+    /// Mirrors the label: tasks complete with a check, events dismiss with
+    /// a slash. Keeps both gestures readable mid-swipe without color cues.
+    private var swipeActionIcon: String {
+        isEvent ? "xmark" : "checkmark"
+    }
+
+    /// Tasks get sacred green (completion is the goal); events get sacred
+    /// gold (an acknowledgment, not a finish line). Matches the row's own
+    /// gold-trimmed event treatment.
+    private var swipeActionColor: Color {
+        isEvent ? Color.sacredGold : Color.sacredGreen
+    }
+
     private var isCompleted: Bool {
         reminder.completedAt != nil
+    }
+
+    /// A reminder that recurs (currently only yearly birthdays/anniversaries)
+    /// is treated as an event, not a task — events happen on their date and
+    /// roll forward; they aren't "done." The row drops the swipe-to-complete
+    /// gesture, swaps the filled date chip for an outlined one, and shows a
+    /// small leading glyph next to the title so it reads as a date on the
+    /// calendar rather than a chore.
+    private var isEvent: Bool {
+        reminder.recurrence != .none
+    }
+
+    /// SF Symbol shown immediately before the title on event rows. Picked
+    /// from the label's own words so common cases ("Mom's birthday",
+    /// "Wedding Anniversary") get a fitting glyph without a model change.
+    /// Falls back to `repeat` for generic yearly events (festivals,
+    /// holidays) so the row still signals "this comes around every year."
+    private var eventGlyph: String {
+        let lc = reminder.label.lowercased()
+        if lc.contains("anniversary") { return "heart" }
+        if lc.contains("birthday") { return "gift" }
+        return "repeat"
     }
 
     /// "{Connection} · {label}" when the row is connection-scoped; just
@@ -112,10 +153,21 @@ struct ReminderRow: View {
             leadingSlot
 
             VStack(alignment: .leading, spacing: 2) {
-                labelText
-                    .font(.sacredTextMedium)
-                    .foregroundColor(isCompleted ? .sacredMuted : .sacredText)
-                    .lineLimit(1)
+                HStack(spacing: 6) {
+                    if isEvent && !isCompleted {
+                        // Small gold glyph picked from the label keywords —
+                        // heart / gift / repeat. Drops to muted opacity so
+                        // it sits with the title rather than fighting it.
+                        Image(systemName: eventGlyph)
+                            .font(.system(size: 11, weight: .regular))
+                            .foregroundColor(.sacredGold.opacity(0.7))
+                            .accessibilityHidden(true)
+                    }
+                    labelText
+                        .font(.sacredTextMedium)
+                        .foregroundColor(isCompleted ? .sacredMuted : .sacredText)
+                        .lineLimit(1)
+                }
 
                 if let sharedLabel = sharedSubtitle {
                     Text(sharedLabel)
@@ -248,7 +300,7 @@ struct ReminderRow: View {
     @ViewBuilder
     private var leadingSlot: some View {
         if showDateStamp, let parsed = parseISODate(reminder.date) {
-            SacredDateStamp(date: parsed, daysRemaining: localDaysRemaining)
+            SacredDateStamp(date: parsed, daysRemaining: localDaysRemaining, isEvent: isEvent)
         } else {
             Image(systemName: "calendar.badge.clock")
                 .font(.sacredText)

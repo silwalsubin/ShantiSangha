@@ -14,6 +14,11 @@ struct SacredDateStamp: View {
     /// Optional app-relative state for reminder rows. `nil` keeps the
     /// neutral stamp used by headers and profile date lists.
     var daysRemaining: Int? = nil
+    /// Outlined treatment for event-type reminders (recurring anniversaries,
+    /// birthdays). Same shape and weight, but the fill drops out and the
+    /// stroke becomes a thin gold line — so the row reads as "a date on the
+    /// calendar" rather than "a task to check off."
+    var isEvent: Bool = false
 
     var body: some View {
         let day = Calendar.current.component(.day, from: date)
@@ -63,18 +68,21 @@ struct SacredDateStamp: View {
     private var dayColor: Color {
         if isPast { return .sacredMuted }
         if isToday { return .sacredGold }
+        if isEvent { return .sacredGold }
         return .sacredText
     }
 
     private var backgroundColor: Color {
         if isPast { return .sacredBgCard.opacity(0.56) }
         if isToday { return .sacredGold.opacity(0.12) }
+        if isEvent { return .clear }
         return .sacredBgCard
     }
 
     private var strokeColor: Color {
         if isPast { return .sacredRed.opacity(0.16) }
         if isToday { return .sacredGold.opacity(0.22) }
+        if isEvent { return .sacredGold.opacity(0.45) }
         return .clear
     }
 
