@@ -11,6 +11,13 @@ struct ChatsTabView: View {
     @State private var selectedFilter: ChatsFilter = .all
     @State private var navTarget: ChatsNavRoute?
     @FocusState private var searchFocused: Bool
+    @Environment(\.scenePhase) private var scenePhase
+
+    /// How often to re-pull the conversation list while it's on screen.
+    /// Silent pushes are the fast path, but iOS throttles them too hard
+    /// to rely on in the foreground — this keeps row previews and unread
+    /// dots live without the user having to leave and come back.
+    private static let pollInterval: UInt64 = 15 * 1_000_000_000
 
     private enum ChatsNavRoute: Hashable {
         case chat(UUID)
@@ -82,8 +89,24 @@ struct ChatsTabView: View {
         .task {
             await circleVM.refresh()
             resolvePendingChat()
+            // Keep the list live while it's visible. `.task` is cancelled
+            // automatically on disappear, which ends this loop; switching
+            // tabs or pushing a chat both tear it down and the re-appear
+            // restarts it with a fresh pull.
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: Self.pollInterval)
+                if Task.isCancelled { break }
+                await circleVM.refresh()
+            }
         }
         .refreshable { await circleVM.refresh() }
+        // Returning from the background doesn't re-fire `.task`, so pull
+        // once on reactivation to catch anything that arrived while away.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                Task { await circleVM.refresh() }
+            }
+        }
         // Two triggers because the routing intent and the connection
         // list arrive in either order — same dual-listener pattern as
         // FriendsTabView used before chats split off.

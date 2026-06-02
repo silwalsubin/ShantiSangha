@@ -74,9 +74,15 @@ final class ChatRealtimeClient {
     func sendTyping(_ isTyping: Bool) async {
         guard let task = task else { return }
         let envelope: [String: Any] = ["kind": "typing", "isTyping": isTyping]
-        guard let data = try? JSONSerialization.data(withJSONObject: envelope) else { return }
+        // Must be a TEXT frame: the server's read loop ignores any frame
+        // that isn't `WebSocketMessageType.Text`, so a `.data` (binary)
+        // send is silently dropped and never broadcast. `typing` is the
+        // only client→server frame, which is why this was the only thing
+        // that silently failed while messages/reads/reactions worked.
+        guard let data = try? JSONSerialization.data(withJSONObject: envelope),
+              let json = String(data: data, encoding: .utf8) else { return }
         do {
-            try await task.send(.data(data))
+            try await task.send(.string(json))
         } catch {
             // The send failure will be picked up by the receive loop's
             // error handler, which kicks off reconnection. Don't double-
