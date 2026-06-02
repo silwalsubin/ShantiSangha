@@ -54,6 +54,11 @@ struct Connection: Codable, Identifiable, Equatable, Hashable {
     /// the linked in-app person never sees it. Presigned GET URL — the
     /// backend re-issues on every read so a list refresh keeps it live.
     let privateAvatarUrl: String?
+    /// Presigned GET URL for the most recent message's photo, set only
+    /// when the last message in the thread is an image. Lets the chat
+    /// list show a thumbnail instead of a "(photo)" label. Optional so
+    /// older payloads (and non-image last messages) decode to nil.
+    let lastMessageImageUrl: String?
 
     /// What we render anywhere this connection's name shows up. Falls
     /// back to the Person's display name when no nickname is set.

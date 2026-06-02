@@ -481,7 +481,16 @@ private struct ChatRow: View {
 
     @ViewBuilder
     private var subtitleLine: some View {
-        if let preview = connection.lastMessagePreview, !preview.isEmpty {
+        if let imageUrl = connection.lastMessageImageUrl, !imageUrl.isEmpty {
+            // Last message was a photo — show a small thumbnail + label,
+            // the iMessage/Telegram pattern, instead of a "(photo)" string.
+            HStack(spacing: 6) {
+                MessageThumbnail(urlString: imageUrl, size: 28)
+                Text("Photo")
+                    .font(hasUnread ? .sacredSmallSemibold : .sacredSmall)
+                    .foregroundColor(hasUnread ? .sacredText : .sacredTextSecondary)
+            }
+        } else if let preview = connection.lastMessagePreview, !preview.isEmpty {
             Text(preview)
                 .font(hasUnread ? .sacredSmallSemibold : .sacredSmall)
                 .foregroundColor(hasUnread ? .sacredText : .sacredTextSecondary)
@@ -491,6 +500,36 @@ private struct ChatRow: View {
                 .font(.sacredSmall)
                 .foregroundColor(.sacredMutedLight)
         }
+    }
+}
+
+/// Small rounded thumbnail of the chat list's last photo. Loads through
+/// the shared presigned-image cache (same one avatars use), which strips
+/// the rotating query params so a refreshed URL reuses the cached file.
+private struct MessageThumbnail: View {
+    let urlString: String
+    let size: CGFloat
+    @State private var image: UIImage?
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 6)
+            .fill(Color.sacredBgCard)
+            .frame(width: size, height: size)
+            .overlay {
+                if let image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.sacredGold.opacity(0.15), lineWidth: 0.5))
+            .task(id: urlString) {
+                guard let url = URL(string: urlString) else { return }
+                image = await AvatarImageCache.shared.image(for: url)
+            }
     }
 }
 

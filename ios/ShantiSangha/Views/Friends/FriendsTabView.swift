@@ -351,7 +351,8 @@ struct FriendsTabView: View {
             lastMessagePreview: nil,
             lastMessageAt: nil,
             unreadCount: 0,
-            privateAvatarUrl: nil)
+            privateAvatarUrl: nil,
+            lastMessageImageUrl: nil)
     }
 
     /// Deterministic UUID from a seed string. UUID v4 layout (random)

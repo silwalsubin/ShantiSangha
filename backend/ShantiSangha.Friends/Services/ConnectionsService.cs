@@ -70,16 +70,18 @@ public class ConnectionsService(
         foreach (var x in rows)
         {
             var (preview, sentAt, unread) = (string.Empty as string, default(DateTime?), 0);
+            string? lastImageKey = null;
             if (x.Conn.FriendshipId is { } fsId)
             {
                 if (lastByFs.TryGetValue(fsId, out var last))
                 {
                     preview = BuildPreview(last);
                     sentAt = last.SentAt;
+                    if (last.Kind == FriendMessageKind.Image) lastImageKey = last.StorageKey;
                 }
                 unreadByFs.TryGetValue(fsId, out unread);
             }
-            result.Add(await ProjectAsync(x.Conn, x.Person, preview, sentAt, unread, ct));
+            result.Add(await ProjectAsync(x.Conn, x.Person, preview, sentAt, unread, ct, lastImageKey));
         }
         return result;
     }
@@ -95,17 +97,23 @@ public class ConnectionsService(
         string? preview = null;
         DateTime? sentAt = null;
         int unread = 0;
+        string? lastImageKey = null;
         if (hit.Conn.FriendshipId is { } fsId)
         {
             var last = await db.Messages
                 .Where(m => m.FriendshipId == fsId)
                 .OrderByDescending(m => m.SentAt)
                 .FirstOrDefaultAsync(ct);
-            if (last is not null) { preview = BuildPreview(last); sentAt = last.SentAt; }
+            if (last is not null)
+            {
+                preview = BuildPreview(last);
+                sentAt = last.SentAt;
+                if (last.Kind == FriendMessageKind.Image) lastImageKey = last.StorageKey;
+            }
             unread = await db.Messages.CountAsync(
                 m => m.FriendshipId == fsId && m.SenderUserId != userId && m.ReadAt == null, ct);
         }
-        return await ProjectAsync(hit.Conn, hit.Person, preview, sentAt, unread, ct);
+        return await ProjectAsync(hit.Conn, hit.Person, preview, sentAt, unread, ct, lastImageKey);
     }
 
     public async Task<ConnectionResponse> CreateLocalAsync(
@@ -331,7 +339,8 @@ public class ConnectionsService(
         string? preview,
         DateTime? sentAt,
         int unread,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? lastImageKey = null)
     {
         var personDto = await BuildPersonResponseAsync(person, ct);
 
@@ -356,6 +365,27 @@ public class ConnectionsService(
             }
         }
 
+        // Presign the last image (when the most recent message is a
+        // photo) so the chat list can show a thumbnail. Same lifetime and
+        // best-effort handling as the avatar above.
+        string? lastMessageImageUrl = null;
+        if (!string.IsNullOrWhiteSpace(lastImageKey))
+        {
+            try
+            {
+                lastMessageImageUrl = await storage.GetPresignedDownloadUrlAsync(
+                    lastImageKey,
+                    AvatarDownloadUrlLifetime);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(
+                    ex,
+                    "Failed to presign last-message image for connection {ConnectionId}",
+                    conn.Id);
+            }
+        }
+
         return new ConnectionResponse(
             conn.Id,
             conn.OwnerUserId,
@@ -371,7 +401,8 @@ public class ConnectionsService(
             preview,
             sentAt,
             unread,
-            privateAvatarUrl);
+            privateAvatarUrl,
+            lastMessageImageUrl);
     }
 
     public async Task<CreateConnectionAvatarUploadResponse?> CreateAvatarUploadUrlAsync(

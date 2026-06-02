@@ -180,7 +180,12 @@ public record ConnectionResponse(
     // Owner-private "my version" avatar; presigned GET URL re-issued on
     // every read. Null when the owner hasn't set one — clients fall back
     // to `Person.AvatarUrl` (in-app users) or initials (local persons).
-    string? PrivateAvatarUrl);
+    string? PrivateAvatarUrl,
+    // Presigned GET URL for the most recent message's photo, set only
+    // when the last message is an image. Lets the chat list render a
+    // thumbnail instead of a "(photo)" placeholder. Re-issued each read
+    // like the avatar URLs; null otherwise.
+    string? LastMessageImageUrl = null);
 
 // ── Connection attachments (keepsakes: media + files) ───────────────
 
