@@ -73,7 +73,7 @@ struct MainTabView: View {
                     ReflectView()
                 }
                 .tabItem {
-                    Image("tab.dialogue")
+                    Image("tab.peepal")
                     Text("Reflect")
                 }
                 .tag(1)
@@ -82,7 +82,7 @@ struct MainTabView: View {
                     ChatsTabView()
                 }
                 .tabItem {
-                    Image("tab.chat")
+                    Image("tab.dialogue")
                     Text("Chats")
                 }
                 .badge(friendsBadge.unreadMessagesCount)
