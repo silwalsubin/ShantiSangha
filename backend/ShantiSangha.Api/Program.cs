@@ -260,53 +260,6 @@ try
         await sp.GetRequiredService<ShantiSangha.AgentFeedback.Data.AgentFeedbackDbContext>().Database.MigrateAsync();
     }
 
-    // One-shot cleanup of the retired Wise Cat / Trading / IBKR feature:
-    // drops the orphaned tables, removes their rows from the shared EF
-    // migrations history, and deletes the recurring Hangfire jobs that
-    // were registered before the Trading module was removed. Every
-    // statement is idempotent (IF EXISTS / IN-list / RemoveIfExists), so
-    // leaving this block in until the next deploy is safe. Delete the
-    // whole block in a follow-up commit once prod has run it once.
-    using (var scope = app.Services.CreateScope())
-    {
-        var db = scope.ServiceProvider
-            .GetRequiredService<ShantiSangha.AgentFeedback.Data.AgentFeedbackDbContext>();
-        await db.Database.ExecuteSqlRawAsync(@"
-            DROP TABLE IF EXISTS ""TradingSignals"" CASCADE;
-            DROP TABLE IF EXISTS ""TickerDailyCloses"" CASCADE;
-            DROP TABLE IF EXISTS ""UserPortfolioPositions"" CASCADE;
-            DROP TABLE IF EXISTS ""TickerSectors"" CASCADE;
-            DROP TABLE IF EXISTS ""UserStrategySettings"" CASCADE;
-            DROP TABLE IF EXISTS ""StopOutLedgers"" CASCADE;
-            DROP TABLE IF EXISTS ""IbkrAccounts"" CASCADE;
-            DELETE FROM ""__EFMigrationsHistory"" WHERE ""MigrationId"" IN (
-                '20260505120000_InitTrading',
-                '20260507120000_AddTradingSignalHorizons',
-                '20260508120000_AddTradingSignalLastBarDate',
-                '20260508130000_AddTradingSignalProbabilities',
-                '20260509120000_RetireLegacyMirrorColumns',
-                '20260510120000_AddUserPortfolioPositions',
-                '20260511120000_AddTickerSectors',
-                '20260511130000_AddUserStrategySettings',
-                '20260511140000_AddSellSignalAndJournalAndStopOut',
-                '20260511150000_DropTradeJournalEntries',
-                '20260511160000_DropWatchlistItems',
-                '20260518120000_AddIbkrAccountAndPositionSource'
-            );
-        ");
-    }
-
-    foreach (var jobName in new[]
-    {
-        "wisecat-refresh-market-data",
-        "wisecat-generate-signals",
-        "wisecat-ibkr-portfolio-sync",
-        "wisecat-ibkr-keepalive",
-    })
-    {
-        RecurringJob.RemoveIfExists(jobName);
-    }
-
     // Global error handler — returns full error details when EXPOSE_ERRORS=true
     if (appConfig.ExposeErrors)
     {
