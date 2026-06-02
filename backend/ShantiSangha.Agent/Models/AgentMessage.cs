@@ -18,4 +18,12 @@ public class AgentMessage
     /// live cards alongside the prose.
     /// </summary>
     public string? Attachments { get; set; }
+
+    /// <summary>
+    /// S3 object key for a photo the user attached to this turn, stored so
+    /// the image survives a chat reopen. Null for turns without a photo.
+    /// The bytes live in the media bucket; the client fetches a presigned
+    /// GET URL on history load.
+    /// </summary>
+    public string? ImageObjectKey { get; set; }
 }

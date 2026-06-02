@@ -22,8 +22,11 @@ public class AgentController(
     AgentDbContext db,
     ICurrentUser currentUser,
     IReminderService reminders,
+    Storage.AgentMediaStorage mediaStorage,
     ILogger<AgentController> logger) : ControllerBase
 {
+    private static readonly TimeSpan ImageUrlLifetime = TimeSpan.FromHours(6);
+
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     [HttpPost("chat")]
@@ -133,6 +136,7 @@ public class AgentController(
                 m.Role,
                 m.Content,
                 m.Attachments,
+                m.ImageObjectKey,
                 m.CreatedAt,
             })
             .ToListAsync(ct);
@@ -156,7 +160,8 @@ public class AgentController(
                 .ToDictionary(r => r.Id);
         }
 
-        var result = rows.Select(m =>
+        var result = new List<object>(rows.Count);
+        foreach (var m in rows)
         {
             var ids = AgentMessageAttachmentsCodec.Decode(m.Attachments)?.ReminderIds;
             var attachedReminders = ids is null || reminderLookup is null
@@ -166,15 +171,32 @@ public class AgentController(
                     .Select(id => reminderLookup[id])
                     .ToArray();
 
-            return new
+            // Re-issue a presigned GET each load (the stored key is stable;
+            // the URL expires). Best-effort — a presign failure just drops
+            // the image rather than failing the whole history fetch.
+            string? imageUrl = null;
+            if (!string.IsNullOrWhiteSpace(m.ImageObjectKey))
+            {
+                try
+                {
+                    imageUrl = await mediaStorage.GetPresignedDownloadUrlAsync(m.ImageObjectKey, ImageUrlLifetime);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Failed to presign agent image for message {MessageId}", m.Id);
+                }
+            }
+
+            result.Add(new
             {
                 id = m.Id,
                 role = m.Role == AgentMessageRole.User ? "user" : "assistant",
                 content = m.Content,
                 attachedReminders,
+                imageUrl,
                 createdAt = m.CreatedAt,
-            };
-        }).ToList();
+            });
+        }
 
         return Ok(result);
     }

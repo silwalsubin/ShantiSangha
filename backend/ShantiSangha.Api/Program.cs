@@ -107,7 +107,7 @@ try
     // Same tool catalog (ShantiSangha.Tools) is also exposed externally via MCP
     // at /mcp so Claude Desktop / Cursor can connect with a Firebase JWT.
     builder.Services.AddAgentFeedbackModule(connStr);
-    builder.Services.AddAgentModule(connStr);
+    builder.Services.AddAgentModule(connStr, appConfig.FriendsMediaBucketName);
     builder.Services.AddShantiSanghaMcp();
 
     // ── Controller discovery from domain assemblies ─────────────────────

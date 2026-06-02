@@ -17,6 +17,8 @@ final class AgentChatService {
         let role: String
         let content: String
         let attachedReminders: [Reminder]?
+        /// Presigned GET URL for a photo attached to this turn, when present.
+        let imageUrl: String?
     }
 
     /// One frame in the live reply stream — either a chunk of prose or a

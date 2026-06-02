@@ -197,7 +197,8 @@ struct AgentChatView: View {
                 AgentMessage(
                     role: $0.role == "user" ? .user : .assistant,
                     content: $0.content,
-                    attachedReminders: $0.attachedReminders ?? [])
+                    attachedReminders: $0.attachedReminders ?? [],
+                    imageUrl: $0.imageUrl)
             }
         } catch {
             if !error.isCancellation {
@@ -380,15 +381,13 @@ struct AgentChatView: View {
     private func bubble(_ msg: AgentMessage, at index: Int) -> some View {
         let side: SacredChatSide = msg.role == .user ? .mine : .theirs
         VStack(alignment: msg.role == .user ? .trailing : .leading, spacing: SacredSpacing.xs) {
-            if let image = msg.localImage {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: 220, maxHeight: 260)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.sacredGold.opacity(0.15), lineWidth: 1))
+            if msg.localImage != nil || msg.imageUrl != nil {
+                AgentBubbleImage(uiImage: msg.localImage, urlString: msg.imageUrl)
+                    // Align to the sender's side — the bare image doesn't
+                    // claim full width the way the text bubble row does, so
+                    // without this it drifts to the leading edge.
+                    .frame(maxWidth: .infinity,
+                           alignment: msg.role == .user ? .trailing : .leading)
             }
             if !msg.content.isEmpty {
                 if msg.role == .user {
@@ -564,22 +563,65 @@ struct AgentMessage: Identifiable {
     let role: Role
     var content: String
     var attachedReminders: [Reminder]
-    /// Display-only photo the user attached to this turn. Not persisted
-    /// or fetched from history — only shown for the live in-session turn.
+    /// Photo the user attached to this turn, shown live right after send.
     var localImage: UIImage?
+    /// Presigned URL for a persisted photo, populated from history on
+    /// reopen (when `localImage` isn't available in-memory).
+    var imageUrl: String?
 
     init(
         id: UUID = UUID(),
         role: Role,
         content: String,
         attachedReminders: [Reminder] = [],
-        localImage: UIImage? = nil
+        localImage: UIImage? = nil,
+        imageUrl: String? = nil
     ) {
         self.id = id
         self.role = role
         self.content = content
         self.attachedReminders = attachedReminders
         self.localImage = localImage
+        self.imageUrl = imageUrl
+    }
+}
+
+// MARK: - Bubble image
+
+/// Renders a photo attached to an assistant turn. Uses the in-memory
+/// `UIImage` when available (the live turn just after sending); otherwise
+/// loads the persisted photo from its presigned URL through the shared
+/// image cache (which strips the rotating query params).
+private struct AgentBubbleImage: View {
+    let uiImage: UIImage?
+    let urlString: String?
+
+    @State private var loaded: UIImage?
+
+    private var image: UIImage? { uiImage ?? loaded }
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: 220, maxHeight: 260)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.sacredGold.opacity(0.15), lineWidth: 1))
+            } else {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.sacredBgCard)
+                    .frame(width: 180, height: 180)
+                    .overlay(ProgressView().tint(.sacredGold))
+            }
+        }
+        .task(id: urlString) {
+            guard uiImage == nil, let urlString, let url = URL(string: urlString) else { return }
+            loaded = await AvatarImageCache.shared.image(for: url)
+        }
     }
 }
 

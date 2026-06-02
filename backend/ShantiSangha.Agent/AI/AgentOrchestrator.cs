@@ -24,7 +24,8 @@ public class AgentOrchestrator(
     IReminderService reminderService,
     RemindersListSink remindersSink,
     AgentTurnContext turnContext,
-    AgentDbContext db)
+    AgentDbContext db,
+    Storage.AgentMediaStorage mediaStorage)
 {
     private static readonly TimeSpan LoopTimeout = TimeSpan.FromSeconds(45);
     private const int HistoryReplayCount = 20;
@@ -53,6 +54,25 @@ public class AgentOrchestrator(
         var persistedContent = trimmed.Length > 0
             ? trimmed
             : (imageBytes is not null ? "[Shared a photo]" : trimmed);
+
+        // Persist the photo to the media bucket so it survives a chat
+        // reopen. Best-effort: a failed upload still lets the image inform
+        // THIS turn's vision call below — it just won't replay later.
+        string? imageObjectKey = null;
+        if (imageBytes is not null)
+        {
+            imageObjectKey = $"agent/{user.Id}/{Guid.NewGuid()}.jpg";
+            try
+            {
+                await mediaStorage.UploadAsync(
+                    imageObjectKey, imageBytes, imageContentType ?? "image/jpeg", cancellationToken);
+            }
+            catch
+            {
+                imageObjectKey = null;
+            }
+        }
+
         var userTurnId = Guid.NewGuid();
         db.AgentMessages.Add(new AgentMessage
         {
@@ -60,6 +80,7 @@ public class AgentOrchestrator(
             UserId = user.Id,
             Role = AgentMessageRole.User,
             Content = persistedContent,
+            ImageObjectKey = imageObjectKey,
             CreatedAt = DateTime.UtcNow,
         });
         await db.SaveChangesAsync(cancellationToken);
