@@ -403,7 +403,42 @@ struct AgentChatView: View {
             if !msg.attachedReminders.isEmpty {
                 reminderAttachments(msg.attachedReminders)
             }
+            // Quick-action chips ride only on the latest message and only once
+            // the reply has fully streamed. When the next turn is appended this
+            // message stops being last, so the chips clear themselves — whether
+            // the user tapped a chip or typed something custom.
+            if msg.role == .assistant,
+               !msg.quickActions.isEmpty,
+               msg.id == messages.last?.id,
+               !sending {
+                quickActionChips(msg.quickActions)
+            }
         }
+    }
+
+    /// Tappable follow-ups under the latest assistant reply — a one-tap path
+    /// for the actions the user is most likely to want next. Tapping sends the
+    /// chip's prompt through the normal pipeline; the text box stays open for
+    /// custom typing. Saffron-outlined pills in the sacred palette.
+    private func quickActionChips(_ actions: [AgentChatService.QuickAction]) -> some View {
+        WrapLayout(spacing: SacredSpacing.xs, lineSpacing: SacredSpacing.xs) {
+            ForEach(actions, id: \.self) { action in
+                Button {
+                    Task { await sendSuggestion(action.prompt) }
+                } label: {
+                    Text(action.label)
+                        .font(.sacredTextSemibold)
+                        .foregroundColor(.sacredGold)
+                        .padding(.horizontal, SacredSpacing.m)
+                        .padding(.vertical, 10)
+                        .frame(minHeight: 44)
+                        .background(Capsule().fill(Color.sacredBgCard))
+                        .overlay(Capsule().strokeBorder(Color.sacredGold.opacity(0.35), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.top, SacredSpacing.xs)
     }
 
     private func spacingBeforeMessage(at index: Int) -> CGFloat {
@@ -508,6 +543,10 @@ struct AgentChatView: View {
                     withAnimation(.easeOut(duration: 0.2)) {
                         messages[idx].attachedReminders = items
                     }
+                case .quickActions(let actions):
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        messages[idx].quickActions = actions
+                    }
                 }
             }
         } catch {
@@ -530,6 +569,13 @@ struct AgentChatView: View {
     private func retry(_ text: String) async {
         inputText = text
         failedSendText = nil
+        await send()
+    }
+
+    /// Fires when the user taps a quick-action chip: prefill the composer with
+    /// the chip's prompt and send it through the normal flow.
+    private func sendSuggestion(_ prompt: String) async {
+        inputText = prompt
         await send()
     }
 
@@ -568,6 +614,9 @@ struct AgentMessage: Identifiable {
     /// Presigned URL for a persisted photo, populated from history on
     /// reopen (when `localImage` isn't available in-memory).
     var imageUrl: String?
+    /// Tappable follow-ups offered after this assistant reply. Ephemeral —
+    /// only rendered while this is the latest message, never persisted.
+    var quickActions: [AgentChatService.QuickAction]
 
     init(
         id: UUID = UUID(),
@@ -575,7 +624,8 @@ struct AgentMessage: Identifiable {
         content: String,
         attachedReminders: [Reminder] = [],
         localImage: UIImage? = nil,
-        imageUrl: String? = nil
+        imageUrl: String? = nil,
+        quickActions: [AgentChatService.QuickAction] = []
     ) {
         self.id = id
         self.role = role
@@ -583,6 +633,7 @@ struct AgentMessage: Identifiable {
         self.attachedReminders = attachedReminders
         self.localImage = localImage
         self.imageUrl = imageUrl
+        self.quickActions = quickActions
     }
 }
 

@@ -71,6 +71,9 @@ public class AgentController(
                     case AgentStreamEvent.Reminders r:
                         await WriteRemindersAsync(r.Items, cancellationToken);
                         break;
+                    case AgentStreamEvent.QuickActions qa:
+                        await WriteQuickActionsAsync(qa.Items, cancellationToken);
+                        break;
                 }
             }
         }
@@ -107,6 +110,15 @@ public class AgentController(
         var payload = JsonSerializer.Serialize(items, JsonOptions);
         await HttpContext.Response.WriteAsync(
             $"event: reminders\ndata: {payload}\n\n", Encoding.UTF8, ct);
+        await HttpContext.Response.Body.FlushAsync(ct);
+    }
+
+    private async Task WriteQuickActionsAsync(
+        IReadOnlyList<Contracts.QuickAction> items, CancellationToken ct)
+    {
+        var payload = JsonSerializer.Serialize(items, JsonOptions);
+        await HttpContext.Response.WriteAsync(
+            $"event: quick_actions\ndata: {payload}\n\n", Encoding.UTF8, ct);
         await HttpContext.Response.Body.FlushAsync(ct);
     }
 

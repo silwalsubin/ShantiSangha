@@ -25,7 +25,8 @@ public class AgentOrchestrator(
     RemindersListSink remindersSink,
     AgentTurnContext turnContext,
     AgentDbContext db,
-    Storage.AgentMediaStorage mediaStorage)
+    Storage.AgentMediaStorage mediaStorage,
+    QuickActionSuggester quickActions)
 {
     private static readonly TimeSpan LoopTimeout = TimeSpan.FromSeconds(45);
     private const int HistoryReplayCount = 20;
@@ -124,7 +125,7 @@ public class AgentOrchestrator(
                 {
                     var items = new ChatMessageContentItemCollection
                     {
-                        new TextContent(trimmed.Length > 0 ? trimmed : "Please look at this image."),
+                        new TextContent(trimmed.Length > 0 ? trimmed : "Here's an image — take a look at what's in it."),
                         new ImageContent(imageBytes, imageContentType ?? "image/jpeg")
                     };
                     history.AddUserMessage(items);
@@ -191,6 +192,20 @@ public class AgentOrchestrator(
         }
 
         var assistantContent = assembled.ToString().Trim();
+
+        // Cheap second pass: offer up to 3 tappable follow-ups so a lazy-typing
+        // user can act with one tap. Runs after the reply has fully streamed, so
+        // it never delays the prose; returns nothing on most turns. Ephemeral —
+        // we don't persist chips, so they don't reappear on history reopen.
+        if (assistantContent.Length > 0)
+        {
+            var actions = await quickActions.SuggestAsync(trimmed, assistantContent, cancellationToken);
+            if (actions.Count > 0)
+            {
+                yield return new AgentStreamEvent.QuickActions(actions);
+            }
+        }
+
         if (assistantContent.Length > 0)
         {
             db.AgentMessages.Add(new AgentMessage

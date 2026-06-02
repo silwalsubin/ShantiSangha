@@ -21,12 +21,20 @@ final class AgentChatService {
         let imageUrl: String?
     }
 
-    /// One frame in the live reply stream — either a chunk of prose or a
-    /// list of reminders the assistant referenced and the app should
-    /// render as interactive cards.
+    /// A tappable follow-up the assistant offers after a reply. `label` is the
+    /// short button text; `prompt` is the message sent when the chip is tapped.
+    struct QuickAction: Decodable, Hashable {
+        let label: String
+        let prompt: String
+    }
+
+    /// One frame in the live reply stream — a chunk of prose, a list of
+    /// reminders to render as cards, or up to 3 quick-action chips offered
+    /// after the reply.
     enum StreamEvent {
         case text(String)
         case reminders([Reminder])
+        case quickActions([QuickAction])
     }
 
     func fetchHistory() async throws -> [HistoryMessage] {
@@ -120,6 +128,10 @@ final class AgentChatService {
                             case "reminders":
                                 if let reminders = try? JSONDecoder().decode([Reminder].self, from: payloadData) {
                                     continuation.yield(.reminders(reminders))
+                                }
+                            case "quick_actions":
+                                if let actions = try? JSONDecoder().decode([QuickAction].self, from: payloadData) {
+                                    continuation.yield(.quickActions(actions))
                                 }
                             default:
                                 if let decoded = try? JSONDecoder().decode(String.self, from: payloadData) {

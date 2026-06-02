@@ -1079,7 +1079,10 @@ struct WrapHStack<Content: View>: View {
     }
 }
 
-private struct WrapLayout: Layout {
+/// Flows subviews left-to-right, wrapping to the next line when they overflow
+/// the available width. Shared across the circle's sub-circle tags and the
+/// assistant chat's quick-action chips.
+struct WrapLayout: Layout {
     let spacing: CGFloat
     let lineSpacing: CGFloat
 

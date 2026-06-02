@@ -29,6 +29,7 @@ public static class DependencyInjection
         });
 
         services.AddToolsModule();
+        services.AddScoped<QuickActionSuggester>();
         services.AddScoped<AgentOrchestrator>();
         return services;
     }
