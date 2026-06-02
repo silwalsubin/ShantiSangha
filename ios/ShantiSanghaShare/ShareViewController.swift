@@ -1,5 +1,6 @@
 import UIKit
 import UniformTypeIdentifiers
+import ImageIO
 
 /// Share Extension entry point.
 ///
@@ -13,6 +14,13 @@ final class ShareViewController: UIViewController {
     private static let appGroup = "group.com.shantisangha.app"
     private static let pendingKey = "share.pendingText"
     private static let pendingDateKey = "share.pendingDate"
+    // Media hand-off: the image is copied into the App Group container and
+    // its filename + content type are left in defaults for the main app
+    // (DeepLinkRouter) to drain and route into a connection's chat.
+    private static let pendingMediaNameKey = "share.pendingMediaName"
+    private static let pendingMediaTypeKey = "share.pendingMediaType"
+    private static let pendingMediaDateKey = "share.pendingMediaDate"
+    private static let inboxDir = "SharedInbox"
     private static let openURL = URL(string: "shantisangha://share")!
 
     override func viewDidLoad() {
@@ -22,9 +30,16 @@ final class ShareViewController: UIViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        harvest { [weak self] text in
+        harvest { [weak self] payload in
             guard let self else { return }
-            self.persist(text: text)
+            switch payload {
+            case .image(let data):
+                self.persistMedia(data: data, contentType: "image/jpeg")
+            case .text(let text):
+                self.persist(text: text)
+            case .none:
+                break
+            }
             self.openContainingApp()
             self.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
         }
@@ -32,21 +47,43 @@ final class ShareViewController: UIViewController {
 
     // MARK: - Harvest
 
-    /// Walks every attachment on every input item and loads each one's
-    /// best representation (URL > plain text > text > image breadcrumb).
-    /// All loads run in parallel; the completion fires once they've all
-    /// settled.
-    private func harvest(_ completion: @escaping (String) -> Void) {
+    private enum SharePayload {
+        case image(Data)
+        case text(String)
+        case none
+    }
+
+    /// Decides what was shared. An image takes priority — the main app
+    /// routes it to a connection's chat. Otherwise we fall back to the
+    /// existing text path (URL > plain text > text) that pre-fills the
+    /// assistant composer.
+    private func harvest(_ completion: @escaping (SharePayload) -> Void) {
         guard let items = extensionContext?.inputItems as? [NSExtensionItem] else {
-            completion("")
+            completion(.none)
             return
         }
         let attachments = items.flatMap { $0.attachments ?? [] }
         guard !attachments.isEmpty else {
-            completion("")
+            completion(.none)
             return
         }
 
+        if let imageProvider = attachments.first(where: {
+            $0.hasItemConformingToTypeIdentifier(UTType.image.identifier)
+        }) {
+            loadImage(from: imageProvider) { data in
+                DispatchQueue.main.async {
+                    completion(data.map(SharePayload.image) ?? .none)
+                }
+            }
+            return
+        }
+
+        harvestText(attachments, completion: completion)
+    }
+
+    private func harvestText(_ attachments: [NSItemProvider],
+                             completion: @escaping (SharePayload) -> Void) {
         let group = DispatchGroup()
         var pieces: [String] = []
         let lock = NSLock()
@@ -81,17 +118,82 @@ final class ShareViewController: UIViewController {
                     append(item as? String)
                     group.leave()
                 }
-            } else if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
-                // No multimodal chat yet — leave a breadcrumb so the
-                // composer at least shows something useful and the user
-                // can describe what they shared.
-                append("[shared image]")
             }
         }
 
         group.notify(queue: .main) {
-            completion(pieces.joined(separator: "\n\n"))
+            let text = pieces.joined(separator: "\n\n")
+            completion(text.isEmpty ? .none : .text(text))
         }
+    }
+
+    /// Loads the shared image and returns downsampled JPEG bytes.
+    ///
+    /// CRITICAL: a share extension has a tiny memory budget (~120 MB, often
+    /// killed sooner). Fully decoding a modern photo into a `UIImage` and
+    /// re-encoding it blows that budget and the OS jetsam-kills the process
+    /// — which looks exactly like a crash that dumps the user back to the
+    /// host app. So we never decode the full image: ImageIO produces a
+    /// downsampled thumbnail straight from the source bytes/URL with a
+    /// bounded memory footprint, and we encode that to JPEG.
+    private func loadImage(from provider: NSItemProvider, completion: @escaping (Data?) -> Void) {
+        // Preferred: raw bytes, downsampled via ImageIO.
+        provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
+            if let data, let jpeg = Self.downsampledJPEG(fromData: data) {
+                completion(jpeg)
+                return
+            }
+            // Fallback: some hosts only vend a file URL or a UIImage.
+            provider.loadItem(forTypeIdentifier: UTType.image.identifier, options: nil) { item, _ in
+                switch item {
+                case let url as URL:
+                    completion(Self.downsampledJPEG(fromURL: url))
+                case let data as Data:
+                    completion(Self.downsampledJPEG(fromData: data))
+                case let image as UIImage:
+                    completion(image.jpegData(compressionQuality: 0.82))
+                default:
+                    completion(nil)
+                }
+            }
+        }
+    }
+
+    /// Max edge for the downsample. Chat photos don't need full-res, and
+    /// staying small keeps the extension well under its memory ceiling.
+    private static let maxPixel: CGFloat = 2048
+
+    private static func downsampledJPEG(fromURL url: URL) -> Data? {
+        guard let src = CGImageSourceCreateWithURL(url as CFURL,
+                                                   [kCGImageSourceShouldCache: false] as CFDictionary)
+        else { return nil }
+        return downsampledJPEG(from: src)
+    }
+
+    private static func downsampledJPEG(fromData data: Data) -> Data? {
+        guard let src = CGImageSourceCreateWithData(data as CFData,
+                                                    [kCGImageSourceShouldCache: false] as CFDictionary)
+        else { return nil }
+        return downsampledJPEG(from: src)
+    }
+
+    private static func downsampledJPEG(from src: CGImageSource) -> Data? {
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true, // respect EXIF orientation
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel
+        ]
+        guard let thumb = CGImageSourceCreateThumbnailAtIndex(src, 0, options as CFDictionary) else {
+            return nil
+        }
+        let out = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(
+            out, UTType.jpeg.identifier as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(dest, thumb,
+                                   [kCGImageDestinationLossyCompressionQuality: 0.82] as CFDictionary)
+        guard CGImageDestinationFinalize(dest) else { return nil }
+        return out as Data
     }
 
     // MARK: - Hand-off
@@ -100,6 +202,26 @@ final class ShareViewController: UIViewController {
         guard let defaults = UserDefaults(suiteName: Self.appGroup) else { return }
         defaults.set(text, forKey: Self.pendingKey)
         defaults.set(Date(), forKey: Self.pendingDateKey)
+    }
+
+    private func persistMedia(data: Data, contentType: String) {
+        guard let container = FileManager.default
+                .containerURL(forSecurityApplicationGroupIdentifier: Self.appGroup),
+              let defaults = UserDefaults(suiteName: Self.appGroup) else { return }
+
+        let inbox = container.appendingPathComponent(Self.inboxDir, isDirectory: true)
+        try? FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
+
+        let filename = "share-\(UUID().uuidString).jpg"
+        do {
+            try data.write(to: inbox.appendingPathComponent(filename), options: .atomic)
+            defaults.set(filename, forKey: Self.pendingMediaNameKey)
+            defaults.set(contentType, forKey: Self.pendingMediaTypeKey)
+            defaults.set(Date(), forKey: Self.pendingMediaDateKey)
+        } catch {
+            // If the copy fails there's nothing to route — fall through
+            // silently; the main app simply won't see a pending media.
+        }
     }
 
     /// Share extensions can't call `UIApplication.shared.open` directly.

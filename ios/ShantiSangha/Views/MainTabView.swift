@@ -11,6 +11,7 @@ struct MainTabView: View {
     @StateObject private var syncStatus = SyncStatus.shared
     @StateObject private var deepLinks = DeepLinkRouter.shared
     @StateObject private var friendsBadge = FriendsBadgeService.shared
+    @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab = 0
 
     init() {
@@ -104,6 +105,13 @@ struct MainTabView: View {
                     selectedTab = 3
                 }
             }
+            // A photo shared in from another app → pick one connection
+            // and send it into that chat.
+            .sheet(item: sharedMediaBinding) { media in
+                ShareToConnectionSheet(media: media) {
+                    deepLinks.clearSharedMedia()
+                }
+            }
 
             SyncBanner(
                 isConnected: network.isConnected,
@@ -125,8 +133,27 @@ struct MainTabView: View {
                 selectedTab = 2
             }
         }
-        .onAppear { MotionManager.shared.start() }
+        .onAppear {
+            MotionManager.shared.start()
+            // Cold-launch hand-off: a share that launched the app may
+            // arrive before/instead of `.onOpenURL`, so drain here too.
+            deepLinks.consumeSharedMedia()
+        }
         .onDisappear { MotionManager.shared.stop() }
+        // Reopening after a share while backgrounded doesn't re-fire
+        // `.onAppear`, so re-check when the scene becomes active.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { deepLinks.consumeSharedMedia() }
+        }
+    }
+
+    private var sharedMediaBinding: Binding<SharedMediaPayload?> {
+        Binding(
+            get: { deepLinks.pendingSharedMedia },
+            set: { newValue in
+                if newValue == nil { deepLinks.clearSharedMedia() }
+            }
+        )
     }
 
     private var deepLinkBinding: Binding<InviteTokenItem?> {
