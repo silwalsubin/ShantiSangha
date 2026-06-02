@@ -41,7 +41,12 @@ final class ShareViewController: UIViewController {
                 break
             }
             self.openContainingApp()
-            self.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
+            // Tear the extension down only AFTER the host has had a beat
+            // to action the open. Completing immediately cancels the
+            // pending app launch — that's why it "closed doing nothing."
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                self.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
+            }
         }
     }
 
@@ -224,13 +229,24 @@ final class ShareViewController: UIViewController {
         }
     }
 
-    /// Share extensions can't call `UIApplication.shared.open` directly.
-    /// Walk the responder chain to find a `UIApplication` and invoke
-    /// `openURL:` via the Obj-C runtime. This is the long-standing
-    /// workaround that still ships in production share extensions.
+    /// Share extensions can't reach `UIApplication.shared`, so we walk
+    /// the responder chain to the `UIApplication` living in the extension
+    /// process and call the modern `open(_:options:completionHandler:)`.
+    /// Falls back to the legacy `openURL:` selector for hosts where the
+    /// application isn't found in the chain.
     private func openContainingApp() {
         var responder: UIResponder? = self
+        while let current = responder {
+            if let app = current as? UIApplication {
+                app.open(Self.openURL, options: [:], completionHandler: nil)
+                return
+            }
+            responder = current.next
+        }
+
+        // Legacy fallback.
         let selector = NSSelectorFromString("openURL:")
+        responder = self
         while let current = responder {
             if current.responds(to: selector) {
                 _ = current.perform(selector, with: Self.openURL)
