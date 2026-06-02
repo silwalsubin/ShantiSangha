@@ -237,7 +237,8 @@
       "Bash(grep -c \"PBXFileSystemSynchronizedRootGroup\" *.xcodeproj/project.pbxproj)",
       "Bash(grep -c \"DesignTokens.swift\" *.xcodeproj/project.pbxproj)",
       "Bash(sed -n '320,345p' ios/ShantiSangha/ViewModels/FriendChatViewModel.swift)",
-      "Bash(sed -n '1,60p' ios/ShantiSangha/Views/Friends/CollaboratorPickerSheet.swift)"
+      "Bash(sed -n '1,60p' ios/ShantiSangha/Views/Friends/CollaboratorPickerSheet.swift)",
+      "Bash(grep -E \"\\\\.swift$\")"
     ],
     "additionalDirectories": [
       "/Users/subinsilwal/Desktop/code/maiself/.claude",

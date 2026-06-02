@@ -22,6 +22,9 @@ struct HomeView: View {
     @AppStorage("reminders.horizonDays") private var horizonDays = 30
     @State private var showProfileMenu = false
     @State private var showChatSheet = false
+    /// Increments only when the chat is summoned, so the sparkle spray
+    /// fires on open but not when the sheet dismisses back to Home.
+    @State private var sparkleTrigger = 0
     @State private var showCalendar = false
     @State private var promptHintIndex = 0
     /// Subscribes to CoreMotion device tilt so the send button's
@@ -345,6 +348,7 @@ struct HomeView: View {
     private var sendButton: some View {
         Button {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            sparkleTrigger += 1
             showChatSheet = true
         } label: {
             sendButtonBody
@@ -355,14 +359,16 @@ struct HomeView: View {
             .glow(color: .sacredGold, radius: 14),
             value: voicePrefill.isEmpty
         )
-        // Sparkles spray as the chat is summoned. Fires before the
-        // sheet covers it because Pow effects render above all content.
+        // Sparkles spray as the chat is summoned. Keyed to sparkleTrigger
+        // (which only advances on open) so it never re-fires on dismiss.
+        // Fires before the sheet covers it because Pow effects render
+        // above all content.
         .changeEffect(
             .spray(origin: UnitPoint.center) {
                 Image(systemName: "sparkle")
                     .foregroundStyle(Color.sacredGold)
             },
-            value: showChatSheet
+            value: sparkleTrigger
         )
     }
 
