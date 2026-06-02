@@ -44,8 +44,15 @@ public sealed class QuickActionSuggester(Kernel kernel, ILogger<QuickActionSugge
               trailing punctuation (e.g. "Add a new one", "Remind me June 14",
               "Share with someone").
             - "prompt": the full message sent as the user when the button is
-              tapped. Write it in the user's voice and include enough context to
-              act on its own (e.g. "Remind me to cancel Paramount on May 31").
+              tapped. Write it in the user's voice and ALWAYS restate the
+              concrete subject from the conversation so it stands on its own —
+              never a bare verb. If the assistant just discussed a specific
+              thing (a document, a photo, a bill, a person), name it in the
+              prompt. Good: "Remind me about my USCIS notice of action". Bad:
+              "Set a reminder" (the subject is lost the moment it's tapped).
+              Example: after the assistant describes a shared I-797 notice, a
+              reminder chip's prompt is "Remind me about my I-797 notice", not
+              "Set a reminder".
             - At most 3 actions. Fewer is better.
             - Return {"actions": []} whenever there is no clearly useful next
               step. This is common and expected — most replies need none. Do NOT

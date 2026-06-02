@@ -53,6 +53,28 @@ public sealed class QuickActionSuggesterEvalTests(ITestOutputHelper output)
     ];
 
     [LiveEvalFact]
+    public async Task ChipPromptCarriesTheSubjectNotABareVerb()
+    {
+        // Regression: after a shared document the chip used to send a bare
+        // "Set a reminder", dropping the subject so the assistant restarted.
+        // The prompt must name what it's about.
+        var suggester = BuildSuggester();
+        var actions = await suggester.SuggestAsync(
+            "[Shared a photo]",
+            "It looks like a notice of action from the U.S. Citizenship and Immigration Services (USCIS). If there's anything specific you'd like to do with this, let me know.");
+        output.WriteLine($"[subject] -> {Describe(actions)}");
+
+        Assert.NotEmpty(actions);
+        var carriesSubject = actions.Any(a =>
+        {
+            var p = a.Prompt.ToLowerInvariant();
+            return p.Contains("notice") || p.Contains("uscis") || p.Contains("immigration");
+        });
+        Assert.True(carriesSubject,
+            $"Expected a chip whose prompt names the document; got: {Describe(actions)}");
+    }
+
+    [LiveEvalFact]
     public async Task TrivialRepliesYieldNoChips()
     {
         var suggester = BuildSuggester();
