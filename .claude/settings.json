@@ -220,7 +220,13 @@
       "Bash(awk '/aws_ecs_service \"api\"/,/^}$/' infrastructure/terraform/app.tf)",
       "Edit(/.claude/skills/agent-reports/**)",
       "Bash(chmod +x /Users/subinsilwal/Desktop/code/maiself/.claude/skills/agent-reports/scripts/digest.sh)",
-      "Bash(bash /Users/subinsilwal/Desktop/code/maiself/.claude/skills/agent-reports/scripts/digest.sh --since 30d --format markdown)"
+      "Bash(bash /Users/subinsilwal/Desktop/code/maiself/.claude/skills/agent-reports/scripts/digest.sh --since 30d --format markdown)",
+      "Bash(git stash *)",
+      "Bash(gh workflow *)",
+      "Bash(command -v gh github)",
+      "Bash(gh --version)",
+      "Bash(env)",
+      "Bash(git credential *)"
     ],
     "additionalDirectories": [
       "/Users/subinsilwal/Desktop/code/maiself/.claude",
