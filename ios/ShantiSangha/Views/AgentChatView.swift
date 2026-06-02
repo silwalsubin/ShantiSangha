@@ -360,10 +360,15 @@ struct AgentChatView: View {
         }
     }
 
+    /// Editable examples that mirror what the assistant can actually do —
+    /// one per primary MCP capability (list/schedule reminders, list/add
+    /// people in your circle) rather than over-specific guesses. Tapping
+    /// prefills the composer so the user tweaks the details before sending.
     private static let starterPrompts = [
         "What reminders do I have this week?",
-        "Remind me about my dad's birthday on June 10, yearly.",
-        "Cancel the electric bill reminder.",
+        "Remind me to call mom on Sunday.",
+        "Who's in my circle?",
+        "Add someone to my circle.",
     ]
 
     @ViewBuilder
