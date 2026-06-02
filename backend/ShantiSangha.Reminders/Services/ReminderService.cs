@@ -453,6 +453,23 @@ public class ReminderService(
 
         var daysRemaining = nextOccurrence.DayNumber - today.DayNumber;
 
+        // Yearly reminders only "complete" for one cycle. If the recorded
+        // dismissal sits before the most-recently-passed anniversary, that
+        // cycle is over and the next occurrence should surface as pending
+        // again — Home filters on completedAt == null, so blanking it here
+        // is enough to reanimate the row. The DB keeps the historical
+        // timestamp; the next dismissal just overwrites it.
+        var effectiveCompletedAt = r.CompletedAt;
+        if (effectiveCompletedAt is not null
+            && r.Recurrence == ReminderRecurrence.Yearly)
+        {
+            var mostRecentPast = nextOccurrence.AddYears(-1);
+            if (DateOnly.FromDateTime(effectiveCompletedAt.Value) < mostRecentPast)
+            {
+                effectiveCompletedAt = null;
+            }
+        }
+
         var collaborators = r.Collaborators
             .Select(c =>
             {
@@ -479,7 +496,7 @@ public class ReminderService(
             r.Recurrence.ToString().ToLowerInvariant(),
             r.RemindersEnabled,
             r.ConnectionId,
-            r.CompletedAt,
+            effectiveCompletedAt,
             r.CreatedAt,
             daysRemaining,
             collaborators,
