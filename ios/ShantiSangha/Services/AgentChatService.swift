@@ -59,7 +59,9 @@ final class AgentChatService {
     /// structured attachments (reminder lists). Throws on transport
     /// errors; the caller is expected to surface a friendly fallback.
     func stream(
-        message: String
+        message: String,
+        imageBase64: String? = nil,
+        imageContentType: String? = nil
     ) -> AsyncThrowingStream<StreamEvent, Error> {
         AsyncThrowingStream { continuation in
             Task {
@@ -77,7 +79,10 @@ final class AgentChatService {
                     if let token {
                         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
                     }
-                    request.httpBody = try JSONEncoder().encode(["message": message])
+                    var payload: [String: String] = ["message": message]
+                    if let imageBase64 { payload["imageBase64"] = imageBase64 }
+                    if let imageContentType { payload["imageContentType"] = imageContentType }
+                    request.httpBody = try JSONEncoder().encode(payload)
 
                     let (bytes, _) = try await URLSession.shared.bytes(for: request)
                     var buffer = Data()

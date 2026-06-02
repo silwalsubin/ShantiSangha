@@ -31,6 +31,8 @@ public class AgentOrchestrator(
 
     public async IAsyncEnumerable<AgentStreamEvent> StreamAsync(
         string userMessage,
+        byte[]? imageBytes = null,
+        string? imageContentType = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var user = await currentUser.GetAsync()
@@ -45,14 +47,19 @@ public class AgentOrchestrator(
         catch { /* best-effort */ }
 
         // Persist the user turn FIRST so it survives an LLM failure mid-stream.
+        // The image bytes are NOT persisted (they inform this turn only); a
+        // text marker keeps the saved history readable when there's no caption.
         var trimmed = userMessage.Trim();
+        var persistedContent = trimmed.Length > 0
+            ? trimmed
+            : (imageBytes is not null ? "[Shared a photo]" : trimmed);
         var userTurnId = Guid.NewGuid();
         db.AgentMessages.Add(new AgentMessage
         {
             Id = userTurnId,
             UserId = user.Id,
             Role = AgentMessageRole.User,
-            Content = trimmed,
+            Content = persistedContent,
             CreatedAt = DateTime.UtcNow,
         });
         await db.SaveChangesAsync(cancellationToken);
@@ -87,8 +94,29 @@ public class AgentOrchestrator(
 
         foreach (var msg in recent)
         {
-            if (msg.Role == AgentMessageRole.User) history.AddUserMessage(msg.Content);
-            else history.AddAssistantMessage(msg.Content);
+            if (msg.Role == AgentMessageRole.User)
+            {
+                // Attach the photo to the current turn only, as a multimodal
+                // message (text + image), so GPT-4o vision can see it. Prior
+                // turns replay as text — we never stored their images.
+                if (msg.Id == userTurnId && imageBytes is not null)
+                {
+                    var items = new ChatMessageContentItemCollection
+                    {
+                        new TextContent(trimmed.Length > 0 ? trimmed : "Please look at this image."),
+                        new ImageContent(imageBytes, imageContentType ?? "image/jpeg")
+                    };
+                    history.AddUserMessage(items);
+                }
+                else
+                {
+                    history.AddUserMessage(msg.Content);
+                }
+            }
+            else
+            {
+                history.AddAssistantMessage(msg.Content);
+            }
         }
 
         var settings = new OpenAIPromptExecutionSettings

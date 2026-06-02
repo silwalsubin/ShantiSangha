@@ -31,10 +31,24 @@ public class AgentController(
         [FromBody] AgentChatRequest body,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(body?.Message))
+        // A turn must carry text, an image, or both.
+        if (string.IsNullOrWhiteSpace(body?.Message)
+            && string.IsNullOrWhiteSpace(body?.ImageBase64))
         {
             HttpContext.Response.StatusCode = 400;
             return;
+        }
+
+        byte[]? imageBytes = null;
+        if (!string.IsNullOrWhiteSpace(body!.ImageBase64))
+        {
+            try { imageBytes = Convert.FromBase64String(body.ImageBase64); }
+            catch (FormatException)
+            {
+                // Malformed image — proceed text-only rather than 400 so a
+                // bad attachment doesn't swallow the user's question.
+                imageBytes = null;
+            }
         }
 
         HttpContext.Response.Headers.ContentType = "text/event-stream";
@@ -43,7 +57,8 @@ public class AgentController(
 
         try
         {
-            await foreach (var evt in orchestrator.StreamAsync(body.Message, cancellationToken))
+            await foreach (var evt in orchestrator.StreamAsync(
+                body.Message ?? string.Empty, imageBytes, body.ImageContentType, cancellationToken))
             {
                 switch (evt)
                 {

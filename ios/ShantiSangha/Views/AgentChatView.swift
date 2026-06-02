@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 /// Agent chat — the in-app surface where GPT-4o can call backend
 /// operations as tools. Spike scope: Reminders only (list / schedule /
@@ -10,9 +11,12 @@ struct AgentChatView: View {
     @State private var messages: [AgentMessage] = []
     @State private var inputText: String
     @State private var sending = false
+    @State private var stagedImage: UIImage?
+    @State private var photoItem: PhotosPickerItem?
 
-    init(prefill: String = "") {
+    init(prefill: String = "", prefillImage: UIImage? = nil) {
         _inputText = State(initialValue: prefill)
+        _stagedImage = State(initialValue: prefillImage)
     }
 
     @State private var loadingHistory = true
@@ -271,16 +275,73 @@ struct AgentChatView: View {
         }
     }
 
+    private var canSend: Bool {
+        (!inputText.trimmingCharacters(in: .whitespaces).isEmpty || stagedImage != nil) && !sending
+    }
+
     private var composer: some View {
         SacredChatComposer(
             text: $inputText,
-            placeholder: "Ask about your reminders…",
-            canSend: !inputText.trimmingCharacters(in: .whitespaces).isEmpty && !sending,
+            placeholder: "Ask anything…",
+            canSend: canSend,
             onSend: { Task { await send() } },
             onFocusChange: { composerFocused = $0 },
             focusOnAppear: true,
-            accessories: { SacredVoiceInputButton(text: $inputText) },
-            banner: { EmptyView() })
+            accessories: { composerAccessories },
+            banner: { stagedImageBanner })
+        .onChange(of: photoItem) { _, item in
+            guard let item else { return }
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self),
+                   let image = UIImage(data: data) {
+                    stagedImage = image
+                }
+                photoItem = nil
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var composerAccessories: some View {
+        HStack(spacing: 10) {
+            PhotosPicker(selection: $photoItem, matching: .images, photoLibrary: .shared()) {
+                Image(systemName: "photo")
+                    .font(.system(size: 22))
+                    .foregroundColor(.sacredGold)
+                    .frame(width: 32, height: 32)
+            }
+            SacredVoiceInputButton(text: $inputText)
+        }
+    }
+
+    @ViewBuilder
+    private var stagedImageBanner: some View {
+        if let stagedImage {
+            HStack {
+                ZStack(alignment: .topTrailing) {
+                    Image(uiImage: stagedImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 56, height: 56)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.sacredGold.opacity(0.2), lineWidth: 1))
+
+                    Button {
+                        self.stagedImage = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(.white)
+                            .background(Circle().fill(Color.black.opacity(0.5)))
+                    }
+                    .offset(x: 6, y: -6)
+                }
+                Spacer()
+            }
+            .padding(.bottom, 4)
+        }
     }
 
     private var emptyState: some View {
@@ -319,6 +380,16 @@ struct AgentChatView: View {
     private func bubble(_ msg: AgentMessage, at index: Int) -> some View {
         let side: SacredChatSide = msg.role == .user ? .mine : .theirs
         VStack(alignment: msg.role == .user ? .trailing : .leading, spacing: SacredSpacing.xs) {
+            if let image = msg.localImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: 220, maxHeight: 260)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.sacredGold.opacity(0.15), lineWidth: 1))
+            }
             if !msg.content.isEmpty {
                 if msg.role == .user {
                     SacredChatBubbleRow(side: side, hasTail: isLastInSenderRun(at: index)) {
@@ -397,20 +468,32 @@ struct AgentChatView: View {
 
     private func send() async {
         let text = inputText.trimmingCharacters(in: .whitespaces)
-        guard !text.isEmpty else { return }
+        let image = stagedImage
+        guard !text.isEmpty || image != nil else { return }
         failedSendText = nil
         inputText = ""
+        stagedImage = nil
+        photoItem = nil
         sending = true
         followNextMessage = true
 
+        // Encode the attached photo (if any) for the vision request.
+        var imageBase64: String?
+        var imageContentType: String?
+        if let image, let jpeg = image.jpegData(compressionQuality: 0.8) {
+            imageBase64 = jpeg.base64EncodedString()
+            imageContentType = "image/jpeg"
+        }
+
         let assistantId = UUID()
         withAnimation(.easeOut(duration: 0.2)) {
-            messages.append(AgentMessage(role: .user, content: text))
+            messages.append(AgentMessage(role: .user, content: text, localImage: image))
             messages.append(AgentMessage(id: assistantId, role: .assistant, content: ""))
         }
 
         do {
-            for try await event in AgentChatService.shared.stream(message: text) {
+            for try await event in AgentChatService.shared.stream(
+                message: text, imageBase64: imageBase64, imageContentType: imageContentType) {
                 guard let idx = messages.firstIndex(where: { $0.id == assistantId }) else { continue }
                 switch event {
                 case .text(let chunk):
@@ -481,17 +564,22 @@ struct AgentMessage: Identifiable {
     let role: Role
     var content: String
     var attachedReminders: [Reminder]
+    /// Display-only photo the user attached to this turn. Not persisted
+    /// or fetched from history — only shown for the live in-session turn.
+    var localImage: UIImage?
 
     init(
         id: UUID = UUID(),
         role: Role,
         content: String,
-        attachedReminders: [Reminder] = []
+        attachedReminders: [Reminder] = [],
+        localImage: UIImage? = nil
     ) {
         self.id = id
         self.role = role
         self.content = content
         self.attachedReminders = attachedReminders
+        self.localImage = localImage
     }
 }
 

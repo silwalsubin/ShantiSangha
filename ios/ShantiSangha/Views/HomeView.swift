@@ -43,6 +43,9 @@ struct HomeView: View {
     /// AgentChatView when the sheet opens; cleared on dismiss so the
     /// next dictation starts from an empty slate.
     @State private var voicePrefill: String = ""
+    /// A photo shared to the assistant — staged into AgentChatView's
+    /// composer when the chat opens; cleared on dismiss.
+    @State private var sharedAssistantImage: UIImage?
     @StateObject private var notifications = NotificationsViewModel()
     @StateObject private var deepLinks = DeepLinkRouter.shared
     @Environment(\.scenePhase) private var scenePhase
@@ -140,6 +143,14 @@ struct HomeView: View {
                 showChatSheet = true
                 deepLinks.clearSharedText()
             }
+            // A photo shared to the assistant → open the chat with it
+            // staged in the composer so the user can add a question.
+            .onChange(of: deepLinks.pendingAssistantImage) { _, payload in
+                guard let payload, let image = UIImage(data: payload.data) else { return }
+                sharedAssistantImage = image
+                showChatSheet = true
+                deepLinks.clearAssistantImage()
+            }
 
             // Wider horizontal margins than the page content so the
             // AI pill reads as visibly narrower than the full-width
@@ -151,7 +162,7 @@ struct HomeView: View {
                 .padding(.bottom, 24)
         }
         .navigationDestination(isPresented: $showChatSheet) {
-            AgentChatView(prefill: voicePrefill)
+            AgentChatView(prefill: voicePrefill, prefillImage: sharedAssistantImage)
         }
         .navigationDestination(isPresented: $showCalendar) {
             CalendarView(showsNavigationBar: true)
@@ -163,7 +174,10 @@ struct HomeView: View {
             }
         }
         .onChange(of: showChatSheet) { _, isShown in
-            if !isShown { voicePrefill = "" }
+            if !isShown {
+                voicePrefill = ""
+                sharedAssistantImage = nil
+            }
         }
         .navigationDestination(item: $navTarget) { target in
             ReminderEditView(

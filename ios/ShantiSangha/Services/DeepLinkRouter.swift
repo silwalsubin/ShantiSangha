@@ -28,6 +28,10 @@ final class DeepLinkRouter: ObservableObject {
     /// connection. MainTabView observes this and presents the
     /// share-to-connection picker.
     @Published var pendingSharedMedia: SharedMediaPayload?
+    /// A photo the user chose to send to the assistant (from the share
+    /// picker). Home observes this and opens the assistant chat with the
+    /// photo staged in the composer so the user can add a question.
+    @Published var pendingAssistantImage: SharedMediaPayload?
 
     private static let appGroup = "group.com.shantisangha.app"
     private static let sharedTextKey = "share.pendingText"
@@ -133,5 +137,9 @@ final class DeepLinkRouter: ObservableObject {
 
     func clearSharedMedia() {
         pendingSharedMedia = nil
+    }
+
+    func clearAssistantImage() {
+        pendingAssistantImage = nil
     }
 }

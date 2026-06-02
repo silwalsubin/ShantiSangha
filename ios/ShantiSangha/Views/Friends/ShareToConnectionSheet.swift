@@ -20,6 +20,10 @@ struct ShareToConnectionSheet: View {
     @State private var errorMessage: String?
     @FocusState private var searchFocused: Bool
 
+    /// Sentinel id for the "Assistant" target. Selecting it routes the
+    /// photo to the AI assistant instead of a 1:1 connection.
+    private let assistantTargetId = UUID()
+
     private var preview: UIImage? { UIImage(data: media.data) }
 
     private var canSend: Bool { selectedId != nil && !sending }
@@ -75,16 +79,26 @@ struct ShareToConnectionSheet: View {
                 Spacer()
                 ProgressView().tint(.sacredGold)
                 Spacer()
-            } else if connections.isEmpty {
-                emptyState
             } else {
                 ScrollView {
                     VStack(spacing: 0) {
+                        assistantRow
+                        Divider().padding(.leading, 64)
+
                         ForEach(Array(messageable.enumerated()), id: \.element.id) { idx, conn in
                             row(conn)
                             if idx < messageable.count - 1 {
                                 Divider().padding(.leading, 64)
                             }
+                        }
+
+                        if connections.isEmpty {
+                            Text("Add someone to your circle to share photos with them too.")
+                                .font(.sacredMicro)
+                                .foregroundColor(.sacredMuted)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, SacredSpacing.l)
+                                .padding(.top, SacredSpacing.m)
                         }
                     }
                 }
@@ -144,6 +158,46 @@ struct ShareToConnectionSheet: View {
         .padding(.bottom, SacredSpacing.s)
     }
 
+    private var assistantRow: some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            selectedId = (selectedId == assistantTargetId) ? nil : assistantTargetId
+            searchFocused = false
+        } label: {
+            HStack(spacing: 12) {
+                Image("tab.vajra")
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 24, height: 24)
+                    .foregroundColor(.sacredGold)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(Color.sacredGold.opacity(0.12)))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Assistant")
+                        .font(.sacredTextSemibold)
+                        .foregroundColor(.sacredText)
+                    Text("Ask the AI about this photo")
+                        .font(.sacredMicro)
+                        .foregroundColor(.sacredMuted)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 4)
+
+                Image(systemName: selectedId == assistantTargetId ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22))
+                    .foregroundColor(selectedId == assistantTargetId ? .sacredGold : .sacredMuted.opacity(0.4))
+            }
+            .padding(.horizontal, SacredSpacing.m)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
     private func row(_ conn: Connection) -> some View {
         Button {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -176,18 +230,6 @@ struct ShareToConnectionSheet: View {
         .buttonStyle(.plain)
     }
 
-    private var emptyState: some View {
-        VStack(spacing: SacredSpacing.s) {
-            Spacer()
-            SacredEmptyState(
-                icon: "person.crop.circle.badge.questionmark",
-                title: "No connections yet.",
-                subtitle: "Add someone to your circle to share photos with them.")
-            Spacer()
-        }
-        .padding(.horizontal, SacredSpacing.m)
-    }
-
     private func sentState(_ name: String) -> some View {
         VStack(spacing: SacredSpacing.m) {
             Spacer()
@@ -218,6 +260,14 @@ struct ShareToConnectionSheet: View {
     }
 
     private func send() async {
+        // Assistant target: hand the photo to the AI chat (which opens
+        // with it staged so the user can add a question), not a connection.
+        if selectedId == assistantTargetId {
+            DeepLinkRouter.shared.pendingAssistantImage = media
+            onClose()
+            return
+        }
+
         guard let conn = connections.first(where: { $0.id == selectedId }),
               let friendshipId = conn.friendshipId else { return }
         sending = true
