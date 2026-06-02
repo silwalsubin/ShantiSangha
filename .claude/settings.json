@@ -226,7 +226,18 @@
       "Bash(command -v gh github)",
       "Bash(gh --version)",
       "Bash(env)",
-      "Bash(git credential *)"
+      "Bash(git credential *)",
+      "Bash(tmutil listlocalsnapshots *)",
+      "Bash(diskutil apfs *)",
+      "Bash(diskutil info *)",
+      "Read(//private/var/vm/**)",
+      "Bash(sudo -n du -sh /Library /private/var/folders /opt /Users/Shared)",
+      "Read(//Library/Developer/CoreSimulator/Volumes/**)",
+      "Bash(mount)",
+      "Bash(grep -c \"PBXFileSystemSynchronizedRootGroup\" *.xcodeproj/project.pbxproj)",
+      "Bash(grep -c \"DesignTokens.swift\" *.xcodeproj/project.pbxproj)",
+      "Bash(sed -n '320,345p' ios/ShantiSangha/ViewModels/FriendChatViewModel.swift)",
+      "Bash(sed -n '1,60p' ios/ShantiSangha/Views/Friends/CollaboratorPickerSheet.swift)"
     ],
     "additionalDirectories": [
       "/Users/subinsilwal/Desktop/code/maiself/.claude",
