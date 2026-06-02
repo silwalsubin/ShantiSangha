@@ -48,5 +48,29 @@ public class AgentMediaStorage : IDisposable
         return _client.GetPreSignedURLAsync(request);
     }
 
+    /// Removes shared-photo objects when the user clears their conversation,
+    /// so the bytes don't outlive the chat history that referenced them.
+    /// Best-effort: a partial S3 failure is logged, not thrown, so clearing
+    /// the conversation still succeeds for the user.
+    public async Task DeleteManyAsync(IEnumerable<string> objectKeys, CancellationToken ct = default)
+    {
+        var keys = objectKeys.Where(k => !string.IsNullOrWhiteSpace(k)).ToList();
+        if (keys.Count == 0) return;
+
+        var request = new DeleteObjectsRequest
+        {
+            BucketName = _bucket,
+            Objects = keys.Select(k => new KeyVersion { Key = k }).ToList()
+        };
+        try
+        {
+            await _client.DeleteObjectsAsync(request, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Bulk delete partially failed for {Count} agent media keys", keys.Count);
+        }
+    }
+
     public void Dispose() => _client.Dispose();
 }

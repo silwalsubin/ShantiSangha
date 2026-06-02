@@ -207,9 +207,19 @@ public class AgentController(
         var user = await currentUser.GetAsync();
         if (user is null) return Unauthorized();
 
+        // Collect the shared-photo keys before dropping the rows, then
+        // delete the bytes from S3 so they don't outlive the history that
+        // referenced them. S3 cleanup is best-effort (logged, not thrown).
+        var imageKeys = await db.AgentMessages
+            .Where(m => m.UserId == user.Id && m.ImageObjectKey != null)
+            .Select(m => m.ImageObjectKey!)
+            .ToListAsync(ct);
+
         await db.AgentMessages
             .Where(m => m.UserId == user.Id)
             .ExecuteDeleteAsync(ct);
+
+        await mediaStorage.DeleteManyAsync(imageKeys, ct);
 
         return NoContent();
     }
