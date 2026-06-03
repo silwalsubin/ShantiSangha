@@ -10,6 +10,7 @@ struct ReminderLivePatch {
     var date: String? = nil      // yyyy-MM-dd
     var recurrence: ReminderRecurrence? = nil
     var collaboratorUserIds: [UUID]? = nil
+    var notes: String? = nil
 }
 
 /// Full-page add / edit reminder. Pushed onto the parent's NavigationStack
@@ -59,6 +60,15 @@ struct ReminderEditView: View {
     @State private var lastSavedLabel: String? = nil
     @State private var labelSaving = false
     @State private var showLabelSheet = false
+    /// Free-text notes draft (edit mode only). Auto-saved on a debounce
+    /// since it changes on every keystroke. `lastSavedNotes` mirrors the
+    /// label pattern so a re-seed doesn't fire a spurious PATCH.
+    @State private var notesDraft: String = ""
+    @State private var lastSavedNotes: String? = nil
+    @State private var notesSaving = false
+    @State private var notesDebounce: Task<Void, Never>? = nil
+    /// Drives the push to the reminder-scoped "Plan with assistant" chat.
+    @State private var showAssistant = false
     @State private var showSharePicker = false
     @State private var friends: [FriendSummary] = []
     @State private var friendsLoading = false
@@ -106,6 +116,9 @@ struct ReminderEditView: View {
                 labelSection
                 dateSection
                 recurrenceSection
+                if target.isEditing {
+                    notesSection
+                }
                 if viewerIsOwner {
                     sharedWithSection
                 }
@@ -151,6 +164,20 @@ struct ReminderEditView: View {
             guard let last = lastSavedRecurrence, newValue != last else { return }
             Task { await autoSaveSchedule() }
         }
+        .onChange(of: notesDraft) { _, _ in
+            // Debounce — notes change on every keystroke; only PATCH once
+            // typing settles. A final save also fires on disappear.
+            notesDebounce?.cancel()
+            notesDebounce = Task {
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                if Task.isCancelled { return }
+                await autoSaveNotes()
+            }
+        }
+        .onDisappear {
+            notesDebounce?.cancel()
+            Task { await autoSaveNotes() }
+        }
         .confirmationDialog(
             sharedConfirmCopy,
             isPresented: $showDeleteConfirm,
@@ -170,6 +197,16 @@ struct ReminderEditView: View {
                     showSharePicker = false
                 },
                 onCancel: { showSharePicker = false })
+        }
+        .navigationDestination(isPresented: $showAssistant) {
+            if case .edit(let reminder) = target {
+                AgentChatView(reminderId: reminder.id, reminderLabel: reminder.label)
+            }
+        }
+        .onChange(of: showAssistant) { _, isShown in
+            // Returning from the planning chat: the assistant may have
+            // written notes via its tool — pull the latest into the editor.
+            if !isShown { Task { await refreshNotesFromServer() } }
         }
         .sheet(isPresented: $showLabelSheet) {
             ReminderLabelEditSheet(
@@ -267,6 +304,56 @@ struct ReminderEditView: View {
         let f = DateFormatter()
         f.dateFormat = "EEEE, MMMM d, yyyy"
         return f.string(from: date)
+    }
+
+    private var notesSection: some View {
+        VStack(alignment: .leading, spacing: SacredSpacing.xs) {
+            HStack {
+                sectionLabel("NOTES")
+                Spacer()
+                if notesSaving {
+                    ProgressView().controlSize(.small).tint(.sacredMuted)
+                } else if case .edit = target {
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        // Flush any pending local notes first so the scoped
+                        // assistant is grounded in the latest text.
+                        Task {
+                            notesDebounce?.cancel()
+                            await autoSaveNotes()
+                            showAssistant = true
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "sparkles")
+                            Text("Plan with assistant")
+                        }
+                        .font(.sacredSmallSemibold)
+                        .foregroundColor(.sacredGold)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Plan this reminder with the assistant")
+                }
+            }
+            SacredListCard {
+                ZStack(alignment: .topLeading) {
+                    if notesDraft.isEmpty {
+                        Text("Add notes…")
+                            .font(.sacredText)
+                            .foregroundColor(.sacredMuted)
+                            .padding(.top, 8)
+                            .padding(.horizontal, 5)
+                    }
+                    TextEditor(text: $notesDraft)
+                        .font(.sacredText)
+                        .foregroundColor(.sacredText)
+                        .scrollContentBackground(.hidden)
+                        .frame(minHeight: 120)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+            }
+        }
     }
 
     private var recurrenceSection: some View {
@@ -455,6 +542,8 @@ struct ReminderEditView: View {
             lastSavedLabel = reminder.label
             lastSavedDate = dateDraft
             lastSavedRecurrence = recurrenceDraft
+            notesDraft = reminder.notes ?? ""
+            lastSavedNotes = reminder.notes ?? ""
         }
         // Open the picker on the seeded date's month so the user sees
         // their saved date without having to navigate to it first.
@@ -531,6 +620,32 @@ struct ReminderEditView: View {
             labelDraft = previous
             AppLogger.shared.error("ReminderEdit", "Auto-save label failed; reverted draft")
         }
+    }
+
+    /// Commits the notes draft to the server (edit mode only), debounced
+    /// by the caller. No-op when unchanged. Notes save independently — a
+    /// failure just logs (the next keystroke or disappear retries).
+    private func autoSaveNotes() async {
+        guard let onLivePatch else { return }
+        let trimmed = notesDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed == (lastSavedNotes ?? "") { return }
+        notesSaving = true
+        defer { notesSaving = false }
+        if let updated = await onLivePatch(ReminderLivePatch(notes: trimmed)) {
+            lastSavedNotes = updated.notes ?? ""
+        } else {
+            AppLogger.shared.error("ReminderEdit", "Auto-save notes failed; will retry")
+        }
+    }
+
+    /// Pulls the reminder fresh from the server and adopts its notes —
+    /// used after the scoped assistant may have written them via its tool.
+    private func refreshNotesFromServer() async {
+        guard case .edit(let reminder) = target else { return }
+        guard let fresh = try? await ReminderRepository.shared.get(id: reminder.id) else { return }
+        let serverNotes = fresh.notes ?? ""
+        notesDraft = serverNotes
+        lastSavedNotes = serverNotes
     }
 
     /// Commits the current date + recurrence drafts to the server.

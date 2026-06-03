@@ -28,6 +28,21 @@ final class AgentChatService {
         let prompt: String
     }
 
+    /// One prior turn sent up for a scoped (reminder) session's within-session
+    /// memory. Role is "user" or "assistant".
+    struct HistoryTurn: Encodable {
+        let role: String
+        let content: String
+    }
+
+    private struct ChatPayload: Encodable {
+        let message: String
+        var imageBase64: String? = nil
+        var imageContentType: String? = nil
+        var reminderId: String? = nil
+        var history: [HistoryTurn]? = nil
+    }
+
     /// One frame in the live reply stream — a chunk of prose, a list of
     /// reminders to render as cards, or up to 3 quick-action chips offered
     /// after the reply.
@@ -71,7 +86,9 @@ final class AgentChatService {
     func stream(
         message: String,
         imageBase64: String? = nil,
-        imageContentType: String? = nil
+        imageContentType: String? = nil,
+        reminderId: UUID? = nil,
+        history: [HistoryTurn]? = nil
     ) -> AsyncThrowingStream<StreamEvent, Error> {
         AsyncThrowingStream { continuation in
             Task {
@@ -89,9 +106,12 @@ final class AgentChatService {
                     if let token {
                         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
                     }
-                    var payload: [String: String] = ["message": message]
-                    if let imageBase64 { payload["imageBase64"] = imageBase64 }
-                    if let imageContentType { payload["imageContentType"] = imageContentType }
+                    let payload = ChatPayload(
+                        message: message,
+                        imageBase64: imageBase64,
+                        imageContentType: imageContentType,
+                        reminderId: reminderId?.uuidString,
+                        history: history)
                     request.httpBody = try JSONEncoder().encode(payload)
 
                     let (bytes, _) = try await URLSession.shared.bytes(for: request)

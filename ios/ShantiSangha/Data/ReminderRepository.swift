@@ -59,14 +59,16 @@ final class ReminderRepository: ObservableObject {
                 recurrence: ReminderRecurrence = .none,
                 remindersEnabled: Bool = true,
                 connectionId: UUID? = nil,
-                collaboratorUserIds: [UUID]? = nil) async throws -> Reminder {
+                collaboratorUserIds: [UUID]? = nil,
+                notes: String? = nil) async throws -> Reminder {
         let body = CreateReminderRequest(
             label: label,
             date: date,
             recurrence: recurrence,
             remindersEnabled: remindersEnabled,
             connectionId: connectionId,
-            collaboratorUserIds: collaboratorUserIds)
+            collaboratorUserIds: collaboratorUserIds,
+            notes: notes)
         let created: Reminder = try await api.post("/reminders", body: body)
         if connectionId == nil {
             reminders.insert(created, at: 0)
@@ -81,14 +83,16 @@ final class ReminderRepository: ObservableObject {
                 recurrence: ReminderRecurrence? = nil,
                 remindersEnabled: Bool? = nil,
                 completed: Bool? = nil,
-                collaboratorUserIds: [UUID]? = nil) async throws -> Reminder {
+                collaboratorUserIds: [UUID]? = nil,
+                notes: String? = nil) async throws -> Reminder {
         let body = UpdateReminderRequest(
             label: label,
             date: date,
             recurrence: recurrence,
             remindersEnabled: remindersEnabled,
             completed: completed,
-            collaboratorUserIds: collaboratorUserIds)
+            collaboratorUserIds: collaboratorUserIds,
+            notes: notes)
         let updated: Reminder = try await api.patch(
             "/reminders/\(id.uuidString.lowercased())",
             body: body)

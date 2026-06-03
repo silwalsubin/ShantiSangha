@@ -205,7 +205,8 @@ struct HomeView: View {
                                 label: patch.label,
                                 date: patch.date,
                                 recurrence: patch.recurrence,
-                                collaboratorUserIds: patch.collaboratorUserIds)
+                                collaboratorUserIds: patch.collaboratorUserIds,
+                                notes: patch.notes)
                         }
                     }
                     return nil

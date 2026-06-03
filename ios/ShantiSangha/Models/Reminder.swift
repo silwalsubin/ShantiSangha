@@ -49,6 +49,9 @@ struct Reminder: Codable, Identifiable, Equatable, Hashable {
     /// the recipient's row so the participant pip can include the
     /// owner, not just the other recipients.
     let ownerAvatarUrl: String?
+    /// Free-text notes on this reminder — the user's own plus anything
+    /// the reminder-scoped assistant wrote. Null/empty when none.
+    let notes: String?
 
     /// Device-local interpretation of the backend's DateOnly string.
     /// The API's `daysRemaining` can drift around UTC/local midnight;
@@ -95,7 +98,7 @@ struct Reminder: Codable, Identifiable, Equatable, Hashable {
     enum CodingKeys: String, CodingKey {
         case id, label, date, recurrence, remindersEnabled, connectionId
         case completedAt, createdAt, daysRemaining, collaborators
-        case isSharedWithMe, ownerDisplayName, ownerAvatarUrl
+        case isSharedWithMe, ownerDisplayName, ownerAvatarUrl, notes
     }
 
     init(from decoder: Decoder) throws {
@@ -113,6 +116,7 @@ struct Reminder: Codable, Identifiable, Equatable, Hashable {
         isSharedWithMe = try c.decodeIfPresent(Bool.self, forKey: .isSharedWithMe) ?? false
         ownerDisplayName = try c.decodeIfPresent(String.self, forKey: .ownerDisplayName)
         ownerAvatarUrl = try c.decodeIfPresent(String.self, forKey: .ownerAvatarUrl)
+        notes = try c.decodeIfPresent(String.self, forKey: .notes)
     }
 }
 
@@ -126,6 +130,8 @@ struct CreateReminderRequest: Encodable {
     /// must be an accepted friend of the caller or the server rejects
     /// the whole request with 400.
     var collaboratorUserIds: [UUID]? = nil
+    /// Optional free-text notes to seed on creation.
+    var notes: String? = nil
 }
 
 struct UpdateReminderRequest: Encodable {
@@ -138,4 +144,6 @@ struct UpdateReminderRequest: Encodable {
     /// leave it untouched; pass an empty array to clear all sharing.
     /// Owner-only — non-owner collaborators sending this get 403.
     var collaboratorUserIds: [UUID]? = nil
+    /// Free-text notes. Pass nil to leave untouched; pass "" to clear.
+    var notes: String? = nil
 }

@@ -15,10 +15,19 @@ struct AgentChatView: View {
     @State private var stagedImage: UIImage?
     @State private var photoItem: PhotosPickerItem?
     @State private var showCamera = false
+    @State private var showPhotoLibrary = false
+    /// When set, this chat is scoped to one reminder ("Plan with assistant"):
+    /// no global history, every turn carries the reminderId, scoped starters.
+    private let reminderId: UUID?
+    private let reminderLabel: String?
+    private var isScoped: Bool { reminderId != nil }
 
-    init(prefill: String = "", prefillImage: UIImage? = nil) {
+    init(prefill: String = "", prefillImage: UIImage? = nil,
+         reminderId: UUID? = nil, reminderLabel: String? = nil) {
         _inputText = State(initialValue: prefill)
         _stagedImage = State(initialValue: prefillImage)
+        self.reminderId = reminderId
+        self.reminderLabel = reminderLabel
     }
 
     @State private var loadingHistory = true
@@ -119,7 +128,8 @@ struct AgentChatView: View {
                                 label: patch.label,
                                 date: patch.date,
                                 recurrence: patch.recurrence,
-                                collaboratorUserIds: patch.collaboratorUserIds)
+                                collaboratorUserIds: patch.collaboratorUserIds,
+                                notes: patch.notes)
                             if let updated { patchAttachedReminder(updated) }
                             return updated
                         }
@@ -306,30 +316,36 @@ struct AgentChatView: View {
             CameraPicker { image in stagedImage = image }
                 .ignoresSafeArea()
         }
+        .photosPicker(isPresented: $showPhotoLibrary, selection: $photoItem, matching: .images)
     }
 
     @ViewBuilder
     private var composerAccessories: some View {
         HStack(spacing: 10) {
-            PhotosPicker(selection: $photoItem, matching: .images, photoLibrary: .shared()) {
-                Image(systemName: "photo")
+            // A single "+" collapses the attachment options into one tidy
+            // control (ChatGPT-style) instead of a row of inline buttons.
+            Menu {
+                Button {
+                    showPhotoLibrary = true
+                } label: {
+                    Label("Photo Library", systemImage: "photo")
+                }
+                // Camera is unavailable on the Simulator and camera-less devices.
+                if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                    Button {
+                        showCamera = true
+                    } label: {
+                        Label("Take Photo", systemImage: "camera")
+                    }
+                }
+            } label: {
+                Image(systemName: "plus")
                     .font(.system(size: 22))
                     .foregroundColor(.sacredGold)
                     .frame(width: 32, height: 32)
             }
-            // Capture a photo on the spot — useful for documents like the
-            // I-797 above. Hidden on devices without a camera (e.g. Simulator).
-            if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                Button {
-                    showCamera = true
-                } label: {
-                    Image(systemName: "camera")
-                        .font(.system(size: 22))
-                        .foregroundColor(.sacredGold)
-                        .frame(width: 32, height: 32)
-                }
-                .accessibilityLabel("Take a photo")
-            }
+            .accessibilityLabel("Add a photo")
+
             SacredVoiceInputButton(text: $inputText)
         }
     }
@@ -366,17 +382,28 @@ struct AgentChatView: View {
 
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: SacredSpacing.s) {
+            if isScoped, let reminderLabel, !reminderLabel.isEmpty {
+                Text("Planning “\(reminderLabel)”")
+                    .font(.sacredText)
+                    .foregroundColor(.sacredMuted)
+            }
             Text("Try one of these")
                 .font(.sacredSmallSemibold)
                 .foregroundColor(.sacredMuted)
                 .tracking(2)
 
-            ForEach(Self.starterPrompts, id: \.self) { prompt in
+            ForEach(starters, id: \.self) { prompt in
                 suggestionChip(prompt) {
                     inputText = prompt
                 }
             }
         }
+    }
+
+    /// Scoped chats nudge toward planning the one reminder; the main chat
+    /// mirrors what the assistant can do across reminders + circle.
+    private var starters: [String] {
+        isScoped ? Self.scopedStarters : Self.starterPrompts
     }
 
     /// Editable examples that mirror what the assistant can actually do —
@@ -388,6 +415,12 @@ struct AgentChatView: View {
         "Remind me to call mom on Sunday.",
         "Who's in my circle?",
         "Add someone to my circle.",
+    ]
+
+    private static let scopedStarters = [
+        "Break this into steps",
+        "What do I need to prepare?",
+        "Add a step",
     ]
 
     @ViewBuilder
@@ -516,6 +549,11 @@ struct AgentChatView: View {
     // MARK: - Send
 
     private func loadInitialData() async {
+        // Scoped planning chats start fresh — no global history to replay.
+        if isScoped {
+            loadingHistory = false
+            return
+        }
         async let connectionLoad: Void = connections.refresh()
         await loadHistory()
         _ = await connectionLoad
@@ -540,6 +578,17 @@ struct AgentChatView: View {
             imageContentType = "image/jpeg"
         }
 
+        // Scoped chats keep no server-side history, so carry the in-session
+        // transcript ourselves. Snapshot it BEFORE appending the new turn.
+        let priorHistory: [AgentChatService.HistoryTurn]? = isScoped
+            ? messages.compactMap { m in
+                m.content.isEmpty ? nil
+                    : AgentChatService.HistoryTurn(
+                        role: m.role == .user ? "user" : "assistant",
+                        content: m.content)
+              }
+            : nil
+
         let assistantId = UUID()
         withAnimation(.easeOut(duration: 0.2)) {
             messages.append(AgentMessage(role: .user, content: text, localImage: image))
@@ -548,7 +597,8 @@ struct AgentChatView: View {
 
         do {
             for try await event in AgentChatService.shared.stream(
-                message: text, imageBase64: imageBase64, imageContentType: imageContentType) {
+                message: text, imageBase64: imageBase64, imageContentType: imageContentType,
+                reminderId: reminderId, history: priorHistory) {
                 guard let idx = messages.firstIndex(where: { $0.id == assistantId }) else { continue }
                 switch event {
                 case .text(let chunk):
