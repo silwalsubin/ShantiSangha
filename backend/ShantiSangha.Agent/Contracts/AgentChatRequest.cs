@@ -12,4 +12,12 @@ public record AgentChatRequest(
     /// the assistant is grounded in that reminder + its notes, the exchange is
     /// ephemeral (not persisted, no global history), and it writes its plan
     /// into the reminder's notes.
-    Guid? ReminderId = null);
+    Guid? ReminderId = null,
+    /// Prior turns of THIS scoped session, oldest-first, EXCLUDING the current
+    /// `Message`. Scoped chats persist nothing server-side, so the client
+    /// holds the transcript and replays it here for within-session memory.
+    /// Ignored outside scoped mode (the main chat replays from the DB).
+    IReadOnlyList<AgentChatTurn>? History = null);
+
+/// One prior turn in a scoped session. Role is "user" or "assistant".
+public record AgentChatTurn(string Role, string Content);

@@ -61,7 +61,7 @@ public class AgentController(
         try
         {
             await foreach (var evt in orchestrator.StreamAsync(
-                body.Message ?? string.Empty, imageBytes, body.ImageContentType, body.ReminderId, cancellationToken))
+                body.Message ?? string.Empty, imageBytes, body.ImageContentType, body.ReminderId, body.History, cancellationToken))
             {
                 switch (evt)
                 {

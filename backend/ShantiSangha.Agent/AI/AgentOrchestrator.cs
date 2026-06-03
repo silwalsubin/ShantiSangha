@@ -5,6 +5,7 @@ using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
 using ShantiSangha.Agent.Data;
+using ShantiSangha.Agent.Contracts;
 using ShantiSangha.Agent.Models;
 using ShantiSangha.Reminders.Contracts;
 using ShantiSangha.Reminders.Services;
@@ -36,6 +37,7 @@ public class AgentOrchestrator(
         byte[]? imageBytes = null,
         string? imageContentType = null,
         Guid? reminderId = null,
+        IReadOnlyList<AgentChatTurn>? clientHistory = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var user = await currentUser.GetAsync()
@@ -134,8 +136,23 @@ public class AgentOrchestrator(
 
         if (scoped)
         {
-            // No global history — just this turn, grounded by the scoped
-            // system prompt (which carries the reminder + its current notes).
+            // Replay the in-session transcript the client sent (oldest-first,
+            // excluding the current message). Scoped chats persist nothing
+            // server-side, so this is the only source of within-session memory.
+            if (clientHistory is not null)
+            {
+                foreach (var turn in clientHistory)
+                {
+                    if (string.IsNullOrWhiteSpace(turn.Content)) continue;
+                    if (string.Equals(turn.Role, "assistant", StringComparison.OrdinalIgnoreCase))
+                        history.AddAssistantMessage(turn.Content);
+                    else
+                        history.AddUserMessage(turn.Content);
+                }
+            }
+
+            // The current turn, grounded by the scoped system prompt (which
+            // carries the reminder + its current notes).
             if (imageBytes is not null)
             {
                 var items = new ChatMessageContentItemCollection
