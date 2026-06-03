@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import UIKit
 
 /// Agent chat — the in-app surface where GPT-4o can call backend
 /// operations as tools. Spike scope: Reminders only (list / schedule /
@@ -13,6 +14,7 @@ struct AgentChatView: View {
     @State private var sending = false
     @State private var stagedImage: UIImage?
     @State private var photoItem: PhotosPickerItem?
+    @State private var showCamera = false
 
     init(prefill: String = "", prefillImage: UIImage? = nil) {
         _inputText = State(initialValue: prefill)
@@ -300,6 +302,10 @@ struct AgentChatView: View {
                 photoItem = nil
             }
         }
+        .fullScreenCover(isPresented: $showCamera) {
+            CameraPicker { image in stagedImage = image }
+                .ignoresSafeArea()
+        }
     }
 
     @ViewBuilder
@@ -310,6 +316,19 @@ struct AgentChatView: View {
                     .font(.system(size: 22))
                     .foregroundColor(.sacredGold)
                     .frame(width: 32, height: 32)
+            }
+            // Capture a photo on the spot — useful for documents like the
+            // I-797 above. Hidden on devices without a camera (e.g. Simulator).
+            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                Button {
+                    showCamera = true
+                } label: {
+                    Image(systemName: "camera")
+                        .font(.system(size: 22))
+                        .foregroundColor(.sacredGold)
+                        .frame(width: 32, height: 32)
+                }
+                .accessibilityLabel("Take a photo")
             }
             SacredVoiceInputButton(text: $inputText)
         }

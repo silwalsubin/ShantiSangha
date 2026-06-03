@@ -238,7 +238,13 @@
       "Bash(grep -c \"DesignTokens.swift\" *.xcodeproj/project.pbxproj)",
       "Bash(sed -n '320,345p' ios/ShantiSangha/ViewModels/FriendChatViewModel.swift)",
       "Bash(sed -n '1,60p' ios/ShantiSangha/Views/Friends/CollaboratorPickerSheet.swift)",
-      "Bash(grep -E \"\\\\.swift$\")"
+      "Bash(grep -E \"\\\\.swift$\")",
+      "Bash(curl -s -m 15 https://api.shantisangha.com/health)",
+      "Bash(curl -sI -m 15 https://api.shantisangha.com/health)",
+      "Bash(curl -s -m 15 -o /dev/null -w \"github.com: HTTP %{http_code}\\\\n\" https://github.com)",
+      "Bash(curl -s -m 15 -o /dev/null -w \"api.shantisangha.com/health: HTTP %{http_code}\\\\n\" https://api.shantisangha.com/health)",
+      "Bash(curl -s -m 15 -o /dev/null -w \"shantisangha.com: HTTP %{http_code}\\\\n\" https://shantisangha.com)",
+      "Bash(nslookup api.shantisangha.com)"
     ],
     "additionalDirectories": [
       "/Users/subinsilwal/Desktop/code/maiself/.claude",
