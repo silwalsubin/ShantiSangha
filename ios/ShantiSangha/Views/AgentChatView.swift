@@ -394,7 +394,7 @@ struct AgentChatView: View {
 
             ForEach(starters, id: \.self) { prompt in
                 suggestionChip(prompt) {
-                    inputText = prompt
+                    Task { await sendSuggestion(prompt) }
                 }
             }
         }
@@ -406,15 +406,15 @@ struct AgentChatView: View {
         isScoped ? Self.scopedStarters : Self.starterPrompts
     }
 
-    /// Editable examples that mirror what the assistant can actually do —
-    /// one per primary MCP capability (list/schedule reminders, list/add
-    /// people in your circle) rather than over-specific guesses. Tapping
-    /// prefills the composer so the user tweaks the details before sending.
+    /// Starters that mirror what the assistant can do — one per primary MCP
+    /// capability. Tapping sends immediately, so each is safe to fire as-is:
+    /// queries, or open prompts that make the assistant ask for details rather
+    /// than create anything on a single tap.
     private static let starterPrompts = [
         "What reminders do I have this week?",
-        "Remind me to call mom on Sunday.",
+        "Add a reminder",
         "Who's in my circle?",
-        "Add someone to my circle.",
+        "Add someone to my circle",
     ]
 
     private static let scopedStarters = [
