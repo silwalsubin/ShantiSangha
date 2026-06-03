@@ -6,7 +6,8 @@ public record CreateReminderRequest(
     string? Recurrence = null,
     bool? RemindersEnabled = null,
     Guid? ConnectionId = null,
-    Guid[]? CollaboratorUserIds = null);
+    Guid[]? CollaboratorUserIds = null,
+    string? Notes = null);
 
 public record UpdateReminderRequest(
     string? Label = null,
@@ -14,7 +15,8 @@ public record UpdateReminderRequest(
     string? Recurrence = null,
     bool? RemindersEnabled = null,
     bool? Completed = null,
-    Guid[]? CollaboratorUserIds = null);
+    Guid[]? CollaboratorUserIds = null,
+    string? Notes = null);
 
 /// One person the owner has shared a reminder with. The owner is NOT in
 /// this list — they're identified separately as the reminder's UserId.
@@ -45,4 +47,7 @@ public record ReminderResponse(
     /// Owner avatar URL. Companion to OwnerDisplayName — used by the
     /// recipient's row to render the owner in the participant pip.
     /// Null on the owner's own rows.
-    string? OwnerAvatarUrl);
+    string? OwnerAvatarUrl,
+    /// Free-text notes on this reminder (the user's own + anything the
+    /// reminder-scoped assistant wrote). Null/empty when none.
+    string? Notes = null);

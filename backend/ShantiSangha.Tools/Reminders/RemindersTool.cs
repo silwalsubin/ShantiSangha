@@ -7,6 +7,7 @@ using ShantiSangha.Reminders.Contracts;
 using ShantiSangha.Reminders.Services;
 using ShantiSangha.Shared;
 using ShantiSangha.Shared.Interfaces;
+using ShantiSangha.Tools.AgentFeedback;
 using ShantiSangha.Tools.Internal;
 
 namespace ShantiSangha.Tools.Reminders;
@@ -17,7 +18,8 @@ public sealed class RemindersTool(
     IConnectionsService connections,
     ICurrentUser currentUser,
     IProfileQueryService profileQuery,
-    RemindersListSink listSink)
+    RemindersListSink listSink,
+    AgentTurnContext turnContext)
 {
     [McpServerTool(Name = "list_reminders")]
     [KernelFunction("list_reminders")]
@@ -164,6 +166,54 @@ public sealed class RemindersTool(
                 new UpdateReminderRequest(Date: date.Value.ToString("yyyy-MM-dd")),
                 ct);
 
+            return updated is null
+                ? Error("That reminder no longer exists.")
+                : new { updated = Project(updated) };
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Error(ex.Message);
+        }
+    }
+
+    [McpServerTool(Name = "update_reminder_notes")]
+    [KernelFunction("update_reminder_notes")]
+    [Description(
+        "Set the free-text notes on a reminder — the user's planning scratchpad. " +
+        "Pass the FULL new notes text: include anything already in the notes (don't drop the user's own lines) plus your additions. This replaces the notes field. " +
+        "When working inside one reminder's planning view the target is implicit, so `label` can be omitted; otherwise give the reminder's label (fuzzy-matched).")]
+    public async Task<object> UpdateReminderNotes(
+        [Description("The full notes text to save — existing notes merged with your additions. This overwrites the notes field.")]
+        string notes,
+        [Description("Label or partial label of the reminder. Optional when scoped to a single reminder's planning view.")]
+        string? label = null,
+        CancellationToken ct = default)
+    {
+        var user = await RequireUserAsync();
+
+        Guid targetId;
+        if (turnContext.ScopedReminderId is { } scopedId)
+        {
+            targetId = scopedId;
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(label))
+                return Error("Which reminder? Provide the reminder's label.");
+
+            var all = await reminders.ListAsync(user.Id, connectionId: null, date: null, ct);
+            var lookup = LabeledLookup.FindByLabel(all, r => r.Label, label);
+            if (lookup.Outcome == LookupOutcome.None)
+                return Error($"No reminder matches '{label}'.");
+            if (lookup.Outcome == LookupOutcome.Ambiguous)
+                return Ambiguous(lookup.Candidates);
+            targetId = lookup.Match!.Id;
+        }
+
+        try
+        {
+            var updated = await reminders.UpdateAsync(
+                targetId, user.Id, new UpdateReminderRequest(Notes: notes), ct);
             return updated is null
                 ? Error("That reminder no longer exists.")
                 : new { updated = Project(updated) };
@@ -396,6 +446,7 @@ public sealed class RemindersTool(
         shared_with = r.IsSharedWithMe
             ? null
             : (object)r.Collaborators.Select(c => c.DisplayName).ToArray(),
+        notes = r.Notes,
     };
 
     private static object Error(string message) => new { error = message };

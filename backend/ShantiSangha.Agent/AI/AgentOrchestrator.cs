@@ -35,6 +35,7 @@ public class AgentOrchestrator(
         string userMessage,
         byte[]? imageBytes = null,
         string? imageContentType = null,
+        Guid? reminderId = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var user = await currentUser.GetAsync()
@@ -48,48 +49,71 @@ public class AgentOrchestrator(
         try { timezone = await profileQuery.GetTimezoneAsync(user.Id, cancellationToken); }
         catch { /* best-effort */ }
 
-        // Persist the user turn FIRST so it survives an LLM failure mid-stream.
-        // The image bytes are NOT persisted (they inform this turn only); a
-        // text marker keeps the saved history readable when there's no caption.
         var trimmed = userMessage.Trim();
-        var persistedContent = trimmed.Length > 0
-            ? trimmed
-            : (imageBytes is not null ? "[Shared a photo]" : trimmed);
 
-        // Persist the photo to the media bucket so it survives a chat
-        // reopen. Best-effort: a failed upload still lets the image inform
-        // THIS turn's vision call below — it just won't replay later.
-        string? imageObjectKey = null;
-        if (imageBytes is not null)
+        // Scoped mode: the turn is about one specific reminder ("Plan with
+        // assistant"). We load it for grounding, and the whole exchange is
+        // ephemeral — no persistence, no global history replay — so it stays
+        // out of the main assistant thread. Continuity comes from the
+        // reminder's notes, which the assistant reads + rewrites via a tool.
+        ReminderResponse? scopedReminder = null;
+        if (reminderId is not null)
         {
-            imageObjectKey = $"agent/{user.Id}/{Guid.NewGuid()}.jpg";
-            try
-            {
-                await mediaStorage.UploadAsync(
-                    imageObjectKey, imageBytes, imageContentType ?? "image/jpeg", cancellationToken);
-            }
-            catch
-            {
-                imageObjectKey = null;
-            }
+            scopedReminder = await reminderService.GetByIdAsync(
+                reminderId.Value, user.Id, date: null, cancellationToken);
         }
+        var scoped = scopedReminder is not null;
 
-        var userTurnId = Guid.NewGuid();
-        db.AgentMessages.Add(new AgentMessage
+        Guid userTurnId = Guid.Empty;
+        if (scoped)
         {
-            Id = userTurnId,
-            UserId = user.Id,
-            Role = AgentMessageRole.User,
-            Content = persistedContent,
-            ImageObjectKey = imageObjectKey,
-            CreatedAt = DateTime.UtcNow,
-        });
-        await db.SaveChangesAsync(cancellationToken);
+            // Point the notes tool at this reminder; no persisted message id.
+            turnContext.ScopedReminderId = reminderId;
+        }
+        else
+        {
+            // Persist the user turn FIRST so it survives an LLM failure
+            // mid-stream. The image bytes are NOT persisted (they inform this
+            // turn only); a text marker keeps history readable with no caption.
+            var persistedContent = trimmed.Length > 0
+                ? trimmed
+                : (imageBytes is not null ? "[Shared a photo]" : trimmed);
 
-        // Expose the user-turn id so AgentFeedbackTool can attribute any
-        // feedback the LLM records during this turn back to the exact
-        // message that triggered it.
-        turnContext.CurrentUserMessageId = userTurnId;
+            // Persist the photo to the media bucket so it survives a chat
+            // reopen. Best-effort: a failed upload still lets the image inform
+            // THIS turn's vision call below — it just won't replay later.
+            string? imageObjectKey = null;
+            if (imageBytes is not null)
+            {
+                imageObjectKey = $"agent/{user.Id}/{Guid.NewGuid()}.jpg";
+                try
+                {
+                    await mediaStorage.UploadAsync(
+                        imageObjectKey, imageBytes, imageContentType ?? "image/jpeg", cancellationToken);
+                }
+                catch
+                {
+                    imageObjectKey = null;
+                }
+            }
+
+            userTurnId = Guid.NewGuid();
+            db.AgentMessages.Add(new AgentMessage
+            {
+                Id = userTurnId,
+                UserId = user.Id,
+                Role = AgentMessageRole.User,
+                Content = persistedContent,
+                ImageObjectKey = imageObjectKey,
+                CreatedAt = DateTime.UtcNow,
+            });
+            await db.SaveChangesAsync(cancellationToken);
+
+            // Expose the user-turn id so AgentFeedbackTool can attribute any
+            // feedback the LLM records during this turn back to the exact
+            // message that triggered it.
+            turnContext.CurrentUserMessageId = userTurnId;
+        }
 
         var scopedKernel = kernel.Clone();
         scopedKernel.Plugins.AddFromObject(
@@ -103,41 +127,65 @@ public class AgentOrchestrator(
             pluginName: "agent_feedback");
 
         var today = UserClock.TodayFor(timezone);
-        var history = new ChatHistory(AgentSystemPrompt.Build(today, displayName));
+        var systemPrompt = scoped
+            ? AgentSystemPrompt.BuildForReminder(today, displayName, scopedReminder!)
+            : AgentSystemPrompt.Build(today, displayName);
+        var history = new ChatHistory(systemPrompt);
 
-        // Replay the last N turns (including the user message we just saved)
-        // so the LLM can resolve references like "move that to next Friday".
-        var recent = await db.AgentMessages
-            .Where(m => m.UserId == user.Id)
-            .OrderByDescending(m => m.CreatedAt)
-            .Take(HistoryReplayCount)
-            .OrderBy(m => m.CreatedAt)
-            .ToListAsync(cancellationToken);
-
-        foreach (var msg in recent)
+        if (scoped)
         {
-            if (msg.Role == AgentMessageRole.User)
+            // No global history — just this turn, grounded by the scoped
+            // system prompt (which carries the reminder + its current notes).
+            if (imageBytes is not null)
             {
-                // Attach the photo to the current turn only, as a multimodal
-                // message (text + image), so GPT-4o vision can see it. Prior
-                // turns replay as text — we never stored their images.
-                if (msg.Id == userTurnId && imageBytes is not null)
+                var items = new ChatMessageContentItemCollection
                 {
-                    var items = new ChatMessageContentItemCollection
-                    {
-                        new TextContent(trimmed.Length > 0 ? trimmed : "Here's an image — take a look at what's in it."),
-                        new ImageContent(imageBytes, imageContentType ?? "image/jpeg")
-                    };
-                    history.AddUserMessage(items);
-                }
-                else
-                {
-                    history.AddUserMessage(msg.Content);
-                }
+                    new TextContent(trimmed.Length > 0 ? trimmed : "Here's an image — take a look at what's in it."),
+                    new ImageContent(imageBytes, imageContentType ?? "image/jpeg")
+                };
+                history.AddUserMessage(items);
             }
             else
             {
-                history.AddAssistantMessage(msg.Content);
+                history.AddUserMessage(trimmed.Length > 0 ? trimmed : "Help me plan this.");
+            }
+        }
+        else
+        {
+            // Replay the last N turns (including the user message we just saved)
+            // so the LLM can resolve references like "move that to next Friday".
+            var recent = await db.AgentMessages
+                .Where(m => m.UserId == user.Id)
+                .OrderByDescending(m => m.CreatedAt)
+                .Take(HistoryReplayCount)
+                .OrderBy(m => m.CreatedAt)
+                .ToListAsync(cancellationToken);
+
+            foreach (var msg in recent)
+            {
+                if (msg.Role == AgentMessageRole.User)
+                {
+                    // Attach the photo to the current turn only, as a multimodal
+                    // message (text + image), so GPT-4o vision can see it. Prior
+                    // turns replay as text — we never stored their images.
+                    if (msg.Id == userTurnId && imageBytes is not null)
+                    {
+                        var items = new ChatMessageContentItemCollection
+                        {
+                            new TextContent(trimmed.Length > 0 ? trimmed : "Here's an image — take a look at what's in it."),
+                            new ImageContent(imageBytes, imageContentType ?? "image/jpeg")
+                        };
+                        history.AddUserMessage(items);
+                    }
+                    else
+                    {
+                        history.AddUserMessage(msg.Content);
+                    }
+                }
+                else
+                {
+                    history.AddAssistantMessage(msg.Content);
+                }
             }
         }
 
@@ -206,7 +254,9 @@ public class AgentOrchestrator(
             }
         }
 
-        if (assistantContent.Length > 0)
+        // Scoped planning turns are ephemeral — don't persist to the main
+        // thread. The durable artifact is the reminder's notes.
+        if (!scoped && assistantContent.Length > 0)
         {
             db.AgentMessages.Add(new AgentMessage
             {

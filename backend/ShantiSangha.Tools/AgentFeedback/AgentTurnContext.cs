@@ -11,4 +11,9 @@ namespace ShantiSangha.Tools.AgentFeedback;
 public class AgentTurnContext
 {
     public Guid? CurrentUserMessageId { get; set; }
+
+    /// When set, this turn is scoped to one reminder (the "Plan with
+    /// assistant" surface). Tools like update_reminder_notes target this
+    /// reminder directly instead of fuzzy-matching a label.
+    public Guid? ScopedReminderId { get; set; }
 }

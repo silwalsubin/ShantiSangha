@@ -30,6 +30,7 @@ public class ReminderService(
             Id = Guid.NewGuid(),
             UserId = userId,
             Label = body.Label.Trim(),
+            Notes = NormalizeNotes(body.Notes),
             Date = date,
             Recurrence = recurrence,
             RemindersEnabled = body.RemindersEnabled ?? true,
@@ -117,6 +118,12 @@ public class ReminderService(
             if (string.IsNullOrWhiteSpace(body.Label))
                 throw new InvalidOperationException("Label cannot be empty.");
             reminder.Label = body.Label.Trim();
+            contentChanged = true;
+        }
+
+        if (body.Notes is not null)
+        {
+            reminder.Notes = NormalizeNotes(body.Notes);
             contentChanged = true;
         }
 
@@ -502,7 +509,18 @@ public class ReminderService(
             collaborators,
             isSharedWithMe,
             ownerDisplayName,
-            ownerAvatarUrl);
+            ownerAvatarUrl,
+            r.Notes);
+    }
+
+    /// Trims notes and caps length so a runaway paste (or model output)
+    /// can't bloat a row. Empty/whitespace collapses to null.
+    private static string? NormalizeNotes(string? notes)
+    {
+        if (string.IsNullOrWhiteSpace(notes)) return null;
+        var trimmed = notes.Trim();
+        const int max = 4000;
+        return trimmed.Length > max ? trimmed[..max] : trimmed;
     }
 
     private async Task<Dictionary<Guid, (string DisplayName, string? AvatarUrl)>> BuildProfileCacheAsync(
