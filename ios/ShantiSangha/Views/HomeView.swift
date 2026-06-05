@@ -1,6 +1,7 @@
 import SwiftUI
 import FirebaseAuth
 import WidgetKit
+import Pow
 
 /// Home screen — daily dashboard with progress circles
 struct HomeView: View {
@@ -19,17 +20,15 @@ struct HomeView: View {
     /// this is quietly held back until it enters the window. Overdue
     /// items always show regardless. User adjusts in Settings.
     @AppStorage("reminders.horizonDays") private var horizonDays = 30
-    /// The secondary surfaces (Chats / Reflect / Circles / Profile) live in
-    /// HubView, presented over Home by the atom icon. `hubTab` picks which
-    /// tab opens — the atom defaults to Chats; deep links target a specific one.
-    @State private var showHub = false
-    @State private var hubTab: HubTab = .chats
+    @State private var showProfileMenu = false
     @State private var showChatSheet = false
+    /// Increments only when the chat is summoned, so the sparkle spray
+    /// fires on open but not when the sheet dismisses back to Home.
+    @State private var sparkleTrigger = 0
     @State private var showCalendar = false
-    @StateObject private var friendsBadge = FriendsBadgeService.shared
-    /// Transcript captured from a share/voice hand-off. Passed through to
-    /// AgentChatView when the chat opens; cleared on dismiss so the next
-    /// session starts from an empty slate.
+    /// Text handed in from a share extension (or the shared sheet).
+    /// Passed through to AgentChatView when the chat opens; cleared on
+    /// dismiss so the next session starts from an empty slate.
     @State private var voicePrefill: String = ""
     /// A photo shared to the assistant — staged into AgentChatView's
     /// composer when the chat opens; cleared on dismiss.
@@ -67,23 +66,23 @@ struct HomeView: View {
                     }
                 }
                 .padding(.top, SacredSpacing.xl)
-                .padding(.bottom, SacredSpacing.tabBarSafe + 56)
+                .padding(.bottom, SacredSpacing.tabBarSafe + 72)
             }
             .background(Color.clear)
             .toolbar {
                 if #available(iOS 26.0, *) {
                     ToolbarItem(placement: .topBarTrailing) {
-                        hubButton
+                        profileMenuButton
                     }
                     .sharedBackgroundVisibility(.hidden)
                 } else {
                     ToolbarItem(placement: .navigationBarTrailing) {
-                        hubButton
+                        profileMenuButton
                     }
                 }
             }
-            .fullScreenCover(isPresented: $showHub) {
-                HubView(initialTab: hubTab, unreadNotifications: notifications.unreadCount)
+            .fullScreenCover(isPresented: $showProfileMenu) {
+                ProfileMenuSheet(unreadNotifications: notifications.unreadCount)
                     .environmentObject(auth)
                     .environmentObject(profile)
             }
@@ -138,33 +137,22 @@ struct HomeView: View {
                 showChatSheet = true
                 deepLinks.clearAssistantImage()
             }
-            // A "new message" push → open the hub on Chats; ChatsTabView
-            // resolves the friendship id to the thread once it's on screen.
-            .onChange(of: deepLinks.pendingChatFriendshipId) { _, newValue in
-                if newValue != nil {
-                    hubTab = .chats
-                    showHub = true
-                }
-            }
 
-            // The single assistant affordance, where the tab bar used to
-            // sit: a calm vajra glyph. Tap opens the chat.
-            vajraButton
-                .padding(.bottom, 20)
+            // The assistant lives in a small gold orb pinned to the
+            // bottom-right — a quiet affordance you reach for, not a
+            // banner across Home. Floats just above the tab bar.
+            HStack {
+                Spacer()
+                chatFAB
+            }
+            .padding(.trailing, 20)
+            .padding(.bottom, 20)
         }
         .navigationDestination(isPresented: $showChatSheet) {
             AgentChatView(prefill: voicePrefill, prefillImage: sharedAssistantImage)
         }
         .navigationDestination(isPresented: $showCalendar) {
             CalendarView(showsNavigationBar: true)
-        }
-        // Accepting an invitation deep link → open the hub on Circles.
-        // Bound directly to the router so a cold-launch invite is caught.
-        .sheet(item: inviteBinding) { token in
-            AcceptInvitationView(token: token.value) { _ in
-                hubTab = .circles
-                showHub = true
-            }
         }
         .onChange(of: showChatSheet) { _, isShown in
             if !isShown {
@@ -215,44 +203,70 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Assistant affordance
+    // MARK: - Assistant button
 
-    /// The single entry to the assistant, sitting where the tab bar used
-    /// to. A calm vajra glyph — the app's mark for the AI — on a soft gold
-    /// disc. No animation: Home stays quiet, the assistant is one tap away.
-    private var vajraButton: some View {
+    /// A small floating action button pinned to the bottom-right — a
+    /// gold orb bearing the vajra (the assistant's mark). Tap summons
+    /// the chat. Replaces the old full-width prompt pill: the assistant
+    /// is a tool you reach for in the corner, not a banner across Home.
+    private var chatFAB: some View {
         Button {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            sparkleTrigger += 1
             showChatSheet = true
         } label: {
-            Image("tab.vajra")
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 30, height: 30)
-                .foregroundColor(.sacredGold)
-                .frame(width: 60, height: 60)
-                .background(
-                    Circle()
-                        .fill(Color.sacredBgCard)
-                        .overlay(Circle().stroke(Color.sacredGold.opacity(0.30), lineWidth: 1))
-                )
-                .shadow(color: .sacredMuted.opacity(0.18), radius: 10, y: 4)
+            chatFABBody
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SendButtonPressStyle())
         .accessibilityLabel("Open assistant")
+        // Sparkles spray as the chat is summoned. Keyed to sparkleTrigger
+        // (which only advances on open) so it never re-fires on dismiss.
+        // Fires before the destination covers it — Pow renders above all.
+        .changeEffect(
+            .spray(origin: UnitPoint.center) {
+                Image(systemName: "sparkle")
+                    .foregroundStyle(Color.sacredGold)
+            },
+            value: sparkleTrigger
+        )
     }
 
-    /// Mirrors the router's invite token into a `.sheet(item:)` source.
-    /// Reading the current value (vs. observing a change) means a cold-launch
-    /// invite is presented too; clearing the router on dismiss closes it.
-    private var inviteBinding: Binding<InviteTokenItem?> {
-        Binding(
-            get: { deepLinks.pendingInviteToken.map { InviteTokenItem(value: $0) } },
-            set: { newValue in
-                if newValue == nil { deepLinks.clear() }
-            }
-        )
+    /// A gold speech-bubble — a softly rounded body with a tail that
+    /// flows out of the bottom-right corner — carrying the vajra (the
+    /// assistant's mark) at center. The vertical gradient and a top
+    /// rim-light give it the same quiet depth the orb had; the shape
+    /// reads as "chat," the glyph names whose chat it is.
+    private var chatFABBody: some View {
+        ZStack {
+            ChatBubbleShape()
+                .fill(LinearGradient.sacredGoldShinyVertical)
+                .overlay(
+                    // Thin top rim-light → catches the eye as a sheen so
+                    // the bubble reads as a lit surface, not a flat fill.
+                    ChatBubbleShape()
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.5),
+                                    Color.sacredGoldShine.opacity(0.12),
+                                    .clear
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 1
+                        )
+                )
+
+            // Vajra — bone-cream against the gold. Nudged up so it sits
+            // centered in the bubble body, clear of the tail.
+            SacredIconView(icon: .vajra, size: 24)
+                .foregroundColor(.sacredBg)
+                .offset(y: -4)
+        }
+        .frame(width: 56, height: 56)
+        .shadow(color: Color.sacredGold.opacity(0.30), radius: 10, y: 4)
+        .shadow(color: .sacredMuted.opacity(0.16), radius: 6, y: 3)
     }
 
     // MARK: - Reminders section
@@ -427,45 +441,43 @@ struct HomeView: View {
             .components(separatedBy: " ").first
     }
 
-    // MARK: - Hub entry
+    // MARK: - Profile
 
-    /// Top-right atom icon — the doorway to the secondary surfaces (Chats,
-    /// Reflect, Circles, Profile) hosted in HubView. A bindi-style gold dot
-    /// lights when anything in there wants attention (unread notifications
-    /// or messages, or a pending request) so the signal survives the move
-    /// off Home.
-    private var hubButton: some View {
+    private var profileMenuButton: some View {
         Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            hubTab = .chats
-            showHub = true
+            showProfileMenu = true
         } label: {
-            ZStack(alignment: .topTrailing) {
-                Image(systemName: "atom")
-                    .font(.system(size: 20, weight: .regular))
-                    .foregroundColor(.sacredGold)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Circle())
-
-                if hubHasAttention {
-                    Circle()
-                        .fill(LinearGradient.sacredGoldShinyVertical)
-                        .frame(width: 10, height: 10)
-                        .overlay(Circle().stroke(Color.sacredBg, lineWidth: 2))
-                        .shadow(color: .sacredGold.opacity(0.45), radius: 3)
-                        .offset(x: -2, y: 2)
-                }
-            }
+            profileMenuAvatar
         }
         .buttonStyle(.plain)
         .fixedSize()
-        .accessibilityLabel(hubHasAttention ? "Menu, new activity" : "Menu")
+        .accessibilityLabel(
+            notifications.unreadCount > 0
+                ? "Profile menu, \(notifications.unreadCount) unread notifications"
+                : "Profile menu"
+        )
     }
 
-    private var hubHasAttention: Bool {
-        notifications.unreadCount > 0
-            || friendsBadge.unreadMessagesCount > 0
-            || friendsBadge.requestsCount > 0
+    /// Single toolbar chip — the user's avatar doubles as the notifications
+    /// signal. Unread notifications light the same bindi-style gold dot
+    /// that used to sit on the bell chip; tap opens the profile menu,
+    /// which carries the notifications row at the top.
+    @ViewBuilder
+    private var profileMenuAvatar: some View {
+        ZStack(alignment: .topTrailing) {
+            ProfileAvatarImage(rawUrl: profile.profile?.avatarUrl, size: 36, shadow: true)
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
+
+            if notifications.unreadCount > 0 {
+                Circle()
+                    .fill(LinearGradient.sacredGoldShinyVertical)
+                    .frame(width: 10, height: 10)
+                    .overlay(Circle().stroke(Color.sacredBg, lineWidth: 2))
+                    .shadow(color: .sacredGold.opacity(0.45), radius: 3)
+                    .offset(x: -4, y: 4)
+            }
+        }
     }
 
     // MARK: - Whole-day context
@@ -492,48 +504,57 @@ struct HomeView: View {
 
 // MARK: - Profile menu sheet
 
-/// Identity-scoped surface: account, notifications, settings, sign out.
-/// Hosted as the "Profile" tab inside HubView, which supplies the
-/// NavigationStack and the vajra back-to-Home button.
-struct ProfileView: View {
+/// Identity-scoped surface on Home: birth chart, settings, sign out.
+/// Owns its own NavigationStack so pushes stay inside the sheet.
+struct ProfileMenuSheet: View {
     /// Passed in from Home so the Notifications row can show the same
-    /// unread count that drives Home's atom-icon bindi dot. Single source
-    /// of truth (HomeView's NotificationsViewModel); the tab just renders it.
+    /// unread count that drives the toolbar avatar's bindi dot. Single
+    /// source of truth (HomeView's NotificationsViewModel); the sheet
+    /// just renders it.
     let unreadNotifications: Int
     @EnvironmentObject var auth: AuthService
     @EnvironmentObject var profile: ProfileService
+    @Environment(\.dismiss) private var dismiss
     @State private var activeAccountEdit: AccountEdit?
     @State private var showSignOutConfirmation = false
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                accountTitle
-                accountAvatarButton
-                menuList
-                signOutButton
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    accountTitle
+                    accountAvatarButton
+                    menuList
+                    signOutButton
+                }
+                .padding(20)
+                .padding(.bottom, 40)
             }
-            .padding(20)
-            .padding(.bottom, 40)
-        }
-        .sacredBackground()
-        .navigationTitle("Profile")
-        .navigationBarTitleDisplayMode(.inline)
-        .confirmationDialog(
-            "Are you sure you want to sign out?",
-            isPresented: $showSignOutConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("Sign Out", role: .destructive) { auth.signOut() }
-            Button("Cancel", role: .cancel) {}
-        }
-        .sheet(item: $activeAccountEdit) { edit in
-            SacredFormSheet(
-                title: edit.title,
-                detent: edit.detent,
-                onCancel: { activeAccountEdit = nil }
+            .sacredBackground()
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .font(.sacredTextMedium)
+                        .foregroundColor(.sacredGold)
+                }
+            }
+            .confirmationDialog(
+                "Are you sure you want to sign out?",
+                isPresented: $showSignOutConfirmation,
+                titleVisibility: .visible
             ) {
-                accountEditSheet(edit)
+                Button("Sign Out", role: .destructive) { auth.signOut() }
+                Button("Cancel", role: .cancel) {}
+            }
+            .sheet(item: $activeAccountEdit) { edit in
+                SacredFormSheet(
+                    title: edit.title,
+                    detent: edit.detent,
+                    onCancel: { activeAccountEdit = nil }
+                ) {
+                    accountEditSheet(edit)
+                }
             }
         }
     }
@@ -739,5 +760,63 @@ private extension String {
     var nonEmpty: String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+/// A speech-bubble drawn as one continuous outline: three softly
+/// rounded corners (top-left, top-right, bottom-left) with the
+/// bottom-right corner pulled into a small curved tail that points
+/// toward the screen corner the bubble sits in. Single subpath, so the
+/// gold gradient and the rim-light stroke both run cleanly around it.
+private struct ChatBubbleShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width
+        let h = rect.height
+        // Body stops short of the bottom; the gap is where the tail drops.
+        let bodyH = h * 0.84
+        let r = min(w, bodyH) * 0.30
+
+        var p = Path()
+        // Top edge, left → right
+        p.move(to: CGPoint(x: r, y: 0))
+        p.addLine(to: CGPoint(x: w - r, y: 0))
+        // Top-right corner
+        p.addArc(center: CGPoint(x: w - r, y: r), radius: r,
+                 startAngle: .degrees(-90), endAngle: .degrees(0), clockwise: false)
+        // Right edge straight down to where the tail begins
+        p.addLine(to: CGPoint(x: w, y: bodyH))
+        // Tail — flares out and down to a soft point, then curves back
+        // up onto the bottom edge. This is the bottom-right "corner."
+        p.addQuadCurve(to: CGPoint(x: w - 1, y: h),
+                       control: CGPoint(x: w + 2, y: bodyH + 4))
+        p.addQuadCurve(to: CGPoint(x: w - r - 2, y: bodyH),
+                       control: CGPoint(x: w - 7, y: bodyH))
+        // Bottom edge, right → left
+        p.addLine(to: CGPoint(x: r, y: bodyH))
+        // Bottom-left corner
+        p.addArc(center: CGPoint(x: r, y: bodyH - r), radius: r,
+                 startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
+        // Left edge up
+        p.addLine(to: CGPoint(x: 0, y: r))
+        // Top-left corner
+        p.addArc(center: CGPoint(x: r, y: r), radius: r,
+                 startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
+        p.closeSubpath()
+        return p
+    }
+}
+
+/// Custom press style for the send button — tighter scale-down + a
+/// confident spring back. The default `.plain` style has no press
+/// feedback at all, which makes the button feel dead at the moment of
+/// tap (especially since the chat sheet covers it within ~100ms).
+private struct SendButtonPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.88 : 1.0)
+            .animation(
+                .spring(response: 0.28, dampingFraction: 0.55),
+                value: configuration.isPressed
+            )
     }
 }

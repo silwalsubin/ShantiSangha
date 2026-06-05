@@ -1,11 +1,10 @@
 import SwiftUI
 
-/// App shell. Home is the single root screen; the assistant is reached
-/// from the vajra affordance on Home, and Reflect / Chats / Circles live
-/// behind Home's top-right profile menu. This view keeps the app-level
-/// concerns that aren't tied to any one screen: the sync banner, device
-/// motion lifecycle, and the share-extension "send a photo to a friend"
-/// sheet.
+/// Main tab navigation: Home, Reflect, Chats, Circles. Chats and
+/// Circles split off from a single Friends tab — Circles holds who is
+/// in your circle (mandala + directory + invites/requests), Chats
+/// holds active conversations.
+/// Custom sacred icons matching the web app's SacredIcons.vue
 struct MainTabView: View {
     @EnvironmentObject var auth: AuthService
     @StateObject private var network = NetworkMonitor.shared
@@ -13,10 +12,10 @@ struct MainTabView: View {
     @StateObject private var deepLinks = DeepLinkRouter.shared
     @StateObject private var friendsBadge = FriendsBadgeService.shared
     @Environment(\.scenePhase) private var scenePhase
+    @State private var selectedTab = 0
 
     init() {
-        // Tab bar appearance — blur background + serif labels. Applies to
-        // the HubView tab bar reached from Home's atom icon.
+        // Tab bar appearance — blur background + serif labels
         let tabAppearance = UITabBarAppearance()
         tabAppearance.configureWithDefaultBackground()
         tabAppearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
@@ -60,10 +59,52 @@ struct MainTabView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            NavigationStack {
-                HomeView()
+            TabView(selection: $selectedTab) {
+                NavigationStack {
+                    HomeView()
+                }
+                .tabItem {
+                    Image("tab.vajra")
+                    Text("Home")
+                }
+                .tag(0)
+
+                NavigationStack {
+                    ReflectView()
+                }
+                .tabItem {
+                    Image("tab.peepal")
+                    Text("Reflect")
+                }
+                .tag(1)
+
+                NavigationStack {
+                    ChatsTabView()
+                }
+                .tabItem {
+                    Image("tab.dialogue")
+                    Text("Chats")
+                }
+                .badge(friendsBadge.unreadMessagesCount)
+                .tag(2)
+
+                NavigationStack {
+                    FriendsTabView()
+                }
+                .tabItem {
+                    Image(systemName: "atom")
+                    Text("Circles")
+                }
+                .badge(friendsBadge.requestsCount)
+                .tag(3)
             }
+            .tint(.sacredGold)
             .task { await friendsBadge.refresh() }
+            .sheet(item: deepLinkBinding) { token in
+                AcceptInvitationView(token: token.value) { _ in
+                    selectedTab = 3
+                }
+            }
             // A photo shared in from another app → pick one connection
             // and send it into that chat.
             .sheet(item: sharedMediaBinding) { media in
@@ -79,6 +120,18 @@ struct MainTabView: View {
             )
             .padding(.horizontal, 16)
             .padding(.top, 8)
+        }
+        .onChange(of: selectedTab) { _, _ in
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        }
+        // Tap on a "new message" notification → jump to Chats so the
+        // tab's own router can resolve the friendship id and push the
+        // chat thread. We only switch tabs here; we don't clear the
+        // routing intent (ChatsTabView clears it once it resolves).
+        .onChange(of: deepLinks.pendingChatFriendshipId) { _, newValue in
+            if newValue != nil {
+                selectedTab = 2
+            }
         }
         .onAppear {
             MotionManager.shared.start()
@@ -102,10 +155,21 @@ struct MainTabView: View {
             }
         )
     }
+
+    private var deepLinkBinding: Binding<InviteTokenItem?> {
+        Binding(
+            get: {
+                deepLinks.pendingInviteToken.map { InviteTokenItem(value: $0) }
+            },
+            set: { newValue in
+                if newValue == nil { deepLinks.clear() }
+            }
+        )
+    }
 }
 
 /// Identifiable wrapper for `.sheet(item:)` driven by a token string.
-struct InviteTokenItem: Identifiable, Equatable {
+struct InviteTokenItem: Identifiable {
     let value: String
     var id: String { value }
 }
