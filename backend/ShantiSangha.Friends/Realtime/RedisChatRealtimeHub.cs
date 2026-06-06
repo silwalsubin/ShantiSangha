@@ -3,6 +3,7 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using ShantiSangha.Shared.Interfaces;
 using StackExchange.Redis;
 
 namespace ShantiSangha.Friends.Realtime;
@@ -30,7 +31,10 @@ namespace ShantiSangha.Friends.Realtime;
 /// the publish call: chat realtime is best-effort, the REST mutation is
 /// the source of truth.
 /// </summary>
-public class RedisChatRealtimeHub : IChatRealtimeHub, IAsyncDisposable
+// Also implements the Shared `IRealtimeBroadcaster` (its single PublishAsync
+// matches the one below) so other modules (e.g. Chess) can broadcast without
+// depending on Friends.
+public class RedisChatRealtimeHub : IChatRealtimeHub, IRealtimeBroadcaster, IAsyncDisposable
 {
     private record Subscriber(Guid UserId, Guid ConversationId, WebSocket Socket);
 

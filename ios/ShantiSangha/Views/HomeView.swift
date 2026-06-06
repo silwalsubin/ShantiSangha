@@ -64,6 +64,8 @@ struct HomeView: View {
                     } else {
                         remindersSection
                     }
+
+                    chessEntryCard
                 }
                 .padding(.top, SacredSpacing.xl)
                 .padding(.bottom, SacredSpacing.tabBarSafe + 72)
@@ -231,11 +233,11 @@ struct HomeView: View {
         )
     }
 
-    /// A gold speech-bubble — a softly rounded body with a tail that
-    /// flows out of the bottom-right corner — carrying the vajra (the
+    /// A gold speech-bubble with a round body and a small tail flowing
+    /// out of the bottom-right corner, carrying the vajra (the
     /// assistant's mark) at center. The vertical gradient and a top
-    /// rim-light give it the same quiet depth the orb had; the shape
-    /// reads as "chat," the glyph names whose chat it is.
+    /// rim-light give it a quiet depth; the shape reads as "chat," the
+    /// glyph names whose chat it is.
     private var chatFABBody: some View {
         ZStack {
             ChatBubbleShape()
@@ -259,17 +261,47 @@ struct HomeView: View {
                 )
 
             // Vajra — bone-cream against the gold. Nudged up so it sits
-            // centered in the bubble body, clear of the tail.
+            // centered in the round body, clear of the tail.
             SacredIconView(icon: .vajra, size: 24)
                 .foregroundColor(.sacredBg)
-                .offset(y: -4)
+                .offset(y: -3)
         }
         .frame(width: 56, height: 56)
-        .shadow(color: Color.sacredGold.opacity(0.30), radius: 10, y: 4)
-        .shadow(color: .sacredMuted.opacity(0.16), radius: 6, y: 3)
     }
 
     // MARK: - Reminders section
+
+    /// Quiet entry into the Chess feature — a single understated card that
+    /// pushes the Chess hub. Kept low-key so Home stays reminders-first.
+    private var chessEntryCard: some View {
+        Button {
+            ChessPresenter.present()
+        } label: {
+            LuxCard {
+                HStack(spacing: SacredSpacing.s) {
+                    Text("\u{265E}\u{FE0E}")
+                        .font(.system(size: 30, design: .serif))
+                        .foregroundColor(.sacredGold)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Chess")
+                            .font(.sacredSubheading)
+                            .foregroundColor(.sacredText)
+                        Text("A quiet game against the app")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredMuted)
+                }
+                .padding(SacredSpacing.m)
+            }
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, SacredSpacing.m)
+        .padding(.top, SacredSpacing.l)
+    }
 
     /// Wraps the horizon picker + reminders list (or empty-horizon state)
     /// in a single VStack so the parent ViewBuilder stays shallow. Without
@@ -763,44 +795,35 @@ private extension String {
     }
 }
 
-/// A speech-bubble drawn as one continuous outline: three softly
-/// rounded corners (top-left, top-right, bottom-left) with the
-/// bottom-right corner pulled into a small curved tail that points
-/// toward the screen corner the bubble sits in. Single subpath, so the
-/// gold gradient and the rim-light stroke both run cleanly around it.
+/// A round speech-bubble: a circular body with a small curved tail
+/// pulled out of the bottom-right, pointing toward the screen corner the
+/// bubble sits in. Drawn as one continuous subpath so the gold gradient
+/// and the rim-light stroke both run cleanly around it.
 private struct ChatBubbleShape: Shape {
     func path(in rect: CGRect) -> Path {
         let w = rect.width
         let h = rect.height
-        // Body stops short of the bottom; the gap is where the tail drops.
-        let bodyH = h * 0.84
-        let r = min(w, bodyH) * 0.30
+        // The circular body sits in the top portion; the remaining height
+        // is where the tail drops toward the corner.
+        let bodyD = min(w, h * 0.86)
+        let r = bodyD / 2
+        let cx = w / 2
+        let cy = r
 
         var p = Path()
-        // Top edge, left → right
-        p.move(to: CGPoint(x: r, y: 0))
-        p.addLine(to: CGPoint(x: w - r, y: 0))
-        // Top-right corner
-        p.addArc(center: CGPoint(x: w - r, y: r), radius: r,
-                 startAngle: .degrees(-90), endAngle: .degrees(0), clockwise: false)
-        // Right edge straight down to where the tail begins
-        p.addLine(to: CGPoint(x: w, y: bodyH))
-        // Tail — flares out and down to a soft point, then curves back
-        // up onto the bottom edge. This is the bottom-right "corner."
-        p.addQuadCurve(to: CGPoint(x: w - 1, y: h),
-                       control: CGPoint(x: w + 2, y: bodyH + 4))
-        p.addQuadCurve(to: CGPoint(x: w - r - 2, y: bodyH),
-                       control: CGPoint(x: w - 7, y: bodyH))
-        // Bottom edge, right → left
-        p.addLine(to: CGPoint(x: r, y: bodyH))
-        // Bottom-left corner
-        p.addArc(center: CGPoint(x: r, y: bodyH - r), radius: r,
-                 startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
-        // Left edge up
-        p.addLine(to: CGPoint(x: 0, y: r))
-        // Top-left corner
-        p.addArc(center: CGPoint(x: r, y: r), radius: r,
-                 startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
+        // Sweep the body clockwise from the top, stopping just before the
+        // bottom-right where the tail breaks out.
+        p.addArc(center: CGPoint(x: cx, y: cy), radius: r,
+                 startAngle: .degrees(-90), endAngle: .degrees(40), clockwise: false)
+        // Tail — flares out and down to a soft point near the corner...
+        p.addQuadCurve(to: CGPoint(x: w - 2, y: h),
+                       control: CGPoint(x: w, y: bodyD * 0.92))
+        // ...then curves back up onto the body's lower edge.
+        p.addQuadCurve(to: CGPoint(x: cx + r * 0.30, y: cy + r * 0.94),
+                       control: CGPoint(x: cx + r * 0.66, y: cy + r * 0.98))
+        // Close the remaining arc back to the start point at the top.
+        p.addArc(center: CGPoint(x: cx, y: cy), radius: r,
+                 startAngle: .degrees(72), endAngle: .degrees(270), clockwise: false)
         p.closeSubpath()
         return p
     }
