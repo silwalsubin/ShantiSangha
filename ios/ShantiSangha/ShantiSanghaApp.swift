@@ -6,6 +6,17 @@ import FirebaseMessaging
 import GoogleSignIn
 
 class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, UNUserNotificationCenterDelegate {
+    /// App-wide orientation gate. The app is portrait-first (mobile-first design
+    /// principle); `ChessPresenter` opens chess in a forced-landscape controller
+    /// and flips this to allow landscape while it's up, restoring `.portrait` on
+    /// dismiss.
+    static var orientationLock: UIInterfaceOrientationMask = .portrait
+
+    func application(_ application: UIApplication,
+                     supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        AppDelegate.orientationLock
+    }
+
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         FirebaseApp.configure()
