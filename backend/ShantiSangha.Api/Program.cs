@@ -12,6 +12,7 @@ using Serilog;
 using ShantiSangha.Api;
 using ShantiSangha.Chat;
 using ShantiSangha.Chat.AI;
+using ShantiSangha.Chess;
 using ShantiSangha.Friends;
 using ShantiSangha.Friends.Realtime;
 using ShantiSangha.Identity;
@@ -101,6 +102,7 @@ try
     builder.Services.AddJournalModule(vectorDataSource);
     builder.Services.AddWellnessModule(connStr, appConfig.VoiceBucketName);
     builder.Services.AddFriendsModule(connStr, appConfig.FriendsMediaBucketName, appConfig.RedisUrl);
+    builder.Services.AddChessModule(connStr);
     builder.Services.AddNotificationsModule(connStr);
 
     // Agent: the in-app GPT-4o chat that can call backend operations as tools.
@@ -118,6 +120,7 @@ try
         .AddApplicationPart(typeof(ShantiSangha.Journal.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Wellness.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Friends.DependencyInjection).Assembly)
+        .AddApplicationPart(typeof(ShantiSangha.Chess.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Notifications.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Agent.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.AgentFeedback.DependencyInjection).Assembly)
@@ -255,6 +258,7 @@ try
         await sp.GetRequiredService<ShantiSangha.Journal.Data.JournalDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Wellness.Data.WellnessDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Friends.Data.FriendsDbContext>().Database.MigrateAsync();
+        await sp.GetRequiredService<ShantiSangha.Chess.Data.ChessDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Notifications.Data.NotificationsDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Agent.Data.AgentDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.AgentFeedback.Data.AgentFeedbackDbContext>().Database.MigrateAsync();

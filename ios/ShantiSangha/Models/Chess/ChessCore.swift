@@ -133,6 +133,26 @@ struct ChessMove: Hashable, Codable {
         if let promotion { s.append(promotion.fenLetter) }
         return s
     }
+
+    /// Parse UCI long algebraic ("e2e4", "e7e8q"). Used to apply a move that
+    /// arrived from a remote player.
+    init?(uci: String) {
+        let chars = Array(uci.lowercased())
+        guard chars.count >= 4,
+              let from = Square(algebraic: String(chars[0...1])),
+              let to = Square(algebraic: String(chars[2...3])) else { return nil }
+        var promo: PieceType?
+        if chars.count >= 5 {
+            switch chars[4] {
+            case "q": promo = .queen
+            case "r": promo = .rook
+            case "b": promo = .bishop
+            case "n": promo = .knight
+            default: promo = nil
+            }
+        }
+        self.init(from: from, to: to, promotion: promo)
+    }
 }
 
 /// Castling availability, mirrored from FEN's KQkq field.

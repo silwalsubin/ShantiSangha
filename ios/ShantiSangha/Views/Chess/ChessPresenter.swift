@@ -15,7 +15,18 @@ final class LandscapeHostingController<Content: View>: UIHostingController<Conte
 /// portrait on dismiss. Used instead of a navigation push so chess never
 /// appears in portrait.
 enum ChessPresenter {
+    /// Solo (vs the app / pass-and-play).
     static func present() {
+        present { close in ChessGameView(onClose: close) }
+    }
+
+    /// Friend game over the network (channel = friendship id).
+    static func presentFriend(friendshipId: UUID, friendUserId: UUID) {
+        let friend = ChessGameViewModel.FriendGame(friendshipId: friendshipId, friendUserId: friendUserId)
+        present { close in ChessGameView(friend: friend, onClose: close) }
+    }
+
+    private static func present<Content: View>(@ViewBuilder content: (@escaping () -> Void) -> Content) {
         guard let scene = UIApplication.shared.connectedScenes
                 .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
               let root = scene.keyWindow?.rootViewController else { return }
@@ -33,8 +44,7 @@ enum ChessPresenter {
             weakHost?.dismiss(animated: true)
         }
 
-        let content = NavigationStack { ChessGameView(onClose: close) }
-        let host = LandscapeHostingController(rootView: content)
+        let host = LandscapeHostingController(rootView: NavigationStack { content(close) })
         host.modalPresentationStyle = .fullScreen
         weakHost = host
         top.present(host, animated: true)

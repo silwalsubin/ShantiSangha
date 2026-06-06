@@ -1,7 +1,26 @@
-# Later — Friend Mode (designed, deferred)
+# Friend Mode
 
-Turn-based chess with a friend. **Not scheduled** — captured so the solo build doesn't paint us
-into a corner. The app's existing infrastructure makes this largely *assembly*, not new plumbing.
+**Compact v1 is built** (see PROGRESS.md). Live moves ride the existing chat WebSocket; the server
+trusts the client for legality and checks only turn ownership. What shipped vs. the full design below:
+
+**Built (compact v1):**
+- Backend `ShantiSangha.Chess` module — `ChessGame` keyed to a friendship; endpoints
+  `POST /api/chess/games`, `GET /api/chess/games/{friendshipId}`, `POST .../moves`, `POST .../resign`.
+  Broadcasts `chess_move` / `chess_game_over` / `chess_game_created` over the chat hub
+  (channel = friendship id) via the new Shared `IRealtimeBroadcaster`; pushes the opponent.
+  Stores only the latest FEN + last move (no per-move table).
+- iOS — `ChessAPI`, remote mode in `ChessGameViewModel` (loads/creates the game, submits moves,
+  applies opponent moves from `ChatRealtimeClient.onChessUpdate`), "Play chess" entry in `FriendChatView`.
+
+**Manual step to go live:** merge to `main` → backend deploy runs `MigrateAsync` (creates `ChessGames`).
+
+**Deferred / hardening (the original full design follows):** server-side legality, draw offers,
+time controls, separate invite/accept flow, per-move history, captured-pieces tray.
+
+---
+
+The original full design (for hardening) — the app's existing infrastructure makes this largely
+*assembly*, not new plumbing.
 
 ## Backend — new `ShantiSangha.Chess` module
 A new project in the modular monolith (mirrors `ShantiSangha.Friends`):

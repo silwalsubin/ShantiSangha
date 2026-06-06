@@ -87,5 +87,15 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done
 - [ ] Reduce Motion support
 - [ ] **Test:** all game-over states correct; visuals serif / saffron-gold / emoji-free
 
-## Later — Friend mode (deferred)
-- [ ] See [friend-mode-later.md](friend-mode-later.md) — not scheduled
+## Friend mode — compact v1 (built, needs deploy + device test)
+Decisions: live moves over the **existing chat WebSocket**; **client-trusted** moves (server checks
+turn ownership only). One active game per friendship.
+- [x] Backend `ShantiSangha.Chess` module: `ChessGame` entity, create/get/move/resign endpoints,
+  turn-ownership checks, realtime broadcast + push. **Builds clean; EF `InitChess` migration generated.**
+- [x] `IRealtimeBroadcaster` in Shared (so Chess broadcasts over the chat hub without depending on Friends)
+- [x] iOS `ChessAPI` + remote mode in `ChessGameViewModel` + `chess_*` kinds on `ChatRealtimeClient`
+- [x] "Play chess" (♞) button in `FriendChatView` → `ChessPresenter.presentFriend(...)`
+- [ ] **Deploy backend** (merging to `main` triggers it; `MigrateAsync` creates `ChessGames`) + device test two phones
+- Deferred: server-side legality, draw offers, time controls, separate invite/accept flow, captured tray.
+
+See [friend-mode-later.md](friend-mode-later.md) for the full/hardened design.

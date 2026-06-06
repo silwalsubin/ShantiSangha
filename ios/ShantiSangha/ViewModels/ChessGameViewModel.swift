@@ -1,12 +1,8 @@
 import SwiftUI
 
-/// Owns the authoritative game state and bridges the board scene to a
-/// `ChessOpponent`. The scene is a pure renderer: it emits the user's completed
-/// moves via `onMoveSelected`, the VM applies them, asks the opponent for a
-/// reply, and pushes both back to the scene to animate.
-///
-/// The mode (difficulty / pass-and-play) is selectable on the game screen, so
-/// the opponent is swappable — changing it starts a fresh game.
+/// Owns the authoritative game state and bridges the board scene to either a
+/// local `ChessOpponent` (AI / hot-seat) or a remote friend (moves over the
+/// chat WebSocket, persisted via `ChessAPI`). The scene stays a pure renderer.
 @MainActor
 final class ChessGameViewModel: ObservableObject {
 
@@ -15,12 +11,20 @@ final class ChessGameViewModel: ObservableObject {
     @Published private(set) var isOpponentThinking = false
     @Published private(set) var lastMove: ChessMove?
     @Published private(set) var mode: ChessMode
+    @Published private(set) var connectionError: String?
 
-    /// The human always plays White (board oriented to White).
-    let humanColor: PieceColor = .white
+    /// The side the local player controls (board orientation + which pieces are
+    /// movable). White for solo; assigned by the server for friend games.
+    private(set) var humanColor: PieceColor = .white
     private var opponent: ChessOpponent?
 
-    /// Snapshots taken *before* each applied move, for undo.
+    /// Friend-game config (nil for solo).
+    struct FriendGame { let friendshipId: UUID; let friendUserId: UUID }
+    private let friend: FriendGame?
+    private var realtime: ChatRealtimeClient?
+    private var remoteMoveCount = 0
+
+    /// Snapshots taken *before* each applied move, for undo (solo only).
     private var history: [(position: ChessPosition, lastMove: ChessMove?)] = []
 
     private weak var renderer: (any ChessBoardRenderer)?
@@ -28,30 +32,47 @@ final class ChessGameViewModel: ObservableObject {
     init(mode: ChessMode = .measured) {
         self.mode = mode
         self.opponent = mode.makeOpponent()
+        self.friend = nil
     }
 
-    var isHotSeat: Bool { opponent == nil }
-    var canUndo: Bool { !history.isEmpty && !isOpponentThinking }
+    init(friend: FriendGame) {
+        self.mode = .twoPlayer
+        self.opponent = nil
+        self.friend = friend
+    }
+
+    var isRemote: Bool { friend != nil }
+    var isHotSeat: Bool { opponent == nil && !isRemote }
+    var canUndo: Bool { !history.isEmpty && !isOpponentThinking && !isRemote }
     var isGameOver: Bool { result != nil }
 
-    // MARK: Setup / mode
+    // MARK: Setup
 
     func attach(renderer: any ChessBoardRenderer) {
         self.renderer = renderer
         renderer.onMoveSelected = { [weak self] move in
             self?.handleUserMove(move)
         }
-        configureAndReset()
+        if isRemote { setupRemote() } else { configureAndReset() }
     }
 
-    /// Switch mode (difficulty or pass-and-play) and start a fresh game.
+    /// Switch mode (solo difficulty / pass-and-play) and start a fresh game.
     func select(mode: ChessMode) {
+        guard !isRemote else { return }
         self.mode = mode
         self.opponent = mode.makeOpponent()
         configureAndReset()
     }
 
-    func newGame() { configureAndReset() }
+    func newGame() {
+        if isRemote { setupRemote() } else { configureAndReset() }
+    }
+
+    /// Disconnect the realtime socket (call from the view's onDisappear).
+    func teardown() {
+        realtime?.disconnect()
+        realtime = nil
+    }
 
     private func configureAndReset() {
         history.removeAll()
@@ -63,9 +84,87 @@ final class ChessGameViewModel: ObservableObject {
         renderer?.interactionColor = isHotSeat ? nil : humanColor
         renderer?.show(position, animating: nil, lastMove: nil)
         refreshInteraction()
-        // If the opponent is on move first (not the case while human is White),
-        // let it start.
         maybeTriggerOpponent()
+    }
+
+    // MARK: Friend (remote) mode
+
+    private func setupRemote() {
+        guard let friend else { return }
+        Task {
+            do {
+                let dto = try await ChessAPI.createOrGet(friendshipId: friend.friendshipId,
+                                                         opponentUserId: friend.friendUserId)
+                applyServerGame(dto)
+                connectRealtime()
+            } catch {
+                connectionError = "Couldn't start the game."
+            }
+        }
+    }
+
+    private func applyServerGame(_ dto: ChessGameDTO) {
+        guard let friend, let pos = ChessPosition(fen: dto.fen) else { return }
+        // If white belongs to the friend, I'm black.
+        humanColor = (dto.whiteUserId == friend.friendUserId) ? .black : .white
+        remoteMoveCount = dto.moveCount
+        position = pos
+        lastMove = dto.lastMoveUci.flatMap(ChessMove.init(uci:))
+        result = gameResult(fromStatus: dto.status)
+        renderer?.orientation = humanColor
+        renderer?.interactionColor = humanColor
+        renderer?.show(pos, animating: nil, lastMove: lastMove)
+        refreshInteraction()
+    }
+
+    private func connectRealtime() {
+        guard let friend, realtime == nil else { return }
+        Task {
+            let baseURL = await ApiService.shared.getBaseURL()
+            let client = ChatRealtimeClient(conversationId: friend.friendshipId, baseURL: baseURL,
+                                            tokenProvider: { await ApiService.shared.currentToken() })
+            client.onChessUpdate = { [weak self] fen, uci, status, moveCount in
+                self?.applyRemoteUpdate(fen: fen, uci: uci, status: status, moveCount: moveCount)
+            }
+            self.realtime = client
+            client.connect()
+        }
+    }
+
+    private func applyRemoteUpdate(fen: String, uci: String?, status: String, moveCount: Int) {
+        guard moveCount > remoteMoveCount else { return } // stale or our own echo
+        remoteMoveCount = moveCount
+        if let uci, let move = ChessMove(uci: uci), position.legalMoves().contains(move) {
+            let (next, execution) = position.apply(move)
+            position = next
+            lastMove = move
+            result = gameResult(fromStatus: status) ?? next.result()
+            renderer?.show(next, animating: execution, lastMove: move)
+        } else if let pos = ChessPosition(fen: fen) {
+            position = pos
+            lastMove = uci.flatMap(ChessMove.init(uci:))
+            result = gameResult(fromStatus: status)
+            renderer?.show(pos, animating: nil, lastMove: lastMove)
+        }
+        refreshInteraction()
+    }
+
+    func resign() {
+        guard isRemote, let friend, result == nil else { return }
+        Task {
+            do { applyServerGame(try await ChessAPI.resign(friendshipId: friend.friendshipId)) }
+            catch { connectionError = "Couldn't resign." }
+        }
+    }
+
+    private func submitRemoteMove(_ move: ChessMove) {
+        guard let friend else { return }
+        let fen = position.fen
+        let res = resultString(result)
+        Task {
+            do { _ = try await ChessAPI.move(friendshipId: friend.friendshipId, fen: fen, uci: move.uci, result: res) }
+            catch { connectionError = "Move didn't reach your friend." }
+        }
     }
 
     // MARK: User / opponent moves
@@ -73,7 +172,12 @@ final class ChessGameViewModel: ObservableObject {
     private func handleUserMove(_ move: ChessMove) {
         guard result == nil, !isOpponentThinking else { return }
         apply(move, animate: true)
-        maybeTriggerOpponent()
+        if isRemote {
+            remoteMoveCount += 1
+            submitRemoteMove(move)
+        } else {
+            maybeTriggerOpponent()
+        }
     }
 
     private func maybeTriggerOpponent() {
@@ -83,16 +187,13 @@ final class ChessGameViewModel: ObservableObject {
         let snapshot = position
         Task {
             let move = await opponent.move(for: snapshot)
-            // Guard against a New Game / mode switch having changed the position.
             guard self.position == snapshot, self.result == nil else {
                 self.isOpponentThinking = false
                 self.refreshInteraction()
                 return
             }
             self.isOpponentThinking = false
-            if let move {
-                self.apply(move, animate: true)
-            }
+            if let move { self.apply(move, animate: true) }
             self.refreshInteraction()
         }
     }
@@ -111,8 +212,6 @@ final class ChessGameViewModel: ObservableObject {
 
     func undo() {
         guard canUndo else { return }
-        // In vs-computer mode, undo the AI reply *and* the human move; in
-        // hot-seat undo a single ply.
         let steps = isHotSeat ? 1 : 2
         var restored: (position: ChessPosition, lastMove: ChessMove?)?
         for _ in 0..<steps {
@@ -127,7 +226,29 @@ final class ChessGameViewModel: ObservableObject {
     }
 
     private func refreshInteraction() {
+        // In friend mode you can only move on your turn; the renderer already
+        // restricts to `humanColor`, and game-over disables interaction.
         renderer?.isInteractionEnabled = (result == nil) && !isOpponentThinking
+    }
+
+    // MARK: Mapping helpers
+
+    private func resultString(_ r: GameResult?) -> String? {
+        switch r {
+        case .checkmate: return "checkmate"
+        case .stalemate: return "stalemate"
+        case .drawInsufficientMaterial, .drawFiftyMove, .drawRepetition: return "draw"
+        case nil: return nil
+        }
+    }
+
+    private func gameResult(fromStatus status: String) -> GameResult? {
+        switch status {
+        case "WhiteWon": return .checkmate(winner: .white)
+        case "BlackWon": return .checkmate(winner: .black)
+        case "Draw": return .stalemate
+        default: return nil
+        }
     }
 
     // MARK: Status text
@@ -137,6 +258,7 @@ final class ChessGameViewModel: ObservableObject {
             switch result {
             case .checkmate(let winner):
                 if isHotSeat { return "\(winner == .white ? "White" : "Black") wins by checkmate" }
+                if isRemote { return winner == humanColor ? "You win" : "You lose" }
                 return winner == humanColor ? "Checkmate — you win" : "Checkmate — the app wins"
             case .stalemate: return "Stalemate — a draw"
             case .drawInsufficientMaterial: return "Draw — insufficient material"
@@ -145,12 +267,14 @@ final class ChessGameViewModel: ObservableObject {
             }
         }
         if isOpponentThinking { return "The app is considering…" }
+        let side = position.sideToMove
         if position.isInCheck {
-            let side = position.sideToMove
             if isHotSeat { return "\(side == .white ? "White" : "Black") is in check" }
+            if isRemote { return side == humanColor ? "You are in check" : "Your friend is in check" }
             return side == humanColor ? "You are in check" : "The app is in check"
         }
-        if isHotSeat { return position.sideToMove == .white ? "White to move" : "Black to move" }
-        return position.sideToMove == humanColor ? "Your move" : "The app's move"
+        if isHotSeat { return side == .white ? "White to move" : "Black to move" }
+        if isRemote { return side == humanColor ? "Your move" : "Your friend's move" }
+        return side == humanColor ? "Your move" : "The app's move"
     }
 }

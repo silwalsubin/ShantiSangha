@@ -4,12 +4,27 @@ import SwiftUI
 /// mode chips (Gentle / Measured / Sharp / 2 Players) live right here, so there
 /// is no separate hub: Home opens straight into the game.
 struct ChessGameView: View {
-    @StateObject private var vm = ChessGameViewModel()
+    @StateObject private var vm: ChessGameViewModel
     @StateObject private var holder = ChessSceneHolder()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Dismisses the (modally presented) landscape chess screen.
     var onClose: (() -> Void)?
+    private let isFriendGame: Bool
+
+    /// Solo (vs the app / pass-and-play).
+    init(onClose: (() -> Void)? = nil) {
+        self.onClose = onClose
+        self.isFriendGame = false
+        _vm = StateObject(wrappedValue: ChessGameViewModel())
+    }
+
+    /// Friend game over the network.
+    init(friend: ChessGameViewModel.FriendGame, onClose: (() -> Void)? = nil) {
+        self.onClose = onClose
+        self.isFriendGame = true
+        _vm = StateObject(wrappedValue: ChessGameViewModel(friend: friend))
+    }
 
     var body: some View {
         ZStack {
@@ -48,6 +63,7 @@ struct ChessGameView: View {
         }
         .onDisappear {
             holder.stopMotion()
+            vm.teardown()
         }
         .onChange(of: reduceMotion) { _, newValue in
             holder.controller.reduceMotion = newValue
@@ -141,23 +157,39 @@ struct ChessGameView: View {
     /// focus: choose opponent / difficulty, start a new game, or undo.
     private var optionsMenu: some View {
         Menu {
-            Picker("Opponent", selection: opponentBinding) {
-                ForEach(ChessMode.allCases) { mode in
-                    Text(mode.title).tag(mode)
+            if isFriendGame {
+                Section {
+                    Button(role: .destructive) {
+                        vm.resign()
+                    } label: {
+                        Label("Resign", systemImage: "flag")
+                    }
+                    .disabled(vm.isGameOver)
+                    Button {
+                        vm.newGame()
+                    } label: {
+                        Label("New game", systemImage: "arrow.clockwise")
+                    }
                 }
-            }
-            Section {
-                Button {
-                    vm.newGame()
-                } label: {
-                    Label("New game", systemImage: "arrow.clockwise")
+            } else {
+                Picker("Opponent", selection: opponentBinding) {
+                    ForEach(ChessMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
                 }
-                Button {
-                    vm.undo()
-                } label: {
-                    Label("Undo move", systemImage: "arrow.uturn.backward")
+                Section {
+                    Button {
+                        vm.newGame()
+                    } label: {
+                        Label("New game", systemImage: "arrow.clockwise")
+                    }
+                    Button {
+                        vm.undo()
+                    } label: {
+                        Label("Undo move", systemImage: "arrow.uturn.backward")
+                    }
+                    .disabled(!vm.canUndo)
                 }
-                .disabled(!vm.canUndo)
             }
             Section {
                 Button {
