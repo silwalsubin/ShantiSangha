@@ -38,8 +38,11 @@ public static class DependencyInjection
         {
             var jobs = services.GetRequiredService<IBackgroundJobClient>();
 
-            // Generate title after first exchange (user + assistant = 2 messages)
-            if (@event.MessageCount == 2)
+            // Generate title after the first real exchange. Count is 2 when the
+            // user spoke first, 3 when the companion opened the conversation
+            // (opener + user + assistant). The event only fires after assistant
+            // replies, so exactly one of these values occurs per conversation.
+            if (@event.MessageCount is 2 or 3)
                 jobs.Enqueue<GenerateConversationTitleJob>(j => j.RunAsync(@event.ConversationId));
 
             await Task.CompletedTask;

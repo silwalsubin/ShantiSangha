@@ -118,6 +118,7 @@ try
         .AddApplicationPart(typeof(ShantiSangha.Reminders.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Chat.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Journal.DependencyInjection).Assembly)
+        .AddApplicationPart(typeof(ShantiSangha.Memory.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Wellness.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Friends.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Notifications.DependencyInjection).Assembly)

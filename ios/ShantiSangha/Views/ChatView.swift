@@ -61,7 +61,15 @@ struct ChatView: View {
         .task {
             await loadMessages()
             if messages.isEmpty {
-                await loadOpeningPrompt()
+                // Companion speaks first in a brand-new conversation — unless
+                // the user arrived carrying a voice note to share, where the
+                // greeting would step on their intent.
+                if initialText == nil {
+                    await streamOpener()
+                }
+                if messages.isEmpty {
+                    await loadOpeningPrompt()
+                }
             }
         }
     }
@@ -353,59 +361,7 @@ struct ChatView: View {
             }
             request.httpBody = try JSONEncoder().encode(["content": text])
 
-            let (bytes, _) = try await URLSession.shared.bytes(for: request)
-            var buffer = Data()
-            let eventTerminator = Data("\n\n".utf8)
-
-            for try await byte in bytes {
-                buffer.append(byte)
-
-                // Drain any complete SSE events from the buffer. Events are
-                // separated by `\n\n` per spec.
-                while let range = buffer.range(of: eventTerminator) {
-                    let eventData = buffer.subdata(in: 0..<range.lowerBound)
-                    buffer.removeSubrange(0..<range.upperBound)
-
-                    guard let eventText = String(data: eventData, encoding: .utf8) else { continue }
-
-                    // An SSE event may have multiple `data:` lines; join their
-                    // payloads with `\n` per spec.
-                    var dataParts: [String] = []
-                    for line in eventText.split(separator: "\n", omittingEmptySubsequences: false) {
-                        if line.hasPrefix("data: ") {
-                            dataParts.append(String(line.dropFirst(6)))
-                        } else if line.hasPrefix("data:") {
-                            dataParts.append(String(line.dropFirst(5)))
-                        }
-                    }
-                    let payload = dataParts.joined(separator: "\n")
-                    if payload.isEmpty || payload == "[DONE]" { continue }
-
-                    // Each payload is a JSON-encoded string. Decoding restores
-                    // any embedded newlines, quotes, or non-ASCII chars intact.
-                    guard let payloadData = payload.data(using: .utf8),
-                          let decoded = try? JSONDecoder().decode(String.self, from: payloadData) else {
-                        continue
-                    }
-
-                    if let idx = messages.firstIndex(where: { $0.id == assistantId }) {
-                        let wasEmpty = messages[idx].content.isEmpty
-                        let update = {
-                            messages[idx].content += decoded
-                            if messages[idx].timestamp == nil {
-                                messages[idx].timestamp = Date()
-                            }
-                        }
-                        if wasEmpty {
-                            withAnimation(.easeOut(duration: 0.2)) {
-                                update()
-                            }
-                        } else {
-                            update()
-                        }
-                    }
-                }
-            }
+            try await streamSSE(request: request, into: assistantId)
             failedSendText = nil
         } catch {
             if !error.isCancellation {
@@ -444,6 +400,93 @@ struct ChatView: View {
         inputText = text
         failedSendText = nil
         await sendMessage()
+    }
+
+    /// Companion speaks first: streams a personalized greeting into a
+    /// brand-new conversation. On failure the empty placeholder is removed so
+    /// the static opening card quietly takes its place instead.
+    private func streamOpener() async {
+        sending = true
+        let assistantId = UUID().uuidString
+        withAnimation(.easeOut(duration: 0.2)) {
+            messages.append(ChatMessage(id: assistantId, role: "assistant", content: "", timestamp: nil))
+        }
+
+        do {
+            let token = try await Auth.auth().currentUser?.getIDToken()
+            if let url = URL(string: "https://shantisangha.com/api/conversations/\(conversationId)/opener") {
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                if let token = token {
+                    request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                }
+                try await streamSSE(request: request, into: assistantId)
+            }
+        } catch {
+            if !error.isCancellation {
+                AppLogger.shared.error("Chat", "Opener stream error: \(error)")
+            }
+        }
+
+        if let idx = messages.firstIndex(where: { $0.id == assistantId }), messages[idx].content.isEmpty {
+            messages.remove(at: idx)
+        }
+        sending = false
+    }
+
+    /// Drains an SSE response into the message with `assistantId`. Events are
+    /// separated by `\n\n`; each `data:` payload is a JSON-encoded string so
+    /// embedded newlines, quotes, and non-ASCII chars survive framing intact.
+    private func streamSSE(request: URLRequest, into assistantId: String) async throws {
+        let (bytes, _) = try await URLSession.shared.bytes(for: request)
+        var buffer = Data()
+        let eventTerminator = Data("\n\n".utf8)
+
+        for try await byte in bytes {
+            buffer.append(byte)
+
+            while let range = buffer.range(of: eventTerminator) {
+                let eventData = buffer.subdata(in: 0..<range.lowerBound)
+                buffer.removeSubrange(0..<range.upperBound)
+
+                guard let eventText = String(data: eventData, encoding: .utf8) else { continue }
+
+                // An SSE event may have multiple `data:` lines; join their
+                // payloads with `\n` per spec.
+                var dataParts: [String] = []
+                for line in eventText.split(separator: "\n", omittingEmptySubsequences: false) {
+                    if line.hasPrefix("data: ") {
+                        dataParts.append(String(line.dropFirst(6)))
+                    } else if line.hasPrefix("data:") {
+                        dataParts.append(String(line.dropFirst(5)))
+                    }
+                }
+                let payload = dataParts.joined(separator: "\n")
+                if payload.isEmpty || payload == "[DONE]" { continue }
+
+                guard let payloadData = payload.data(using: .utf8),
+                      let decoded = try? JSONDecoder().decode(String.self, from: payloadData) else {
+                    continue
+                }
+
+                if let idx = messages.firstIndex(where: { $0.id == assistantId }) {
+                    let wasEmpty = messages[idx].content.isEmpty
+                    let update = {
+                        messages[idx].content += decoded
+                        if messages[idx].timestamp == nil {
+                            messages[idx].timestamp = Date()
+                        }
+                    }
+                    if wasEmpty {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            update()
+                        }
+                    } else {
+                        update()
+                    }
+                }
+            }
+        }
     }
 }
 

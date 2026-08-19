@@ -44,4 +44,17 @@ public class MemoryQueryService(
 
         return hits.Where(h => h.Distance <= MaxDistance).ToList();
     }
+
+    public async Task<IReadOnlyList<MemoryHit>> GetRecentAsync(
+        Guid userId,
+        int count = 5,
+        CancellationToken ct = default)
+    {
+        return await db.MemoryChunks
+            .Where(c => c.UserId == userId && c.Embedding != null)
+            .OrderByDescending(c => c.OccurredAt)
+            .Take(count)
+            .Select(c => new MemoryHit(c.SourceType, c.SourceId, c.Content, c.OccurredAt, 0d))
+            .ToListAsync(ct);
+    }
 }

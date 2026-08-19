@@ -128,6 +128,44 @@ public class ConversationsController(
         return NoContent();
     }
 
+    /// The companion speaks first. Called by the client when it enters a
+    /// brand-new (empty) conversation; streams a short personalized greeting
+    /// as SSE and persists it as the first assistant message. No-ops (empty
+    /// stream) if the conversation already has messages.
+    [HttpPost("{id:guid}/opener")]
+    public async Task StreamOpener(Guid id, CancellationToken cancellationToken)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null)
+        {
+            HttpContext.Response.StatusCode = 401;
+            return;
+        }
+
+        var conversation = await db.Conversations
+            .FirstOrDefaultAsync(c => c.Id == id && c.UserId == user.Id, cancellationToken);
+
+        if (conversation is null)
+        {
+            HttpContext.Response.StatusCode = 404;
+            return;
+        }
+
+        HttpContext.Response.Headers.ContentType = "text/event-stream";
+        HttpContext.Response.Headers.CacheControl = "no-cache";
+        HttpContext.Response.Headers.Connection = "keep-alive";
+
+        await foreach (var chunk in chatService.StreamOpenerAsync(user.Id, id, cancellationToken))
+        {
+            var payload = JsonSerializer.Serialize(chunk);
+            await HttpContext.Response.WriteAsync($"data: {payload}\n\n", Encoding.UTF8, cancellationToken);
+            await HttpContext.Response.Body.FlushAsync(cancellationToken);
+        }
+
+        await HttpContext.Response.WriteAsync("data: [DONE]\n\n", Encoding.UTF8, cancellationToken);
+        await HttpContext.Response.Body.FlushAsync(cancellationToken);
+    }
+
     [HttpPost("{id:guid}/messages")]
     public async Task SendMessage(
         Guid id,

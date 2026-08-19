@@ -17,4 +17,12 @@ public interface IMemoryQueryService
         int topK = 5,
         Guid? excludeConversationId = null,
         CancellationToken ct = default);
+
+    /// The user's most recent memory fragments, newest first — used when there
+    /// is no query to search against (e.g. the companion opening a fresh
+    /// conversation). Distance is 0 on these hits.
+    Task<IReadOnlyList<MemoryHit>> GetRecentAsync(
+        Guid userId,
+        int count = 5,
+        CancellationToken ct = default);
 }

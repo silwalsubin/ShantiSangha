@@ -24,8 +24,9 @@ The core feature of ShantiSangha. A conversational AI that helps users process e
 - `GET /api/conversations` — list conversations
 - `POST /api/conversations` — create conversation
 - `GET /api/conversations/{id}` — get conversation with messages
-- `DELETE /api/conversations/{id}` — delete conversation
+- `DELETE /api/conversations/{id}` — delete conversation (also purges memory chunks)
 - `POST /api/conversations/{id}/messages` — send message (SSE streaming response)
+- `POST /api/conversations/{id}/opener` — companion speaks first: streams a personalized greeting into an empty conversation (SSE), drawn from the user's recent memory
 
 ## Q2 improvements planned
 - Spiritual grounding (system prompt with Gita, Buddhist teachings)

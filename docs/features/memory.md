@@ -20,5 +20,9 @@ The connective tissue that makes the companion actually know the user. Everythin
 - Retrieval consumer: `backend/ShantiSangha.Chat/AI/ChatService.cs`, `SystemPrompt.cs`
 - Contracts: `ShantiSangha.Shared/Interfaces/IMemoryQueryService.cs`, `Shared/Models/MemoryHit.cs`
 
-## API endpoints
-None — Memory is invisible infrastructure. It has no screens, no settings, no browsable surface (invisible-content principle).
+## Surfaces powered by memory
+- **Companion retrieval** — every chat reply is grounded in the user's own past words (invisible).
+- **Companion speaks first** — `POST /api/conversations/{id}/opener` (SSE): a short personalized greeting streamed into a brand-new conversation, drawn from the most recent memories. iOS calls it from `ChatView` when an empty conversation opens; falls back to the static opening card on failure.
+- **Home continuity line** — `GET /api/memory/presence?tzOffsetMinutes=` returns `{ daysReflected, windowDays, reflectedToday }`; Home shows "You've reflected N days of the last 7" under the greeting. Hidden at 0 — acknowledgment only, never guilt.
+
+No browsable surface, no settings — memory stays invisible (invisible-content principle).

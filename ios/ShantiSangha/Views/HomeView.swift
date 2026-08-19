@@ -49,6 +49,16 @@ struct HomeView: View {
                         showCalendar = true
                     }
 
+                    // Quiet continuity — presence made visible. Hidden at 0
+                    // days: we acknowledge what was done, never shame a gap.
+                    if let presence = vm.presence, presence.daysReflected > 0 {
+                        Text(continuityLine(presence))
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
+                            .padding(.top, 6)
+                            .transition(.opacity)
+                    }
+
                     // Whole-day context strip — sleep, steps, weather. Only
                     // appears when the user has enabled Health / Weather in
                     // Settings AND the relevant data is available. Silent
@@ -90,6 +100,7 @@ struct HomeView: View {
                 await vm.load()
                 updateWidgetData()
                 await refreshWholeDayContext()
+                await vm.loadPresence()
                 await circleVM.refresh()
             }
             .task {
@@ -97,12 +108,14 @@ struct HomeView: View {
                 // tap on the very first frame doesn't land before the
                 // ConnectionDetailView can find its connection.
                 async let circleLoad: () = circleVM.refresh()
+                async let presenceLoad: () = vm.loadPresence()
                 await vm.load()
                 updateWidgetData()
                 await refreshWholeDayContext()
                 await notifications.refreshUnreadCount()
                 await connections.refresh()
                 await circleLoad
+                await presenceLoad
             }
             .onChange(of: vm.overdueRemindersCount) { updateWidgetData() }
             .onChange(of: vm.dueTodayRemindersCount) { updateWidgetData() }
@@ -496,6 +509,14 @@ struct HomeView: View {
         if hour < 12 { return "Good morning\(name)" }
         if hour < 17 { return "Good afternoon\(name)" }
         return "Good evening\(name)"
+    }
+
+    private func continuityLine(_ presence: MemoryPresence) -> String {
+        if presence.daysReflected >= presence.windowDays {
+            return "You've reflected every day this week."
+        }
+        let days = presence.daysReflected == 1 ? "1 day" : "\(presence.daysReflected) days"
+        return "You've reflected \(days) of the last \(presence.windowDays)."
     }
 
 }

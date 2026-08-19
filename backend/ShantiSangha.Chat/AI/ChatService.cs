@@ -154,11 +154,7 @@ public class ChatService(
                     excludeConversationId: conversationId,
                     ct: cancellationToken);
 
-                if (hits.Count > 0)
-                {
-                    memories = string.Join("\n", hits.Select(h =>
-                        $"- [{(h.SourceType == "journal" ? "journal entry" : "conversation")}, {h.OccurredAt:MMMM d, yyyy}] {Excerpt(h.Content)}"));
-                }
+                memories = FormatMemories(hits);
             }
         }
         catch (Exception ex)
@@ -186,6 +182,85 @@ public class ChatService(
         }
 
         return history;
+    }
+
+    public async IAsyncEnumerable<string> StreamOpenerAsync(
+        Guid userId,
+        Guid conversationId,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        // The opener belongs only at the very start — if anything has been
+        // said (including a previous opener), stay quiet.
+        var hasMessages = await db.Messages
+            .AnyAsync(m => m.ConversationId == conversationId, cancellationToken);
+        if (hasMessages) yield break;
+
+        string? displayName = null;
+        string? memories = null;
+
+        try
+        {
+            displayName = await profileQuery.GetDisplayNameAsync(userId, cancellationToken);
+            var recent = await memoryQuery.GetRecentAsync(userId, MemoryTopK, cancellationToken);
+            memories = FormatMemories(recent);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to load opener context for conversation {ConversationId} — continuing with partial context", conversationId);
+        }
+
+        var systemPrompt = SystemPrompt.WithContext(displayName, memories)
+            + "\n\n---\n\n" + SystemPrompt.OpenerInstruction;
+
+        var history = new ChatHistory(systemPrompt);
+        history.AddUserMessage("(The person has just opened the conversation and hasn't said anything yet. Greet them first.)");
+
+        var chatCompletion = kernel.GetRequiredService<IChatCompletionService>(AiModels.SmartServiceId);
+        var responseChunks = new List<string>();
+
+        await foreach (var chunk in chatCompletion.GetStreamingChatMessageContentsAsync(
+            history, cancellationToken: cancellationToken))
+        {
+            var text = chunk.Content ?? string.Empty;
+            if (!string.IsNullOrEmpty(text))
+            {
+                responseChunks.Add(text);
+                yield return text;
+            }
+        }
+
+        var fullResponse = string.Concat(responseChunks);
+
+        var outputCheck = await safety.CheckOutputAsync(fullResponse, cancellationToken);
+        if (outputCheck.Outcome != SafetyCheckOutcome.Clear)
+        {
+            await safety.LogEventAsync(userId, "ResponseFlagged",
+                fullResponse, outputCheck.Reason, conversationId, CancellationToken.None);
+            logger.LogError("Opener failed output safety check in conversation {ConversationId}", conversationId);
+            yield return SupportResources.ResponseFallback;
+            fullResponse = SupportResources.ResponseFallback;
+        }
+
+        if (!string.IsNullOrWhiteSpace(fullResponse))
+        {
+            db.Messages.Add(new Message
+            {
+                Id = Guid.NewGuid(),
+                ConversationId = conversationId,
+                Role = MessageRole.Assistant,
+                Content = fullResponse.Trim(),
+                CreatedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync(CancellationToken.None);
+        }
+    }
+
+    private static string? FormatMemories(IReadOnlyList<ShantiSangha.Shared.Models.MemoryHit> hits)
+    {
+        if (hits.Count == 0) return null;
+
+        return string.Join("\n", hits.Select(h =>
+            $"- [{(h.SourceType == "journal" ? "journal entry" : "conversation")}, {h.OccurredAt:MMMM d, yyyy}] {Excerpt(h.Content)}"));
     }
 
     private static string Excerpt(string content)

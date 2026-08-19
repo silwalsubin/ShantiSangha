@@ -1,5 +1,14 @@
 import Foundation
 import Combine
+import SwiftUI
+
+/// Response of GET /api/memory/presence — days with a journal, voice note, or
+/// substantive companion message in the last `windowDays` local days.
+struct MemoryPresence: Decodable, Equatable {
+    let daysReflected: Int
+    let windowDays: Int
+    let reflectedToday: Bool
+}
 
 /// ViewModel for the Home screen — "What needs your attention today?"
 /// Reminders are the only thing on this surface now; they're served by
@@ -8,6 +17,10 @@ import Combine
 class HomeViewModel: ObservableObject {
     @Published var loading = true
     @Published var activeSwipeId: String?
+
+    /// Quiet continuity under the greeting — nil until loaded; the view hides
+    /// the line entirely at 0 days (acknowledgment only, never guilt).
+    @Published var presence: MemoryPresence?
 
     private let reminderRepo = ReminderRepository.shared
     private var cancellables = Set<AnyCancellable>()
@@ -84,6 +97,21 @@ class HomeViewModel: ObservableObject {
 
     func load() async {
         await reminderRepo.refresh()
+    }
+
+    func loadPresence() async {
+        do {
+            let tzOffsetMinutes = TimeZone.current.secondsFromGMT() / 60
+            let loaded: MemoryPresence = try await ApiService.shared
+                .get("/memory/presence?tzOffsetMinutes=\(tzOffsetMinutes)")
+            withAnimation(.easeIn(duration: 0.3)) {
+                presence = loaded
+            }
+        } catch {
+            if !error.isCancellation {
+                AppLogger.shared.error("Home", "Failed to load presence: \(error)")
+            }
+        }
     }
 
     // MARK: - Reminder operations
