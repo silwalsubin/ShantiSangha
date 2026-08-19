@@ -12,11 +12,11 @@ using Serilog;
 using ShantiSangha.Api;
 using ShantiSangha.Chat;
 using ShantiSangha.Chat.AI;
-using ShantiSangha.Chess;
 using ShantiSangha.Friends;
 using ShantiSangha.Friends.Realtime;
 using ShantiSangha.Identity;
 using ShantiSangha.Journal;
+using ShantiSangha.Memory;
 using ShantiSangha.Notifications;
 using ShantiSangha.Agent;
 using ShantiSangha.AgentFeedback;
@@ -100,9 +100,9 @@ try
     builder.Services.AddRemindersModule(connStr);
     builder.Services.AddChatModule(vectorDataSource);
     builder.Services.AddJournalModule(vectorDataSource);
+    builder.Services.AddMemoryModule(vectorDataSource);
     builder.Services.AddWellnessModule(connStr, appConfig.VoiceBucketName);
     builder.Services.AddFriendsModule(connStr, appConfig.FriendsMediaBucketName, appConfig.RedisUrl);
-    builder.Services.AddChessModule(connStr);
     builder.Services.AddNotificationsModule(connStr);
 
     // Agent: the in-app GPT-4o chat that can call backend operations as tools.
@@ -120,7 +120,6 @@ try
         .AddApplicationPart(typeof(ShantiSangha.Journal.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Wellness.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Friends.DependencyInjection).Assembly)
-        .AddApplicationPart(typeof(ShantiSangha.Chess.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Notifications.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.Agent.DependencyInjection).Assembly)
         .AddApplicationPart(typeof(ShantiSangha.AgentFeedback.DependencyInjection).Assembly)
@@ -246,6 +245,8 @@ try
     {
         scope.ServiceProvider.UseIdentityModule();
         scope.ServiceProvider.SubscribeJournalEvents();
+        scope.ServiceProvider.SubscribeChatEvents();
+        scope.ServiceProvider.SubscribeMemoryEvents();
     }
 
     // Run pending EF Core migrations on startup (safe to run on every deploy)
@@ -256,9 +257,9 @@ try
         await sp.GetRequiredService<ShantiSangha.Reminders.Data.RemindersDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Chat.Data.ChatDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Journal.Data.JournalDbContext>().Database.MigrateAsync();
+        await sp.GetRequiredService<ShantiSangha.Memory.Data.MemoryDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Wellness.Data.WellnessDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Friends.Data.FriendsDbContext>().Database.MigrateAsync();
-        await sp.GetRequiredService<ShantiSangha.Chess.Data.ChessDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Notifications.Data.NotificationsDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Agent.Data.AgentDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.AgentFeedback.Data.AgentFeedbackDbContext>().Database.MigrateAsync();

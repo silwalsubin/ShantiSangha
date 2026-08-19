@@ -64,8 +64,6 @@ struct HomeView: View {
                     } else {
                         remindersSection
                     }
-
-                    chessEntryCard
                 }
                 .padding(.top, SacredSpacing.xl)
                 .padding(.bottom, SacredSpacing.tabBarSafe + 72)
@@ -270,38 +268,6 @@ struct HomeView: View {
     }
 
     // MARK: - Reminders section
-
-    /// Quiet entry into the Chess feature — a single understated card that
-    /// pushes the Chess hub. Kept low-key so Home stays reminders-first.
-    private var chessEntryCard: some View {
-        Button {
-            ChessPresenter.present()
-        } label: {
-            LuxCard {
-                HStack(spacing: SacredSpacing.s) {
-                    Text("\u{265E}\u{FE0E}")
-                        .font(.system(size: 30, design: .serif))
-                        .foregroundColor(.sacredGold)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Chess")
-                            .font(.sacredSubheading)
-                            .foregroundColor(.sacredText)
-                        Text("A quiet game against the app")
-                            .font(.sacredSmall)
-                            .foregroundColor(.sacredMuted)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.sacredSmall)
-                        .foregroundColor(.sacredMuted)
-                }
-                .padding(SacredSpacing.m)
-            }
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, SacredSpacing.m)
-        .padding(.top, SacredSpacing.l)
-    }
 
     /// Wraps the horizon picker + reminders list (or empty-horizon state)
     /// in a single VStack so the parent ViewBuilder stays shallow. Without

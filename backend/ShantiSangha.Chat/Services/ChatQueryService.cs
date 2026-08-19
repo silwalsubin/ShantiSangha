@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using ShantiSangha.Chat.Data;
 using ShantiSangha.Chat.Models;
 using ShantiSangha.Shared.Interfaces;
+using ShantiSangha.Shared.Models;
 
 namespace ShantiSangha.Chat.Services;
 
@@ -25,5 +26,31 @@ public class ChatQueryService(ChatDbContext db) : IChatQueryService
         Guid conversationId, CancellationToken ct = default)
     {
         return await db.Messages.CountAsync(m => m.ConversationId == conversationId, ct);
+    }
+
+    public async Task<IReadOnlyList<ChatMessageDto>> GetMessagesAsync(
+        IReadOnlyCollection<Guid> messageIds, CancellationToken ct = default)
+    {
+        return await db.Messages
+            .Where(m => messageIds.Contains(m.Id))
+            .Select(m => new ChatMessageDto(
+                m.Id,
+                m.ConversationId,
+                m.Role == MessageRole.User ? "User" : "Assistant",
+                m.Content,
+                m.CreatedAt))
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<UserMessageRef>> GetAllUserMessageRefsAsync(
+        int minLength, CancellationToken ct = default)
+    {
+        return await db.Messages
+            .Where(m => m.Role == MessageRole.User && m.Content.Length >= minLength)
+            .Join(db.Conversations,
+                m => m.ConversationId,
+                c => c.Id,
+                (m, c) => new UserMessageRef(m.Id, c.UserId))
+            .ToListAsync(ct);
     }
 }

@@ -9,7 +9,7 @@ See `docs/features/` for detailed feature documentation (purpose, value, how it 
 - [Voice](docs/features/voice.md) — audio notes with async transcription
 - [Friends](docs/features/friends.md) — quiet shared accountability; aggregated activity only, never content
 - [User search](docs/features/user-search.md) — find people by display name + optional location
-- [Chess](docs/features/chess/README.md) — quiet single-player chess vs the app (iOS, SpriteKit + GameplayKit); friend mode deferred
+- [Memory](docs/features/memory.md) — invisible pgvector memory over journals/voice/chat; the companion remembers the user's own words
 
 ## Design Principles
 Every UI decision must honor these principles. See `docs/design-principles/` for details:

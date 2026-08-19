@@ -32,7 +32,7 @@ namespace ShantiSangha.Friends.Realtime;
 /// the source of truth.
 /// </summary>
 // Also implements the Shared `IRealtimeBroadcaster` (its single PublishAsync
-// matches the one below) so other modules (e.g. Chess) can broadcast without
+// matches the one below) so other modules can broadcast without
 // depending on Friends.
 public class RedisChatRealtimeHub : IChatRealtimeHub, IRealtimeBroadcaster, IAsyncDisposable
 {

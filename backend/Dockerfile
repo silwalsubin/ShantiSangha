@@ -9,6 +9,7 @@ COPY ShantiSangha.Identity/ShantiSangha.Identity.csproj ShantiSangha.Identity/
 COPY ShantiSangha.Reminders/ShantiSangha.Reminders.csproj ShantiSangha.Reminders/
 COPY ShantiSangha.Chat/ShantiSangha.Chat.csproj ShantiSangha.Chat/
 COPY ShantiSangha.Journal/ShantiSangha.Journal.csproj ShantiSangha.Journal/
+COPY ShantiSangha.Memory/ShantiSangha.Memory.csproj ShantiSangha.Memory/
 COPY ShantiSangha.Wellness/ShantiSangha.Wellness.csproj ShantiSangha.Wellness/
 COPY ShantiSangha.Friends/ShantiSangha.Friends.csproj ShantiSangha.Friends/
 COPY ShantiSangha.Notifications/ShantiSangha.Notifications.csproj ShantiSangha.Notifications/

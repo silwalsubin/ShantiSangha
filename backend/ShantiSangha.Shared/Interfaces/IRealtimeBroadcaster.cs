@@ -4,7 +4,7 @@ namespace ShantiSangha.Shared.Interfaces;
 /// broadcast over the existing chat WebSocket hub without depending on the
 /// Friends module. Implemented by `RedisChatRealtimeHub` (Friends), which also
 /// implements the richer `IChatRealtimeHub`. `conversationId` is the channel
-/// clients subscribe to (for chess that's the friendship id).
+/// clients subscribe to (e.g. a friendship id).
 public interface IRealtimeBroadcaster
 {
     Task PublishAsync(Guid conversationId, string kind, object payload, CancellationToken ct = default);

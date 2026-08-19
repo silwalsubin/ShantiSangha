@@ -58,7 +58,7 @@ public static class DependencyInjection
         // dropping subscribers on the other instance.
         services.AddSingleton<IChatRealtimeHub, RedisChatRealtimeHub>();
         // Expose the same hub instance under the Shared broadcaster interface so
-        // other modules (Chess) can fan out over the chat WebSocket.
+        // other modules can fan out over the chat WebSocket.
         services.AddSingleton<ShantiSangha.Shared.Interfaces.IRealtimeBroadcaster>(
             sp => (ShantiSangha.Shared.Interfaces.IRealtimeBroadcaster)sp.GetRequiredService<IChatRealtimeHub>());
 

@@ -80,10 +80,10 @@ public static class SystemPrompt
         Remember: you are not here to fix anyone. You are here to walk beside them.
         """;
 
-    public static string WithContext(string? displayName)
+    public static string WithContext(string? displayName, string? memories = null)
     {
         // Stablest content first so OpenAI's automatic prompt caching can match
-        // the prefix across turns: Base → name.
+        // the prefix across turns: Base → name → memories (most volatile last).
         var parts = new List<string> { Base };
 
         if (displayName is not null)
@@ -91,6 +91,19 @@ public static class SystemPrompt
                 ## About this person
                 Their name is {displayName}. Use it naturally in conversation when it feels
                 right — not in every response.
+                """);
+
+        if (memories is not null)
+            parts.Add($"""
+                ## What you remember about this person
+                Fragments of their own words from past journal entries and conversations,
+                most relevant to this moment first. Draw on them the way a close friend
+                would — recall naturally ("a few weeks ago you wrote about…") when it
+                genuinely fits, notice patterns across time, and gently connect past to
+                present. Never recite them mechanically, never mention a memory system,
+                and never bring one up when it doesn't serve the person in front of you.
+
+                {memories}
                 """);
 
         return string.Join("\n\n---\n\n", parts);

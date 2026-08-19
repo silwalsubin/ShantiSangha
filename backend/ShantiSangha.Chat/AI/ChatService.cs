@@ -18,10 +18,15 @@ public class ChatService(
     Kernel kernel,
     ISafetyService safety,
     IProfileQueryService profileQuery,
+    IMemoryQueryService memoryQuery,
     IEventBus eventBus,
     ILogger<ChatService> logger) : IChatService
 {
     private const int RecentMessageCount = 20;
+    private const int MemoryTopK = 5;
+    // Long journal entries get clipped in the prompt — enough to recall the
+    // theme without paying for the whole entry every turn.
+    private const int MemoryExcerptLength = 400;
 
     public async IAsyncEnumerable<string> StreamResponseAsync(
         Guid userId,
@@ -136,17 +141,32 @@ public class ChatService(
         string? currentMessage = null)
     {
         string? displayName = null;
+        string? memories = null;
 
         try
         {
             displayName = await profileQuery.GetDisplayNameAsync(userId, cancellationToken);
+
+            if (!string.IsNullOrWhiteSpace(currentMessage))
+            {
+                var hits = await memoryQuery.SearchAsync(
+                    userId, currentMessage, MemoryTopK,
+                    excludeConversationId: conversationId,
+                    ct: cancellationToken);
+
+                if (hits.Count > 0)
+                {
+                    memories = string.Join("\n", hits.Select(h =>
+                        $"- [{(h.SourceType == "journal" ? "journal entry" : "conversation")}, {h.OccurredAt:MMMM d, yyyy}] {Excerpt(h.Content)}"));
+                }
+            }
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to load some context for conversation {ConversationId} — continuing with partial context", conversationId);
         }
 
-        var systemPrompt = SystemPrompt.WithContext(displayName: displayName);
+        var systemPrompt = SystemPrompt.WithContext(displayName: displayName, memories: memories);
 
         var history = new ChatHistory(systemPrompt);
 
@@ -166,5 +186,11 @@ public class ChatService(
         }
 
         return history;
+    }
+
+    private static string Excerpt(string content)
+    {
+        var flat = content.ReplaceLineEndings(" ").Trim();
+        return flat.Length <= MemoryExcerptLength ? flat : flat[..MemoryExcerptLength] + "…";
     }
 }

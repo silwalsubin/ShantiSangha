@@ -93,19 +93,6 @@ struct FriendChatView: View {
                 }
                 .buttonStyle(.plain)
             }
-            // Play chess with this friend (opens the landscape board).
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    if let fid = connection.friendshipId, let uid = connection.person.userId {
-                        ChessPresenter.presentFriend(friendshipId: fid, friendUserId: uid)
-                    }
-                } label: {
-                    Text("\u{265E}\u{FE0E}")
-                        .font(.system(size: 18, design: .serif))
-                        .foregroundColor(.sacredGold)
-                }
-                .buttonStyle(.plain)
-            }
         }
         .navigationDestination(isPresented: $showProfile) {
             ConnectionDetailView(connectionId: connection.id, vm: circleVM)

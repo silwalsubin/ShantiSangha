@@ -8,6 +8,7 @@ using ShantiSangha.Chat.Contracts;
 using ShantiSangha.Chat.Data;
 using ShantiSangha.Chat.Models;
 using ShantiSangha.Chat.Services;
+using ShantiSangha.Shared.Events;
 using ShantiSangha.Shared.Interfaces;
 
 namespace ShantiSangha.Chat.Controllers;
@@ -18,7 +19,8 @@ namespace ShantiSangha.Chat.Controllers;
 public class ConversationsController(
     ChatDbContext db,
     IChatService chatService,
-    ICurrentUser currentUser) : ControllerBase
+    ICurrentUser currentUser,
+    IEventBus eventBus) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> ListConversations(CancellationToken ct = default)
@@ -119,6 +121,9 @@ public class ConversationsController(
 
         db.Conversations.Remove(conversation);
         await db.SaveChangesAsync(ct);
+
+        // Deleted words must be forgotten everywhere — Memory purges its chunks.
+        await eventBus.PublishAsync(new ConversationDeletedEvent(id, user.Id), CancellationToken.None);
 
         return NoContent();
     }

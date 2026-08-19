@@ -15,4 +15,9 @@ public class JournalQueryService(JournalDbContext db) : IJournalQueryService
             .Select(j => new JournalContentDto(j.Id, j.UserId, j.Title, j.Content, j.CreatedAt))
             .FirstOrDefaultAsync(ct);
     }
+
+    public async Task<IReadOnlyList<Guid>> GetAllJournalIdsAsync(CancellationToken ct = default)
+    {
+        return await db.Journals.Select(j => j.Id).ToListAsync(ct);
+    }
 }

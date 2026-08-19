@@ -29,7 +29,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShantiSangha.Agent", "Shant
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShantiSangha.AgentFeedback", "ShantiSangha.AgentFeedback\ShantiSangha.AgentFeedback.csproj", "{BE4AB294-44CB-4447-BF88-12E23270CC62}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShantiSangha.Chess", "ShantiSangha.Chess\ShantiSangha.Chess.csproj", "{2E8A08B0-C973-4DA1-A725-B124BBFBEC2A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShantiSangha.Memory", "ShantiSangha.Memory\ShantiSangha.Memory.csproj", "{E9DB6C89-8516-4AA9-9C52-E815459F0EAA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -92,9 +92,9 @@ Global
 		{BE4AB294-44CB-4447-BF88-12E23270CC62}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BE4AB294-44CB-4447-BF88-12E23270CC62}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BE4AB294-44CB-4447-BF88-12E23270CC62}.Release|Any CPU.Build.0 = Release|Any CPU
-		{2E8A08B0-C973-4DA1-A725-B124BBFBEC2A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2E8A08B0-C973-4DA1-A725-B124BBFBEC2A}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2E8A08B0-C973-4DA1-A725-B124BBFBEC2A}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2E8A08B0-C973-4DA1-A725-B124BBFBEC2A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E9DB6C89-8516-4AA9-9C52-E815459F0EAA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E9DB6C89-8516-4AA9-9C52-E815459F0EAA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E9DB6C89-8516-4AA9-9C52-E815459F0EAA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E9DB6C89-8516-4AA9-9C52-E815459F0EAA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

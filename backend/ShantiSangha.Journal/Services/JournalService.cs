@@ -70,6 +70,9 @@ public class JournalService(JournalDbContext db, IEventBus eventBus) : IJournalS
         journal.UpdatedAt = DateTime.UtcNow;
 
         await db.SaveChangesAsync(ct);
+
+        await eventBus.PublishAsync(new JournalUpdatedEvent(journal.Id, userId), ct);
+
         return true;
     }
 
@@ -83,6 +86,9 @@ public class JournalService(JournalDbContext db, IEventBus eventBus) : IJournalS
 
         db.Journals.Remove(journal);
         await db.SaveChangesAsync(ct);
+
+        await eventBus.PublishAsync(new JournalDeletedEvent(id, userId), ct);
+
         return true;
     }
 

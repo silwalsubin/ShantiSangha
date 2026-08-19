@@ -29,12 +29,6 @@ final class ChatRealtimeClient {
     /// finds the matching message and attaches the suggestion inline.
     var onSuggestionReady: ((_ messageId: UUID, _ suggestion: FriendMessageSuggestion) -> Void)?
 
-    /// Fired on chess realtime frames (chess_move / chess_game_over /
-    /// chess_game_created) with the authoritative position, last move (UCI),
-    /// status string, and ply count. Used by friend-mode chess on the same
-    /// conversation channel (the friendship id).
-    var onChessUpdate: ((_ fen: String, _ lastMoveUci: String?, _ status: String, _ moveCount: Int) -> Void)?
-
     private let tokenProvider: TokenProvider
     private let baseURL: String
     private var task: URLSessionWebSocketTask?
@@ -224,13 +218,6 @@ final class ChatRealtimeClient {
                     dismissed: false,
                     accepted: false)
                 onSuggestionReady?(id, suggestion)
-            }
-        case "chess_move", "chess_game_over", "chess_game_created":
-            if let fen = envelope["fen"] as? String {
-                let uci = envelope["lastMoveUci"] as? String
-                let status = (envelope["status"] as? String) ?? "Active"
-                let moveCount = (envelope["moveCount"] as? Int) ?? 0
-                onChessUpdate?(fen, uci, status, moveCount)
             }
         default:
             break
