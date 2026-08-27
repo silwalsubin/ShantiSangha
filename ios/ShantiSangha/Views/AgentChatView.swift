@@ -374,7 +374,6 @@ struct AgentChatView: View {
             }
             .padding(.horizontal, SacredSpacing.m)
             .padding(.top, SacredSpacing.xs)
-            .background(Color.sacredBg)
         }
     }
 

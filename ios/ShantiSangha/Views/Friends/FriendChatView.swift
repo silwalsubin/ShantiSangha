@@ -39,6 +39,10 @@ struct FriendChatView: View {
     /// us on focus change so we can scroll the latest message above the
     /// keyboard rise.
     @State private var composerFocused: Bool = false
+    /// Leftward slide of the whole thread that reveals per-message times
+    /// on the trailing edge (iMessage pattern). 0 at rest; follows the
+    /// finger up to `timeRevealWidth` and springs back on release.
+    @State private var timeRevealX: CGFloat = 0
     @EnvironmentObject var profile: ProfileService
     @Environment(\.dismiss) private var dismiss
 
@@ -199,6 +203,8 @@ struct FriendChatView: View {
     /// leaves the newest bubble clipped).
     private static let bottomAnchorId = "chat-bottom-anchor"
     private static let groupedMessageSpacing: CGFloat = 2
+    /// How far the thread slides left when revealing message times.
+    private static let timeRevealWidth: CGFloat = 64
 
     /// Show the friend's avatar only on the first message of a
     /// consecutive run from them — repeating the same avatar on every
@@ -231,6 +237,22 @@ struct FriendChatView: View {
                 messageListContent
             }
             .scrollDismissesKeyboard(.interactively)
+            // Drag the thread left to peek at per-message times. A
+            // screen-level gesture so every row slides together; the
+            // per-row swipe-to-reply gesture only engages on rightward
+            // drags, so the two never fight.
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 15)
+                    .onChanged { value in
+                        guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                        timeRevealX = min(Self.timeRevealWidth, max(0, -value.translation.width))
+                    }
+                    .onEnded { _ in
+                        withAnimation(.spring(response: 0.32, dampingFraction: 0.8)) {
+                            timeRevealX = 0
+                        }
+                    }
+            )
             // `defaultScrollAnchor(.bottom)` tells the platform to
             // place the initial content at the bottom — the chat opens
             // AT the latest message. This is the platform's official
@@ -342,38 +364,69 @@ struct FriendChatView: View {
                 }
 
                 ForEach(Array(vm.messages.enumerated()), id: \.element.id) { idx, msg in
-                    SwipeToReplyRow(enabled: !msg.isDeleted) {
-                        vm.beginReply(msg)
-                    } content: {
-                        MessageBubble(
-                            message: msg,
-                            fromFriend: vm.isFromFriend(msg),
-                            friendDisplayName: currentConnection.displayLabel,
-                            friendAvatarUrl: currentConnection.ownerVisibleAvatarUrl,
-                            showAvatar: shouldShowAvatar(at: idx),
-                            currentUserId: profile.currentUserId,
-                            isHighlighted: highlightedMessageId == msg.id,
-                            onTapImage: { url in imagePreview = PreviewedImage(url: url, messageId: msg.id) },
-                            onTapReaction: { emoji in
-                                if let me = profile.currentUserId {
-                                    Task { await vm.toggleReaction(emoji, on: msg.id, currentUserId: me) }
-                                }
-                            },
-                            onTapReplyPreview: { parentId in jumpToMessage(parentId) },
-                            onTapAvatar: { showProfile = true },
-                            onScheduleSuggestion: {
-                                if let s = msg.suggestion {
-                                    suggestionScheduleTarget = SuggestionScheduleTarget(
-                                        messageId: msg.id,
-                                        label: s.label,
-                                        date: s.date,
-                                        recurrence: s.recurrence,
-                                        connectionId: connection.id)
-                                }
-                            },
-                            onDismissSuggestion: {
-                                Task { await vm.dismissSuggestion(messageId: msg.id) }
-                            })
+                    // One view per element — the bottom-pinning scroll
+                    // logic (scrollPosition + defaultScrollAnchor) relies
+                    // on each row being a single identified view, so the
+                    // time stamp lives INSIDE the row container, never as
+                    // a sibling.
+                    VStack(spacing: 0) {
+                        if let stamp = timeSeparatorLabel(at: idx) {
+                            Text(stamp)
+                                .font(.sacredMicro)
+                                .foregroundColor(.sacredMuted)
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, idx == 0 ? 0 : SacredSpacing.m)
+                                .padding(.bottom, SacredSpacing.xs)
+                        }
+
+                        SwipeToReplyRow(enabled: !msg.isDeleted) {
+                            vm.beginReply(msg)
+                        } content: {
+                            MessageBubble(
+                                message: msg,
+                                fromFriend: vm.isFromFriend(msg),
+                                friendDisplayName: currentConnection.displayLabel,
+                                friendAvatarUrl: currentConnection.ownerVisibleAvatarUrl,
+                                showAvatar: shouldShowAvatar(at: idx),
+                                currentUserId: profile.currentUserId,
+                                isHighlighted: highlightedMessageId == msg.id,
+                                showTime: idx == vm.messages.count - 1 && vm.outbox.isEmpty,
+                                showReadReceipt: msg.id == lastReadOutgoingMessageId,
+                                onTapImage: { url in imagePreview = PreviewedImage(url: url, messageId: msg.id) },
+                                onTapReaction: { emoji in
+                                    if let me = profile.currentUserId {
+                                        Task { await vm.toggleReaction(emoji, on: msg.id, currentUserId: me) }
+                                    }
+                                },
+                                onTapReplyPreview: { parentId in jumpToMessage(parentId) },
+                                onTapAvatar: { showProfile = true },
+                                onScheduleSuggestion: {
+                                    if let s = msg.suggestion {
+                                        suggestionScheduleTarget = SuggestionScheduleTarget(
+                                            messageId: msg.id,
+                                            label: s.label,
+                                            date: s.date,
+                                            recurrence: s.recurrence,
+                                            connectionId: connection.id)
+                                    }
+                                },
+                                onDismissSuggestion: {
+                                    Task { await vm.dismissSuggestion(messageId: msg.id) }
+                                })
+                        }
+                        // The whole thread slides left together; each row's
+                        // time waits just past the trailing edge and rides in
+                        // with the slide. Applied to the bubble row only, so
+                        // the centered time stamp above stays put.
+                        .overlay(alignment: .trailing) {
+                            Text(revealTimeLabel(for: msg))
+                                .font(.sacredMicro)
+                                .foregroundColor(.sacredMuted)
+                                .fixedSize()
+                                .offset(x: Self.timeRevealWidth)
+                                .opacity(timeRevealX / Self.timeRevealWidth)
+                        }
+                        .offset(x: -timeRevealX)
                     }
                     .id(msg.id.uuidString)
                     .padding(.top, spacingBeforeMessage(at: idx))
@@ -398,6 +451,7 @@ struct FriendChatView: View {
                         pending: pending,
                         onRetry: { Task { await vm.retryPending(pending.id) } },
                         onDelete: { vm.deletePending(pending.id) })
+                    .offset(x: -timeRevealX)
                     .padding(.top, spacingBeforePending(at: idx))
                 }
 
@@ -419,6 +473,56 @@ struct FriendChatView: View {
                 .foregroundColor(.sacredRed)
                 .padding(.horizontal, SacredSpacing.m)
         }
+    }
+
+    /// Only the newest read outgoing message wears the read-receipt
+    /// avatar — one quiet marker for "read up to here", not a trail of
+    /// them down the thread.
+    private var lastReadOutgoingMessageId: UUID? {
+        vm.messages.last(where: { !vm.isFromFriend($0) && !$0.isDeleted && $0.readAt != nil })?.id
+    }
+
+    // MARK: - Time grouping
+
+    private func sentDate(_ msg: FriendMessage) -> Date? {
+        FriendsDates.parse(msg.sentAt)
+    }
+
+    /// Centered stamp above the first message of each time cluster —
+    /// grouped the way Reflect groups its timeline (Today / Yesterday /
+    /// weekday / full date). A new cluster starts at the top of the
+    /// thread, on a day change, or after an hour of silence.
+    private func timeSeparatorLabel(at index: Int) -> String? {
+        guard let date = sentDate(vm.messages[index]) else { return nil }
+        if index > 0,
+           let prev = sentDate(vm.messages[index - 1]),
+           Calendar.current.isDate(prev, inSameDayAs: date),
+           date.timeIntervalSince(prev) < 3600 {
+            return nil
+        }
+
+        let calendar = Calendar.current
+        let time = DateFormatter()
+        time.dateFormat = "h:mm a"
+        if calendar.isDateInToday(date) { return "Today, \(time.string(from: date))" }
+        if calendar.isDateInYesterday(date) { return "Yesterday, \(time.string(from: date))" }
+
+        let days = calendar.dateComponents(
+            [.day],
+            from: calendar.startOfDay(for: date),
+            to: calendar.startOfDay(for: Date())).day ?? 0
+        let f = DateFormatter()
+        f.dateFormat = days < 7 ? "EEEE, h:mm a" : "MMM d, yyyy 'at' h:mm a"
+        return f.string(from: date)
+    }
+
+    /// Short time shown when the thread is slid left.
+    private func revealTimeLabel(for msg: FriendMessage) -> String {
+        guard let d = sentDate(msg) else { return "" }
+        let f = DateFormatter()
+        f.dateStyle = .none
+        f.timeStyle = .short
+        return f.string(from: d)
     }
 
     /// Scroll to and briefly highlight the message with the given id —
@@ -794,6 +898,12 @@ private struct MessageBubble: View {
     let showAvatar: Bool
     let currentUserId: UUID?
     let isHighlighted: Bool
+    /// Timestamps are hidden by default (slide the thread left to peek);
+    /// only the newest message keeps its time visible inline.
+    let showTime: Bool
+    /// True only for the newest read outgoing message — the single row
+    /// that wears the tiny read-receipt avatar.
+    let showReadReceipt: Bool
     let onTapImage: (URL) -> Void
     let onTapReaction: (String) -> Void
     let onTapReplyPreview: (UUID) -> Void
@@ -983,28 +1093,35 @@ private struct MessageBubble: View {
         }
     }
 
+    @ViewBuilder
     private var metaLine: some View {
-        HStack(spacing: 4) {
-            if message.isEdited && !message.isDeleted {
-                Text("edited")
-                    .font(.sacredMicro)
-                    .foregroundColor(.sacredMuted)
-            }
-            Text(timeLabel)
-                .font(.sacredMicro)
-                .foregroundColor(.sacredMuted)
+        let showEdited = message.isEdited && !message.isDeleted
+        let showRead = showReadReceipt
+        if showEdited || showRead || showTime {
+            HStack(spacing: 4) {
+                if showEdited {
+                    Text("edited")
+                        .font(.sacredMicro)
+                        .foregroundColor(.sacredMuted)
+                }
+                if showTime {
+                    Text(timeLabel)
+                        .font(.sacredMicro)
+                        .foregroundColor(.sacredMuted)
+                }
 
-            // Outgoing-only read receipt. Tiny friend avatar appears
-            // once they've read the message — same approach iMessage and
-            // Instagram use, more personal than a checkmark and reuses
-            // the avatar already on the friend's bubbles. While the
-            // message is unread, the slot stays empty (no "sent" tick;
-            // delivery is implicit if the row appeared at all).
-            if !fromFriend && !message.isDeleted && message.readAt != nil {
-                SacredAvatar(
-                    displayName: friendDisplayName,
-                    avatarUrl: friendAvatarUrl,
-                    size: 12)
+                // Outgoing-only read receipt. Tiny friend avatar appears
+                // once they've read the message — same approach iMessage and
+                // Instagram use, more personal than a checkmark and reuses
+                // the avatar already on the friend's bubbles. While the
+                // message is unread, the slot stays empty (no "sent" tick;
+                // delivery is implicit if the row appeared at all).
+                if showRead {
+                    SacredAvatar(
+                        displayName: friendDisplayName,
+                        avatarUrl: friendAvatarUrl,
+                        size: 12)
+                }
             }
         }
     }

@@ -63,6 +63,7 @@ struct SacredChatComposer<Banner: View, Accessories: View>: View {
                 accessories()
 
                 TextField(placeholder, text: $text, axis: .vertical)
+                    .typingHaptics(for: text)
                     .font(.sacredText)
                     .lineLimit(1...5)
                     .padding(.horizontal, 12)
@@ -83,12 +84,8 @@ struct SacredChatComposer<Banner: View, Accessories: View>: View {
         }
         .padding(.horizontal, SacredSpacing.m)
         .padding(.vertical, SacredSpacing.s)
-        .background(Color.sacredBg)
-        .overlay(
-            Rectangle()
-                .fill(Color.sacredGold.opacity(0.1))
-                .frame(height: 0.5),
-            alignment: .top)
+        // No fill or hairline of its own — the screen's background runs
+        // through so the composer reads as part of one continuous surface.
         .onAppear(perform: focusIfNeeded)
         .onChange(of: focused) { _, new in onFocusChange?(new) }
     }
