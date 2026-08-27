@@ -11,6 +11,8 @@ shipping.
 | `GoldenSets/chart_chat_topic_routing.json` | 12 representative chart-chat questions; each declares the signature families that MUST appear in the top-K after `ChartTopicRouter.Rerank` runs. |
 | `ChartChatTopicRoutingTests.cs` | Deterministic test harness. Runs each case against a synthetic (planet × house) passage pool and asserts the rerank hits the expected signatures. **No DB, no LLM, CI-safe.** |
 | `Agent/QuickActionSuggesterEvalTests.cs` | Behavioral eval for the assistant's quick-action chips. Asserts trivial replies yield ZERO chips (sparseness) and actionable replies yield 1–3 well-formed chips (helpfulness). **Live — hits gpt-4o-mini, gated behind `AI_EVAL_LIVE=1`.** |
+| `Shared/UnifiedPromptTests.cs` | Deterministic guards for the merged one-mind prompt behind both chat surfaces: warmth + tool discipline present on both, Reflect never points at reminder cards, memories last for prompt caching. **No LLM, CI-safe.** |
+| `Shared/UnifiedPromptLiveEvalTests.cs` | The merge's two failure modes: tone bleed (a feeling answered with lists or a tool call) and task decay (a reminder request that never reaches `schedule_reminder` or lands on the wrong date). Uses a recording fake reminders plugin. **Live — hits gpt-4o, gated behind `AI_EVAL_LIVE=1`.** |
 
 Run (deterministic, CI-safe — live evals show as skipped):
 

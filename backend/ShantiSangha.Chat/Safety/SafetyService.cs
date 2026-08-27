@@ -25,7 +25,7 @@ public class SafetyService(
     // violence, etc.). We intentionally allow most of them — users may need
     // to process intimacy, anger, conflict, grief, or embodied experience
     // without the chat refusing. The AI's own tone is already shaped by
-    // the SystemPrompt.
+    // the system prompt.
     //
     // These categories remain blocked regardless:
     //   - sexual/minors: legal boundary, never permitted.

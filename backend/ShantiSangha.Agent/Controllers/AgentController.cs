@@ -7,7 +7,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using ShantiSangha.Agent.AI;
 using ShantiSangha.Agent.Contracts;
-using ShantiSangha.Agent.Data;
 using ShantiSangha.Agent.Models;
 using ShantiSangha.Reminders.Services;
 using ShantiSangha.Shared.Interfaces;

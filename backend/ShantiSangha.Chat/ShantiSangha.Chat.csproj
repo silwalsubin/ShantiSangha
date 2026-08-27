@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ShantiSangha.Shared\ShantiSangha.Shared.csproj" />
+    <ProjectReference Include="..\ShantiSangha.Tools\ShantiSangha.Tools.csproj" />
   </ItemGroup>
 
   <ItemGroup>

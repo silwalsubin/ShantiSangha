@@ -1,4 +1,4 @@
-namespace ShantiSangha.Chat.AI;
+namespace ShantiSangha.Shared.AI;
 
 public static class SupportResources
 {

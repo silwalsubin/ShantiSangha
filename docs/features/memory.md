@@ -17,7 +17,7 @@ The connective tissue that makes the companion actually know the user. Everythin
 
 ## Key files
 - Module: `backend/ShantiSangha.Memory/` (own `MemoryDbContext`, own migrations, references Shared only)
-- Retrieval consumer: `backend/ShantiSangha.Chat/AI/ChatService.cs`, `SystemPrompt.cs`
+- Retrieval consumer: `backend/ShantiSangha.Chat/AI/ChatService.cs`, `backend/ShantiSangha.Shared/AI/UnifiedPrompt.cs` (one prompt for both chat surfaces)
 - Contracts: `ShantiSangha.Shared/Interfaces/IMemoryQueryService.cs`, `Shared/Models/MemoryHit.cs`
 
 ## Surfaces powered by memory

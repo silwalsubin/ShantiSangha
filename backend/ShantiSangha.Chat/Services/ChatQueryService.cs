@@ -45,12 +45,16 @@ public class ChatQueryService(ChatDbContext db) : IChatQueryService
     public async Task<IReadOnlyList<UserMessageRef>> GetAllUserMessageRefsAsync(
         int minLength, CancellationToken ct = default)
     {
+        // Companion (Reflect) threads only: assistant threads are task
+        // chatter, deliberately never memory-indexed (see IConversationStore).
         return await db.Messages
             .Where(m => m.Role == MessageRole.User && m.Content.Length >= minLength)
             .Join(db.Conversations,
                 m => m.ConversationId,
                 c => c.Id,
-                (m, c) => new UserMessageRef(m.Id, c.UserId))
+                (m, c) => new { m, c })
+            .Where(x => x.c.Type == ConversationType.General)
+            .Select(x => new UserMessageRef(x.m.Id, x.c.UserId))
             .ToListAsync(ct);
     }
 }

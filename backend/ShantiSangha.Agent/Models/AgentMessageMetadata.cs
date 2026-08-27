@@ -6,8 +6,9 @@ namespace ShantiSangha.Agent.Models;
 /// <summary>
 /// Shape of the JSON the assistant stores in the unified store's
 /// Message.MetadataJson: the reminders a reply referenced and/or the S3 key
-/// of a photo shared on a user turn. Superset of the legacy
-/// AgentMessageAttachments shape, so migrated rows decode unchanged.
+/// of a photo shared on a user turn. Superset of the legacy attachments
+/// shape from the retired AgentMessages table, so migrated rows decode
+/// unchanged.
 /// </summary>
 public sealed record AgentMessageMetadata(
     [property: JsonPropertyName("reminderIds")] IReadOnlyList<Guid>? ReminderIds = null,

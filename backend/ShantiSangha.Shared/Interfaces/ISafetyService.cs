@@ -1,4 +1,4 @@
-namespace ShantiSangha.Chat.Safety;
+namespace ShantiSangha.Shared.Interfaces;
 
 public enum SafetyCheckOutcome { Clear, Flagged, Crisis }
 
@@ -6,6 +6,11 @@ public record SafetyCheckResult(
     SafetyCheckOutcome Outcome,
     string? Reason = null);
 
+/// <summary>
+/// One safety spine for every AI surface. Implemented in the Chat module
+/// (OpenAI moderation + crisis keyword list); consumed by both the Reflect
+/// companion and the assistant orchestrator.
+/// </summary>
 public interface ISafetyService
 {
     /// <summary>Check an inbound user message before it reaches the AI.</summary>

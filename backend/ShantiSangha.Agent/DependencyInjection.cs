@@ -1,8 +1,6 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ShantiSangha.Agent.AI;
-using ShantiSangha.Agent.Data;
 using ShantiSangha.Agent.Storage;
 using ShantiSangha.Tools;
 using ShantiSangha.Tools.AgentFeedback;
@@ -14,11 +12,8 @@ namespace ShantiSangha.Agent;
 public static class DependencyInjection
 {
     public static IServiceCollection AddAgentModule(
-        this IServiceCollection services, string connectionString, string mediaBucketName)
+        this IServiceCollection services, string mediaBucketName)
     {
-        services.AddDbContext<AgentDbContext>(options =>
-            options.UseNpgsql(connectionString));
-
         // Server-side image store for photos the user shares with the
         // assistant. Reuses the shared media bucket under an `agent/` prefix.
         services.AddSingleton(sp =>

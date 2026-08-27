@@ -3,30 +3,35 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
+using Microsoft.SemanticKernel.Connectors.OpenAI;
 using ShantiSangha.Chat.Data;
 using ShantiSangha.Chat.Models;
-using ShantiSangha.Chat.Safety;
 using ShantiSangha.Chat.Services;
 using ShantiSangha.Shared;
+using ShantiSangha.Shared.AI;
 using ShantiSangha.Shared.Events;
 using ShantiSangha.Shared.Interfaces;
+using ShantiSangha.Tools;
+using ShantiSangha.Tools.AgentFeedback;
 
 namespace ShantiSangha.Chat.AI;
 
 public class ChatService(
     ChatDbContext db,
     Kernel kernel,
+    IServiceProvider services,
     ISafetyService safety,
     IProfileQueryService profileQuery,
     IMemoryQueryService memoryQuery,
+    AgentTurnContext turnContext,
     IEventBus eventBus,
     ILogger<ChatService> logger) : IChatService
 {
     private const int RecentMessageCount = 20;
-    private const int MemoryTopK = 5;
-    // Long journal entries get clipped in the prompt — enough to recall the
-    // theme without paying for the whole entry every turn.
-    private const int MemoryExcerptLength = 400;
+
+    // Generous ceiling for a reflective reply that may also cross a tool
+    // round or two — protects against a hung tool loop, not a slow answer.
+    private static readonly TimeSpan LoopTimeout = TimeSpan.FromSeconds(60);
 
     public async IAsyncEnumerable<string> StreamResponseAsync(
         Guid userId,
@@ -69,23 +74,42 @@ public class ChatService(
         db.Messages.Add(userMsg);
         await db.SaveChangesAsync(cancellationToken);
 
-        // --- Step 3: Build context and stream AI response ---
-        var chatHistory = await BuildChatHistoryAsync(userId, conversationId, cancellationToken, userMessage);
-        var chatCompletion = kernel.GetRequiredService<IChatCompletionService>(AiModels.SmartServiceId);
-        var responseChunks = new List<string>();
+        // Any feedback the LLM records this turn attributes back to the exact
+        // message that triggered it.
+        turnContext.CurrentUserMessageId = userMsg.Id;
 
-        await foreach (var chunk in chatCompletion.GetStreamingChatMessageContentsAsync(
-            chatHistory, cancellationToken: cancellationToken))
+        // --- Step 3: Build context and stream AI response (one mind: the
+        // companion carries the shared tool roster too) ---
+        var chatHistory = await BuildChatHistoryAsync(userId, conversationId, cancellationToken, userMessage);
+
+        var toolsKernel = kernel.CloneWithShantiSanghaTools(services);
+        var settings = new OpenAIPromptExecutionSettings
         {
-            var text = chunk.Content ?? string.Empty;
-            if (!string.IsNullOrEmpty(text))
+            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(),
+        };
+        var chatCompletion = toolsKernel.GetRequiredService<IChatCompletionService>(AiModels.SmartServiceId);
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(LoopTimeout);
+
+        var assembled = new System.Text.StringBuilder();
+        await foreach (var chunk in chatCompletion.GetStreamingChatMessageContentsAsync(
+            chatHistory, settings, toolsKernel, timeout.Token))
+        {
+            var text = chunk.Content;
+            if (string.IsNullOrEmpty(text)) continue;
+
+            if (StreamSeams.NeedsRoundBreak(assembled, text))
             {
-                responseChunks.Add(text);
-                yield return text;
+                assembled.Append("\n\n");
+                yield return "\n\n";
             }
+
+            assembled.Append(text);
+            yield return text;
         }
 
-        var fullResponse = string.Concat(responseChunks);
+        var fullResponse = assembled.ToString();
 
         // --- Step 4: Output safety check ---
         var outputCheck = await safety.CheckOutputAsync(fullResponse, cancellationToken);
@@ -140,29 +164,28 @@ public class ChatService(
         CancellationToken cancellationToken,
         string? currentMessage = null)
     {
-        string? displayName = null;
-        string? memories = null;
+        var (displayName, timezone) = await LoadProfileAsync(userId, conversationId, cancellationToken);
 
+        string? memories = null;
         try
         {
-            displayName = await profileQuery.GetDisplayNameAsync(userId, cancellationToken);
-
             if (!string.IsNullOrWhiteSpace(currentMessage))
             {
                 var hits = await memoryQuery.SearchAsync(
-                    userId, currentMessage, MemoryTopK,
+                    userId, currentMessage, UnifiedPrompt.MemoryTopK,
                     excludeConversationId: conversationId,
                     ct: cancellationToken);
 
-                memories = FormatMemories(hits);
+                memories = UnifiedPrompt.FormatMemories(hits);
             }
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to load some context for conversation {ConversationId} — continuing with partial context", conversationId);
+            logger.LogWarning(ex, "Failed to load memories for conversation {ConversationId} — continuing without", conversationId);
         }
 
-        var systemPrompt = SystemPrompt.WithContext(displayName: displayName, memories: memories);
+        var systemPrompt = UnifiedPrompt.Build(
+            UserClock.TodayFor(timezone), displayName, memories, PromptSurface.Reflect);
 
         var history = new ChatHistory(systemPrompt);
 
@@ -195,22 +218,23 @@ public class ChatService(
             .AnyAsync(m => m.ConversationId == conversationId, cancellationToken);
         if (hasMessages) yield break;
 
-        string? displayName = null;
-        string? memories = null;
+        var (displayName, timezone) = await LoadProfileAsync(userId, conversationId, cancellationToken);
 
+        string? memories = null;
         try
         {
-            displayName = await profileQuery.GetDisplayNameAsync(userId, cancellationToken);
-            var recent = await memoryQuery.GetRecentAsync(userId, MemoryTopK, cancellationToken);
-            memories = FormatMemories(recent);
+            var recent = await memoryQuery.GetRecentAsync(userId, UnifiedPrompt.MemoryTopK, cancellationToken);
+            memories = UnifiedPrompt.FormatMemories(recent);
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to load opener context for conversation {ConversationId} — continuing with partial context", conversationId);
         }
 
-        var systemPrompt = SystemPrompt.WithContext(displayName, memories)
-            + "\n\n---\n\n" + SystemPrompt.OpenerInstruction;
+        // The opener speaks first and acts on nothing — no tools needed.
+        var systemPrompt = UnifiedPrompt.Build(
+                UserClock.TodayFor(timezone), displayName, memories, PromptSurface.Reflect)
+            + "\n\n---\n\n" + UnifiedPrompt.OpenerInstruction;
 
         var history = new ChatHistory(systemPrompt);
         history.AddUserMessage("(The person has just opened the conversation and hasn't said anything yet. Greet them first.)");
@@ -255,17 +279,20 @@ public class ChatService(
         }
     }
 
-    private static string? FormatMemories(IReadOnlyList<ShantiSangha.Shared.Models.MemoryHit> hits)
+    private async Task<(string? DisplayName, string? Timezone)> LoadProfileAsync(
+        Guid userId, Guid conversationId, CancellationToken ct)
     {
-        if (hits.Count == 0) return null;
-
-        return string.Join("\n", hits.Select(h =>
-            $"- [{(h.SourceType == "journal" ? "journal entry" : "conversation")}, {h.OccurredAt:MMMM d, yyyy}] {Excerpt(h.Content)}"));
-    }
-
-    private static string Excerpt(string content)
-    {
-        var flat = content.ReplaceLineEndings(" ").Trim();
-        return flat.Length <= MemoryExcerptLength ? flat : flat[..MemoryExcerptLength] + "…";
+        string? displayName = null;
+        string? timezone = null;
+        try
+        {
+            displayName = await profileQuery.GetDisplayNameAsync(userId, ct);
+            timezone = await profileQuery.GetTimezoneAsync(userId, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to load profile context for conversation {ConversationId} — continuing with partial context", conversationId);
+        }
+        return (displayName, timezone);
     }
 }

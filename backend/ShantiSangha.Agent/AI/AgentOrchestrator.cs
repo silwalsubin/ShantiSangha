@@ -1,18 +1,16 @@
 using System.Runtime.CompilerServices;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
-using ShantiSangha.Agent.Data;
 using ShantiSangha.Agent.Contracts;
 using ShantiSangha.Agent.Models;
 using ShantiSangha.Reminders.Contracts;
 using ShantiSangha.Reminders.Services;
 using ShantiSangha.Shared;
+using ShantiSangha.Shared.AI;
 using ShantiSangha.Shared.Interfaces;
+using ShantiSangha.Tools;
 using ShantiSangha.Tools.AgentFeedback;
-using ShantiSangha.Tools.Circles;
 using ShantiSangha.Tools.Reminders;
 
 namespace ShantiSangha.Agent.AI;
@@ -21,6 +19,7 @@ public class AgentOrchestrator(
     Kernel kernel,
     IServiceProvider services,
     ICurrentUser currentUser,
+    ISafetyService safety,
     IProfileQueryService profileQuery,
     IMemoryQueryService memoryQuery,
     IReminderService reminderService,
@@ -55,6 +54,27 @@ public class AgentOrchestrator(
 
         var trimmed = userMessage.Trim();
 
+        // One safety spine across both AI surfaces: same input moderation the
+        // Reflect companion runs. Image-only turns have no text to check.
+        if (trimmed.Length > 0)
+        {
+            var inputCheck = await safety.CheckInputAsync(trimmed, cancellationToken);
+            if (inputCheck.Outcome == SafetyCheckOutcome.Crisis)
+            {
+                await safety.LogEventAsync(user.Id, "CrisisKeywordDetected",
+                    trimmed, inputCheck.Reason, null, cancellationToken);
+                yield return new AgentStreamEvent.Text(SupportResources.CrisisResponse);
+                yield break;
+            }
+            if (inputCheck.Outcome == SafetyCheckOutcome.Flagged)
+            {
+                await safety.LogEventAsync(user.Id, "ModerationFlagged",
+                    trimmed, inputCheck.Reason, null, cancellationToken);
+                yield return new AgentStreamEvent.Text(SupportResources.FlaggedResponse);
+                yield break;
+            }
+        }
+
         // Scoped mode: the turn is about one specific reminder ("Plan with
         // assistant"). We load it for grounding, and the whole exchange is
         // ephemeral — no persistence, no global history replay — so it stays
@@ -75,16 +95,9 @@ public class AgentOrchestrator(
         {
             try
             {
-                var hits = await memoryQuery.SearchAsync(user.Id, trimmed, topK: 4, ct: cancellationToken);
-                if (hits.Count > 0)
-                {
-                    memories = string.Join("\n", hits.Select(h =>
-                    {
-                        var flat = h.Content.ReplaceLineEndings(" ").Trim();
-                        if (flat.Length > 300) flat = flat[..300] + "…";
-                        return $"- [{(h.SourceType == "journal" ? "journal entry" : "reflection")}, {h.OccurredAt:MMMM d, yyyy}] {flat}";
-                    }));
-                }
+                var hits = await memoryQuery.SearchAsync(
+                    user.Id, trimmed, topK: UnifiedPrompt.MemoryTopK, ct: cancellationToken);
+                memories = UnifiedPrompt.FormatMemories(hits);
             }
             catch { /* best-effort */ }
         }
@@ -158,21 +171,12 @@ public class AgentOrchestrator(
             turnContext.CurrentUserMessageId = userTurnId;
         }
 
-        var scopedKernel = kernel.Clone();
-        scopedKernel.Plugins.AddFromObject(
-            services.GetRequiredService<RemindersTool>(),
-            pluginName: "reminders");
-        scopedKernel.Plugins.AddFromObject(
-            services.GetRequiredService<CirclesTool>(),
-            pluginName: "circles");
-        scopedKernel.Plugins.AddFromObject(
-            services.GetRequiredService<AgentFeedbackTool>(),
-            pluginName: "agent_feedback");
+        var scopedKernel = kernel.CloneWithShantiSanghaTools(services);
 
         var today = UserClock.TodayFor(timezone);
         var systemPrompt = scoped
             ? AgentSystemPrompt.BuildForReminder(today, displayName, scopedReminder!)
-            : AgentSystemPrompt.Build(today, displayName, memories);
+            : UnifiedPrompt.Build(today, displayName, memories, PromptSurface.Assistant);
         var history = new ChatHistory(systemPrompt);
 
         if (scoped)
@@ -268,7 +272,7 @@ public class AgentOrchestrator(
             // "Let me do that now.Your reminder…". Detect the seam — prior
             // ends in sentence punctuation, next starts uppercase with no
             // leading whitespace — and insert a paragraph break.
-            if (NeedsRoundBreak(assembled, text))
+            if (StreamSeams.NeedsRoundBreak(assembled, text))
             {
                 assembled.Append("\n\n");
                 yield return new AgentStreamEvent.Text("\n\n");
@@ -296,11 +300,29 @@ public class AgentOrchestrator(
 
         var assistantContent = assembled.ToString().Trim();
 
+        // Same output moderation the companion runs. The prose has already
+        // streamed by now (mirroring the companion's behavior) — a flagged
+        // reply appends the human-reviewed fallback and persists only that.
+        var outputClear = true;
+        if (assistantContent.Length > 0)
+        {
+            var outputCheck = await safety.CheckOutputAsync(assistantContent, cancellationToken);
+            if (outputCheck.Outcome != SafetyCheckOutcome.Clear)
+            {
+                await safety.LogEventAsync(user.Id, "ResponseFlagged",
+                    assistantContent, outputCheck.Reason,
+                    scoped ? null : conversationId, CancellationToken.None);
+                outputClear = false;
+                yield return new AgentStreamEvent.Text("\n\n" + SupportResources.ResponseFallback);
+                assistantContent = SupportResources.ResponseFallback;
+            }
+        }
+
         // Cheap second pass: offer up to 3 tappable follow-ups so a lazy-typing
         // user can act with one tap. Runs after the reply has fully streamed, so
         // it never delays the prose; returns nothing on most turns. Ephemeral —
         // we don't persist chips, so they don't reappear on history reopen.
-        if (assistantContent.Length > 0)
+        if (assistantContent.Length > 0 && outputClear)
         {
             var actions = await quickActions.SuggestAsync(trimmed, assistantContent, cancellationToken);
             if (actions.Count > 0)
@@ -349,14 +371,5 @@ public class AgentOrchestrator(
             if (byId.TryGetValue(id, out var r)) ordered.Add(r);
         }
         return ordered;
-    }
-
-    private static bool NeedsRoundBreak(System.Text.StringBuilder soFar, string next)
-    {
-        if (soFar.Length == 0 || next.Length == 0) return false;
-        var lastChar = soFar[soFar.Length - 1];
-        if (lastChar != '.' && lastChar != '!' && lastChar != '?') return false;
-        var firstChar = next[0];
-        return char.IsLetter(firstChar) && char.IsUpper(firstChar);
     }
 }
