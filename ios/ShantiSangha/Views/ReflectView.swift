@@ -157,8 +157,22 @@ struct ReflectView: View {
         // The journal editor slides up over the tab bar (fullScreenCover) so
         // the bar is covered and revealed with the transition instead of
         // popping in when a pushed screen restores it.
-        .fullScreenCover(item: $journalTarget) { target in
-            JournalEditorView(journalId: target.journalId, isNew: target.journalId == nil)
+        .fullScreenCover(item: $journalTarget, onDismiss: {
+            // Dismissing a cover doesn't re-fire .onAppear, so refetch here.
+            // The delay lets the editor's flushed save (and empty-entry
+            // delete) land first; onSaved below covers the gap instantly.
+            Task {
+                try? await Task.sleep(nanoseconds: 600_000_000)
+                await loadJournals()
+            }
+        }) { target in
+            JournalEditorView(
+                journalId: target.journalId,
+                isNew: target.journalId == nil,
+                onSaved: { id, title, content in
+                    applyJournalUpdate(id: id, title: title, content: content)
+                }
+            )
         }
         .sheet(isPresented: $showBeginReflection) {
             SacredChoiceSheet(
@@ -243,6 +257,9 @@ struct ReflectView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
+        // Transparent regions don't hit-test by default — make the whole
+        // row (padding, gaps, trailing space) accept the tap.
+        .contentShape(Rectangle())
     }
 
     // MARK: - Helpers
@@ -329,6 +346,23 @@ struct ReflectView: View {
         } catch {
             toastMessage = "Could not open a conversation. Try again in a moment."
             AppLogger.shared.error("Reflect", "Failed to create conversation: \(error)")
+        }
+    }
+
+    /// Mirror a save from the journal editor into the timeline immediately,
+    /// without waiting for the post-dismiss refetch.
+    private func applyJournalUpdate(id: String, title: String, content: String) {
+        let preview = String(content.trimmingCharacters(in: .whitespacesAndNewlines).prefix(140))
+        let updated = JournalItem(
+            id: id,
+            title: title.isEmpty ? "Untitled" : title,
+            preview: preview,
+            updatedAt: Date()
+        )
+        if let index = journals.firstIndex(where: { $0.id == id }) {
+            journals[index] = updated
+        } else {
+            journals.append(updated)
         }
     }
 
@@ -448,6 +482,13 @@ struct JournalItem: Identifiable, Decodable {
 
     enum CodingKeys: String, CodingKey {
         case id, title, preview, updatedAt, createdAt
+    }
+
+    init(id: String, title: String, preview: String, updatedAt: Date) {
+        self.id = id
+        self.title = title
+        self.preview = preview
+        self.updatedAt = updatedAt
     }
 
     init(from decoder: Decoder) throws {

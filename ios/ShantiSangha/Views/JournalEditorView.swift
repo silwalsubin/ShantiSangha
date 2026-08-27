@@ -6,6 +6,9 @@ struct JournalEditorView: View {
     let journalId: String?
     let isNew: Bool
     let initialContent: String?
+    /// Reports each successful save (id, title, content) so the presenting
+    /// list can reflect edits without waiting on a refetch.
+    let onSaved: ((String, String, String) -> Void)?
 
     @State private var serverId: String?
     @State private var title = ""
@@ -16,6 +19,12 @@ struct JournalEditorView: View {
     @State private var saveFailed = false
     @State private var createFailed = false
     @State private var lastSaved: Date?
+    @State private var hasUnsavedChanges = false
+    // Snapshot of what the server holds. onChange fires for programmatic
+    // assignments too (loading the entry, applying a draft), so saves are
+    // gated on a real difference — opening a journal must not re-save it.
+    @State private var savedTitle = ""
+    @State private var savedContent = ""
     @Environment(\.dismiss) private var dismiss
     private let api = ApiService.shared
 
@@ -34,10 +43,11 @@ struct JournalEditorView: View {
     @State private var lastTypingHaptic = Date.distantPast
     private let typingHaptic = UIImpactFeedbackGenerator(style: .soft)
 
-    init(journalId: String?, isNew: Bool, initialContent: String? = nil) {
+    init(journalId: String?, isNew: Bool, initialContent: String? = nil, onSaved: ((String, String, String) -> Void)? = nil) {
         self.journalId = journalId
         self.isNew = isNew
         self.initialContent = initialContent
+        self.onSaved = onSaved
     }
 
     private static let placeholders = [
@@ -200,6 +210,10 @@ struct JournalEditorView: View {
             // Delete empty journals when user backs out without writing
             if let id = serverId, content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Task { try? await api.delete("/journals/\(id)") }
+            } else {
+                // Don't let the 1s debounce outlive the page — flush any
+                // pending edits so the list behind us sees them.
+                flushPendingSave()
             }
         }
     }
@@ -287,10 +301,23 @@ struct JournalEditorView: View {
     // MARK: - Save
 
     private func debounceSave() {
+        guard title != savedTitle || content != savedContent else { return }
+        hasUnsavedChanges = true
         saveTask?.cancel()
         saveTask = Task {
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             if !Task.isCancelled { await save() }
+        }
+    }
+
+    /// Cancel the debounce and save immediately (waiting out any in-flight
+    /// save so the newest words win). Called when the editor is dismissed.
+    private func flushPendingSave() {
+        guard hasUnsavedChanges, serverId != nil else { return }
+        saveTask?.cancel()
+        saveTask = Task {
+            while saving { try? await Task.sleep(nanoseconds: 100_000_000) }
+            if hasUnsavedChanges { await save() }
         }
     }
 
@@ -301,13 +328,20 @@ struct JournalEditorView: View {
         }
         saving = true
         saveFailed = false
+        let sentTitle = title
+        let sentContent = content
         do {
             let _: EmptyResponse = try await api.patch("/journals/\(id)", body: UpdateJournalRequest(
-                title: title.isEmpty ? nil : title,
-                content: content
+                title: sentTitle.isEmpty ? nil : sentTitle,
+                content: sentContent
             ))
             lastSaved = Date()
+            savedTitle = sentTitle
+            savedContent = sentContent
+            // Keystrokes during the round-trip stay pending for the next save.
+            hasUnsavedChanges = title != sentTitle || content != sentContent
             clearDraft()
+            onSaved?(id, sentTitle, sentContent)
         } catch {
             if !error.isCancellation {
                 saveFailed = true
@@ -346,6 +380,8 @@ struct JournalEditorView: View {
             let journal: JournalDetailResponse = try await api.get("/journals/\(id)")
             title = journal.title ?? ""
             content = journal.content ?? ""
+            savedTitle = title
+            savedContent = content
             applyStoredDraftIfPresent()
         } catch {
             if !error.isCancellation {
