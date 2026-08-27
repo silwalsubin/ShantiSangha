@@ -150,7 +150,7 @@ struct VoiceNoteDetailView: View {
         .refreshable { await loadEntry() }
         .navigationTitle("Voice Note")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(isPresented: $showJournalFromVoice) {
+        .fullScreenCover(isPresented: $showJournalFromVoice) {
             JournalEditorView(journalId: nil, isNew: true, initialContent: entry?.transcript ?? "")
         }
         .navigationDestination(isPresented: $showVoiceChat) {

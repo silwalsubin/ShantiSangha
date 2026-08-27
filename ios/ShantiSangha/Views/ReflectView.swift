@@ -9,6 +9,7 @@ struct ReflectView: View {
     @State private var newConversationId: String?
     @State private var showBeginReflection = false
     @State private var pendingNavigation: ReflectNavDestination?
+    @State private var journalTarget: JournalEditorTarget?
     @State private var toastMessage: String?
     private let api = ApiService.shared
 
@@ -149,11 +150,15 @@ struct ReflectView: View {
             switch dest {
             case .chat(let id):
                 ChatView(conversationId: id, title: "New Conversation")
-            case .journal:
-                JournalEditorView(journalId: nil, isNew: true)
             case .voice:
                 VoiceNoteView()
             }
+        }
+        // The journal editor slides up over the tab bar (fullScreenCover) so
+        // the bar is covered and revealed with the transition instead of
+        // popping in when a pushed screen restores it.
+        .fullScreenCover(item: $journalTarget) { target in
+            JournalEditorView(journalId: target.journalId, isNew: target.journalId == nil)
         }
         .sheet(isPresented: $showBeginReflection) {
             SacredChoiceSheet(
@@ -162,7 +167,7 @@ struct ReflectView: View {
                 choices: [
                     SacredChoice(icon: "doc.text", title: "Write") {
                         showBeginReflection = false
-                        pendingNavigation = .journal
+                        journalTarget = JournalEditorTarget(journalId: nil)
                     },
                     SacredChoice(icon: "bubble.left", title: "Talk") {
                         showBeginReflection = false
@@ -188,9 +193,12 @@ struct ReflectView: View {
                     rowContent(item, section: section)
                 }
             case .journal:
-                NavigationLink(destination: JournalEditorView(journalId: item.id, isNew: false)) {
+                Button {
+                    journalTarget = JournalEditorTarget(journalId: item.id)
+                } label: {
                     rowContent(item, section: section)
                 }
+                .buttonStyle(.plain)
             case .voice:
                 NavigationLink(destination: VoiceNoteDetailView(entryId: item.id)) {
                     rowContent(item, section: section)
@@ -358,15 +366,19 @@ struct ReflectTimelineItem: Identifiable {
     let date: Date
 }
 
+/// Journal editor presentation target — nil journalId means a new entry.
+struct JournalEditorTarget: Identifiable {
+    let journalId: String?
+    var id: String { journalId ?? "new" }
+}
+
 enum ReflectNavDestination: Identifiable, Hashable {
     case chat(id: String)
-    case journal
     case voice
 
     var id: String {
         switch self {
         case .chat(let id): return "chat-\(id)"
-        case .journal: return "journal"
         case .voice: return "voice"
         }
     }

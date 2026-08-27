@@ -11,6 +11,7 @@ struct JournalEditorView: View {
     @State private var title = ""
     @State private var content = ""
     @State private var loading = true
+    @State private var spinnerVisible = false
     @State private var saving = false
     @State private var saveFailed = false
     @State private var createFailed = false
@@ -19,6 +20,19 @@ struct JournalEditorView: View {
     private let api = ApiService.shared
 
     @State private var saveTask: Task<Void, Never>?
+    @FocusState private var titleFocused: Bool
+    @FocusState private var contentFocused: Bool
+
+    /// Memory-drawn opening question. Unlike the placeholder it stays visible
+    /// while writing — the invitation shouldn't vanish at the first keystroke.
+    @State private var promptText: String?
+
+    // Soft keystroke haptics — a whisper, not a click. Rate-limited, fires
+    // only on insertion (never while deleting), intensity well below the
+    // .light taps used elsewhere. Calm app: the page should feel like paper
+    // that acknowledges the pen.
+    @State private var lastTypingHaptic = Date.distantPast
+    private let typingHaptic = UIImpactFeedbackGenerator(style: .soft)
 
     init(journalId: String?, isNew: Bool, initialContent: String? = nil) {
         self.journalId = journalId
@@ -38,10 +52,30 @@ struct JournalEditorView: View {
     @State private var placeholder = placeholders.randomElement()!
 
     var body: some View {
+        // The editor is presented as a fullScreenCover — it slides up OVER the
+        // tab bar and reveals it on the way down, so the bar never pops in
+        // abruptly (SwiftUI can't animate `.toolbar(.hidden, for: .tabBar)`
+        // restores on pop). Own NavigationStack carries the nav bar.
+        NavigationStack { editorContent }
+            // Paint the presentation layer itself parchment so nothing
+            // system-colored can peek through at the edges mid-slide.
+            .presentationBackground(Color.sacredBg)
+    }
+
+    private var editorContent: some View {
         VStack(spacing: 0) {
             if loading {
+                // No spinner flash during the cover transition — the page
+                // arrives as calm parchment, and the wheel only fades in if
+                // the load is genuinely slow.
                 Spacer()
                 ProgressView()
+                    .opacity(spinnerVisible ? 1 : 0)
+                    .animation(.easeIn(duration: 0.3), value: spinnerVisible)
+                    .task {
+                        try? await Task.sleep(nanoseconds: 450_000_000)
+                        spinnerVisible = true
+                    }
                 Spacer()
             } else if createFailed {
                 Spacer()
@@ -66,27 +100,55 @@ struct JournalEditorView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
+                        // New entries open with the cursor here; return hands
+                        // focus straight down into the writing so the optional
+                        // title never blocks the page.
                         TextField("Title (optional)", text: $title)
                             .font(.sacredHeading)
                             .foregroundColor(.sacredText)
+                            .focused($titleFocused)
+                            .submitLabel(.next)
+                            .onSubmit { contentFocused = true }
                             .onChange(of: title) {
                                 persistDraft()
                                 debounceSave()
                             }
 
+                        // The companion's question stays with the page while
+                        // writing, like a note pinned above the paper.
+                        if let promptText {
+                            Text(promptText)
+                                .font(.sacredSmall.italic())
+                                .foregroundColor(.sacredMuted)
+                                .lineSpacing(4)
+                                .transition(.opacity)
+                        }
+
                         ZStack(alignment: .topLeading) {
                             if content.isEmpty {
                                 Text(placeholder)
-                                    .font(.sacredText)
+                                    .font(.sacredJournal)
                                     .foregroundColor(.sacredMuted)
                                     .padding(.top, 8)
+                                    .padding(.leading, 5)
                             }
+                            // scrollDisabled: the editor grows with its text so
+                            // the page scrolls as ONE surface — no inner
+                            // scroller fighting the outer one.
                             TextEditor(text: $content)
-                                .font(.sacredText)
+                                .font(.sacredJournal)
                                 .foregroundColor(.sacredText)
+                                .lineSpacing(6)
                                 .scrollContentBackground(.hidden)
+                                .scrollDisabled(true)
                                 .frame(minHeight: 300)
-                                .onChange(of: content) {
+                                .focused($contentFocused)
+                                .onChange(of: content) { oldValue, newValue in
+                                    if newValue.count > oldValue.count,
+                                       Date().timeIntervalSince(lastTypingHaptic) > 0.06 {
+                                        typingHaptic.impactOccurred(intensity: 0.35)
+                                        lastTypingHaptic = Date()
+                                    }
                                     persistDraft()
                                     debounceSave()
                                 }
@@ -94,37 +156,26 @@ struct JournalEditorView: View {
                     }
                     .padding(16)
                 }
+                .scrollDismissesKeyboard(.interactively)
+                // No indicator flash when loaded text resizes the content —
+                // and bare parchment suits the page anyway.
+                .scrollIndicators(.hidden)
+                .transition(.opacity)
 
-                // Status bar — each successful save pulses a soft gold
-                // glow around the indicator. The entry feels held by
-                // the system, not just persisted to a database.
-                HStack {
-                    if saving {
-                        HStack(spacing: 6) {
-                            ProgressView().scaleEffect(0.7)
-                            Text("Saving...").font(.sacredSmall).foregroundColor(.sacredMuted)
-                        }
-                    } else if saveFailed {
-                        Text("Saved locally")
-                            .font(.sacredSmallSemibold).foregroundColor(.sacredRed)
-                    } else if let saved = lastSaved {
-                        Text("Saved \(saved.formatted(.relative(presentation: .named)))")
-                            .font(.sacredSmall).foregroundColor(.sacredMuted)
-                            .changeEffect(
-                                .glow(color: .sacredGold, radius: 12),
-                                value: saved
-                            )
-                    }
-                    Spacer()
-                }
-                .padding(.horizontal, 16).padding(.vertical, 8)
-                .background(.ultraThinMaterial)
             }
         }
         .sacredBackground()
         .navigationTitle(isNew ? "New Entry" : "Journal")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button { dismiss() } label: {
+                    Image(systemName: "chevron.down")
+                        .font(.sacredSmall)
+                        .foregroundColor(.sacredMuted)
+                }
+                .accessibilityLabel("Close")
+            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 if !content.trimmingCharacters(in: .whitespaces).isEmpty {
                     ShareLink(item: shareText) {
@@ -133,6 +184,15 @@ struct JournalEditorView: View {
                             .foregroundColor(.sacredMuted)
                     }
                 }
+            }
+        }
+        // Save state floats quietly at the bottom center — above the keyboard
+        // while writing, at the foot of the page when it's down.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if !loading && !createFailed {
+                saveLamp
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
             }
         }
         .task { await setup() }
@@ -144,26 +204,63 @@ struct JournalEditorView: View {
         }
     }
 
+    // MARK: - Save lamp
+
+    /// Wordless save state, in the universal vocabulary: a gold checkmark =
+    /// saved (each save pulses a soft glow), dimmed while a save is in
+    /// flight, cloud-with-slash = held on this device only, syncs when the
+    /// connection settles. SF Symbols so it matches the share icon's weight.
+    private var saveLamp: some View {
+        Image(systemName: saveFailed ? "icloud.slash" : "checkmark.circle")
+            .font(.sacredSmall)
+            .foregroundColor(saveFailed ? .sacredMuted : .sacredGold)
+            .opacity(saving ? 0.35 : 1)
+            .animation(.easeOut(duration: 0.5), value: saving)
+            .animation(.easeOut(duration: 0.5), value: saveFailed)
+            .changeEffect(.glow(color: .sacredGold, radius: 10), value: lastSaved)
+            .accessibilityLabel(
+                saving ? "Saving" :
+                saveFailed ? "Held on this device, not yet synced" :
+                lastSaved != nil ? "Saved" : "Not yet saved")
+    }
+
     // MARK: - Setup
 
     private func setup() async {
         createFailed = false
         if let id = journalId {
-            // Editing existing
+            // Editing existing — the words fade onto the page rather than pop.
             serverId = id
             await loadJournal()
+            withAnimation(.easeOut(duration: 0.3)) {
+                loading = false
+            }
         } else {
-            // Create immediately — same pattern as conversations
+            // Writing must never wait on the network: paint the editor and
+            // raise the keyboard immediately; create the server row and fetch
+            // the prompt in the background. Until the row exists, every
+            // keystroke is held by the local draft.
+            if let initialContent, !initialContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, content.isEmpty {
+                content = initialContent
+            }
+            if content.isEmpty {
+                // Recover words from a session that died before its server
+                // row was created.
+                applyStoredDraftIfPresent()
+            }
+            loading = false
+            titleFocused = true
+
             async let create: () = createJournal()
             async let prompt: () = fetchPrompt()
             _ = await (create, prompt)
-            if let initialContent, !initialContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, content.isEmpty {
-                content = initialContent
+
+            // The row now exists — sync anything typed while it was creating.
+            if !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 persistDraft()
                 debounceSave()
             }
         }
-        loading = false
     }
 
     private func fetchPrompt() async {
@@ -171,10 +268,12 @@ struct JournalEditorView: View {
         do {
             let response: JournalPromptResponse = try await api.get("/journal/prompt?date=\(df.string(from: Date()))")
             if let p = response.prompt, !p.isEmpty {
-                placeholder = p
+                withAnimation(.easeIn(duration: 0.3)) {
+                    promptText = p
+                }
             }
         } catch {
-            // Fall back to the static placeholder already set
+            // Quietly keep the static placeholder
         }
     }
 
@@ -255,8 +354,14 @@ struct JournalEditorView: View {
         }
     }
 
+    private static let pendingDraftKey = "journal.draft.pending"
+
     private var draftKey: String? {
-        serverId.map { "journal.draft.\($0)" }
+        if let serverId { return "journal.draft.\(serverId)" }
+        // New entry whose server row hasn't been created yet — keystrokes are
+        // held under a pending key so nothing is lost even if the app dies
+        // before the create round-trip completes.
+        return isNew ? Self.pendingDraftKey : nil
     }
 
     private func persistDraft() {
@@ -280,8 +385,10 @@ struct JournalEditorView: View {
     }
 
     private func clearDraft() {
-        guard let key = draftKey else { return }
-        UserDefaults.standard.removeObject(forKey: key)
+        if let key = draftKey {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+        UserDefaults.standard.removeObject(forKey: Self.pendingDraftKey)
     }
 }
 

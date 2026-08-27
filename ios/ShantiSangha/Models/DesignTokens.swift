@@ -30,6 +30,9 @@ extension Font {
     static let sacredText = Font.system(size: 14, design: .serif)
     /// 14pt serif regular — alias for sacredText
     static let sacredBody = Font.system(size: 14, design: .serif)
+    /// 17pt serif regular — long-form writing surfaces (journal editor).
+    /// Reading-size text so extended writing doesn't strain.
+    static let sacredJournal = Font.system(size: 17, design: .serif)
     /// 12pt serif semibold — emphasized small text
     static let sacredSmallSemibold = Font.system(size: 12, weight: .semibold, design: .serif)
     /// 12pt serif medium — medium small text
