@@ -16,6 +16,14 @@ public class ChatDbContext(DbContextOptions<ChatDbContext> options) : DbContext(
         {
             e.Property(m => m.Role).HasConversion<string>();
             e.HasIndex(m => m.ConversationId);
+            // Serves per-conversation replay windows and last-message lookups.
+            // (Actual index is created by startup SQL — no migrations here.)
+            e.HasIndex(m => new { m.ConversationId, m.CreatedAt });
+        });
+
+        modelBuilder.Entity<Conversation>(e =>
+        {
+            e.HasIndex(c => c.UserId);
         });
     }
 }

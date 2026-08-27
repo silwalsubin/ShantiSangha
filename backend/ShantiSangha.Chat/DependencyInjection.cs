@@ -25,6 +25,7 @@ public static class DependencyInjection
         services.AddScoped<ISafetyService, SafetyService>();
         services.AddScoped<ChatQueryService>();
         services.AddScoped<IChatQueryService>(sp => sp.GetRequiredService<ChatQueryService>());
+        services.AddScoped<IConversationStore, ConversationStore>();
         services.AddScoped<GenerateConversationTitleJob>();
 
         return services;

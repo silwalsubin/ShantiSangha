@@ -19,12 +19,13 @@ namespace ShantiSangha.Agent.Controllers;
 [Route("api/agent")]
 public class AgentController(
     AgentOrchestrator orchestrator,
-    AgentDbContext db,
+    IConversationStore conversations,
     ICurrentUser currentUser,
     IReminderService reminders,
     Storage.AgentMediaStorage mediaStorage,
     ILogger<AgentController> logger) : ControllerBase
 {
+    private const string ThreadType = "assistant";
     private static readonly TimeSpan ImageUrlLifetime = TimeSpan.FromHours(6);
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -61,7 +62,7 @@ public class AgentController(
         try
         {
             await foreach (var evt in orchestrator.StreamAsync(
-                body.Message ?? string.Empty, imageBytes, body.ImageContentType, body.ReminderId, body.History, cancellationToken))
+                body.Message ?? string.Empty, imageBytes, body.ImageContentType, body.ReminderId, body.History, body.ConversationId, cancellationToken))
             {
                 switch (evt)
                 {
@@ -73,6 +74,9 @@ public class AgentController(
                         break;
                     case AgentStreamEvent.QuickActions qa:
                         await WriteQuickActionsAsync(qa.Items, cancellationToken);
+                        break;
+                    case AgentStreamEvent.Conversation conv:
+                        await WriteConversationAsync(conv.Id, cancellationToken);
                         break;
                 }
             }
@@ -101,6 +105,16 @@ public class AgentController(
     {
         var payload = JsonSerializer.Serialize(text);
         await HttpContext.Response.WriteAsync($"data: {payload}\n\n", Encoding.UTF8, ct);
+        await HttpContext.Response.Body.FlushAsync(ct);
+    }
+
+    private async Task WriteConversationAsync(Guid id, CancellationToken ct)
+    {
+        // Unknown event names are silently ignored by older clients, so this
+        // frame is backward-compatible.
+        var payload = JsonSerializer.Serialize(new { id }, JsonOptions);
+        await HttpContext.Response.WriteAsync(
+            $"event: conversation\ndata: {payload}\n\n", Encoding.UTF8, ct);
         await HttpContext.Response.Body.FlushAsync(ct);
     }
 
@@ -133,31 +147,82 @@ public class AgentController(
         return "Something went wrong. Please try again.";
     }
 
-    [HttpGet("messages")]
-    public async Task<IActionResult> GetMessages(CancellationToken ct = default)
+    /// Thread list, newest-activity first.
+    [HttpGet("conversations")]
+    public async Task<IActionResult> ListConversations(CancellationToken ct = default)
     {
         var user = await currentUser.GetAsync();
         if (user is null) return Unauthorized();
 
-        var rows = await db.AgentMessages
-            .Where(m => m.UserId == user.Id)
-            .OrderBy(m => m.CreatedAt)
-            .Select(m => new
-            {
-                m.Id,
-                m.Role,
-                m.Content,
-                m.Attachments,
-                m.ImageObjectKey,
-                m.CreatedAt,
-            })
-            .ToListAsync(ct);
+        var threads = await conversations.ListConversationsAsync(user.Id, ThreadType, ct);
+        return Ok(threads.Select(t => new
+        {
+            id = t.Id,
+            title = t.Title,
+            createdAt = t.CreatedAt,
+            updatedAt = t.UpdatedAt,
+            lastMessage = t.LastMessage,
+        }));
+    }
 
-        // Expand attachments per row. The agent surfaces stale reminders by
-        // re-querying live state on each fetch, so cards always show today's
-        // truth — completed/deleted reminders simply drop out.
-        var allReminderIds = rows
-            .Select(r => AgentMessageAttachmentsCodec.Decode(r.Attachments)?.ReminderIds)
+    /// Starts a fresh thread; it gets its title from the first message.
+    [HttpPost("conversations")]
+    public async Task<IActionResult> CreateConversation(CancellationToken ct = default)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+
+        var id = await conversations.CreateConversationAsync(user.Id, ThreadType, null, ct);
+        return Ok(new { id });
+    }
+
+    /// Deletes one thread and the S3 bytes of any photos shared in it.
+    [HttpDelete("conversations/{id:guid}")]
+    public async Task<IActionResult> DeleteConversation(Guid id, CancellationToken ct = default)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+
+        var metadata = await conversations.DeleteConversationAsync(id, user.Id, ct);
+        if (metadata is null) return NotFound();
+
+        await DeleteImagesFromMetadataAsync(metadata, ct);
+        return NoContent();
+    }
+
+    /// One thread's messages (or the most recent thread when `conversationId`
+    /// is omitted — which is also what pre-thread clients get).
+    [HttpGet("messages")]
+    public async Task<IActionResult> GetMessages(
+        [FromQuery] Guid? conversationId = null, CancellationToken ct = default)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+
+        Guid? threadId = conversationId;
+        if (threadId is Guid requested)
+        {
+            if (!await conversations.ConversationBelongsToUserAsync(requested, user.Id, ThreadType, ct))
+                return NotFound();
+        }
+        else
+        {
+            threadId = await conversations.GetLatestConversationIdAsync(user.Id, ThreadType, ct);
+        }
+
+        if (threadId is null) return Ok(Array.Empty<object>());
+
+        var rows = await conversations.GetMessagesAsync(threadId.Value, null, ct);
+
+        // Expand reminder attachments by re-querying live state on each fetch,
+        // so cards always show today's truth — completed/deleted reminders
+        // simply drop out.
+        var decoded = rows
+            .Select(m => (Message: m, Metadata: AgentMessageMetadataCodec.Decode(m.MetadataJson)))
+            .ToList();
+
+        var allReminderIds = decoded
+            .Select(d => d.Metadata?.ReminderIds)
             .Where(ids => ids is not null && ids.Count > 0)
             .SelectMany(ids => ids!)
             .Distinct()
@@ -172,10 +237,10 @@ public class AgentController(
                 .ToDictionary(r => r.Id);
         }
 
-        var result = new List<object>(rows.Count);
-        foreach (var m in rows)
+        var result = new List<object>(decoded.Count);
+        foreach (var (m, metadata) in decoded)
         {
-            var ids = AgentMessageAttachmentsCodec.Decode(m.Attachments)?.ReminderIds;
+            var ids = metadata?.ReminderIds;
             var attachedReminders = ids is null || reminderLookup is null
                 ? Array.Empty<Reminders.Contracts.ReminderResponse>()
                 : ids
@@ -187,11 +252,11 @@ public class AgentController(
             // the URL expires). Best-effort — a presign failure just drops
             // the image rather than failing the whole history fetch.
             string? imageUrl = null;
-            if (!string.IsNullOrWhiteSpace(m.ImageObjectKey))
+            if (!string.IsNullOrWhiteSpace(metadata?.ImageObjectKey))
             {
                 try
                 {
-                    imageUrl = await mediaStorage.GetPresignedDownloadUrlAsync(m.ImageObjectKey, ImageUrlLifetime);
+                    imageUrl = await mediaStorage.GetPresignedDownloadUrlAsync(metadata!.ImageObjectKey!, ImageUrlLifetime);
                 }
                 catch (Exception ex)
                 {
@@ -202,7 +267,8 @@ public class AgentController(
             result.Add(new
             {
                 id = m.Id,
-                role = m.Role == AgentMessageRole.User ? "user" : "assistant",
+                conversationId = m.ConversationId,
+                role = string.Equals(m.Role, "User", StringComparison.OrdinalIgnoreCase) ? "user" : "assistant",
                 content = m.Content,
                 attachedReminders,
                 imageUrl,
@@ -213,27 +279,44 @@ public class AgentController(
         return Ok(result);
     }
 
+    /// Legacy clear-everything (pre-thread clients): deletes ALL assistant
+    /// threads and their photo bytes.
     [HttpDelete("messages")]
     public async Task<IActionResult> ClearMessages(CancellationToken ct = default)
     {
         var user = await currentUser.GetAsync();
         if (user is null) return Unauthorized();
 
-        // Collect the shared-photo keys before dropping the rows, then
-        // delete the bytes from S3 so they don't outlive the history that
-        // referenced them. S3 cleanup is best-effort (logged, not thrown).
-        var imageKeys = await db.AgentMessages
-            .Where(m => m.UserId == user.Id && m.ImageObjectKey != null)
-            .Select(m => m.ImageObjectKey!)
-            .ToListAsync(ct);
-
-        await db.AgentMessages
-            .Where(m => m.UserId == user.Id)
-            .ExecuteDeleteAsync(ct);
-
-        await mediaStorage.DeleteManyAsync(imageKeys, ct);
+        var threads = await conversations.ListConversationsAsync(user.Id, ThreadType, ct);
+        foreach (var thread in threads)
+        {
+            var metadata = await conversations.DeleteConversationAsync(thread.Id, user.Id, ct);
+            if (metadata is not null)
+                await DeleteImagesFromMetadataAsync(metadata, ct);
+        }
 
         return NoContent();
     }
 
+    /// S3 cleanup for deleted threads — best-effort (logged, not thrown).
+    private async Task DeleteImagesFromMetadataAsync(IReadOnlyList<string> metadataBlobs, CancellationToken ct)
+    {
+        var imageKeys = metadataBlobs
+            .Select(blob => AgentMessageMetadataCodec.Decode(blob)?.ImageObjectKey)
+            .Where(key => !string.IsNullOrWhiteSpace(key))
+            .Select(key => key!)
+            .Distinct()
+            .ToList();
+
+        if (imageKeys.Count == 0) return;
+
+        try
+        {
+            await mediaStorage.DeleteManyAsync(imageKeys, ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to delete agent images for removed thread(s)");
+        }
+    }
 }

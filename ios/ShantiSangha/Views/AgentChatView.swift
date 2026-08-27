@@ -41,6 +41,10 @@ struct AgentChatView: View {
     @State private var loadingHistory = true
     @State private var failedSendText: String?
     @State private var showClearConfirmation = false
+    // Unified conversation store: which assistant thread this screen shows.
+    @State private var conversationId: String?
+    @State private var threads: [AgentChatService.Thread] = []
+    @State private var showThreads = false
     @State private var editTarget: ReminderEditTarget?
     @State private var activeSwipeId: String?
     @State private var pinnedScrollID: String?
@@ -79,16 +83,35 @@ struct AgentChatView: View {
             }
 
             ToolbarItem(placement: .navigationBarTrailing) {
-                if !messages.isEmpty {
-                    Button {
-                        showClearConfirmation = true
+                if !isScoped {
+                    Menu {
+                        Button {
+                            Task { await startNewThread() }
+                        } label: {
+                            Label("New thread", systemImage: "square.and.pencil")
+                        }
+                        Button {
+                            showThreads = true
+                        } label: {
+                            Label("Previous threads", systemImage: "clock.arrow.circlepath")
+                        }
+                        if !messages.isEmpty {
+                            Button(role: .destructive) {
+                                showClearConfirmation = true
+                            } label: {
+                                Label("Delete this thread", systemImage: "trash")
+                            }
+                        }
                     } label: {
-                        Image(systemName: "arrow.counterclockwise")
+                        Image(systemName: "ellipsis")
                             .font(.sacredSmall)
                             .foregroundColor(.sacredMuted)
                     }
                 }
             }
+        }
+        .sheet(isPresented: $showThreads) {
+            threadsSheet
         }
         .task {
             await loadInitialData()
@@ -98,16 +121,16 @@ struct AgentChatView: View {
             }
         }
         .confirmationDialog(
-            "Start fresh?",
+            "Delete this thread?",
             isPresented: $showClearConfirmation,
             titleVisibility: .visible
         ) {
-            Button("Clear conversation", role: .destructive) {
-                Task { await clearHistory() }
+            Button("Delete thread", role: .destructive) {
+                Task { await deleteCurrentThread() }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This deletes everything you've said to the assistant. It won't touch your reminders.")
+            Text("This deletes this thread's messages. It won't touch your reminders.")
         }
         .navigationDestination(item: $editTarget) { target in
             ReminderEditView(
@@ -228,7 +251,7 @@ struct AgentChatView: View {
 
     private func loadHistory() async {
         do {
-            let history = try await AgentChatService.shared.fetchHistory()
+            let history = try await AgentChatService.shared.fetchHistory(conversationId: conversationId)
             messages = history.map {
                 AgentMessage(
                     role: $0.role == "user" ? .user : .assistant,
@@ -244,13 +267,56 @@ struct AgentChatView: View {
         loadingHistory = false
     }
 
-    private func clearHistory() async {
+    private func loadThreads() async {
         do {
-            try await AgentChatService.shared.clearHistory()
+            threads = try await AgentChatService.shared.fetchThreads()
+        } catch {
+            if !error.isCancellation {
+                AppLogger.shared.error("Agent", "Threads load failed: \(error)")
+            }
+        }
+    }
+
+    private func startNewThread() async {
+        do {
+            let id = try await AgentChatService.shared.createThread()
+            conversationId = id
+            withAnimation(.easeOut(duration: 0.2)) { messages = [] }
+            failedSendText = nil
+            await loadThreads()
+        } catch {
+            AppLogger.shared.error("Agent", "New thread failed: \(error)")
+        }
+    }
+
+    private func switchThread(to id: String) async {
+        guard id != conversationId else { return }
+        conversationId = id
+        loadingHistory = true
+        messages = []
+        await loadHistory()
+    }
+
+    /// Deletes the open thread, then lands on the next most recent one (or
+    /// the empty state when none remain).
+    private func deleteCurrentThread() async {
+        guard let id = conversationId else {
+            messages = []
+            return
+        }
+        do {
+            try await AgentChatService.shared.deleteThread(id: id)
+            conversationId = nil
             messages = []
             failedSendText = nil
+            await loadThreads()
+            if let next = threads.first?.id {
+                conversationId = next
+                loadingHistory = true
+                await loadHistory()
+            }
         } catch {
-            AppLogger.shared.error("Agent", "History clear failed: \(error)")
+            AppLogger.shared.error("Agent", "Thread delete failed: \(error)")
         }
     }
 
@@ -579,6 +645,8 @@ struct AgentChatView: View {
             return
         }
         async let connectionLoad: Void = connections.refresh()
+        await loadThreads()
+        conversationId = threads.first?.id
         await loadHistory()
         _ = await connectionLoad
     }
@@ -622,9 +690,13 @@ struct AgentChatView: View {
         do {
             for try await event in AgentChatService.shared.stream(
                 message: text, imageBase64: imageBase64, imageContentType: imageContentType,
-                reminderId: reminderId, history: priorHistory) {
+                reminderId: reminderId, conversationId: conversationId, history: priorHistory) {
                 guard let idx = messages.firstIndex(where: { $0.id == assistantId }) else { continue }
                 switch event {
+                case .conversation(let id):
+                    // Server tells us which thread this turn landed in (it
+                    // creates one when we had none).
+                    conversationId = id
                 case .text(let chunk):
                     let wasEmpty = messages[idx].content.isEmpty
                     if wasEmpty {
@@ -672,6 +744,95 @@ struct AgentChatView: View {
     private func sendSuggestion(_ prompt: String) async {
         inputText = prompt
         await send()
+    }
+
+    // MARK: - Threads sheet
+
+    /// Previous assistant threads — tap to reopen, swipe to delete. A quick
+    /// focused task, so a sheet (returns exactly where you were).
+    private var threadsSheet: some View {
+        NavigationStack {
+            Group {
+                if threads.isEmpty {
+                    VStack(spacing: SacredSpacing.s) {
+                        Text("No threads yet")
+                            .font(.sacredTextSemibold)
+                            .foregroundColor(.sacredText)
+                        Text("Say something to the assistant and the thread will appear here.")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.horizontal, 32)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    List {
+                        ForEach(threads) { thread in
+                            Button {
+                                showThreads = false
+                                Task { await switchThread(to: thread.id) }
+                            } label: {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(thread.title ?? "New thread")
+                                        .font(.sacredTextSemibold)
+                                        .foregroundColor(thread.id == conversationId ? .sacredGold : .sacredText)
+                                        .lineLimit(1)
+                                    if !thread.lastMessage.isEmpty {
+                                        Text(thread.lastMessage)
+                                            .font(.sacredSmall)
+                                            .foregroundColor(.sacredMuted)
+                                            .lineLimit(2)
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                            }
+                            .listRowBackground(Color.clear)
+                        }
+                        .onDelete { offsets in
+                            Task { await deleteThreads(at: offsets) }
+                        }
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                }
+            }
+            .background(SacredBackground().ignoresSafeArea())
+            .navigationTitle("Threads")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button { showThreads = false } label: {
+                        Image(systemName: "xmark")
+                            .font(.sacredSmall)
+                            .foregroundColor(.sacredMuted)
+                    }
+                    .accessibilityLabel("Close")
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func deleteThreads(at offsets: IndexSet) async {
+        for index in offsets {
+            guard threads.indices.contains(index) else { continue }
+            let thread = threads[index]
+            do {
+                try await AgentChatService.shared.deleteThread(id: thread.id)
+                if thread.id == conversationId {
+                    conversationId = nil
+                    messages = []
+                }
+            } catch {
+                AppLogger.shared.error("Agent", "Thread delete failed: \(error)")
+            }
+        }
+        await loadThreads()
+        if conversationId == nil, let next = threads.first?.id {
+            conversationId = next
+            loadingHistory = true
+            await loadHistory()
+        }
     }
 
     // MARK: - Card state

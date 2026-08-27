@@ -21,6 +21,14 @@ final class AgentChatService {
         let imageUrl: String?
     }
 
+    /// One assistant thread in the unified conversation store.
+    struct Thread: Decodable, Identifiable, Hashable {
+        let id: String
+        let title: String?
+        let updatedAt: String
+        let lastMessage: String
+    }
+
     /// A tappable follow-up the assistant offers after a reply. `label` is the
     /// short button text; `prompt` is the message sent when the chip is tapped.
     struct QuickAction: Decodable, Hashable {
@@ -40,6 +48,7 @@ final class AgentChatService {
         var imageBase64: String? = nil
         var imageContentType: String? = nil
         var reminderId: String? = nil
+        var conversationId: String? = nil
         var history: [HistoryTurn]? = nil
     }
 
@@ -50,12 +59,18 @@ final class AgentChatService {
         case text(String)
         case reminders([Reminder])
         case quickActions([QuickAction])
+        /// First frame of a turn: the thread id the server resolved for it.
+        case conversation(String)
     }
 
-    func fetchHistory() async throws -> [HistoryMessage] {
+    private struct ConversationRef: Decodable { let id: String }
+
+    func fetchHistory(conversationId: String? = nil) async throws -> [HistoryMessage] {
         let token = try await Auth.auth().currentUser?.getIDToken()
         let baseURL = await ApiService.shared.getBaseURL()
-        guard let url = URL(string: "\(baseURL)/agent/messages") else {
+        var path = "\(baseURL)/agent/messages"
+        if let conversationId { path += "?conversationId=\(conversationId)" }
+        guard let url = URL(string: path) else {
             throw URLError(.badURL)
         }
         var request = URLRequest(url: url)
@@ -64,6 +79,49 @@ final class AgentChatService {
         }
         let (data, _) = try await URLSession.shared.data(for: request)
         return try JSONDecoder().decode([HistoryMessage].self, from: data)
+    }
+
+    func fetchThreads() async throws -> [Thread] {
+        let token = try await Auth.auth().currentUser?.getIDToken()
+        let baseURL = await ApiService.shared.getBaseURL()
+        guard let url = URL(string: "\(baseURL)/agent/conversations") else {
+            throw URLError(.badURL)
+        }
+        var request = URLRequest(url: url)
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        let (data, _) = try await URLSession.shared.data(for: request)
+        return try JSONDecoder().decode([Thread].self, from: data)
+    }
+
+    func createThread() async throws -> String {
+        let token = try await Auth.auth().currentUser?.getIDToken()
+        let baseURL = await ApiService.shared.getBaseURL()
+        guard let url = URL(string: "\(baseURL)/agent/conversations") else {
+            throw URLError(.badURL)
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        let (data, _) = try await URLSession.shared.data(for: request)
+        return try JSONDecoder().decode(ConversationRef.self, from: data).id
+    }
+
+    func deleteThread(id: String) async throws {
+        let token = try await Auth.auth().currentUser?.getIDToken()
+        let baseURL = await ApiService.shared.getBaseURL()
+        guard let url = URL(string: "\(baseURL)/agent/conversations/\(id)") else {
+            throw URLError(.badURL)
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        _ = try await URLSession.shared.data(for: request)
     }
 
     func clearHistory() async throws {
@@ -88,6 +146,7 @@ final class AgentChatService {
         imageBase64: String? = nil,
         imageContentType: String? = nil,
         reminderId: UUID? = nil,
+        conversationId: String? = nil,
         history: [HistoryTurn]? = nil
     ) -> AsyncThrowingStream<StreamEvent, Error> {
         AsyncThrowingStream { continuation in
@@ -111,6 +170,7 @@ final class AgentChatService {
                         imageBase64: imageBase64,
                         imageContentType: imageContentType,
                         reminderId: reminderId?.uuidString,
+                        conversationId: conversationId,
                         history: history)
                     request.httpBody = try JSONEncoder().encode(payload)
 
@@ -145,6 +205,10 @@ final class AgentChatService {
                             guard let payloadData = payload.data(using: .utf8) else { continue }
 
                             switch eventName {
+                            case "conversation":
+                                if let ref = try? JSONDecoder().decode(ConversationRef.self, from: payloadData) {
+                                    continuation.yield(.conversation(ref.id))
+                                }
                             case "reminders":
                                 if let reminders = try? JSONDecoder().decode([Reminder].self, from: payloadData) {
                                     continuation.yield(.reminders(reminders))

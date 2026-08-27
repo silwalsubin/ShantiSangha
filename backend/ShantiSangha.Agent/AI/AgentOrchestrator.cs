@@ -26,7 +26,7 @@ public class AgentOrchestrator(
     IReminderService reminderService,
     RemindersListSink remindersSink,
     AgentTurnContext turnContext,
-    AgentDbContext db,
+    IConversationStore conversations,
     Storage.AgentMediaStorage mediaStorage,
     QuickActionSuggester quickActions)
 {
@@ -39,6 +39,7 @@ public class AgentOrchestrator(
         string? imageContentType = null,
         Guid? reminderId = null,
         IReadOnlyList<AgentChatTurn>? clientHistory = null,
+        Guid? requestedConversationId = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var user = await currentUser.GetAsync()
@@ -89,6 +90,7 @@ public class AgentOrchestrator(
         }
 
         Guid userTurnId = Guid.Empty;
+        Guid conversationId = Guid.Empty;
         if (scoped)
         {
             // Point the notes tool at this reminder; no persisted message id.
@@ -96,6 +98,23 @@ public class AgentOrchestrator(
         }
         else
         {
+            // Resolve the thread: a valid requested id wins; otherwise the
+            // most recent assistant thread; otherwise a fresh one. Echo it as
+            // the first frame so the client learns where this turn landed.
+            if (requestedConversationId is Guid requested
+                && await conversations.ConversationBelongsToUserAsync(
+                    requested, user.Id, "assistant", cancellationToken))
+            {
+                conversationId = requested;
+            }
+            else
+            {
+                conversationId =
+                    await conversations.GetLatestConversationIdAsync(user.Id, "assistant", cancellationToken)
+                    ?? await conversations.CreateConversationAsync(user.Id, "assistant", null, cancellationToken);
+            }
+            yield return new AgentStreamEvent.Conversation(conversationId);
+
             // Persist the user turn FIRST so it survives an LLM failure
             // mid-stream. The image bytes are NOT persisted (they inform this
             // turn only); a text marker keeps history readable with no caption.
@@ -122,16 +141,16 @@ public class AgentOrchestrator(
             }
 
             userTurnId = Guid.NewGuid();
-            db.AgentMessages.Add(new AgentMessage
-            {
-                Id = userTurnId,
-                UserId = user.Id,
-                Role = AgentMessageRole.User,
-                Content = persistedContent,
-                ImageObjectKey = imageObjectKey,
-                CreatedAt = DateTime.UtcNow,
-            });
-            await db.SaveChangesAsync(cancellationToken);
+            await conversations.AppendMessageAsync(
+                conversationId, userTurnId, "User", persistedContent,
+                AgentMessageMetadataCodec.Encode(new AgentMessageMetadata(ImageObjectKey: imageObjectKey)),
+                cancellationToken);
+
+            // First message of a fresh thread names it — deterministic, from
+            // the user's own words (companion threads get poetic LLM titles;
+            // task threads deserve plain ones).
+            await conversations.SetTitleIfEmptyAsync(
+                conversationId, ThreadTitleFrom(persistedContent), cancellationToken);
 
             // Expose the user-turn id so AgentFeedbackTool can attribute any
             // feedback the LLM records during this turn back to the exact
@@ -191,18 +210,15 @@ public class AgentOrchestrator(
         }
         else
         {
-            // Replay the last N turns (including the user message we just saved)
-            // so the LLM can resolve references like "move that to next Friday".
-            var recent = await db.AgentMessages
-                .Where(m => m.UserId == user.Id)
-                .OrderByDescending(m => m.CreatedAt)
-                .Take(HistoryReplayCount)
-                .OrderBy(m => m.CreatedAt)
-                .ToListAsync(cancellationToken);
+            // Replay the last N turns of THIS thread (including the user
+            // message we just saved) so the LLM can resolve references like
+            // "move that to next Friday".
+            var recent = await conversations.GetMessagesAsync(
+                conversationId, takeLast: HistoryReplayCount, cancellationToken);
 
             foreach (var msg in recent)
             {
-                if (msg.Role == AgentMessageRole.User)
+                if (string.Equals(msg.Role, "User", StringComparison.OrdinalIgnoreCase))
                 {
                     // Attach the photo to the current turn only, as a multimodal
                     // message (text + image), so GPT-4o vision can see it. Prior
@@ -297,21 +313,28 @@ public class AgentOrchestrator(
         // thread. The durable artifact is the reminder's notes.
         if (!scoped && assistantContent.Length > 0)
         {
-            db.AgentMessages.Add(new AgentMessage
-            {
-                Id = Guid.NewGuid(),
-                UserId = user.Id,
-                Role = AgentMessageRole.Assistant,
-                Content = assistantContent,
-                Attachments = AgentMessageAttachmentsCodec.Encode(
-                    new AgentMessageAttachments(
-                        attachedReminders.Count > 0
-                            ? attachedReminders.Select(r => r.Id).ToList()
-                            : null)),
-                CreatedAt = DateTime.UtcNow,
-            });
-            await db.SaveChangesAsync(CancellationToken.None);
+            // CancellationToken.None: a disconnecting client still gets its
+            // reply stored.
+            await conversations.AppendMessageAsync(
+                conversationId, Guid.NewGuid(), "Assistant", assistantContent,
+                AgentMessageMetadataCodec.Encode(new AgentMessageMetadata(
+                    ReminderIds: attachedReminders.Count > 0
+                        ? attachedReminders.Select(r => r.Id).ToList()
+                        : null)),
+                CancellationToken.None);
         }
+    }
+
+    /// First-message-derived thread title: first line, word-trimmed to ~44
+    /// chars. Photo-only turns get a plain marker.
+    private static string ThreadTitleFrom(string firstMessage)
+    {
+        var line = firstMessage.ReplaceLineEndings(" ").Trim();
+        if (line.Length == 0 || line == "[Shared a photo]") return "Shared a photo";
+        if (line.Length <= 44) return line;
+        var cut = line[..44];
+        var lastSpace = cut.LastIndexOf(' ');
+        return (lastSpace > 20 ? cut[..lastSpace] : cut) + "…";
     }
 
     private async Task<IReadOnlyList<ReminderResponse>> LookupRemindersAsync(

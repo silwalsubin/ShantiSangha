@@ -20,5 +20,8 @@ public class Conversation
 
 public static class ConversationType
 {
+    /// The Reflect companion's threads.
     public const string General = "general";
+    /// The Home assistant's threads (unified store; lives in the same tables).
+    public const string Assistant = "assistant";
 }

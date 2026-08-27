@@ -272,6 +272,48 @@ try
             DROP TABLE IF EXISTS "ChessGames";
             DELETE FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260606215418_InitChess';
             """);
+
+        // ── Unified conversation store (2026-08) ────────────────────────
+        // Chat has no EF migrations baseline (tables predate the modular
+        // split), so its schema evolves via idempotent SQL here.
+        // 1) Metadata column + indexes for the assistant's threads.
+        // 2) One-time migration: the Agent module's flat AgentMessages
+        //    history becomes a single legacy 'assistant' conversation per
+        //    user, preserving message ids (feedback attribution points at
+        //    them) and timestamps. Naturally idempotent: rows are only
+        //    copied while absent. AgentMessages stays in place, unused,
+        //    as a safety net — drop it in a later release.
+        await sp.GetRequiredService<ShantiSangha.Chat.Data.ChatDbContext>().Database.ExecuteSqlRawAsync(
+            """
+            ALTER TABLE "Messages" ADD COLUMN IF NOT EXISTS "MetadataJson" text NULL;
+            CREATE INDEX IF NOT EXISTS "IX_Messages_ConversationId_CreatedAt"
+                ON "Messages" ("ConversationId", "CreatedAt");
+            CREATE INDEX IF NOT EXISTS "IX_Conversations_UserId"
+                ON "Conversations" ("UserId");
+
+            INSERT INTO "Conversations" ("Id", "UserId", "Title", "Type", "CreatedAt", "UpdatedAt")
+            SELECT gen_random_uuid(), am."UserId", 'Earlier conversations', 'assistant',
+                   MIN(am."CreatedAt"), MAX(am."CreatedAt")
+            FROM "AgentMessages" am
+            WHERE NOT EXISTS (
+                SELECT 1 FROM "Conversations" c
+                WHERE c."UserId" = am."UserId" AND c."Type" = 'assistant'
+                  AND c."Title" = 'Earlier conversations')
+            GROUP BY am."UserId";
+
+            INSERT INTO "Messages" ("Id", "ConversationId", "Role", "Content", "CreatedAt", "MetadataJson")
+            SELECT am."Id", c."Id", am."Role", am."Content", am."CreatedAt",
+                   CASE WHEN am."Attachments" IS NULL AND am."ImageObjectKey" IS NULL THEN NULL
+                        ELSE (COALESCE(am."Attachments", '{}')::jsonb
+                              || CASE WHEN am."ImageObjectKey" IS NULL THEN '{}'::jsonb
+                                      ELSE jsonb_build_object('imageObjectKey', am."ImageObjectKey") END)::text
+                   END
+            FROM "AgentMessages" am
+            JOIN "Conversations" c
+              ON c."UserId" = am."UserId" AND c."Type" = 'assistant'
+             AND c."Title" = 'Earlier conversations'
+            WHERE NOT EXISTS (SELECT 1 FROM "Messages" m WHERE m."Id" = am."Id");
+            """);
     }
 
     // Global error handler — returns full error details when EXPOSE_ERRORS=true

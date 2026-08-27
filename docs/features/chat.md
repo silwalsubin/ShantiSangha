@@ -8,6 +8,9 @@ The core feature of ShantiSangha. A conversational AI that helps users process e
 - Available 24/7 — no appointment, no waiting
 - Helps users who aren't ready for therapy but need more than journaling alone
 
+## Unified conversation store
+The Chat module's `Conversations`/`Messages` tables are the single store for every AI thread in the app, discriminated by `Conversations.Type`: `general` = the Reflect companion, `assistant` = the Home assistant. The Agent module persists its turns through `IConversationStore` (Shared interface, implemented here) — no cross-module reference. Assistant messages carry `Messages.MetadataJson` (reminder ids + photo S3 key). Store appends deliberately do NOT publish `MessagesSavedEvent` (no poetic titles or memory self-indexing for assistant turns; assistant threads are titled from their first message). Chat has no EF migrations baseline, so store schema changes ship as idempotent startup SQL in Program.cs. The legacy flat `AgentMessages` table was migrated into one "Earlier conversations" assistant thread per user and is retained, unused, as a safety net.
+
 ## How it works
 - User creates a conversation and sends messages
 - Backend streams responses via Server-Sent Events (SSE) using GPT-4o

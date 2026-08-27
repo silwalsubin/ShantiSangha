@@ -17,4 +17,8 @@ public abstract record AgentStreamEvent
     /// Up to 3 tappable follow-ups offered after the reply. Emitted only when
     /// there's a clearly useful next step; most turns carry none.
     public sealed record QuickActions(IReadOnlyList<QuickAction> Items) : AgentStreamEvent;
+
+    /// First frame of an unscoped turn: the resolved thread id, so the client
+    /// learns which conversation it's in (esp. when it sent none).
+    public sealed record Conversation(Guid Id) : AgentStreamEvent;
 }

@@ -29,7 +29,9 @@ public class ConversationsController(
         if (user is null) return Unauthorized();
 
         var conversations = await db.Conversations
-            .Where(c => c.UserId == user.Id)
+            // Reflect shows only companion threads — assistant threads live in
+            // the same tables (unified store) but belong to the Home surface.
+            .Where(c => c.UserId == user.Id && c.Type == ConversationType.General)
             .OrderByDescending(c => c.UpdatedAt)
             .Select(c => new
             {

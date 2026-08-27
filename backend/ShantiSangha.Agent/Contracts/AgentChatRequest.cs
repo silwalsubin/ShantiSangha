@@ -8,6 +8,11 @@ public record AgentChatRequest(
     string Message,
     string? ImageBase64 = null,
     string? ImageContentType = null,
+    /// The thread this turn belongs to. Null (older clients, or a first
+    /// message with no thread yet) resolves to the most recent assistant
+    /// thread, creating one if none exists. The resolved id is echoed back
+    /// as the stream's first frame (`event: conversation`).
+    Guid? ConversationId = null,
     /// When set, the turn is scoped to one reminder ("Plan with assistant"):
     /// the assistant is grounded in that reminder + its notes, the exchange is
     /// ephemeral (not persisted, no global history), and it writes its plan
