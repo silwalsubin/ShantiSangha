@@ -71,6 +71,14 @@ struct HomeView: View {
                         .padding(.horizontal, 16)
                         .padding(.top, SacredSpacing.s)
 
+                    // The unfinished-thread hook: the last line of the most
+                    // recent assistant conversation, inviting a continuation
+                    // rather than a fresh start. Hidden when the latest
+                    // thread is stale (see HomeViewModel.continueThread).
+                    continueThreadCard
+                        .padding(.horizontal, 16)
+                        .padding(.top, SacredSpacing.s)
+
                     // Whole-day context strip — sleep, steps, weather. Only
                     // appears when the user has enabled Health / Weather in
                     // Settings AND the relevant data is available. Silent
@@ -114,6 +122,7 @@ struct HomeView: View {
                 await refreshWholeDayContext()
                 await vm.loadPresence()
                 await circleVM.refresh()
+                await vm.loadLatestThread()
             }
             .task {
                 // Kick off the Circle fetch up front so a friend's avatar
@@ -121,6 +130,7 @@ struct HomeView: View {
                 // ConnectionDetailView can find its connection.
                 async let circleLoad: () = circleVM.refresh()
                 async let presenceLoad: () = vm.loadPresence()
+                async let threadLoad: () = vm.loadLatestThread()
                 await vm.load()
                 updateWidgetData()
                 await refreshWholeDayContext()
@@ -128,6 +138,7 @@ struct HomeView: View {
                 await connections.refresh()
                 await circleLoad
                 await presenceLoad
+                await threadLoad
             }
             .onChange(of: vm.overdueRemindersCount) { updateWidgetData() }
             .onChange(of: vm.dueTodayRemindersCount) { updateWidgetData() }
@@ -175,6 +186,8 @@ struct HomeView: View {
                 voicePrefill = ""
                 sharedAssistantImage = nil
                 autoSendPrompt = nil
+                // The conversation just changed — refresh the card's preview.
+                Task { await vm.loadLatestThread() }
             }
         }
         .navigationDestination(item: $navTarget) { target in
@@ -260,21 +273,30 @@ struct HomeView: View {
 
     /// Two quiet invitations under the composer. Tapping one opens the
     /// assistant and sends it immediately — an answer, not a staged draft.
+    /// The pair is chosen by `HomeViewModel.starterPrompts` from the moment
+    /// (overdue pile, due today, unreflected evening) so it changes with the
+    /// user's day instead of repeating forever.
     private var starterChips: some View {
-        HStack(spacing: SacredSpacing.xs) {
-            starterChip("What's due this week?")
-            starterChip("How have I been lately?")
-            Spacer(minLength: 0)
+        // Horizontal scroll keeps long label pairs intact on 375pt screens
+        // instead of truncating them.
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: SacredSpacing.xs) {
+                ForEach(vm.starterPrompts) { chip in
+                    starterChip(chip)
+                }
+            }
         }
+        .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+        .animation(.easeIn(duration: 0.3), value: vm.starterPrompts)
     }
 
-    private func starterChip(_ prompt: String) -> some View {
+    private func starterChip(_ chip: StarterPrompt) -> some View {
         Button {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            autoSendPrompt = prompt
+            autoSendPrompt = chip.prompt
             showChatSheet = true
         } label: {
-            Text(prompt)
+            Text(chip.label)
                 .font(.sacredSmall)
                 .foregroundColor(.sacredTextSecondary)
                 .padding(.horizontal, 14)
@@ -286,6 +308,55 @@ struct HomeView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(PillPressStyle())
+    }
+
+    // MARK: - Continue the thread
+
+    /// A quiet preview of where the last assistant conversation left off.
+    /// Tapping opens the assistant, which already resumes the latest thread —
+    /// this card is the Ask pill's door with a memory attached.
+    @ViewBuilder
+    private var continueThreadCard: some View {
+        if let thread = vm.continueThread {
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                showChatSheet = true
+            } label: {
+                HStack(alignment: .center, spacing: SacredSpacing.s) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("WHERE YOU LEFT OFF")
+                            .font(.sacredSectionLabel)
+                            .tracking(3)
+                            .foregroundColor(.sacredLabel)
+                        if let title = thread.title, !title.isEmpty {
+                            Text(title)
+                                .font(.sacredTextSemibold)
+                                .foregroundColor(.sacredText)
+                                .lineLimit(1)
+                        }
+                        Text(thread.lastMessage)
+                            .font(.sacredSmall.italic())
+                            .foregroundColor(.sacredTextSecondary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.sacredGold.opacity(0.6))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.sacredBgCard.opacity(0.8))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.sacredMuted.opacity(0.12), lineWidth: 1))
+                .contentShape(RoundedRectangle(cornerRadius: 16))
+            }
+            .buttonStyle(PillPressStyle())
+            .accessibilityLabel("Continue your last conversation")
+            .transition(.opacity)
+        }
     }
 
     // MARK: - Reminders section

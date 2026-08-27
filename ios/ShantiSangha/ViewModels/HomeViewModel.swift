@@ -10,6 +10,14 @@ struct MemoryPresence: Decodable, Equatable {
     let reflectedToday: Bool
 }
 
+/// One starter chip under the Ask pill: `label` is the chip text, `prompt`
+/// is the message auto-sent to the assistant when tapped.
+struct StarterPrompt: Equatable, Identifiable {
+    let label: String
+    let prompt: String
+    var id: String { label }
+}
+
 /// ViewModel for the Home screen — "What needs your attention today?"
 /// Reminders are the only thing on this surface now; they're served by
 /// `ReminderRepository` (online, no streaks).
@@ -21,6 +29,9 @@ class HomeViewModel: ObservableObject {
     /// Quiet continuity under the greeting — nil until loaded; the view hides
     /// the line entirely at 0 days (acknowledgment only, never guilt).
     @Published var presence: MemoryPresence?
+
+    /// Most recent assistant thread — feeds the continue-the-thread card.
+    @Published var latestThread: AgentChatService.Thread?
 
     private let reminderRepo = ReminderRepository.shared
     private var cancellables = Set<AnyCancellable>()
@@ -72,15 +83,114 @@ class HomeViewModel: ObservableObject {
         return parts.joined(separator: "\n")
     }
 
+    // MARK: - Continue the thread
+
+    /// The unfinished-thread hook: the latest assistant thread, offered only
+    /// when it was touched within the last 7 days and carries a real last
+    /// line. Older threads stay quiet — resurrecting a month-old chat is
+    /// clutter, not pull.
+    var continueThread: AgentChatService.Thread? {
+        guard let thread = latestThread,
+              !thread.lastMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              let updated = Self.parseISODate(thread.updatedAt),
+              let days = Calendar.current.dateComponents([.day], from: updated, to: Date()).day,
+              days <= 7
+        else { return nil }
+        return thread
+    }
+
+    func loadLatestThread() async {
+        do {
+            let threads = try await AgentChatService.shared.fetchThreads()
+            withAnimation(.easeIn(duration: 0.3)) {
+                latestThread = threads.first
+            }
+        } catch {
+            if !error.isCancellation {
+                AppLogger.shared.error("Home", "Failed to load latest thread: \(error)")
+            }
+        }
+    }
+
+    // MARK: - Starter chips
+
+    /// Two living invitations under the Ask pill. Situational chips win
+    /// (something is overdue, something is due today, the evening hasn't been
+    /// reflected on); a small day-rotated pool fills the remaining slots so
+    /// the pair is never identical for weeks on end.
+    var starterPrompts: [StarterPrompt] {
+        let now = Date()
+        let hour = Calendar.current.component(.hour, from: now)
+        let dayOfYear = Calendar.current.ordinality(of: .day, in: .year, for: now) ?? 0
+
+        var chips: [StarterPrompt] = []
+
+        if overdueRemindersCount > 0 {
+            chips.append(StarterPrompt(
+                label: "What's been waiting on me?",
+                prompt: "Some of my reminders have slipped past their dates. Walk me through what's been waiting and help me decide what to do with each."))
+        }
+        if dueTodayRemindersCount > 0 {
+            chips.append(StarterPrompt(
+                label: "What's on today?",
+                prompt: "What's on my plate today?"))
+        }
+        if hour >= 17, presence?.reflectedToday == false {
+            chips.append(StarterPrompt(
+                label: "Look back on today",
+                prompt: "Help me look back on today for a moment."))
+        }
+
+        var pool: [StarterPrompt] = [
+            StarterPrompt(
+                label: "What's due this week?",
+                prompt: "What's due this week?"),
+            StarterPrompt(
+                label: "How have I been lately?",
+                prompt: "How have I been lately?"),
+            StarterPrompt(
+                label: "What have I been circling?",
+                prompt: "Looking at my recent reflections, what themes keep coming up?"),
+            StarterPrompt(
+                label: "Anything slipping through?",
+                prompt: "Is anything slipping through the cracks — things I mentioned but haven't acted on?"),
+        ]
+        // When the continue-the-thread card is showing, the card carries the
+        // conversational pull — lean the chips practical instead.
+        if continueThread != nil {
+            pool.removeAll { $0.label == "How have I been lately?" }
+        }
+
+        var poolIndex = dayOfYear % pool.count
+        while chips.count < 2 {
+            let candidate = pool[poolIndex % pool.count]
+            poolIndex += 1
+            if !chips.contains(candidate) { chips.append(candidate) }
+        }
+
+        return Array(chips.prefix(2))
+    }
+
     private func completedWithinDays(_ dateStr: String?, _ days: Int) -> Bool {
-        guard let dateStr = dateStr else { return false }
-        let iso = ISO8601DateFormatter()
-        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let isoBasic = ISO8601DateFormatter()
-        isoBasic.formatOptions = [.withInternetDateTime]
-        guard let date = iso.date(from: dateStr) ?? isoBasic.date(from: dateStr) else { return false }
+        guard let dateStr, let date = Self.parseISODate(dateStr) else { return false }
         let daysAgo = Calendar.current.dateComponents([.day], from: date, to: Date()).day ?? 999
         return daysAgo <= days
+    }
+
+    /// Lenient ISO-8601 parsing. The backend serializes DateTime with up to
+    /// 7 fractional digits, which ISO8601DateFormatter's fractional mode
+    /// rejects — so fall back to parsing with the fraction stripped.
+    static func parseISODate(_ dateStr: String) -> Date? {
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = iso.date(from: dateStr) { return date }
+        let basic = ISO8601DateFormatter()
+        basic.formatOptions = [.withInternetDateTime]
+        if let date = basic.date(from: dateStr) { return date }
+        if let dot = dateStr.firstIndex(of: ".") {
+            return basic.date(from: String(dateStr[..<dot]) + "Z")
+        }
+        return nil
     }
 
     init() {
