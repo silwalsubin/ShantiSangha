@@ -81,6 +81,7 @@ struct LocationGateBody: View {
                 .foregroundColor(.sacredMuted)
 
             TextField("Search city, town, or village", text: $searchText)
+                .typingHaptics(for: searchText)
                 .font(.sacredText)
                 .foregroundColor(.sacredText)
                 .autocorrectionDisabled()

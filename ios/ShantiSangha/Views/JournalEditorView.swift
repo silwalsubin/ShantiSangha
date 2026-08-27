@@ -36,13 +36,6 @@ struct JournalEditorView: View {
     /// while writing — the invitation shouldn't vanish at the first keystroke.
     @State private var promptText: String?
 
-    // Soft keystroke haptics — a whisper, not a click. Rate-limited, fires
-    // only on insertion (never while deleting), intensity well below the
-    // .light taps used elsewhere. Calm app: the page should feel like paper
-    // that acknowledges the pen.
-    @State private var lastTypingHaptic = Date.distantPast
-    private let typingHaptic = UIImpactFeedbackGenerator(style: .soft)
-
     init(journalId: String?, isNew: Bool, initialContent: String? = nil, onSaved: ((String, String, String) -> Void)? = nil) {
         self.journalId = journalId
         self.isNew = isNew
@@ -119,6 +112,7 @@ struct JournalEditorView: View {
                             .focused($titleFocused)
                             .submitLabel(.next)
                             .onSubmit { contentFocused = true }
+                            .typingHaptics(for: title)
                             .onChange(of: title) {
                                 persistDraft()
                                 debounceSave()
@@ -153,12 +147,8 @@ struct JournalEditorView: View {
                                 .scrollDisabled(true)
                                 .frame(minHeight: 300)
                                 .focused($contentFocused)
-                                .onChange(of: content) { oldValue, newValue in
-                                    if newValue.count > oldValue.count,
-                                       Date().timeIntervalSince(lastTypingHaptic) > 0.06 {
-                                        typingHaptic.impactOccurred(intensity: 0.35)
-                                        lastTypingHaptic = Date()
-                                    }
+                                .typingHaptics(for: content)
+                                .onChange(of: content) {
                                     persistDraft()
                                     debounceSave()
                                 }

@@ -345,6 +345,7 @@ struct ReminderEditView: View {
                             .padding(.horizontal, 5)
                     }
                     TextEditor(text: $notesDraft)
+                        .typingHaptics(for: notesDraft)
                         .font(.sacredText)
                         .foregroundColor(.sacredText)
                         .scrollContentBackground(.hidden)
@@ -744,6 +745,7 @@ private struct ReminderLabelEditSheet: View {
         ) {
             VStack(spacing: SacredSpacing.m) {
                 TextField("Birthday, anniversary…", text: $draft)
+                    .typingHaptics(for: draft)
                     .font(.sacredBody)
                     .foregroundColor(.sacredText)
                     .textInputAutocapitalization(.sentences)

@@ -136,6 +136,7 @@ struct UserSearchView: View {
             .foregroundColor(.sacredText)
             .autocorrectionDisabled()
             .textInputAutocapitalization(autoCapitalize)
+            .typingHaptics(for: text.wrappedValue)
 
             if showSpinner {
                 ProgressView()

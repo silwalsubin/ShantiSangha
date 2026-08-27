@@ -69,6 +69,7 @@ struct CirclesPickerSheet: View {
                 .font(.sacredSmall)
                 .foregroundColor(.sacredMuted)
             TextField("Search or create…", text: $query)
+                .typingHaptics(for: query)
                 .font(.sacredText)
                 .foregroundColor(.sacredText)
                 .submitLabel(.done)

@@ -70,6 +70,7 @@ struct CollaboratorPickerSheet: View {
                 .font(.sacredSmall)
                 .foregroundColor(.sacredMuted)
             TextField("Search friends", text: $query)
+                .typingHaptics(for: query)
                 .font(.sacredText)
                 .foregroundColor(.sacredText)
                 .submitLabel(.done)

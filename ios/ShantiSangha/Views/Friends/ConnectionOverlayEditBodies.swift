@@ -18,6 +18,7 @@ struct ConnectionNicknameEditBody: View {
     var body: some View {
         VStack(spacing: SacredSpacing.m) {
             TextField("Add a nickname", text: $draft)
+                .typingHaptics(for: draft)
                 .font(.sacredBody)
                 .foregroundColor(.sacredText)
                 .textInputAutocapitalization(.words)
@@ -131,6 +132,7 @@ struct ConnectionNotesEditBody: View {
                         .padding(.vertical, 16)
                 }
                 TextEditor(text: $draft)
+                    .typingHaptics(for: draft)
                     .font(.sacredText)
                     .foregroundColor(.sacredText)
                     .scrollContentBackground(.hidden)

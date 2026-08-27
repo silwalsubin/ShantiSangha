@@ -74,6 +74,7 @@ struct AddConnectionView: View {
             sectionLabel("NAME")
             SacredListCard {
                 TextField("Their name", text: $name)
+                    .typingHaptics(for: name)
                     .font(.sacredText)
                     .foregroundColor(.sacredText)
                     .padding(.horizontal, 16)
@@ -162,6 +163,7 @@ struct AddConnectionView: View {
                 .foregroundColor(.sacredLabel)
                 .frame(width: 80, alignment: .leading)
             TextField("Add", text: text)
+                .typingHaptics(for: text.wrappedValue)
                 .font(.sacredText)
                 .foregroundColor(.sacredText)
                 .keyboardType(keyboard)

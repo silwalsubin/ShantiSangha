@@ -889,6 +889,7 @@ private struct AttachmentCaptionSheet: View {
                                             .padding(.vertical, 18)
                                     }
                                     TextEditor(text: $captionDraft)
+                                        .typingHaptics(for: captionDraft)
                                         .font(.sacredText)
                                         .foregroundColor(.sacredText)
                                         .scrollContentBackground(.hidden)

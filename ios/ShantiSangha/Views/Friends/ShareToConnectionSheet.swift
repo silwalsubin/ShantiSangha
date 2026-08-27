@@ -145,6 +145,7 @@ struct ShareToConnectionSheet: View {
                 .font(.sacredSmall)
                 .foregroundColor(.sacredMuted)
             TextField("Send to…", text: $query)
+                .typingHaptics(for: query)
                 .focused($searchFocused)
                 .font(.sacredSmall)
                 .foregroundColor(.sacredText)

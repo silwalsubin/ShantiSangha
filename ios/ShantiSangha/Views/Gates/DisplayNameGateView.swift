@@ -23,6 +23,7 @@ struct DisplayNameGateBody: View {
     var body: some View {
         VStack(spacing: SacredSpacing.m) {
             TextField("Your name", text: $name)
+                .typingHaptics(for: name)
                 .font(.sacredBody)
                 .foregroundColor(.sacredText)
                 .textInputAutocapitalization(.words)

@@ -183,6 +183,7 @@ struct ChatsTabView: View {
                 .foregroundColor(.sacredMuted)
 
             TextField("Search your chats", text: $searchText)
+                .typingHaptics(for: searchText)
                 .focused($searchFocused)
                 .font(.sacredSmall)
                 .foregroundColor(.sacredText)

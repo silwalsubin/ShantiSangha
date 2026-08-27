@@ -430,6 +430,7 @@ struct FriendsTabView: View {
                 .foregroundColor(.sacredMuted)
 
             TextField("Search your circle", text: $circleSearchText)
+                .typingHaptics(for: circleSearchText)
                 .focused($circleSearchFocused)
                 .font(.sacredSmall)
                 .foregroundColor(.sacredText)

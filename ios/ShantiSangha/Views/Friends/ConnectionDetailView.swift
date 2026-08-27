@@ -695,6 +695,7 @@ struct ConnectionDetailView: View {
                 .foregroundColor(.sacredLabel)
                 .frame(width: 80, alignment: .leading)
             TextField("Add", text: text)
+                .typingHaptics(for: text.wrappedValue)
                 .font(.sacredText)
                 .foregroundColor(.sacredText)
                 .keyboardType(keyboard)
