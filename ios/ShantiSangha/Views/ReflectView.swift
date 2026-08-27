@@ -31,11 +31,14 @@ struct ReflectView: View {
         }
 
         for journal in journals {
+            // Title only — the words themselves stay private to the page.
+            // A titleless entry borrows its first line as the label.
+            let hasTitle = !journal.title.isEmpty && journal.title != "Untitled"
             items.append(ReflectTimelineItem(
                 id: journal.id,
                 type: .journal,
-                title: journal.title,
-                preview: journal.preview,
+                title: hasTitle ? journal.title : journal.preview,
+                preview: "",
                 date: journal.updatedAt
             ))
         }

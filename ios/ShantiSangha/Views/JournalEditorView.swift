@@ -36,6 +36,31 @@ struct JournalEditorView: View {
     /// while writing — the invitation shouldn't vanish at the first keystroke.
     @State private var promptText: String?
 
+    /// The page's date line — the entry's creation day for existing
+    /// journals, today for new ones.
+    @State private var entryDate = Date()
+
+    /// Kindle-style reading size: one Aa tap cycles three page sizes.
+    /// A display preference shared by every entry — never per-text
+    /// formatting, so the page stays one calm surface.
+    @AppStorage("journal.textSize") private var textSizeStep = 1
+
+    // MARK: Undo history
+    //
+    // Snapshot-based undo/redo over (title, content). Keystrokes are
+    // coalesced into bursts: a snapshot commits after a short pause in
+    // typing, so undo steps back by thought, not by character. History
+    // ignores programmatic assignments (loading, draft recovery, applying
+    // undo itself) because those set `lastCommitted` to match the text.
+    private struct HistorySnapshot: Equatable {
+        let title: String
+        let content: String
+    }
+    @State private var undoStack: [HistorySnapshot] = []
+    @State private var redoStack: [HistorySnapshot] = []
+    @State private var lastCommitted = HistorySnapshot(title: "", content: "")
+    @State private var historyTask: Task<Void, Never>?
+
     init(journalId: String?, isNew: Bool, initialContent: String? = nil, onSaved: ((String, String, String) -> Void)? = nil) {
         self.journalId = journalId
         self.isNew = isNew
@@ -103,20 +128,34 @@ struct JournalEditorView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        // New entries open with the cursor here; return hands
-                        // focus straight down into the writing so the optional
-                        // title never blocks the page.
-                        TextField("Title (optional)", text: $title)
-                            .font(.sacredHeading)
-                            .foregroundColor(.sacredText)
-                            .focused($titleFocused)
-                            .submitLabel(.next)
-                            .onSubmit { contentFocused = true }
-                            .typingHaptics(for: title)
-                            .onChange(of: title) {
-                                persistDraft()
-                                debounceSave()
-                            }
+                        VStack(alignment: .leading, spacing: 8) {
+                            // New entries open with the cursor here; return
+                            // hands focus straight down into the writing so
+                            // the optional title never blocks the page.
+                            TextField("Title (optional)", text: $title)
+                                .font(.sacredHeading)
+                                .foregroundColor(.sacredText)
+                                .tint(.sacredGold)
+                                .focused($titleFocused)
+                                .submitLabel(.next)
+                                .onSubmit { contentFocused = true }
+                                .typingHaptics(for: title)
+                                .onChange(of: title) {
+                                    persistDraft()
+                                    debounceSave()
+                                    recordHistory()
+                                }
+
+                            // A quiet dateline and hairline, like the opening
+                            // of a chapter — the page knows its own day.
+                            Text(dateLine)
+                                .font(.sacredMicro)
+                                .tracking(1.5)
+                                .foregroundColor(.sacredLabel)
+                            Rectangle()
+                                .fill(Color.sacredGold.opacity(0.35))
+                                .frame(width: 44, height: 1)
+                        }
 
                         // The companion's question stays with the page while
                         // writing, like a note pinned above the paper.
@@ -131,7 +170,7 @@ struct JournalEditorView: View {
                         ZStack(alignment: .topLeading) {
                             if content.isEmpty {
                                 Text(placeholder)
-                                    .font(.sacredJournal)
+                                    .font(pageFont)
                                     .foregroundColor(.sacredMuted)
                                     .padding(.top, 8)
                                     .padding(.leading, 5)
@@ -140,21 +179,27 @@ struct JournalEditorView: View {
                             // the page scrolls as ONE surface — no inner
                             // scroller fighting the outer one.
                             TextEditor(text: $content)
-                                .font(.sacredJournal)
+                                .font(pageFont)
                                 .foregroundColor(.sacredText)
-                                .lineSpacing(6)
+                                .tint(.sacredGold)
+                                .lineSpacing(pageLineSpacing)
                                 .scrollContentBackground(.hidden)
                                 .scrollDisabled(true)
                                 .frame(minHeight: 300)
                                 .focused($contentFocused)
                                 .typingHaptics(for: content)
-                                .onChange(of: content) {
+                                .onChange(of: content) { oldValue, newValue in
+                                    continueListIfNeeded(from: oldValue, to: newValue)
                                     persistDraft()
                                     debounceSave()
+                                    recordHistory()
                                 }
                         }
                     }
-                    .padding(16)
+                    // Book margins: a touch wider than the app's default so
+                    // the text column reads like a printed page.
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 16)
                 }
                 .scrollDismissesKeyboard(.interactively)
                 // No indicator flash when loaded text resizes the content —
@@ -176,7 +221,22 @@ struct JournalEditorView: View {
                 }
                 .accessibilityLabel("Close")
             }
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                // The Kindle "Aa": one tap steps the page through three
+                // reading sizes — the text itself is the feedback.
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        textSizeStep = (textSizeStep + 1) % 3
+                    }
+                } label: {
+                    Text("Aa")
+                        .font(.system(size: 15, weight: .semibold, design: .serif))
+                        .foregroundColor(.sacredMuted)
+                        .frame(width: 34, height: 44)
+                }
+                .accessibilityLabel("Reading size")
+
                 if !content.trimmingCharacters(in: .whitespaces).isEmpty {
                     ShareLink(item: shareText) {
                         Image(systemName: "square.and.arrow.up")
@@ -185,14 +245,57 @@ struct JournalEditorView: View {
                     }
                 }
             }
+
+            // Undo / redo ride above the keyboard while writing — present
+            // when needed, gone when the pen is down.
+            ToolbarItemGroup(placement: .keyboard) {
+                Button(action: undo) {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.sacredText)
+                        .foregroundColor(canUndo ? .sacredGold : .sacredMuted.opacity(0.4))
+                        .frame(width: 44, height: 44)
+                }
+                .disabled(!canUndo)
+                .accessibilityLabel("Undo")
+
+                Button(action: redo) {
+                    Image(systemName: "arrow.uturn.forward")
+                        .font(.sacredText)
+                        .foregroundColor(canRedo ? .sacredGold : .sacredMuted.opacity(0.4))
+                        .frame(width: 44, height: 44)
+                }
+                .disabled(!canRedo)
+                .accessibilityLabel("Redo")
+
+                Spacer()
+
+                Button {
+                    titleFocused = false
+                    contentFocused = false
+                } label: {
+                    Image(systemName: "keyboard.chevron.compact.down")
+                        .font(.sacredText)
+                        .foregroundColor(.sacredMuted)
+                        .frame(width: 44, height: 44)
+                }
+                .accessibilityLabel("Put the keyboard away")
+            }
         }
-        // Save state floats quietly at the bottom center — above the keyboard
-        // while writing, at the foot of the page when it's down.
+        // The page's footer: the save lamp with the word count tucked
+        // beneath it — one small centered column of quiet facts.
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if !loading && !createFailed {
-                saveLamp
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
+                VStack(spacing: 3) {
+                    saveLamp
+                    if !wordCountText.isEmpty {
+                        Text(wordCountText)
+                            .font(.sacredMicro)
+                            .foregroundColor(.sacredMuted)
+                            .transition(.opacity)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
             }
         }
         .task { await setup() }
@@ -252,6 +355,8 @@ struct JournalEditorView: View {
                 // row was created.
                 applyStoredDraftIfPresent()
             }
+            // History starts from whatever the page opened with.
+            lastCommitted = currentSnapshot
             loading = false
             titleFocused = true
 
@@ -286,6 +391,144 @@ struct JournalEditorView: View {
     private var shareText: String {
         let heading = title.isEmpty ? "" : "\(title)\n\n"
         return "\(heading)\(content)"
+    }
+
+    // MARK: - Reading size
+
+    /// Three page sizes, Kindle-fashion. Line spacing grows with the type
+    /// so the page keeps its airy set at every step.
+    private var pageFont: Font {
+        let sizes: [CGFloat] = [15, 17, 20]
+        return Font.system(size: sizes[textSizeStep % 3], design: .serif)
+    }
+
+    private var pageLineSpacing: CGFloat {
+        let spacing: [CGFloat] = [7, 8, 10]
+        return spacing[textSizeStep % 3]
+    }
+
+    // MARK: - Smart lists
+
+    /// Plain-text list intelligence: pressing return at the end of the
+    /// page continues a `- ` / `• ` / `* ` / `1. ` line with the next
+    /// marker, and return on an empty marker ends the list. The words
+    /// stay plain text — no formats, no toolbar, nothing to learn.
+    /// End-of-page only: SwiftUI's TextEditor doesn't expose the caret,
+    /// and appending is the one edit whose caret lands correctly.
+    private func continueListIfNeeded(from oldValue: String, to newValue: String) {
+        guard newValue.count == oldValue.count + 1,
+              newValue.hasSuffix("\n"),
+              newValue.dropLast() == oldValue else { return }
+
+        let lastLine = String(oldValue.split(separator: "\n", omittingEmptySubsequences: false).last ?? "")
+
+        for marker in ["- ", "• ", "* "] {
+            if lastLine == marker {
+                // Empty item — the list is finished; lift the marker away.
+                content = String(oldValue.dropLast(marker.count)) + "\n"
+                return
+            }
+            if lastLine.hasPrefix(marker) {
+                content = newValue + marker
+                return
+            }
+        }
+
+        // Numbered lines: "3. next thought" → the return brings "4. ".
+        if let dot = lastLine.firstIndex(of: "."),
+           let number = Int(lastLine[..<dot]),
+           lastLine[lastLine.index(after: dot)...].hasPrefix(" ") {
+            let prefixLength = lastLine.distance(from: lastLine.startIndex, to: dot) + 2
+            if lastLine.count == prefixLength {
+                content = String(oldValue.dropLast(prefixLength)) + "\n"
+            } else {
+                content = newValue + "\(number + 1). "
+            }
+        }
+    }
+
+    // MARK: - Page furniture
+
+    private var dateLine: String {
+        let f = DateFormatter()
+        f.dateFormat = "EEEE, MMMM d"
+        return f.string(from: entryDate).uppercased()
+    }
+
+    private var wordCount: Int {
+        content.split(whereSeparator: \.isWhitespace).count
+    }
+
+    private var wordCountText: String {
+        switch wordCount {
+        case 0: return ""
+        case 1: return "1 word"
+        default: return "\(wordCount) words"
+        }
+    }
+
+    // MARK: - Undo history
+
+    private var currentSnapshot: HistorySnapshot {
+        HistorySnapshot(title: title, content: content)
+    }
+
+    /// A burst of typing is still open — text differs from the last
+    /// committed snapshot — so undo has somewhere to go even before the
+    /// pause commits it.
+    private var canUndo: Bool {
+        !undoStack.isEmpty || currentSnapshot != lastCommitted
+    }
+
+    private var canRedo: Bool {
+        !redoStack.isEmpty
+    }
+
+    /// Called from the text onChange handlers. Programmatic assignments
+    /// (load, draft recovery, undo/redo application) keep `lastCommitted`
+    /// equal to the text, so only real typing opens a burst.
+    private func recordHistory() {
+        historyTask?.cancel()
+        guard currentSnapshot != lastCommitted else { return }
+        // New writing forfeits the forward path — standard editor law.
+        redoStack.removeAll()
+        historyTask = Task {
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            guard !Task.isCancelled else { return }
+            commitBurst()
+        }
+    }
+
+    private func commitBurst() {
+        guard currentSnapshot != lastCommitted else { return }
+        undoStack.append(lastCommitted)
+        if undoStack.count > 100 { undoStack.removeFirst() }
+        redoStack.removeAll()
+        lastCommitted = currentSnapshot
+    }
+
+    private func undo() {
+        historyTask?.cancel()
+        commitBurst()
+        guard let previous = undoStack.popLast() else { return }
+        redoStack.append(currentSnapshot)
+        apply(previous)
+    }
+
+    private func redo() {
+        guard let next = redoStack.popLast() else { return }
+        historyTask?.cancel()
+        undoStack.append(currentSnapshot)
+        apply(next)
+    }
+
+    /// Restore a snapshot. Setting `lastCommitted` first keeps the change
+    /// out of history; the onChange handlers still persist + save it.
+    private func apply(_ snapshot: HistorySnapshot) {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        lastCommitted = snapshot
+        title = snapshot.title
+        content = snapshot.content
     }
 
     // MARK: - Save
@@ -372,7 +615,12 @@ struct JournalEditorView: View {
             content = journal.content ?? ""
             savedTitle = title
             savedContent = content
+            if let created = journal.createdAt {
+                entryDate = created
+            }
             applyStoredDraftIfPresent()
+            // History starts from what the page opened with (draft included).
+            lastCommitted = currentSnapshot
         } catch {
             if !error.isCancellation {
                 AppLogger.shared.error("Journal", "Failed to load: \(error)")
@@ -424,6 +672,28 @@ struct JournalDetailResponse: Decodable {
     let id: String
     let title: String?
     let content: String?
+    let createdAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, content, createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        title = try c.decodeIfPresent(String.self, forKey: .title)
+        content = try c.decodeIfPresent(String.self, forKey: .content)
+
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let isoBasic = ISO8601DateFormatter()
+        isoBasic.formatOptions = [.withInternetDateTime]
+        if let raw = try c.decodeIfPresent(String.self, forKey: .createdAt) {
+            createdAt = iso.date(from: raw) ?? isoBasic.date(from: raw)
+        } else {
+            createdAt = nil
+        }
+    }
 }
 
 struct UpdateJournalRequest: Encodable {

@@ -25,14 +25,19 @@ private struct TypingHapticsModifier: ViewModifier {
 
     /// One shared generator so every field taps the motor with the same
     /// touch, and stays warm across fields.
-    private static let generator = UIImpactFeedbackGenerator(style: .soft)
+    private static let generator = UIImpactFeedbackGenerator(style: .light)
 
     func body(content: Content) -> some View {
-        content.onChange(of: text) { oldValue, newValue in
-            guard newValue.count > oldValue.count,
-                  Date().timeIntervalSince(lastPulse) > 0.06 else { return }
-            Self.generator.impactOccurred(intensity: 0.35)
-            lastPulse = Date()
-        }
+        content
+            // A cold Taptic Engine drops or delays pulses — prime it when
+            // the field appears and keep it primed after every tick.
+            .onAppear { Self.generator.prepare() }
+            .onChange(of: text) { oldValue, newValue in
+                guard newValue.count > oldValue.count,
+                      Date().timeIntervalSince(lastPulse) > 0.06 else { return }
+                Self.generator.impactOccurred(intensity: 0.65)
+                Self.generator.prepare()
+                lastPulse = Date()
+            }
     }
 }
