@@ -159,6 +159,14 @@ struct ChatView: View {
                     proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
                 }
             }
+            // During streaming the last message's id never changes — only its
+            // content grows — so the id-based follow above never fires and
+            // the reply slides out of view behind the composer. Track growth
+            // per chunk, unanimated so it feels pinned rather than chased.
+            .onChange(of: messages.last?.content) { _, _ in
+                guard isAtBottom else { return }
+                proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
+            }
         }
     }
 

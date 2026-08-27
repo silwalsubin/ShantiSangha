@@ -22,13 +22,21 @@ struct AgentChatView: View {
     private let reminderLabel: String?
     private var isScoped: Bool { reminderId != nil }
 
+    /// A prompt sent automatically as soon as the chat opens — used by the
+    /// Home starter chips, which promise an answer, not a staged draft.
+    private let autoSend: String?
+
     init(prefill: String = "", prefillImage: UIImage? = nil,
+         autoSend: String? = nil,
          reminderId: UUID? = nil, reminderLabel: String? = nil) {
         _inputText = State(initialValue: prefill)
         _stagedImage = State(initialValue: prefillImage)
+        self.autoSend = autoSend
         self.reminderId = reminderId
         self.reminderLabel = reminderLabel
     }
+
+    @State private var autoSendFired = false
 
     @State private var loadingHistory = true
     @State private var failedSendText: String?
@@ -82,7 +90,13 @@ struct AgentChatView: View {
                 }
             }
         }
-        .task { await loadInitialData() }
+        .task {
+            await loadInitialData()
+            if let autoSend, !autoSendFired {
+                autoSendFired = true
+                await sendSuggestion(autoSend)
+            }
+        }
         .confirmationDialog(
             "Start fresh?",
             isPresented: $showClearConfirmation,
@@ -198,6 +212,16 @@ struct AgentChatView: View {
                 withAnimation(.easeOut(duration: 0.2)) {
                     proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
                 }
+            }
+            // THE fix for "the last message hides behind the composer":
+            // during streaming the last message's id never changes — only its
+            // content grows — so the id-based follow above never fires. Track
+            // growth per chunk (no animation: many small hops must feel like
+            // pinning, not chasing). Reading upward mid-stream still works —
+            // isAtBottom goes false the moment the user scrolls away.
+            .onChange(of: messages.last?.content) { _, _ in
+                guard isAtBottom else { return }
+                proxy.scrollTo(Self.bottomAnchorId, anchor: .bottom)
             }
         }
     }

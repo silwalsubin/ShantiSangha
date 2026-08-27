@@ -25,6 +25,7 @@ struct HomeView: View {
     /// Increments only when the chat is summoned, so the sparkle spray
     /// fires on open but not when the sheet dismisses back to Home.
     @State private var sparkleTrigger = 0
+    @State private var autoSendPrompt: String?
     @State private var showCalendar = false
     /// Text handed in from a share extension (or the shared sheet).
     /// Passed through to AgentChatView when the chat opens; cleared on
@@ -59,6 +60,17 @@ struct HomeView: View {
                             .transition(.opacity)
                     }
 
+                    // The assistant is the heart of Home (ChatGPT-style hero):
+                    // composer directly under the greeting, with starter chips
+                    // that auto-send so a tap delivers an answer, not a draft.
+                    askPill
+                        .padding(.horizontal, 16)
+                        .padding(.top, SacredSpacing.l)
+
+                    starterChips
+                        .padding(.horizontal, 16)
+                        .padding(.top, SacredSpacing.s)
+
                     // Whole-day context strip — sleep, steps, weather. Only
                     // appears when the user has enabled Health / Weather in
                     // Settings AND the relevant data is available. Silent
@@ -76,7 +88,7 @@ struct HomeView: View {
                     }
                 }
                 .padding(.top, SacredSpacing.xl)
-                .padding(.bottom, SacredSpacing.tabBarSafe + 72)
+                .padding(.bottom, SacredSpacing.tabBarSafe)
             }
             .background(Color.clear)
             .toolbar {
@@ -151,18 +163,9 @@ struct HomeView: View {
                 deepLinks.clearAssistantImage()
             }
 
-            // The assistant lives in a small gold orb pinned to the
-            // bottom-right — a quiet affordance you reach for, not a
-            // banner across Home. Floats just above the tab bar.
-            HStack {
-                Spacer()
-                chatFAB
-            }
-            .padding(.trailing, 20)
-            .padding(.bottom, 20)
         }
         .navigationDestination(isPresented: $showChatSheet) {
-            AgentChatView(prefill: voicePrefill, prefillImage: sharedAssistantImage)
+            AgentChatView(prefill: voicePrefill, prefillImage: sharedAssistantImage, autoSend: autoSendPrompt)
         }
         .navigationDestination(isPresented: $showCalendar) {
             CalendarView(showsNavigationBar: true)
@@ -171,6 +174,7 @@ struct HomeView: View {
             if !isShown {
                 voicePrefill = ""
                 sharedAssistantImage = nil
+                autoSendPrompt = nil
             }
         }
         .navigationDestination(item: $navTarget) { target in
@@ -216,25 +220,35 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Assistant button
+    // MARK: - Ask pill
 
-    /// A small floating action button pinned to the bottom-right — a
-    /// gold orb bearing the vajra (the assistant's mark). Tap summons
-    /// the chat. Replaces the old full-width prompt pill: the assistant
-    /// is a tool you reach for in the corner, not a banner across Home.
-    private var chatFAB: some View {
+    /// The assistant's front door: a quiet parchment pill docked above the
+    /// tab bar. Reads as an invitation ("Ask anything…"), not a control —
+    /// the vajra names who answers.
+    private var askPill: some View {
         Button {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             sparkleTrigger += 1
             showChatSheet = true
         } label: {
-            chatFABBody
+            HStack(spacing: SacredSpacing.s) {
+                SacredIconView(icon: .vajra, size: 18)
+                    .foregroundColor(.sacredGold)
+                Text("Ask anything…")
+                    .font(.sacredText)
+                    .foregroundColor(.sacredMuted)
+                Spacer()
+            }
+            .padding(.horizontal, SacredSpacing.lux)
+            .frame(height: 48)
+            .background(Capsule().fill(Color.sacredBgCard.opacity(0.94)))
+            .overlay(Capsule().stroke(Color.sacredGold.opacity(0.22), lineWidth: 1))
+            .shadow(color: .sacredMuted.opacity(0.15), radius: 8, y: 4)
         }
-        .buttonStyle(SendButtonPressStyle())
+        .buttonStyle(PillPressStyle())
         .accessibilityLabel("Open assistant")
         // Sparkles spray as the chat is summoned. Keyed to sparkleTrigger
         // (which only advances on open) so it never re-fires on dismiss.
-        // Fires before the destination covers it — Pow renders above all.
         .changeEffect(
             .spray(origin: UnitPoint.center) {
                 Image(systemName: "sparkle")
@@ -244,40 +258,34 @@ struct HomeView: View {
         )
     }
 
-    /// A gold speech-bubble with a round body and a small tail flowing
-    /// out of the bottom-right corner, carrying the vajra (the
-    /// assistant's mark) at center. The vertical gradient and a top
-    /// rim-light give it a quiet depth; the shape reads as "chat," the
-    /// glyph names whose chat it is.
-    private var chatFABBody: some View {
-        ZStack {
-            ChatBubbleShape()
-                .fill(LinearGradient.sacredGoldShinyVertical)
-                .overlay(
-                    // Thin top rim-light → catches the eye as a sheen so
-                    // the bubble reads as a lit surface, not a flat fill.
-                    ChatBubbleShape()
-                        .stroke(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.5),
-                                    Color.sacredGoldShine.opacity(0.12),
-                                    .clear
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            ),
-                            lineWidth: 1
-                        )
-                )
-
-            // Vajra — bone-cream against the gold. Nudged up so it sits
-            // centered in the round body, clear of the tail.
-            SacredIconView(icon: .vajra, size: 24)
-                .foregroundColor(.sacredBg)
-                .offset(y: -3)
+    /// Two quiet invitations under the composer. Tapping one opens the
+    /// assistant and sends it immediately — an answer, not a staged draft.
+    private var starterChips: some View {
+        HStack(spacing: SacredSpacing.xs) {
+            starterChip("What's due this week?")
+            starterChip("How have I been lately?")
+            Spacer(minLength: 0)
         }
-        .frame(width: 56, height: 56)
+    }
+
+    private func starterChip(_ prompt: String) -> some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            autoSendPrompt = prompt
+            showChatSheet = true
+        } label: {
+            Text(prompt)
+                .font(.sacredSmall)
+                .foregroundColor(.sacredTextSecondary)
+                .padding(.horizontal, 14)
+                .frame(height: 36)
+                .background(Capsule().fill(Color.sacredBgCard.opacity(0.8)))
+                .overlay(Capsule().stroke(Color.sacredMuted.opacity(0.18), lineWidth: 1))
+                // Visual capsule stays slim; the tap target meets 44pt.
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(PillPressStyle())
     }
 
     // MARK: - Reminders section
@@ -782,51 +790,13 @@ private extension String {
     }
 }
 
-/// A round speech-bubble: a circular body with a small curved tail
-/// pulled out of the bottom-right, pointing toward the screen corner the
-/// bubble sits in. Drawn as one continuous subpath so the gold gradient
-/// and the rim-light stroke both run cleanly around it.
-private struct ChatBubbleShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        let w = rect.width
-        let h = rect.height
-        // The circular body sits in the top portion; the remaining height
-        // is where the tail drops toward the corner.
-        let bodyD = min(w, h * 0.86)
-        let r = bodyD / 2
-        let cx = w / 2
-        let cy = r
-
-        var p = Path()
-        // Sweep the body clockwise from the top, stopping just before the
-        // bottom-right where the tail breaks out.
-        p.addArc(center: CGPoint(x: cx, y: cy), radius: r,
-                 startAngle: .degrees(-90), endAngle: .degrees(40), clockwise: false)
-        // Tail — flares out and down to a soft point near the corner...
-        p.addQuadCurve(to: CGPoint(x: w - 2, y: h),
-                       control: CGPoint(x: w, y: bodyD * 0.92))
-        // ...then curves back up onto the body's lower edge.
-        p.addQuadCurve(to: CGPoint(x: cx + r * 0.30, y: cy + r * 0.94),
-                       control: CGPoint(x: cx + r * 0.66, y: cy + r * 0.98))
-        // Close the remaining arc back to the start point at the top.
-        p.addArc(center: CGPoint(x: cx, y: cy), radius: r,
-                 startAngle: .degrees(72), endAngle: .degrees(270), clockwise: false)
-        p.closeSubpath()
-        return p
-    }
-}
-
-/// Custom press style for the send button — tighter scale-down + a
-/// confident spring back. The default `.plain` style has no press
-/// feedback at all, which makes the button feel dead at the moment of
-/// tap (especially since the chat sheet covers it within ~100ms).
-private struct SendButtonPressStyle: ButtonStyle {
+/// Gentle press feedback for the ask pill — the sacred 0.97 scale-down
+/// with a soft return. The default `.plain` style has no press feedback,
+/// which makes the pill feel dead at the moment of tap.
+private struct PillPressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.88 : 1.0)
-            .animation(
-                .spring(response: 0.28, dampingFraction: 0.55),
-                value: configuration.isPressed
-            )
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .animation(.easeOut(duration: 0.2), value: configuration.isPressed)
     }
 }
