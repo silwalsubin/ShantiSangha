@@ -9,8 +9,25 @@ namespace ShantiSangha.Journal.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/journals")]
-public class JournalsController(IJournalService journalService, ICurrentUser currentUser) : ControllerBase
+public class JournalsController(
+    IJournalService journalService,
+    JournalPromptService promptService,
+    ICurrentUser currentUser) : ControllerBase
 {
+    /// Personalized opening question for the journal editor's placeholder,
+    /// drawn from the user's memory. Absolute route (singular "journal")
+    /// matches the path the iOS client has called since the original daily
+    /// prompts feature; `date` is accepted for compatibility but unused.
+    [HttpGet("/api/journal/prompt")]
+    public async Task<IActionResult> GetPrompt([FromQuery] string? date, CancellationToken ct = default)
+    {
+        var user = await currentUser.GetAsync();
+        if (user is null) return Unauthorized();
+
+        var prompt = await promptService.GetPromptAsync(user.Id, ct);
+        return Ok(new JournalPromptResponse(prompt));
+    }
+
     [HttpGet]
     public async Task<IActionResult> List(
         int page = 1, int pageSize = 20, CancellationToken ct = default)

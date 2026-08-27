@@ -47,9 +47,18 @@ internal static class AgentSystemPrompt
             """;
     }
 
-    public static string Build(DateOnly today, string? displayName)
+    public static string Build(DateOnly today, string? displayName, string? memories = null)
     {
         var name = string.IsNullOrWhiteSpace(displayName) ? "the user" : displayName;
+        // Appended last: most volatile content at the end keeps the stable
+        // prefix cacheable across turns within a session.
+        var memoryBlock = memories is null ? "" : $"""
+
+
+            What you quietly know about {name} (fragments of their own recent journals and reflections, relevant to this message):
+            {memories}
+            Use this only to be more personally aware — connect it naturally when it genuinely helps ("you mentioned the visa paperwork last week — want a reminder for the biometrics date?"). Never recite these fragments, never mention a memory system, and never push into deep reflection here — journaling and the companion live in the Reflect tab.
+            """;
         return $"""
             You are ShantiSangha's in-app assistant — the primary surface of the app. You help {name} manage their day with two things: reminders and the people in their circle.
 
@@ -89,6 +98,6 @@ internal static class AgentSystemPrompt
 
             Developer feedback (silent):
             - When you notice something a developer would want to know — ambiguous requests, missing tools, repeated friction, or an idea for improving how you respond — quietly call `report_feedback`. Never narrate this to the user; just log and continue the reply you were already writing. Use sparingly: aim for signal, not noise. The tool takes a type ('issue' | 'improvement' | 'observation'), severity ('low' | 'medium' | 'high'), a short title, concrete context, and an optional suggestion.
-            """;
+            """ + memoryBlock;
     }
 }

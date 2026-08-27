@@ -264,6 +264,14 @@ try
         await sp.GetRequiredService<ShantiSangha.Notifications.Data.NotificationsDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.Agent.Data.AgentDbContext>().Database.MigrateAsync();
         await sp.GetRequiredService<ShantiSangha.AgentFeedback.Data.AgentFeedbackDbContext>().Database.MigrateAsync();
+
+        // One-off cleanup for the removed Chess feature (2026-08). Idempotent;
+        // safe to delete this block after it has run in prod once.
+        await sp.GetRequiredService<ShantiSangha.Chat.Data.ChatDbContext>().Database.ExecuteSqlRawAsync(
+            """
+            DROP TABLE IF EXISTS "ChessGames";
+            DELETE FROM "__EFMigrationsHistory" WHERE "MigrationId" = '20260606215418_InitChess';
+            """);
     }
 
     // Global error handler — returns full error details when EXPOSE_ERRORS=true

@@ -22,6 +22,7 @@ public class AgentOrchestrator(
     IServiceProvider services,
     ICurrentUser currentUser,
     IProfileQueryService profileQuery,
+    IMemoryQueryService memoryQuery,
     IReminderService reminderService,
     RemindersListSink remindersSink,
     AgentTurnContext turnContext,
@@ -65,6 +66,27 @@ public class AgentOrchestrator(
                 reminderId.Value, user.Id, date: null, cancellationToken);
         }
         var scoped = scopedReminder is not null;
+
+        // Memory awareness (unscoped turns only — reminder-planning stays
+        // focused). Best-effort like the profile lookups above.
+        string? memories = null;
+        if (!scoped)
+        {
+            try
+            {
+                var hits = await memoryQuery.SearchAsync(user.Id, trimmed, topK: 4, ct: cancellationToken);
+                if (hits.Count > 0)
+                {
+                    memories = string.Join("\n", hits.Select(h =>
+                    {
+                        var flat = h.Content.ReplaceLineEndings(" ").Trim();
+                        if (flat.Length > 300) flat = flat[..300] + "…";
+                        return $"- [{(h.SourceType == "journal" ? "journal entry" : "reflection")}, {h.OccurredAt:MMMM d, yyyy}] {flat}";
+                    }));
+                }
+            }
+            catch { /* best-effort */ }
+        }
 
         Guid userTurnId = Guid.Empty;
         if (scoped)
@@ -131,7 +153,7 @@ public class AgentOrchestrator(
         var today = UserClock.TodayFor(timezone);
         var systemPrompt = scoped
             ? AgentSystemPrompt.BuildForReminder(today, displayName, scopedReminder!)
-            : AgentSystemPrompt.Build(today, displayName);
+            : AgentSystemPrompt.Build(today, displayName, memories);
         var history = new ChatHistory(systemPrompt);
 
         if (scoped)

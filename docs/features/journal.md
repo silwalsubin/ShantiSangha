@@ -24,5 +24,5 @@ A private writing space for self-reflection. Users capture thoughts, process emo
 - `DELETE /api/journals/{id}` — delete entry
 
 ## Q2 improvements planned
-- Guided prompts ("What am I grateful for today?")
+- ~~Guided prompts~~ — done 2026-08: `GET /api/journal/prompt` serves a personalized opening question drawn from the user's memory (see memory.md)
 - Emotion/theme tagging

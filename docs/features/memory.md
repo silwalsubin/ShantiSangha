@@ -24,5 +24,7 @@ The connective tissue that makes the companion actually know the user. Everythin
 - **Companion retrieval** — every chat reply is grounded in the user's own past words (invisible).
 - **Companion speaks first** — `POST /api/conversations/{id}/opener` (SSE): a short personalized greeting streamed into a brand-new conversation, drawn from the most recent memories. iOS calls it from `ChatView` when an empty conversation opens; falls back to the static opening card on failure.
 - **Home continuity line** — `GET /api/memory/presence?tzOffsetMinutes=` returns `{ daysReflected, windowDays, reflectedToday }`; Home shows "You've reflected N days of the last 7" under the greeting. Hidden at 0 — acknowledgment only, never guilt.
+- **Assistant awareness** — the Home-orb assistant (`/api/agent/chat`, unscoped turns) retrieves top-4 memories per message into its system prompt, so the task assistant is personally aware without becoming the companion.
+- **Journal prompts** — `GET /api/journal/prompt` generates one opening question (fast model) from the user's 5 most recent memories; serves the editor placeholder the iOS client already requests, static fallback on null.
 
 No browsable surface, no settings — memory stays invisible (invisible-content principle).
