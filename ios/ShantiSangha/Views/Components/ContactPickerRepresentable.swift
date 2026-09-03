@@ -1,8 +1,11 @@
 import SwiftUI
+import UIKit
 import Contacts
 import ContactsUI
 
-struct PickedContact {
+struct PickedContact: Identifiable {
+    var id: String { identifier }
+
     let displayName: String
     let birthday: DateComponents?
     let imageData: Data?
@@ -11,6 +14,66 @@ struct PickedContact {
     /// Identifier of the source contact, so the profile can offer a way back
     /// to their card. Device/iCloud-scoped — see ContactLinkStore.
     let identifier: String
+}
+
+extension PickedContact {
+    /// "March 4" — a contact's birthday often carries no year, and a birthday
+    /// doesn't need one, so this never shows one either.
+    var birthdayLabel: String? {
+        guard let birthday else { return nil }
+        return Self.monthDay.string(from: Self.date(from: birthday))
+    }
+
+    /// The same day as "yyyy-MM-dd" for the reminders API. When the contact
+    /// has no birth year we substitute one: it's inert downstream, since a
+    /// yearly reminder recomputes its countdown from today and ignores the
+    /// stored year.
+    var birthdayISODate: String? {
+        guard let birthday else { return nil }
+        return Self.iso.string(from: Self.date(from: birthday))
+    }
+
+    /// Their photo, sized for an avatar: 512pt on the long edge at JPEG 0.7,
+    /// matching what the avatar picker produces. Contact photos can be several
+    /// megabytes; an avatar never needs that.
+    var avatarJPEG: Data? {
+        guard let imageData, let image = UIImage(data: imageData) else { return nil }
+        let maxDimension: CGFloat = 512
+        let largest = max(image.size.width, image.size.height)
+        guard largest > maxDimension else { return image.jpegData(compressionQuality: 0.7) }
+
+        let scale = maxDimension / largest
+        let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        let resized = UIGraphicsImageRenderer(size: size).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: size))
+        }
+        return resized.jpegData(compressionQuality: 0.7)
+    }
+
+    private static func date(from components: DateComponents) -> Date {
+        var normalized = components
+        if normalized.year == nil {
+            // Feb 29 needs a leap year or Calendar returns nil.
+            normalized.year = (components.month == 2 && components.day == 29) ? 2024 : 2001
+        }
+        return Calendar(identifier: .gregorian).date(from: normalized) ?? Date()
+    }
+
+    private static let monthDay: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMMM d"
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
+    private static let iso: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
 }
 
 /// Opens the system contact picker — no permission prompt, since it runs

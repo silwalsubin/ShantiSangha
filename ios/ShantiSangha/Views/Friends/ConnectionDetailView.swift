@@ -55,7 +55,11 @@ struct ConnectionDetailView: View {
     /// Set when this person was imported from the phone's contacts.
     @State private var linkedContactIdentifier: String?
     @State private var showContactCard = false
+    @State private var showContactPicker = false
     @State private var contactCardMessage: String?
+    @State private var pendingImport: PickedContact?
+    @State private var importItems: [ContactImportSheet.Item] = []
+    @State private var importing = false
 
     private var connection: Connection? {
         vm.connections.first(where: { $0.id == connectionId })
@@ -135,6 +139,20 @@ struct ConnectionDetailView: View {
         .task(id: connectionId) { await loadDates() }
         .onAppear {
             linkedContactIdentifier = ContactLinkStore.contactIdentifier(for: connectionId)
+        }
+        .sheet(item: $pendingImport) { picked in
+            SacredFormSheet(
+                title: "Import details",
+                detent: .height(480),
+                onCancel: { pendingImport = nil; importItems = [] }
+            ) {
+                ContactImportSheet(
+                    contactName: picked.displayName,
+                    items: importItems,
+                    importing: importing,
+                    onImport: { fields in Task { await applyContactImport(fields) } },
+                    onCancel: { pendingImport = nil; importItems = [] })
+            }
         }
         .sheet(isPresented: $showContactCard) {
             if let identifier = linkedContactIdentifier {
@@ -561,12 +579,13 @@ struct ConnectionDetailView: View {
         .buttonStyle(.plain)
     }
 
-    /// Only for people brought in from the phone's contacts — a way back to
-    /// their card, read live so it's never a stale copy.
+    /// A way to their card in the phone's contacts, read live so it's never a
+    /// stale copy. People imported from Contacts arrive linked; anyone added
+    /// by hand can be linked here. Long-press a linked row to undo it.
     @ViewBuilder
     private var contactCardSection: some View {
-        if linkedContactIdentifier != nil {
-            VStack(alignment: .leading, spacing: SacredSpacing.xs) {
+        VStack(alignment: .leading, spacing: SacredSpacing.xs) {
+            if linkedContactIdentifier != nil {
                 Button {
                     showContactCard = true
                 } label: {
@@ -578,8 +597,134 @@ struct ConnectionDetailView: View {
                     }
                 }
                 .buttonStyle(.plain)
+                .contextMenu {
+                    Button(role: .destructive) {
+                        ContactLinkStore.unlink(connectionId: connectionId)
+                        linkedContactIdentifier = nil
+                        contactCardMessage = nil
+                    } label: {
+                        Label("Unlink from Contacts", systemImage: "person.crop.circle.badge.xmark")
+                    }
+                }
+            } else {
+                Button {
+                    showContactPicker = true
+                } label: {
+                    SacredListCard {
+                        SacredMenuRow(
+                            icon: "person.crop.circle.badge.plus",
+                            title: "Link to Contacts",
+                            subtitle: "Reach them from their card on this phone")
+                    }
+                }
+                .buttonStyle(.plain)
             }
+
+            PrivateFootnote("This link stays on this phone.")
         }
+        // The link lives on this phone only — see ContactLinkStore.
+        .background(
+            ContactPickerPresenter(isPresented: $showContactPicker) { picked in
+                ContactLinkStore.link(
+                    connectionId: connectionId, contactIdentifier: picked.identifier)
+                linkedContactIdentifier = picked.identifier
+                contactCardMessage = nil
+                // Only ask about importing when the card actually offers
+                // something this profile doesn't already have.
+                let plan = importPlan(from: picked)
+                if !plan.isEmpty {
+                    pendingImport = picked
+                    importItems = plan
+                }
+            }
+            .frame(width: 0, height: 0)
+        )
+    }
+
+    // MARK: - Importing from a linked contact
+
+    /// What this card offers that the profile doesn't already say. Fields the
+    /// contact leaves blank, and values that already match, are left out
+    /// entirely — there's nothing to decide about them.
+    private func importPlan(from picked: PickedContact) -> [ContactImportSheet.Item] {
+        guard let c = connection else { return [] }
+        var items: [ContactImportSheet.Item] = []
+
+        if picked.imageData != nil {
+            items.append(.init(
+                id: .photo,
+                label: "PHOTO",
+                incoming: "Their contact photo",
+                existing: c.privateAvatarUrl == nil ? nil : "the current photo"))
+        }
+
+        if let phone = picked.phoneNumber, phone != c.person.phoneNumber {
+            items.append(.init(
+                id: .phone, label: "PHONE", incoming: phone, existing: c.person.phoneNumber))
+        }
+
+        if let email = picked.email, email != c.person.email {
+            items.append(.init(
+                id: .email, label: "EMAIL", incoming: email, existing: c.person.email))
+        }
+
+        if let birthdayLabel = picked.birthdayLabel {
+            // A yearly reminder already standing in for their birthday means
+            // this would duplicate rather than fill.
+            let existing = dates.first {
+                $0.recurrence == .yearly && $0.label.localizedCaseInsensitiveContains("birthday")
+            }
+            items.append(.init(
+                id: .birthday,
+                label: "BIRTHDAY",
+                incoming: "Yearly reminder on \(birthdayLabel)",
+                existing: existing.map { "\($0.label)" }))
+        }
+
+        return items
+    }
+
+    private func applyContactImport(_ fields: Set<ContactImportSheet.Item.Field>) async {
+        guard let picked = pendingImport, let c = connection else { return }
+        importing = true
+        defer { importing = false }
+
+        var failed = false
+
+        if fields.contains(.photo), let jpeg = picked.avatarJPEG {
+            do { try await vm.uploadPrivateAvatar(connectionId: c.id, jpegData: jpeg) }
+            catch { failed = true }
+        }
+
+        // Phone and email travel together: one PATCH, only the chosen fields.
+        if fields.contains(.phone) || fields.contains(.email) {
+            do {
+                _ = try await vm.updatePerson(
+                    connectionId: c.id,
+                    request: UpdatePersonRequest(
+                        phoneNumber: fields.contains(.phone) ? picked.phoneNumber : nil,
+                        email: fields.contains(.email) ? picked.email : nil))
+            } catch { failed = true }
+        }
+
+        if fields.contains(.birthday), let isoDate = picked.birthdayISODate {
+            do {
+                _ = try await ReminderRepository.shared.create(
+                    label: "\(c.displayLabel)'s Birthday",
+                    date: isoDate,
+                    recurrence: .yearly,
+                    connectionId: c.id)
+                await loadDates()
+            } catch { failed = true }
+        }
+
+        // Reported on the contact row itself — the sheet has just closed, and
+        // the shared saveError renders far down the page where it'd be missed.
+        contactCardMessage = failed ? "Some details couldn't be saved" : nil
+        pendingImport = nil
+        importItems = []
+        // The edit drafts still hold the pre-import values.
+        seedDrafts(force: true)
     }
 
     private var nicknameSection: some View {

@@ -27,11 +27,10 @@ struct AddConnectionView: View {
     @State private var country: String = ""
 
     @State private var showContactPicker = false
-    @State private var pickedBirthday: DateComponents?
+    /// Everything the picked contact brought with it. Name and phone are
+    /// copied into their own editable fields; the rest is read from here.
+    @State private var pickedContact: PickedContact?
     @State private var includeBirthdayReminder = false
-    @State private var pickedImageData: Data?
-    @State private var pickedEmail: String?
-    @State private var pickedContactIdentifier: String?
 
     @State private var saving = false
     @State private var errorMessage: String?
@@ -41,7 +40,7 @@ struct AddConnectionView: View {
             ScrollView {
                 VStack(spacing: SacredSpacing.l) {
                     nameSection
-                    if pickedBirthday != nil {
+                    if pickedContact?.birthday != nil {
                         birthdaySection
                     }
                     relationSection
@@ -91,7 +90,7 @@ struct AddConnectionView: View {
                 HStack(spacing: 4) {
                     // Their contact photo, once picked — shown so the import
                     // is visible rather than silent.
-                    if let pickedImageData, let image = UIImage(data: pickedImageData) {
+                    if let data = pickedContact?.imageData, let image = UIImage(data: data) {
                         Image(uiImage: image)
                             .resizable()
                             .scaledToFill()
@@ -126,15 +125,10 @@ struct AddConnectionView: View {
         // Background, not a sheet — see ContactPickerPresenter for why.
         .background(
             ContactPickerPresenter(isPresented: $showContactPicker) { picked in
+                pickedContact = picked
                 name = picked.displayName
-                pickedImageData = picked.imageData
-                pickedEmail = picked.email
-                pickedContactIdentifier = picked.identifier
                 if let number = picked.phoneNumber { phone = number }
-                if let birthday = picked.birthday {
-                    pickedBirthday = birthday
-                    includeBirthdayReminder = true
-                }
+                includeBirthdayReminder = picked.birthday != nil
             }
             .frame(width: 0, height: 0)
         )
@@ -145,7 +139,7 @@ struct AddConnectionView: View {
             sectionLabel("BIRTHDAY")
             SacredListCard {
                 Toggle(isOn: $includeBirthdayReminder) {
-                    Text("Remind me every year on \(birthdayLabel)")
+                    Text("Remind me every year on \(pickedContact?.birthdayLabel ?? "")")
                         .font(.sacredText)
                         .foregroundColor(.sacredText)
                 }
@@ -251,60 +245,6 @@ struct AddConnectionView: View {
             .padding(.horizontal, 4)
     }
 
-    // MARK: - Birthday
-
-    private var birthdayLabel: String {
-        guard let pickedBirthday else { return "" }
-        return Self.monthDayFormatter.string(from: Self.normalizedDate(from: pickedBirthday))
-    }
-
-    private static let monthDayFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "MMMM d"
-        f.calendar = Calendar(identifier: .gregorian)
-        f.locale = Locale(identifier: "en_US_POSIX")
-        return f
-    }()
-
-    private static let isoDateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.calendar = Calendar(identifier: .gregorian)
-        f.locale = Locale(identifier: "en_US_POSIX")
-        return f
-    }()
-
-    /// A real `Date` for a month/day-only birthday. The year is a display-inert
-    /// placeholder — never shown (the UI only ever formats "MMMM d") and never
-    /// meaningful downstream (a yearly reminder recomputes its own countdown
-    /// off today, ignoring the stored year). Feb 29 needs a leap year, or
-    /// `Calendar.date(from:)` returns nil.
-    // MARK: - Photo
-
-    /// Matches the avatar picker's output: 512pt on the long edge, JPEG 0.7.
-    /// Contact photos can be several megabytes; an avatar never needs that.
-    private static func avatarJPEG(from data: Data) -> Data? {
-        guard let image = UIImage(data: data) else { return nil }
-        let maxDimension: CGFloat = 512
-        let largest = max(image.size.width, image.size.height)
-        guard largest > maxDimension else { return image.jpegData(compressionQuality: 0.7) }
-
-        let scale = maxDimension / largest
-        let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
-        let resized = UIGraphicsImageRenderer(size: size).image { _ in
-            image.draw(in: CGRect(origin: .zero, size: size))
-        }
-        return resized.jpegData(compressionQuality: 0.7)
-    }
-
-    private static func normalizedDate(from components: DateComponents) -> Date {
-        var normalized = components
-        if normalized.year == nil {
-            normalized.year = (components.month == 2 && components.day == 29) ? 2024 : 2001
-        }
-        return Calendar(identifier: .gregorian).date(from: normalized) ?? Date()
-    }
-
     private func save() async {
         guard canSave else { return }
         saving = true
@@ -314,7 +254,7 @@ struct AddConnectionView: View {
                 displayName: name.trimmingCharacters(in: .whitespacesAndNewlines),
                 circles: circles.isEmpty ? nil : circles,
                 phoneNumber: phone.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
-                email: pickedEmail,
+                email: pickedContact?.email,
                 country: country.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
                 state: stateValue.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
                 city: city.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty)
@@ -322,9 +262,9 @@ struct AddConnectionView: View {
 
             // Remember where they came from so their profile can offer a way
             // back to the contact card. On-device only.
-            if let pickedContactIdentifier {
+            if let pickedContact {
                 ContactLinkStore.link(
-                    connectionId: created.id, contactIdentifier: pickedContactIdentifier)
+                    connectionId: created.id, contactIdentifier: pickedContact.identifier)
             }
 
             // The person is safely added by this point; anything that fails
@@ -332,9 +272,8 @@ struct AddConnectionView: View {
             // than failing the whole add.
             var unsaved: [String] = []
 
-            if includeBirthdayReminder, let pickedBirthday {
+            if includeBirthdayReminder, let isoDate = pickedContact?.birthdayISODate {
                 do {
-                    let isoDate = Self.isoDateFormatter.string(from: Self.normalizedDate(from: pickedBirthday))
                     _ = try await ReminderRepository.shared.create(
                         label: "\(req.displayName)'s Birthday",
                         date: isoDate,
@@ -345,7 +284,7 @@ struct AddConnectionView: View {
                 }
             }
 
-            if let pickedImageData, let jpeg = Self.avatarJPEG(from: pickedImageData) {
+            if let jpeg = pickedContact?.avatarJPEG {
                 do {
                     try await vm.uploadPrivateAvatar(connectionId: created.id, jpegData: jpeg)
                 } catch {
