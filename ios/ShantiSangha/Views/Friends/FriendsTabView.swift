@@ -20,6 +20,7 @@ struct FriendsTabView: View {
     @State private var circleSearchText = ""
     @State private var selectedFilter: CircleFilter = .all
     @State private var solarResetTrigger = UUID()
+    @State private var toastMessage: String?
     @FocusState private var circleSearchFocused: Bool
 
     /// Single nav destination. Chats split off to their own tab in
@@ -126,7 +127,7 @@ struct FriendsTabView: View {
         }
         .sheet(isPresented: $showShare) { ShareSheet(items: shareItems) }
         .sheet(isPresented: $showAddLocal) {
-            AddConnectionView(vm: circleVM)
+            AddConnectionView(vm: circleVM, onPartialFailure: { toastMessage = $0 })
         }
         .sheet(isPresented: $showRequestsSheet) {
             requestsAndInvitesSheet
@@ -137,6 +138,7 @@ struct FriendsTabView: View {
                 ConnectionDetailView(connectionId: id, vm: circleVM)
             }
         }
+        .sacredToast($toastMessage)
     }
 
     // MARK: - Overlays

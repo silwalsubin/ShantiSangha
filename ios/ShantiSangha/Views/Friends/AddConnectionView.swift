@@ -10,6 +10,10 @@ import SwiftUI
 /// stays one screen of two fields.
 struct AddConnectionView: View {
     @ObservedObject var vm: CircleViewModel
+    /// Fires when the connection saved but its birthday reminder didn't —
+    /// the sheet still dismisses (the person is safely added), so the
+    /// caller surfaces this as a toast naming the profile-page fallback.
+    var onPartialFailure: ((String) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
 
     @State private var name: String = ""
@@ -21,6 +25,10 @@ struct AddConnectionView: View {
     @State private var stateValue: String = ""
     @State private var country: String = ""
 
+    @State private var showContactPicker = false
+    @State private var pickedBirthday: DateComponents?
+    @State private var includeBirthdayReminder = false
+
     @State private var saving = false
     @State private var errorMessage: String?
 
@@ -29,6 +37,9 @@ struct AddConnectionView: View {
             ScrollView {
                 VStack(spacing: SacredSpacing.l) {
                     nameSection
+                    if pickedBirthday != nil {
+                        birthdaySection
+                    }
                     relationSection
                     optionalToggle
                     if showOptional {
@@ -73,14 +84,52 @@ struct AddConnectionView: View {
         VStack(alignment: .leading, spacing: SacredSpacing.xs) {
             sectionLabel("NAME")
             SacredListCard {
-                TextField("Their name", text: $name)
-                    .typingHaptics(for: name)
-                    .font(.sacredText)
-                    .foregroundColor(.sacredText)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
-                    .submitLabel(.next)
-                    .textInputAutocapitalization(.words)
+                HStack(spacing: 4) {
+                    TextField("Their name", text: $name)
+                        .typingHaptics(for: name)
+                        .font(.sacredText)
+                        .foregroundColor(.sacredText)
+                        .submitLabel(.next)
+                        .textInputAutocapitalization(.words)
+
+                    Button {
+                        showContactPicker = true
+                    } label: {
+                        Image(systemName: "person.crop.circle.badge.plus")
+                            .font(.system(size: 20))
+                            .foregroundColor(.sacredGold)
+                            .frame(width: 44, height: 44)
+                    }
+                    .accessibilityLabel("Add from Contacts")
+                }
+                .padding(.leading, 16)
+                .padding(.trailing, 6)
+                .padding(.vertical, 6)
+            }
+        }
+        .sheet(isPresented: $showContactPicker) {
+            ContactPickerRepresentable { picked in
+                name = picked.displayName
+                if let birthday = picked.birthday {
+                    pickedBirthday = birthday
+                    includeBirthdayReminder = true
+                }
+            }
+        }
+    }
+
+    private var birthdaySection: some View {
+        VStack(alignment: .leading, spacing: SacredSpacing.xs) {
+            sectionLabel("BIRTHDAY")
+            SacredListCard {
+                Toggle(isOn: $includeBirthdayReminder) {
+                    Text("Remind me every year on \(birthdayLabel)")
+                        .font(.sacredText)
+                        .foregroundColor(.sacredText)
+                }
+                .tint(.sacredGold)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
             }
         }
     }
@@ -180,6 +229,42 @@ struct AddConnectionView: View {
             .padding(.horizontal, 4)
     }
 
+    // MARK: - Birthday
+
+    private var birthdayLabel: String {
+        guard let pickedBirthday else { return "" }
+        return Self.monthDayFormatter.string(from: Self.normalizedDate(from: pickedBirthday))
+    }
+
+    private static let monthDayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMMM d"
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
+    private static let isoDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        return f
+    }()
+
+    /// A real `Date` for a month/day-only birthday. The year is a display-inert
+    /// placeholder — never shown (the UI only ever formats "MMMM d") and never
+    /// meaningful downstream (a yearly reminder recomputes its own countdown
+    /// off today, ignoring the stored year). Feb 29 needs a leap year, or
+    /// `Calendar.date(from:)` returns nil.
+    private static func normalizedDate(from components: DateComponents) -> Date {
+        var normalized = components
+        if normalized.year == nil {
+            normalized.year = (components.month == 2 && components.day == 29) ? 2024 : 2001
+        }
+        return Calendar(identifier: .gregorian).date(from: normalized) ?? Date()
+    }
+
     private func save() async {
         guard canSave else { return }
         saving = true
@@ -192,7 +277,21 @@ struct AddConnectionView: View {
                 country: country.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
                 state: stateValue.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
                 city: city.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty)
-            _ = try await vm.addLocal(req)
+            let created = try await vm.addLocal(req)
+
+            if includeBirthdayReminder, let pickedBirthday {
+                do {
+                    let isoDate = Self.isoDateFormatter.string(from: Self.normalizedDate(from: pickedBirthday))
+                    _ = try await ReminderRepository.shared.create(
+                        label: "\(req.displayName)'s Birthday",
+                        date: isoDate,
+                        recurrence: .yearly,
+                        connectionId: created.id)
+                } catch {
+                    onPartialFailure?("Added to your circle — couldn't save the birthday reminder. Add it from their profile.")
+                }
+            }
+
             dismiss()
         } catch {
             errorMessage = "Couldn't add. Try again."
