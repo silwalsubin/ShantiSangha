@@ -30,9 +30,6 @@ class HomeViewModel: ObservableObject {
     /// the line entirely at 0 days (acknowledgment only, never guilt).
     @Published var presence: MemoryPresence?
 
-    /// Most recent assistant thread — feeds the continue-the-thread card.
-    @Published var latestThread: AgentChatService.Thread?
-
     private let reminderRepo = ReminderRepository.shared
     private var cancellables = Set<AnyCancellable>()
 
@@ -83,35 +80,6 @@ class HomeViewModel: ObservableObject {
         return parts.joined(separator: "\n")
     }
 
-    // MARK: - Continue the thread
-
-    /// The unfinished-thread hook: the latest assistant thread, offered only
-    /// when it was touched within the last 7 days and carries a real last
-    /// line. Older threads stay quiet — resurrecting a month-old chat is
-    /// clutter, not pull.
-    var continueThread: AgentChatService.Thread? {
-        guard let thread = latestThread,
-              !thread.lastMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              let updated = Self.parseISODate(thread.updatedAt),
-              let days = Calendar.current.dateComponents([.day], from: updated, to: Date()).day,
-              days <= 7
-        else { return nil }
-        return thread
-    }
-
-    func loadLatestThread() async {
-        do {
-            let threads = try await AgentChatService.shared.fetchThreads()
-            withAnimation(.easeIn(duration: 0.3)) {
-                latestThread = threads.first
-            }
-        } catch {
-            if !error.isCancellation {
-                AppLogger.shared.error("Home", "Failed to load latest thread: \(error)")
-            }
-        }
-    }
-
     // MARK: - Starter chips
 
     /// Two living invitations under the Ask pill. Situational chips win
@@ -155,11 +123,6 @@ class HomeViewModel: ObservableObject {
                 label: "Anything slipping through?",
                 prompt: "Is anything slipping through the cracks — things I mentioned but haven't acted on?"),
         ]
-        // When the continue-the-thread card is showing, the card carries the
-        // conversational pull — lean the chips practical instead.
-        if continueThread != nil {
-            pool.removeAll { $0.label == "How have I been lately?" }
-        }
 
         var poolIndex = dayOfYear % pool.count
         while chips.count < 2 {
