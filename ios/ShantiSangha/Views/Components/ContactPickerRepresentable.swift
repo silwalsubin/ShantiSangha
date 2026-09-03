@@ -7,51 +7,74 @@ struct PickedContact {
     let birthday: DateComponents?
 }
 
-/// Wraps the system contact picker — no permission prompt, since it runs
-/// out-of-process and hands back only the one contact the user taps.
-/// Shaped like `CameraPicker`: a delegate-backed `UIViewControllerRepresentable`
-/// that dismisses itself on pick or cancel.
-struct ContactPickerRepresentable: UIViewControllerRepresentable {
+/// Opens the system contact picker — no permission prompt, since it runs
+/// out-of-process and hands back only the one person the user taps.
+///
+/// Attach with `.background(...)`, not `.sheet(...)`. The picker must be
+/// *presented by* a real view controller rather than being SwiftUI sheet
+/// content: as a sheet's root its delegate connection doesn't survive, so
+/// selecting someone silently closes the picker and the choice is lost.
+/// This presents from a zero-size host that lives quietly in the hierarchy.
+struct ContactPickerPresenter: UIViewControllerRepresentable {
+    @Binding var isPresented: Bool
     let onPick: (PickedContact) -> Void
-    @Environment(\.dismiss) private var dismiss
 
-    func makeUIViewController(context: Context) -> CNContactPickerViewController {
+    func makeUIViewController(context: Context) -> UIViewController {
+        UIViewController()
+    }
+
+    func updateUIViewController(_ host: UIViewController, context: Context) {
+        // Refresh captures each update so the coordinator never holds a
+        // stale closure from an earlier render.
+        context.coordinator.onPick = onPick
+        context.coordinator.onFinish = { isPresented = false }
+
+        guard isPresented,
+              host.view.window != nil,
+              host.presentedViewController == nil,
+              !context.coordinator.isPresenting
+        else { return }
+
+        context.coordinator.isPresenting = true
         let picker = CNContactPickerViewController()
-        // Deliberately NOT setting displayedPropertyKeys: it switches the
-        // picker into property-selection mode, where tapping a person drills
-        // into a detail card instead of returning them — the whole-contact
-        // delegate below then never fires.
         picker.delegate = context.coordinator
-        return picker
+        host.present(picker, animated: true)
     }
 
-    func updateUIViewController(_ uiViewController: CNContactPickerViewController, context: Context) {}
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onPick: onPick, dismiss: dismiss)
-    }
+    func makeCoordinator() -> Coordinator { Coordinator() }
 
     final class Coordinator: NSObject, CNContactPickerDelegate {
-        let onPick: (PickedContact) -> Void
-        let dismiss: DismissAction
+        var onPick: ((PickedContact) -> Void)?
+        var onFinish: (() -> Void)?
+        var isPresenting = false
 
-        init(onPick: @escaping (PickedContact) -> Void, dismiss: DismissAction) {
-            self.onPick = onPick
-            self.dismiss = dismiss
-        }
+        // The picker dismisses itself on both paths; we only reset our own state.
 
         func contactPicker(_ picker: CNContactPickerViewController, didSelect contact: CNContact) {
             let name = CNContactFormatter.string(from: contact, style: .fullName)
-                ?? contact.givenName
+                ?? [contact.givenName, contact.familyName]
+                    .filter { !$0.isEmpty }
+                    .joined(separator: " ")
             // Reading an unfetched key throws an ObjC exception rather than
             // returning nil, so ask before touching it.
             let birthday = contact.isKeyAvailable(CNContactBirthdayKey) ? contact.birthday : nil
-            onPick(PickedContact(displayName: name, birthday: birthday))
-            dismiss()
+
+            // UIKit delivers these callbacks on the main thread; AppLogger is
+            // bound to the main actor.
+            MainActor.assumeIsolated {
+                AppLogger.shared.info(
+                    "Contacts",
+                    "Picked contact — name: '\(name)', birthday: \(birthday.map { "\($0.month ?? 0)/\($0.day ?? 0)" } ?? "none")")
+            }
+
+            isPresenting = false
+            onPick?(PickedContact(displayName: name, birthday: birthday))
+            onFinish?()
         }
 
         func contactPickerDidCancel(_ picker: CNContactPickerViewController) {
-            dismiss()
+            isPresenting = false
+            onFinish?()
         }
     }
 }

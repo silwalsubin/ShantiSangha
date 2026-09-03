@@ -107,15 +107,17 @@ struct AddConnectionView: View {
                 .padding(.vertical, 6)
             }
         }
-        .sheet(isPresented: $showContactPicker) {
-            ContactPickerRepresentable { picked in
+        // Background, not a sheet — see ContactPickerPresenter for why.
+        .background(
+            ContactPickerPresenter(isPresented: $showContactPicker) { picked in
                 name = picked.displayName
                 if let birthday = picked.birthday {
                     pickedBirthday = birthday
                     includeBirthdayReminder = true
                 }
             }
-        }
+            .frame(width: 0, height: 0)
+        )
     }
 
     private var birthdaySection: some View {
