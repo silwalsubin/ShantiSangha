@@ -52,6 +52,11 @@ struct ConnectionDetailView: View {
     @State private var dates: [Reminder] = []
     @State private var datesLoading = false
 
+    /// Set when this person was imported from the phone's contacts.
+    @State private var linkedContactIdentifier: String?
+    @State private var showContactCard = false
+    @State private var contactCardMessage: String?
+
     private var connection: Connection? {
         vm.connections.first(where: { $0.id == connectionId })
     }
@@ -69,6 +74,7 @@ struct ConnectionDetailView: View {
                     mediaFilesRow(connection)
                     relationSection
                     datesSection(connection)
+                    contactCardSection
                     nicknameSection
                     notesSection
                     removeSection(connection)
@@ -127,6 +133,24 @@ struct ConnectionDetailView: View {
                 }())
         }
         .task(id: connectionId) { await loadDates() }
+        .onAppear {
+            linkedContactIdentifier = ContactLinkStore.contactIdentifier(for: connectionId)
+        }
+        .sheet(isPresented: $showContactCard) {
+            if let identifier = linkedContactIdentifier {
+                ContactCardView(contactIdentifier: identifier) { reason in
+                    contactCardMessage = reason.message
+                    showContactCard = false
+                    // A contact deleted from the phone won't come back — drop
+                    // the link so the row stops promising something gone.
+                    if case .notFound = reason {
+                        ContactLinkStore.unlink(connectionId: connectionId)
+                        linkedContactIdentifier = nil
+                    }
+                }
+                .ignoresSafeArea()
+            }
+        }
         .sheet(isPresented: $showAvatarPickerSheet) {
             if let c = connection {
                 SacredFormSheet(
@@ -535,6 +559,27 @@ struct ConnectionDetailView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    /// Only for people brought in from the phone's contacts — a way back to
+    /// their card, read live so it's never a stale copy.
+    @ViewBuilder
+    private var contactCardSection: some View {
+        if linkedContactIdentifier != nil {
+            VStack(alignment: .leading, spacing: SacredSpacing.xs) {
+                Button {
+                    showContactCard = true
+                } label: {
+                    SacredListCard {
+                        SacredMenuRow(
+                            icon: "person.crop.circle",
+                            title: "View in Contacts",
+                            subtitle: contactCardMessage ?? "Their card on this phone")
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 
     private var nicknameSection: some View {

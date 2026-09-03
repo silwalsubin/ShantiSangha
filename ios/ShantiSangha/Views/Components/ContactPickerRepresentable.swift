@@ -5,6 +5,12 @@ import ContactsUI
 struct PickedContact {
     let displayName: String
     let birthday: DateComponents?
+    let imageData: Data?
+    let phoneNumber: String?
+    let email: String?
+    /// Identifier of the source contact, so the profile can offer a way back
+    /// to their card. Device/iCloud-scoped — see ContactLinkStore.
+    let identifier: String
 }
 
 /// Opens the system contact picker — no permission prompt, since it runs
@@ -56,19 +62,44 @@ struct ContactPickerPresenter: UIViewControllerRepresentable {
                     .filter { !$0.isEmpty }
                     .joined(separator: " ")
             // Reading an unfetched key throws an ObjC exception rather than
-            // returning nil, so ask before touching it.
+            // returning nil, so ask before touching any of these.
             let birthday = contact.isKeyAvailable(CNContactBirthdayKey) ? contact.birthday : nil
+
+            // Full-size first, thumbnail as a fallback — either is plenty
+            // once it's been scaled down to avatar size.
+            let imageData: Data? = {
+                if contact.isKeyAvailable(CNContactImageDataKey), let full = contact.imageData {
+                    return full
+                }
+                if contact.isKeyAvailable(CNContactThumbnailImageDataKey) {
+                    return contact.thumbnailImageData
+                }
+                return nil
+            }()
+
+            let phone = contact.isKeyAvailable(CNContactPhoneNumbersKey)
+                ? contact.phoneNumbers.first?.value.stringValue
+                : nil
+            let email = contact.isKeyAvailable(CNContactEmailAddressesKey)
+                ? contact.emailAddresses.first?.value as String?
+                : nil
 
             // UIKit delivers these callbacks on the main thread; AppLogger is
             // bound to the main actor.
             MainActor.assumeIsolated {
                 AppLogger.shared.info(
                     "Contacts",
-                    "Picked contact — name: '\(name)', birthday: \(birthday.map { "\($0.month ?? 0)/\($0.day ?? 0)" } ?? "none")")
+                    "Picked contact — name: '\(name)', birthday: \(birthday.map { "\($0.month ?? 0)/\($0.day ?? 0)" } ?? "none"), photo: \(imageData.map { "\($0.count / 1024)KB" } ?? "none"), phone: \(phone == nil ? "none" : "yes"), email: \(email == nil ? "none" : "yes")")
             }
 
             isPresenting = false
-            onPick?(PickedContact(displayName: name, birthday: birthday))
+            onPick?(PickedContact(
+                displayName: name,
+                birthday: birthday,
+                imageData: imageData,
+                phoneNumber: phone,
+                email: email,
+                identifier: contact.identifier))
             onFinish?()
         }
 

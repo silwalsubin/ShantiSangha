@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Sheet for adding a local connection — someone the owner wants in
 /// their circle who isn't on ShantiSangha. Friend invitations remain a
@@ -28,6 +29,9 @@ struct AddConnectionView: View {
     @State private var showContactPicker = false
     @State private var pickedBirthday: DateComponents?
     @State private var includeBirthdayReminder = false
+    @State private var pickedImageData: Data?
+    @State private var pickedEmail: String?
+    @State private var pickedContactIdentifier: String?
 
     @State private var saving = false
     @State private var errorMessage: String?
@@ -85,6 +89,18 @@ struct AddConnectionView: View {
             sectionLabel("NAME")
             SacredListCard {
                 HStack(spacing: 4) {
+                    // Their contact photo, once picked — shown so the import
+                    // is visible rather than silent.
+                    if let pickedImageData, let image = UIImage(data: pickedImageData) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 32, height: 32)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.sacredGold.opacity(0.3), lineWidth: 1))
+                            .padding(.trailing, 4)
+                    }
+
                     TextField("Their name", text: $name)
                         .typingHaptics(for: name)
                         .font(.sacredText)
@@ -111,6 +127,10 @@ struct AddConnectionView: View {
         .background(
             ContactPickerPresenter(isPresented: $showContactPicker) { picked in
                 name = picked.displayName
+                pickedImageData = picked.imageData
+                pickedEmail = picked.email
+                pickedContactIdentifier = picked.identifier
+                if let number = picked.phoneNumber { phone = number }
                 if let birthday = picked.birthday {
                     pickedBirthday = birthday
                     includeBirthdayReminder = true
@@ -259,6 +279,24 @@ struct AddConnectionView: View {
     /// meaningful downstream (a yearly reminder recomputes its own countdown
     /// off today, ignoring the stored year). Feb 29 needs a leap year, or
     /// `Calendar.date(from:)` returns nil.
+    // MARK: - Photo
+
+    /// Matches the avatar picker's output: 512pt on the long edge, JPEG 0.7.
+    /// Contact photos can be several megabytes; an avatar never needs that.
+    private static func avatarJPEG(from data: Data) -> Data? {
+        guard let image = UIImage(data: data) else { return nil }
+        let maxDimension: CGFloat = 512
+        let largest = max(image.size.width, image.size.height)
+        guard largest > maxDimension else { return image.jpegData(compressionQuality: 0.7) }
+
+        let scale = maxDimension / largest
+        let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        let resized = UIGraphicsImageRenderer(size: size).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: size))
+        }
+        return resized.jpegData(compressionQuality: 0.7)
+    }
+
     private static func normalizedDate(from components: DateComponents) -> Date {
         var normalized = components
         if normalized.year == nil {
@@ -276,10 +314,23 @@ struct AddConnectionView: View {
                 displayName: name.trimmingCharacters(in: .whitespacesAndNewlines),
                 circles: circles.isEmpty ? nil : circles,
                 phoneNumber: phone.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+                email: pickedEmail,
                 country: country.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
                 state: stateValue.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
                 city: city.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty)
             let created = try await vm.addLocal(req)
+
+            // Remember where they came from so their profile can offer a way
+            // back to the contact card. On-device only.
+            if let pickedContactIdentifier {
+                ContactLinkStore.link(
+                    connectionId: created.id, contactIdentifier: pickedContactIdentifier)
+            }
+
+            // The person is safely added by this point; anything that fails
+            // below is recoverable from their profile, so we name it rather
+            // than failing the whole add.
+            var unsaved: [String] = []
 
             if includeBirthdayReminder, let pickedBirthday {
                 do {
@@ -290,8 +341,21 @@ struct AddConnectionView: View {
                         recurrence: .yearly,
                         connectionId: created.id)
                 } catch {
-                    onPartialFailure?("Added to your circle — couldn't save the birthday reminder. Add it from their profile.")
+                    unsaved.append("birthday reminder")
                 }
+            }
+
+            if let pickedImageData, let jpeg = Self.avatarJPEG(from: pickedImageData) {
+                do {
+                    try await vm.uploadPrivateAvatar(connectionId: created.id, jpegData: jpeg)
+                } catch {
+                    unsaved.append("photo")
+                }
+            }
+
+            if !unsaved.isEmpty {
+                onPartialFailure?(
+                    "Added to your circle — couldn't save their \(unsaved.joined(separator: " or ")). You can add that from their profile.")
             }
 
             dismiss()

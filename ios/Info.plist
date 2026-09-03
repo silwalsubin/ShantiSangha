@@ -23,7 +23,7 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>ShantiSangha needs access to your photo library so you can choose a profile photo and attach images to messages you send to friends.</string>
 	<key>NSContactsUsageDescription</key>
-	<string>ShantiSangha can save the people in your circle to your iPhone contacts so you can reach them outside the app.</string>
+	<string>ShantiSangha opens the contact card for someone you added to your circle from your contacts, so you can reach them outside the app.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
