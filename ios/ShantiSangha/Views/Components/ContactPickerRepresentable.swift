@@ -2,9 +2,6 @@ import SwiftUI
 import Contacts
 import ContactsUI
 
-/// The one detail this feature depends on quietly: without requesting the
-/// birthday key up front, `didSelect` hands back a contact with only an
-/// identifier and a name — no birthday, no error, it's just absent.
 struct PickedContact {
     let displayName: String
     let birthday: DateComponents?
@@ -20,8 +17,10 @@ struct ContactPickerRepresentable: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> CNContactPickerViewController {
         let picker = CNContactPickerViewController()
-        // Without this, the picked CNContact carries no birthday at all.
-        picker.displayedPropertyKeys = [CNContactBirthdayKey]
+        // Deliberately NOT setting displayedPropertyKeys: it switches the
+        // picker into property-selection mode, where tapping a person drills
+        // into a detail card instead of returning them — the whole-contact
+        // delegate below then never fires.
         picker.delegate = context.coordinator
         return picker
     }
@@ -44,7 +43,10 @@ struct ContactPickerRepresentable: UIViewControllerRepresentable {
         func contactPicker(_ picker: CNContactPickerViewController, didSelect contact: CNContact) {
             let name = CNContactFormatter.string(from: contact, style: .fullName)
                 ?? contact.givenName
-            onPick(PickedContact(displayName: name, birthday: contact.birthday))
+            // Reading an unfetched key throws an ObjC exception rather than
+            // returning nil, so ask before touching it.
+            let birthday = contact.isKeyAvailable(CNContactBirthdayKey) ? contact.birthday : nil
+            onPick(PickedContact(displayName: name, birthday: birthday))
             dismiss()
         }
 
