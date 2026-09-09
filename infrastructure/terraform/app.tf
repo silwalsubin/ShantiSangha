@@ -17,9 +17,8 @@ resource "aws_ecr_repository" "api" {
     scan_on_push = true
   }
 
-  lifecycle {
-    prevent_destroy = true
-  }
+  # Teardown: delete the repository even while it still holds images.
+  force_delete = true
 }
 
 resource "aws_ecr_lifecycle_policy" "api" {

@@ -9,7 +9,7 @@ on:
       - 'infrastructure/terraform/**'
       - '.github/workflows/terraform.yml'
 
-  # Manual trigger — choose plan or apply
+  # Manual trigger — choose plan, apply, or destroy
   workflow_dispatch:
     inputs:
       action:
@@ -20,6 +20,11 @@ on:
         options:
           - plan
           - apply
+          - destroy
+      confirm:
+        description: 'For destroy only: type destroy-production to confirm'
+        required: false
+        default: ''
 
 env:
   TF_STATE_BUCKET: shantisangha-terraform-state
@@ -75,6 +80,14 @@ jobs:
             echo "State bucket already exists."
           fi
 
+      - name: Confirm destroy
+        if: github.event.inputs.action == 'destroy'
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "destroy-production" ]; then
+            echo "A destroy run needs confirm=destroy-production. Refusing."
+            exit 1
+          fi
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -92,8 +105,17 @@ jobs:
         run: terraform validate
 
       - name: Terraform Plan
+        if: github.event.inputs.action != 'destroy'
         run: terraform plan -out=tfplan
+
+      - name: Terraform Plan (destroy)
+        if: github.event.inputs.action == 'destroy'
+        run: terraform plan -destroy -out=tfplan
 
       - name: Terraform Apply
         if: github.event.inputs.action == 'apply'
+        run: terraform apply -auto-approve tfplan
+
+      - name: Terraform Destroy
+        if: github.event.inputs.action == 'destroy'
         run: terraform apply -auto-approve tfplan

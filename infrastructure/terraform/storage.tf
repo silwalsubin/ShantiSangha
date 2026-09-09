@@ -3,9 +3,8 @@
 resource "aws_s3_bucket" "voice" {
   bucket = "${var.app_name}-voice-${data.aws_caller_identity.current.account_id}"
 
-  lifecycle {
-    prevent_destroy = true
-  }
+  # Teardown: delete every object version before removing the bucket.
+  force_destroy = true
 }
 
 resource "aws_s3_bucket_versioning" "voice" {
@@ -53,9 +52,8 @@ resource "aws_s3_bucket_cors_configuration" "voice" {
 resource "aws_s3_bucket" "friends_media" {
   bucket = "${var.app_name}-friends-media-${data.aws_caller_identity.current.account_id}"
 
-  lifecycle {
-    prevent_destroy = true
-  }
+  # Teardown: delete every object version before removing the bucket.
+  force_destroy = true
 }
 
 resource "aws_s3_bucket_versioning" "friends_media" {

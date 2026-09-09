@@ -3,9 +3,8 @@
 resource "aws_s3_bucket" "frontend" {
   bucket = "${var.app_name}-frontend-${data.aws_caller_identity.current.account_id}"
 
-  lifecycle {
-    prevent_destroy = true
-  }
+  # Teardown: delete every object version before removing the bucket.
+  force_destroy = true
 }
 
 resource "aws_s3_bucket_public_access_block" "frontend" {
